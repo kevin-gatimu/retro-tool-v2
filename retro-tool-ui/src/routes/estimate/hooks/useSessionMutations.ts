@@ -1,0 +1,124 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
+import { toast } from 'sonner'
+import { api } from '@/lib/api'
+import { ESTIMATES_ENDPOINTS } from '@/lib/api-endpoints'
+import type {
+  EstimateRoundInput,
+  EstimateSession,
+} from '@/common/types/estimates'
+import { getEstimateSocket } from '@/lib/socket'
+import { usesConvexForEstimates } from '@/lib/realtime-config'
+
+export function useSessionMutations(sessionId: string) {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const usesConvexRealtime = usesConvexForEstimates()
+
+  const invalidate = () => {
+    void queryClient.refetchQueries({
+      queryKey: ['estimate-session', sessionId],
+    })
+  }
+
+  const castVoteMutation = useMutation({
+    mutationFn: async (points: string) => {
+      // Hybrid approach: HTTP for persistence + WebSocket for instant broadcast
+      const httpPromise = api.post(ESTIMATES_ENDPOINTS.VOTES(sessionId), {
+        points,
+      })
+      // Emit via WebSocket only when Socket.IO is still the active realtime backend.
+      if (!usesConvexRealtime) {
+        getEstimateSocket().emit('cast-vote', { sessionId, points })
+      }
+      // Wait for HTTP to ensure persistence
+      return httpPromise
+    },
+    onMutate: (points: string) => {
+      // Optimistic update - show vote immediately to you
+      queryClient.setQueryData<EstimateSession>(
+        ['estimate-session', sessionId],
+        (prev) => (prev ? { ...prev, userVote: points } : prev),
+      )
+    },
+    onSuccess: () => {
+      // Don't refetch - WebSocket session-changed will handle it
+      // HTTP guarantees persistence, WebSocket gives instant broadcast
+    },
+    onError: (error: Error) => {
+      // Revert optimistic update on error
+      invalidate()
+      toast.error(error.message || 'Failed to cast vote')
+    },
+  })
+
+  const removeVoteMutation = useMutation({
+    mutationFn: () => api.delete(ESTIMATES_ENDPOINTS.VOTES(sessionId)),
+    onMutate: () => {
+      // Optimistic update - remove vote immediately
+      queryClient.setQueryData<EstimateSession>(
+        ['estimate-session', sessionId],
+        (prev) => (prev ? { ...prev, userVote: null } : prev),
+      )
+    },
+    onSuccess: () => {
+      // Don't refetch - WebSocket session-changed will handle it
+    },
+    onError: (error: Error) => {
+      // Revert optimistic update on error
+      invalidate()
+      toast.error(error.message || 'Failed to remove vote')
+    },
+  })
+
+  const revealVotesMutation = useMutation({
+    mutationFn: () => api.post(ESTIMATES_ENDPOINTS.REVEAL(sessionId)),
+    onSuccess: () => {
+      invalidate()
+      toast.success('Votes revealed')
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || 'Failed to reveal votes'),
+  })
+
+  const startRoundMutation = useMutation({
+    mutationFn: (payload: EstimateRoundInput) =>
+      api.post(ESTIMATES_ENDPOINTS.START_ROUND(sessionId), payload),
+    onSuccess: () => {
+      invalidate()
+      toast.success('New round started')
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || 'Failed to start round'),
+  })
+
+  const startTimerMutation = useMutation({
+    mutationFn: (seconds: number) =>
+      api.post(ESTIMATES_ENDPOINTS.TIMER(sessionId), { duration: seconds }),
+    onSuccess: (_, seconds) => {
+      invalidate()
+      toast.success(`Timer started — ${seconds / 60} min`)
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || 'Failed to start timer'),
+  })
+
+  const endSessionMutation = useMutation({
+    mutationFn: () => api.delete(ESTIMATES_ENDPOINTS.BY_ID(sessionId)),
+    onSuccess: () => {
+      toast.success('Session ended')
+      navigate({ to: '/estimate' })
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || 'Failed to end session'),
+  })
+
+  return {
+    castVoteMutation,
+    removeVoteMutation,
+    revealVotesMutation,
+    startRoundMutation,
+    startTimerMutation,
+    endSessionMutation,
+  }
+}
