@@ -1,0 +1,110 @@
+import { mutation, query } from './server'
+import { v } from 'convex/values'
+
+const retroStatus = v.union(
+  v.literal('draft'),
+  v.literal('waiting'),
+  v.literal('active'),
+  v.literal('grouping'),
+  v.literal('voting'),
+  v.literal('discussing'),
+  v.literal('completed'),
+)
+
+export const upsertRetroProjection = mutation({
+  args: {
+    retroId: v.string(),
+    teamId: v.string(),
+    status: retroStatus,
+    currentDiscussionCardId: v.optional(v.string()),
+    currentDiscussionActionItemId: v.optional(v.string()),
+    updatedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existingProjection = await ctx.db
+      .query('liveRetroSessions')
+      .withIndex('by_retro_id', (queryBuilder) =>
+        queryBuilder.eq('retroId', args.retroId),
+      )
+      .unique()
+
+    const nextProjection = {
+      retroId: args.retroId,
+      teamId: args.teamId,
+      status: args.status,
+      currentDiscussionCardId: args.currentDiscussionCardId,
+      currentDiscussionActionItemId: args.currentDiscussionActionItemId,
+      updatedAt: args.updatedAt,
+    }
+
+    if (existingProjection) {
+      await ctx.db.patch(existingProjection._id, nextProjection)
+      return { retroId: args.retroId, operation: 'updated' as const }
+    }
+
+    await ctx.db.insert('liveRetroSessions', nextProjection)
+    return { retroId: args.retroId, operation: 'created' as const }
+  },
+})
+
+export const deleteRetroProjection = mutation({
+  args: {
+    retroId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existingProjection = await ctx.db
+      .query('liveRetroSessions')
+      .withIndex('by_retro_id', (queryBuilder) =>
+        queryBuilder.eq('retroId', args.retroId),
+      )
+      .unique()
+
+    if (!existingProjection) {
+      return { retroId: args.retroId, operation: 'noop' as const }
+    }
+
+    await ctx.db.delete(existingProjection._id)
+    return { retroId: args.retroId, operation: 'deleted' as const }
+  },
+})
+
+export const getRetroProjection = query({
+  args: {
+    retroId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const projection = await ctx.db
+      .query('liveRetroSessions')
+      .withIndex('by_retro_id', (queryBuilder) =>
+        queryBuilder.eq('retroId', args.retroId),
+      )
+      .unique()
+
+    if (!projection) {
+      return null
+    }
+
+    return {
+      retroId: projection.retroId,
+      status: projection.status,
+      currentDiscussionCardId: projection.currentDiscussionCardId,
+      currentDiscussionActionItemId: projection.currentDiscussionActionItemId,
+      updatedAt: new Date(projection.updatedAt).toISOString(),
+    }
+  },
+})
+
+export const listRecentRetroProjections = query({
+  args: {},
+  handler: async (ctx) => {
+    const projections = await ctx.db.query('liveRetroSessions').collect()
+
+    return projections
+      .sort((left, right) => left.retroId.localeCompare(right.retroId))
+      .map((projection) => ({
+        retroId: projection.retroId,
+        status: projection.status,
+        updatedAt: new Date(projection.updatedAt).toISOString(),
+      }))
+  },
+})

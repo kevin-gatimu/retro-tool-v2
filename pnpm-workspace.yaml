@@ -1,0 +1,5 @@
+packages:
+  - 'retro-tool-api'
+  - 'retro-tool-ui'
+  - 'convex-backend'
+  - 'packages/*/*'

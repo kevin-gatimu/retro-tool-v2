@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: retro-tool-production
+resources:
+  - ../../base
+patches:
+  - target:
+      kind: Ingress
+      name: retro-tool-ingress
+    patch: |-
+      - op: replace
+        path: /metadata/namespace
+        value: retro-tool-production

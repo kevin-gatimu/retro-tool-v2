@@ -1,0 +1,14 @@
+{
+    "name": "retro-tool",
+    "private": true,
+    "packageManager": "pnpm@9.15.0",
+    "scripts": {
+        "build": "pnpm -r --filter @retro-tool/contracts --filter retro-tool-api --filter retro-tool-ui --filter convex-backend build",
+        "lint": "pnpm -r --filter @retro-tool/contracts --filter retro-tool-api --filter retro-tool-ui --filter convex-backend lint",
+        "type-check": "pnpm -r --filter @retro-tool/contracts --filter retro-tool-api --filter retro-tool-ui --filter convex-backend type-check",
+        "test": "pnpm -r --filter retro-tool-api --filter retro-tool-ui test",
+        "dev:api": "pnpm --dir retro-tool-api start:dev",
+        "dev:ui": "pnpm --dir retro-tool-ui dev",
+        "dev:convex": "pnpm --dir convex-backend dev"
+    }
+}

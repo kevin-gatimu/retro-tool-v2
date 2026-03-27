@@ -1,0 +1,16 @@
+{
+    "name": "convex-backend",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "convex dev",
+        "codegen": "convex codegen",
+        "deploy": "convex deploy",
+        "build": "node -e \"console.log('convex-backend scaffold created; run pnpm codegen after configuring a Convex deployment')\"",
+        "lint": "node -e \"console.log('convex-backend lint scaffold ready')\"",
+        "type-check": "node -e \"console.log('convex-backend type-check is deferred until Convex generated types are available')\""
+    },
+    "dependencies": {
+        "convex": "^1.18.0"
+    }
+}

@@ -1,0 +1,868 @@
+# @baseUrl = <paste-base-url-here>
+# @baseUrl = http://localhost:8000
+@baseUrl = https://retro-tool.azurewebsites.net
+
+# Set after sign-in — copy the token value from the response body
+# @sessionToken = <paste-token-here>
+@sessionToken = KWEn7gp30SdBWFK9OCFjjeGPQFu0Ycvc
+
+# Set after sign-in — copy an ID from /users or /api/auth/get-session
+# @userId = <paste-user-id-here>
+@userId = <paste-user-id-here>
+
+# Set after creating an organization
+# @orgId = <paste-org-id-here>
+@orgId = <paste-org-id-here>
+
+# Set after creating a team
+# @teamId = <paste-team-id-here>
+@teamId = <paste-team-id-here>
+
+# Set after creating a retro
+# @retroId = <paste-retro-id-here>
+@retroId = <paste-retro-id-here>
+
+# Set after creating a card
+# @cardId = <paste-card-id-here>
+@cardId = <paste-card-id-here>
+
+# Set after creating a comment
+# @commentId = <paste-comment-id-here>
+@commentId = <paste-comment-id-here>
+
+# Set after creating an estimate session
+# @estimateSessionId = <paste-session-id-here>
+@estimateSessionId = <paste-session-id-here>
+
+# Set after getting a notification
+# @notificationId = <paste-notification-id-here>
+@notificationId = <paste-notification-id-here>
+
+# Built-in template ID (after seeding)
+@templateId = template-4ls
+
+# Set after adding a team member
+# @teamMemberId = <paste-team-member-id-here>
+@teamMemberId = <paste-team-member-id-here>
+
+# Set after adding an org member
+# @orgMemberId = <paste-org-member-id-here>
+@orgMemberId = <paste-org-member-id-here>
+
+# Set after getting a team join request
+# @joinRequestId = <paste-join-request-id-here>
+@joinRequestId = <paste-join-request-id-here>
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AUTHENTICATION (No dependencies)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Sign up (email + password)
+POST {{baseUrl}}/api/auth/sign-up/email
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+###
+
+### Sign up (email + password)
+POST {{baseUrl}}/api/auth/sign-up/email
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "password",
+  "name": "John Doe",
+  "image": "https://example.com/avatar.png",
+  "callbackURL": "https://retro-tool.azurewebsites.net/dashboard"
+}
+
+###
+
+### Sign in (email + password)
+# On success, a session cookie is set automatically.
+# Copy the `token` from the response to use as Bearer token below.
+POST {{baseUrl}}/api/auth/sign-in/email
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "password",
+  "rememberMe": true
+}
+
+###
+
+### Get session (via cookie — works automatically in REST Client)
+GET {{baseUrl}}/api/auth/get-session
+
+###
+
+### Get session (via Bearer token)
+GET {{baseUrl}}/api/auth/get-session
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Change password (authenticated)
+POST {{baseUrl}}/api/auth/change-password
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "password123",
+  "newPassword": "password456",
+  "revokeOtherSessions": true
+}
+
+###
+
+### Request password reset (sends reset link to email)
+# The reset token will be appended to redirectTo as ?token=...
+# Check server logs in development — no email service is wired up yet.
+POST {{baseUrl}}/api/auth/forget-password
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "redirectTo": "http://localhost:5173/reset-password"
+}
+
+###
+
+### Reset password (use token from reset email / server log)
+POST {{baseUrl}}/api/auth/reset-password
+Content-Type: application/json
+
+{
+  "token": "<paste-reset-token-here>",
+  "newPassword": "password456"
+}
+
+###
+
+### Sign out
+POST {{baseUrl}}/api/auth/sign-out
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Sign in with Google (browser redirect — open in browser)
+GET {{baseUrl}}/api/auth/sign-in/google
+
+###
+
+### Sign in with Microsoft / Azure Entra ID (browser redirect — open in browser)
+GET {{baseUrl}}/api/auth/sign-in/microsoft
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# USERS (Depends on: Auth)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── Public / Authenticated User Endpoints ───────────────────────────────────
+
+### Get current authenticated user
+GET {{baseUrl}}/api/users/me
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Update current user's profile
+PATCH {{baseUrl}}/api/users/me
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "name": "Updated Name",
+  "bio": "My bio",
+  "image": "https://example.com/avatar.jpg"
+}
+
+###
+
+### Search approved users (for adding to teams/orgs)
+GET {{baseUrl}}/api/users/search?q=john
+Authorization: Bearer {{sessionToken}}
+
+###
+
+# ── Admin-only Endpoints ────────────────────────────────────────────────────
+
+### Get all users (with optional filters)
+GET {{baseUrl}}/api/users?search=john&status=approved&role=member&page=1&limit=10
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get a single user by ID
+GET {{baseUrl}}/api/users/{{userId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Update user status (approve/reject)
+POST {{baseUrl}}/api/users/{{userId}}/status
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "status": "approved"
+}
+
+###
+
+### Update user role (admin/member)
+POST {{baseUrl}}/api/users/{{userId}}/role
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "role": "admin"
+}
+
+###
+
+### Delete a user
+DELETE {{baseUrl}}/api/users/{{userId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Suspend a user
+POST {{baseUrl}}/api/users/{{userId}}/suspend
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "reason": "Violation of terms"
+}
+
+###
+
+### Reactivate a suspended user
+POST {{baseUrl}}/api/users/{{userId}}/reactivate
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Bulk update user status
+POST {{baseUrl}}/api/users/bulk/status
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "userIds": ["user-id-1", "user-id-2"],
+  "status": "approved"
+}
+
+###
+
+### Get user details with org/team memberships & action history
+GET {{baseUrl}}/api/users/{{userId}}/details
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get admin action log
+GET {{baseUrl}}/api/users/admin/logs?userId={{userId}}&limit=20
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Check if any admin exists (for bootstrapping)
+GET {{baseUrl}}/api/users/admin/exists
+
+###
+
+### Bootstrap first admin
+POST {{baseUrl}}/api/users/admin/bootstrap
+Authorization: Bearer {{sessionToken}}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ORGANIZATIONS (Depends on: Auth, Users)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Create organization
+# slug: lowercase, numbers, and hyphens only (e.g., "my-org-123")
+POST {{baseUrl}}/api/organizations
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "name": "My Organization",
+  "slug": "my-org",
+  "logo": "https://example.com/logo.png"
+}
+
+###
+
+### Get all organizations (user's orgs)
+GET {{baseUrl}}/api/organizations?page=1&limit=10
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get all organizations (system admin only)
+GET {{baseUrl}}/api/organizations?all=true&page=1&limit=10
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get organization by ID
+GET {{baseUrl}}/api/organizations/{{orgId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Update organization
+PUT {{baseUrl}}/api/organizations/{{orgId}}
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "name": "Updated Org Name",
+  "logo": "https://example.com/new-logo.png"
+}
+
+###
+
+### Delete organization
+DELETE {{baseUrl}}/api/organizations/{{orgId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get organization members
+GET {{baseUrl}}/api/organizations/{{orgId}}/members?page=1&limit=10
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Add member to organization
+# role options: "member", "admin"
+POST {{baseUrl}}/api/organizations/{{orgId}}/members
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}",
+  "role": "member"
+}
+
+###
+
+### Remove member from organization
+DELETE {{baseUrl}}/api/organizations/{{orgId}}/members/{{orgMemberId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Update member role in organization
+# role options: "member", "admin"
+PUT {{baseUrl}}/api/organizations/{{orgId}}/members/{{orgMemberId}}/role
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "role": "admin"
+}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEAMS (Depends on: Auth, Users, Organizations)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Create team
+# emoji: optional, max 10 characters (e.g., "🚀", "💻")
+POST {{baseUrl}}/api/teams
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "name": "Engineering Team",
+  "description": "The engineering team",
+  "emoji": "🚀",
+  "organizationId": "{{orgId}}"
+}
+
+###
+
+### Get all teams for current user
+GET {{baseUrl}}/api/teams?page=1&limit=10
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get teams in an organization
+GET {{baseUrl}}/api/teams?organizationId={{orgId}}&page=1&limit=10
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get team by ID
+GET {{baseUrl}}/api/teams/{{teamId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Update team
+# All fields optional - only include what you want to update
+PUT {{baseUrl}}/api/teams/{{teamId}}
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "name": "Updated Team Name",
+  "description": "Updated description",
+  "emoji": "💻"
+}
+
+###
+
+### Delete team
+DELETE {{baseUrl}}/api/teams/{{teamId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get team members
+GET {{baseUrl}}/api/teams/{{teamId}}/members?page=1&limit=10
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Add member to team
+# role options: "Dev", "QA/QE", "QE", "QA", "DevOps", "BI-Dev", "Oversight"
+# tag options: "lead", "member"
+POST {{baseUrl}}/api/teams/{{teamId}}/members
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}",
+  "role": "Dev",
+  "tag": "member"
+}
+
+###
+
+### Remove member from team
+DELETE {{baseUrl}}/api/teams/{{teamId}}/members/{{teamMemberId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Update member role/tag in team
+# role options: "Dev", "QA/QE", "QE", "QA", "DevOps", "BI-Dev", "Oversight"
+# tag options: "lead", "member"
+PUT {{baseUrl}}/api/teams/{{teamId}}/members/{{teamMemberId}}
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "role": "Senior Dev",
+  "tag": "lead"
+}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEAM JOIN REQUESTS (Depends on: Auth, Teams)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Get pending join requests for a team (team lead only)
+GET {{baseUrl}}/api/teams/{{teamId}}/join-requests
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Approve a join request (team lead only)
+POST {{baseUrl}}/api/teams/{{teamId}}/join-requests/{{joinRequestId}}/approve
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Reject a join request (team lead only)
+POST {{baseUrl}}/api/teams/{{teamId}}/join-requests/{{joinRequestId}}/reject
+Authorization: Bearer {{sessionToken}}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# USER PREFERENCES (Depends on: Auth, Users)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Get current user's notification preferences
+GET {{baseUrl}}/api/user-preferences
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Update current user's notification preferences
+# All fields optional - only include what you want to update
+# weeklyDigestDay options: "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+PATCH {{baseUrl}}/api/user-preferences
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "emailVerificationReminders": true,
+  "weeklyDigestEnabled": true,
+  "weeklyDigestDay": "monday",
+  "retrospectiveRemindersEnabled": true,
+  "retrospectiveReminderHours": 24,
+  "teamActivityEmailsEnabled": false
+}
+
+###
+
+### Update only weekly digest day
+PATCH {{baseUrl}}/api/user-preferences
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "weeklyDigestDay": "friday"
+}
+
+###
+
+### Disable all email notifications
+PATCH {{baseUrl}}/api/user-preferences
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "emailVerificationReminders": false,
+  "weeklyDigestEnabled": false,
+  "retrospectiveRemindersEnabled": false,
+  "teamActivityEmailsEnabled": false
+}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RETROS — Templates (Depends on: Auth)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Get all templates
+GET {{baseUrl}}/api/retros/templates
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get template by ID (built-in: template-4ls, template-appreciation, template-cupid)
+GET {{baseUrl}}/api/retros/templates/{{templateId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Seed built-in templates (admin only — run once)
+POST {{baseUrl}}/api/retros/templates/seed
+Authorization: Bearer {{sessionToken}}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RETROS — Dashboard (Depends on: Auth, Teams)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Get dashboard stats for current user
+GET {{baseUrl}}/api/retros/dashboard
+Authorization: Bearer {{sessionToken}}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RETROS — Retrospectives (Depends on: Auth, Teams, Templates)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Get recent retros for current user (last 10)
+GET {{baseUrl}}/api/retros
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Create a new retrospective
+# voteType: "multi" | "single"
+# timerDuration: seconds (60–3600), optional
+POST {{baseUrl}}/api/retros
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "name": "Sprint 42 Retrospective",
+  "teamId": "{{teamId}}",
+  "templateId": "template-4ls",
+  "isAnonymous": true,
+  "maxVotesPerUser": 3,
+  "voteType": "multi",
+  "timerDuration": 300
+}
+
+###
+
+### Create retro — no timer
+POST {{baseUrl}}/api/retros
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "name": "Appreciation Game — Q1",
+  "teamId": "{{teamId}}",
+  "templateId": "template-appreciation",
+  "isAnonymous": false,
+  "maxVotesPerUser": 5,
+  "voteType": "multi"
+}
+
+###
+
+### Get retrospective by ID
+GET {{baseUrl}}/api/retros/{{retroId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Start retrospective (creator or team lead only)
+POST {{baseUrl}}/api/retros/{{retroId}}/start
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Move to voting phase (creator or team lead only)
+POST {{baseUrl}}/api/retros/{{retroId}}/voting
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Move to discussion phase (creator or team lead only)
+POST {{baseUrl}}/api/retros/{{retroId}}/discussion
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Complete retrospective (creator or team lead only)
+POST {{baseUrl}}/api/retros/{{retroId}}/complete
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Join retrospective as participant
+POST {{baseUrl}}/api/retros/{{retroId}}/join
+Authorization: Bearer {{sessionToken}}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RETROS — Cards (Depends on: Auth, Retros, Templates)
+# ═══════════════════════════════════════════════════════════════════════════
+# Note: columnId comes from the template's columns (GET /api/retros/templates/:id)
+
+### Create a card (retro must be in draft or active status)
+POST {{baseUrl}}/api/retros/cards
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "retroId": "{{retroId}}",
+  "columnId": "<paste-column-id-here>",
+  "content": "I liked how we handled the deployment process this sprint"
+}
+
+###
+
+### Update a card (own cards only, retro must not be completed)
+PATCH {{baseUrl}}/api/retros/cards/{{cardId}}
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "content": "Updated: I liked the deployment process improvements"
+}
+
+###
+
+### Delete a card (own cards only, retro must not be completed)
+DELETE {{baseUrl}}/api/retros/cards/{{cardId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RETROS — Voting (Depends on: Auth, Cards, Retro in voting phase)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Vote for a card (retro must be in voting phase)
+POST {{baseUrl}}/api/retros/cards/{{cardId}}/vote
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Remove vote from a card (retro must be in voting phase)
+DELETE {{baseUrl}}/api/retros/cards/{{cardId}}/vote
+Authorization: Bearer {{sessionToken}}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RETROS — Comments (Depends on: Auth, Cards)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Add a comment to a card
+POST {{baseUrl}}/api/retros/cards/{{cardId}}/comments
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "content": "Great point — we should keep doing this next sprint"
+}
+
+###
+
+### Delete a comment (own comments only)
+DELETE {{baseUrl}}/api/retros/comments/{{commentId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NOTIFICATIONS (Depends on: Auth)
+# ═══════════════════════════════════════════════════════════════════════════
+# Real-time notifications are delivered via WebSocket:
+#   ws://localhost:8000/notifications  (namespace)
+#   Auth: set "better-auth.session_token" cookie before connecting
+#   Event received: "notification" → { id, type, title, message, link, read, createdAt }
+
+### List notifications for current user (max 50, newest first)
+GET {{baseUrl}}/api/notifications
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get unread notification count
+GET {{baseUrl}}/api/notifications/unread-count
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Mark a single notification as read
+PATCH {{baseUrl}}/api/notifications/{{notificationId}}/read
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Mark all notifications as read
+PATCH {{baseUrl}}/api/notifications/read-all
+Authorization: Bearer {{sessionToken}}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ESTIMATES — Planning Poker (Depends on: Auth, Teams)
+# ═══════════════════════════════════════════════════════════════════════════
+# Real-time events via WebSocket:
+#   ws://localhost:8000/estimates  (namespace)
+#   Auth: set "better-auth.session_token" cookie before connecting
+#
+# Client → Server events:
+#   join-session      { sessionId }
+#   leave-session     { sessionId }
+#   cast-vote         { sessionId, points }        points: "1","2","3","5","8","13","?","☕"
+#   reveal-votes      { sessionId }                creator only
+#   clear-votes       { sessionId }                creator only
+#   update-story      { sessionId, currentStory }  creator only
+#   start-timer       { sessionId, duration }      creator only, duration in seconds
+#   end-session       { sessionId }                creator only
+#
+# Server → Client events:
+#   participant-joined  { participant }
+#   participant-left    { userId }
+#   vote-cast           { voterId }                (no points until revealed)
+#   votes-revealed      { votes: [{id,voterId,points,votedAt},...] }
+#   votes-cleared
+#   story-updated       { currentStory }
+#   timer-started       { duration, timerEndsAt }
+#   session-ended
+
+### List all estimate sessions for current user's teams
+GET {{baseUrl}}/api/estimates
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### List active estimate sessions (status = waiting | voting)
+GET {{baseUrl}}/api/estimates/active
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get estimate session detail (participants + votes)
+GET {{baseUrl}}/api/estimates/{{estimateSessionId}}
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Create a new estimate session
+POST {{baseUrl}}/api/estimates
+Authorization: Bearer {{sessionToken}}
+Content-Type: application/json
+
+{
+  "name": "Sprint 42 Planning",
+  "teamId": "{{teamId}}"
+}
+
+###
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# REPORTS — Analytics (Depends on: Auth, Teams, Organizations)
+# ═══════════════════════════════════════════════════════════════════════════
+
+### Get team metrics (period: week | month | quarter)
+GET {{baseUrl}}/api/reports/teams/{{teamId}}/metrics?period=month
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get team health score (0–100)
+GET {{baseUrl}}/api/reports/teams/{{teamId}}/health
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get action item analytics for a team
+GET {{baseUrl}}/api/reports/teams/{{teamId}}/action-items
+Authorization: Bearer {{sessionToken}}
+
+###
+
+### Get template usage metrics for an organization
+GET {{baseUrl}}/api/reports/organizations/{{orgId}}/templates
+Authorization: Bearer {{sessionToken}}
+
+###

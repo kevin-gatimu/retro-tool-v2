@@ -1,0 +1,16 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "dtos",
+    "nestjs",
+    "drizzle",
+    "resend",
+    "thallesp",
+    "typeorm",
+    "tsconfig",
+    "upsert",
+    "behaviours"
+  ],
+  "ignorePaths": ["node_modules", "dist", "coverage"]
+}
