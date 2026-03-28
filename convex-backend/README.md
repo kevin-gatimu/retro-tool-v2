@@ -11,7 +11,7 @@ Initial scope:
 Next setup steps:
 
 1. Configure a local or self-hosted Convex deployment.
-2. Copy `.env.example` to `.env.local` and set the deployment values.
+2. Copy `.env.example` to `.env` and set the deployment values.
 3. Run `pnpm codegen` after the deployment is reachable.
 4. Create a deploy/admin key for the Convex deployment and set it as `CONVEX_SYNC_ADMIN_KEY` in the NestJS API.
 5. Point the NestJS API at the Convex Functions endpoint with `CONVEX_SYNC_URL`.

@@ -34,6 +34,9 @@ export const env = createEnv({
     VITE_RETROS_REALTIME_BACKEND: z
       .enum(['socket-io', 'convex'])
       .default('socket-io'),
+    VITE_NOTIFICATIONS_REALTIME_BACKEND: z
+      .enum(['socket-io', 'convex'])
+      .default('socket-io'),
   },
 
   /**

@@ -4,12 +4,21 @@ import { api } from '@/lib/api'
 import { RETROS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { RetroDetail } from '@/common/types/retros'
 import type { TRetroStatus } from '@/common/enums/retro.enums'
+import { usesConvexForRetros } from '@/lib/realtime-config'
 
 export function useRetroMutations(retroId: string) {
   const queryClient = useQueryClient()
+  const usesConvexRealtime = usesConvexForRetros()
+
+  const refetchRetro = () => {
+    void queryClient.refetchQueries({ queryKey: ['retro', retroId] })
+  }
 
   const invalidate = () => {
-    void queryClient.refetchQueries({ queryKey: ['retro', retroId] })
+    if (usesConvexRealtime) {
+      return
+    }
+    refetchRetro()
   }
 
   const invalidateOnComplete = () => {
@@ -43,7 +52,7 @@ export function useRetroMutations(retroId: string) {
     },
     onError: (error: Error) => {
       // Revert optimistic update
-      invalidate()
+      refetchRetro()
       toast.error(error.message || 'Failed to start lobby')
     },
   })
@@ -59,7 +68,7 @@ export function useRetroMutations(retroId: string) {
     },
     onError: (error: Error) => {
       // Revert optimistic update
-      invalidate()
+      refetchRetro()
       toast.error(error.message || 'Failed to start retro')
     },
   })
@@ -75,7 +84,7 @@ export function useRetroMutations(retroId: string) {
     },
     onError: (error: Error) => {
       // Revert optimistic update
-      invalidate()
+      refetchRetro()
       toast.error(error.message || 'Failed to move to voting')
     },
   })
@@ -91,7 +100,7 @@ export function useRetroMutations(retroId: string) {
     },
     onError: (error: Error) => {
       // Revert optimistic update
-      invalidate()
+      refetchRetro()
       toast.error(error.message || 'Failed to move to grouping')
     },
   })
@@ -107,7 +116,7 @@ export function useRetroMutations(retroId: string) {
     },
     onError: (error: Error) => {
       // Revert optimistic update
-      invalidate()
+      refetchRetro()
       toast.error(error.message || 'Failed to move to discussion')
     },
   })
@@ -124,7 +133,7 @@ export function useRetroMutations(retroId: string) {
     },
     onError: (error: Error) => {
       // Revert optimistic update
-      invalidate()
+      refetchRetro()
       toast.error(error.message || 'Failed to complete retro')
     },
   })

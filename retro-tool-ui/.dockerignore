@@ -4,4 +4,5 @@ dist
 .github
 coverage
 *.log
-.env.local
+.env
+.env.*

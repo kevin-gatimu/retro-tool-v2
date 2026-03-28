@@ -112,6 +112,22 @@ function RetroDetailPage() {
   const queryClient = useQueryClient()
   const usesConvexRealtime = usesConvexForRetros()
 
+  const invalidateRetroDetail = useCallback(() => {
+    if (usesConvexRealtime) {
+      return
+    }
+    void queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
+  }, [queryClient, retroId, usesConvexRealtime])
+
+  const invalidatePreviousCarried = useCallback(() => {
+    if (usesConvexRealtime) {
+      return
+    }
+    void queryClient.invalidateQueries({
+      queryKey: ['retro-previous-carried', retroId],
+    })
+  }, [queryClient, retroId, usesConvexRealtime])
+
   // Join retro on mount
   useEffect(() => {
     api.post(RETROS_ENDPOINTS.JOIN(retroId)).catch(() => {
@@ -396,7 +412,7 @@ function RetroDetailPage() {
       }))
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
+      invalidateRetroDetail()
     },
   })
 
@@ -417,7 +433,7 @@ function RetroDetailPage() {
     mutationFn: (cardId: string) =>
       api.delete(RETROS_ENDPOINTS.CARD_BY_ID(cardId)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
+      invalidateRetroDetail()
     },
   })
 
@@ -439,7 +455,7 @@ function RetroDetailPage() {
     },
     onSuccess: () => {
       setSelectedCardIds({})
-      queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
+      invalidateRetroDetail()
     },
   })
 
@@ -452,7 +468,7 @@ function RetroDetailPage() {
     },
     onSuccess: () => {
       setSelectedCardIds({})
-      queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
+      invalidateRetroDetail()
     },
   })
 
@@ -522,7 +538,7 @@ function RetroDetailPage() {
     mutationFn: (cardId: string) =>
       api.post(RETROS_ENDPOINTS.DISCUSS_CARD(retroId, cardId)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
+      invalidateRetroDetail()
     },
   })
 
@@ -530,7 +546,7 @@ function RetroDetailPage() {
     mutationFn: (cardId: string) =>
       api.post(RETROS_ENDPOINTS.MARK_DISCUSSED(retroId, cardId)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
+      invalidateRetroDetail()
     },
   })
 
@@ -539,7 +555,7 @@ function RetroDetailPage() {
       api.post(RETROS_ENDPOINTS.CARD_COMMENTS(cardId), { content }),
     onSuccess: () => {
       setNewComment('')
-      queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
+      invalidateRetroDetail()
     },
   })
 
@@ -547,7 +563,7 @@ function RetroDetailPage() {
     mutationFn: (commentId: string) =>
       api.delete(RETROS_ENDPOINTS.COMMENT_BY_ID(commentId)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
+      invalidateRetroDetail()
     },
   })
 
@@ -576,13 +592,13 @@ function RetroDetailPage() {
         RETROS_ENDPOINTS.PREVIOUS_CARRIED_FORWARD(retroId),
       ),
     enabled: retro?.status === 'discussing' || retro?.status === 'completed',
-    staleTime: 0,
-    // Fallback to keep all clients in sync even if a websocket event is missed.
+    staleTime: usesConvexRealtime ? 60_000 : 0,
     refetchInterval:
-      retro?.status === 'discussing' || retro?.status === 'completed'
+      !usesConvexRealtime &&
+        (retro?.status === 'discussing' || retro?.status === 'completed')
         ? 3000
         : false,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: !usesConvexRealtime,
   })
 
   const createCarriedItemCommentMutation = useMutation({
@@ -598,9 +614,7 @@ function RetroDetailPage() {
         ...prev,
         [variables.actionItemId]: '',
       }))
-      queryClient.invalidateQueries({
-        queryKey: ['retro-previous-carried', retroId],
-      })
+      invalidatePreviousCarried()
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to add comment'),
   })
@@ -609,9 +623,7 @@ function RetroDetailPage() {
     mutationFn: (commentId: string) =>
       api.delete(ACTION_ITEMS_ENDPOINTS.COMMENT_BY_ID(commentId)),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['retro-previous-carried', retroId],
-      })
+      invalidatePreviousCarried()
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to delete comment'),
   })
@@ -644,9 +656,7 @@ function RetroDetailPage() {
           }
           : prev,
       )
-      queryClient.invalidateQueries({
-        queryKey: ['retro-previous-carried', retroId],
-      })
+      invalidatePreviousCarried()
     },
     onSettled: () => {
       setPendingCarriedDoneItemId(null)
@@ -671,7 +681,7 @@ function RetroDetailPage() {
           }
           : prev,
       )
-      queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
+      invalidateRetroDetail()
     },
     onSettled: () => {
       setPendingCarriedDiscussItemId(null)
@@ -696,9 +706,7 @@ function RetroDetailPage() {
       ]),
     onSuccess: () => {
       toast.success('Item carried forward to this retro')
-      queryClient.invalidateQueries({
-        queryKey: ['retro-previous-carried', retroId],
-      })
+      invalidatePreviousCarried()
     },
     onError: (e: Error) =>
       toast.error(e.message || 'Failed to carry forward item'),
@@ -1513,18 +1521,18 @@ function RetroDetailPage() {
                                       {card.author.jobRole && (
                                         <Badge
                                           className={`text-[10px] h-5 ${{
-                                              Dev: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-                                              QA: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-                                              QE: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
-                                              'QA/QE':
-                                                'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-                                              DevOps:
-                                                'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-                                              'BI-Dev':
-                                                'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
-                                              Oversight:
-                                                'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                                            }[card.author.jobRole]
+                                            Dev: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+                                            QA: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                                            QE: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+                                            'QA/QE':
+                                              'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+                                            DevOps:
+                                              'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+                                            'BI-Dev':
+                                              'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+                                            Oversight:
+                                              'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+                                          }[card.author.jobRole]
                                             }`}
                                         >
                                           {card.author.jobRole}
@@ -1959,8 +1967,8 @@ function RetroDetailPage() {
                     <div
                       key={item.id}
                       className={`space-y-2 px-4 py-3 transition-colors ${isBeingDiscussed
-                          ? 'bg-primary/5 ring-1 ring-primary/30 rounded-lg'
-                          : ''
+                        ? 'bg-primary/5 ring-1 ring-primary/30 rounded-lg'
+                        : ''
                         }`}
                     >
                       {hasMultipleContents ? (

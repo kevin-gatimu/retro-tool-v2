@@ -4,11 +4,17 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - '5432:5432'
+      - '${POSTGRES_PORT}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
@@ -16,56 +22,77 @@ services:
   redis:
     image: redis:7
     ports:
-      - '6379:6379'
+      - '${REDIS_PORT}:6379'
 
   nest-api:
     build:
       context: ../retro-tool-api
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app_local
-      REDIS_URL: redis://redis:6379
-      CONVEX_SYNC_URL: http://convex-backend:3210
-      CONVEX_SYNC_ADMIN_KEY: ''
-      PORT: 8000
-      NODE_ENV: development
+      DATABASE_URL: ${API_DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      BETTER_AUTH_SESSION_EXPIRES_IN: ${BETTER_AUTH_SESSION_EXPIRES_IN}
+      FRONTEND_URL: ${FRONTEND_URL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      LOCAL_SERVER_URL: ${LOCAL_SERVER_URL}
+      DEPLOYED_SERVER_URL: ${DEPLOYED_SERVER_URL}
+      REDIS_URL: ${API_REDIS_URL}
+      CONVEX_SYNC_URL: ${CONVEX_SYNC_URL}
+      CONVEX_SYNC_ADMIN_KEY: ${CONVEX_SYNC_ADMIN_KEY}
+      ENABLE_CRON_JOBS: ${ENABLE_CRON_JOBS}
+      WEEKLY_DIGEST_SEND_HOUR: ${WEEKLY_DIGEST_SEND_HOUR}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT}
+      PORT: ${API_PORT}
+      NODE_ENV: ${API_NODE_ENV}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
-      - '8000:8000'
+      - '${API_PORT}:8000'
 
   convex-backend:
     image: ghcr.io/get-convex/convex-backend:latest
     environment:
-      INSTANCE_NAME: convex-local
-      POSTGRES_URL: postgresql://postgres:postgres@postgres:5432
-      DO_NOT_REQUIRE_SSL: '1'
+      INSTANCE_NAME: ${CONVEX_INSTANCE_NAME}
+      INSTANCE_SECRET: ${CONVEX_INSTANCE_SECRET}
+      POSTGRES_URL: ${CONVEX_POSTGRES_URL}
+      DO_NOT_REQUIRE_SSL: ${CONVEX_DO_NOT_REQUIRE_SSL}
+    restart: on-failure
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
-      - '3210:3210'
-      - '3211:3211'
+      - '${CONVEX_API_PORT}:3210'
+      - '${CONVEX_SITE_PORT}:3211'
 
   convex-dashboard:
     image: ghcr.io/get-convex/convex-dashboard:latest
     depends_on:
       - convex-backend
     ports:
-      - '6791:6791'
+      - '${CONVEX_DASHBOARD_PORT}:6791'
 
   ui:
     build:
-      context: ../retro-tool-ui
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: retro-tool-ui/Dockerfile
       args:
-        VITE_APP_ENV: development
-        VITE_API_URL: http://localhost:8000
-        VITE_APP_TITLE: Retro Tool
+        VITE_APP_ENV: ${VITE_APP_ENV}
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_APP_TITLE: ${VITE_APP_TITLE}
+        VITE_CONVEX_URL: ${VITE_CONVEX_URL}
+        VITE_ESTIMATES_REALTIME_BACKEND: ${VITE_ESTIMATES_REALTIME_BACKEND}
+        VITE_RETROS_REALTIME_BACKEND: ${VITE_RETROS_REALTIME_BACKEND}
+        VITE_NOTIFICATIONS_REALTIME_BACKEND: ${VITE_NOTIFICATIONS_REALTIME_BACKEND}
     depends_on:
       - nest-api
     ports:
-      - '3000:80'
+      - '${UI_PORT}:80'
 
 volumes:
   postgres-data:

@@ -217,6 +217,7 @@ export class RetrosController {
   ) {
     const result = await this.retrosService.createRetro(session.user.id, body);
     this.retrosGateway.emitRetroChanged(result.id);
+    this.retrosGateway.emitRetroListChanged();
     return result;
   }
 
@@ -246,6 +247,7 @@ export class RetrosController {
   ) {
     const result = await this.retrosService.deleteRetro(session.user.id, id);
     await this.retrosProjectionSyncService.deleteRetroProjection(id);
+    this.retrosGateway.emitRetroListChanged();
     return result;
   }
 
@@ -262,6 +264,7 @@ export class RetrosController {
   ) {
     const result = await this.retrosService.startLobby(session.user.id, id);
     this.retrosGateway.emitRetroStatusChanged(id, 'waiting');
+    this.retrosGateway.emitRetroListChanged();
     return result;
   }
 
@@ -278,6 +281,7 @@ export class RetrosController {
   ) {
     const result = await this.retrosService.startRetro(session.user.id, id);
     this.retrosGateway.emitRetroStatusChanged(id, 'active');
+    this.retrosGateway.emitRetroListChanged();
     return result;
   }
 
@@ -294,6 +298,7 @@ export class RetrosController {
   ) {
     const result = await this.retrosService.moveToGrouping(session.user.id, id);
     this.retrosGateway.emitRetroStatusChanged(id, 'grouping');
+    this.retrosGateway.emitRetroListChanged();
     return result;
   }
 
@@ -310,6 +315,7 @@ export class RetrosController {
   ) {
     const result = await this.retrosService.moveToVoting(session.user.id, id);
     this.retrosGateway.emitRetroStatusChanged(id, 'voting');
+    this.retrosGateway.emitRetroListChanged();
     return result;
   }
 
@@ -329,6 +335,7 @@ export class RetrosController {
       id,
     );
     this.retrosGateway.emitRetroStatusChanged(id, 'discussing');
+    this.retrosGateway.emitRetroListChanged();
     return result;
   }
 
@@ -345,6 +352,7 @@ export class RetrosController {
   ) {
     const result = await this.retrosService.completeRetro(session.user.id, id);
     this.retrosGateway.emitRetroStatusChanged(id, 'completed');
+    this.retrosGateway.emitRetroListChanged();
     return result;
   }
 
@@ -375,7 +383,9 @@ export class RetrosController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.retrosService.joinRetro(session.user.id, id);
+    const result = await this.retrosService.joinRetro(session.user.id, id);
+    this.retrosGateway.emitRetroChanged(id);
+    return result;
   }
 
   // ============================================================================
@@ -611,7 +621,13 @@ export class RetrosController {
     body: { title: string; description?: string; isCarriedForward?: boolean },
     @Session() session: SessionUser,
   ) {
-    return this.retrosService.createActionItem(session.user.id, id, body);
+    const result = await this.retrosService.createActionItem(
+      session.user.id,
+      id,
+      body,
+    );
+    this.retrosGateway.emitRetroChanged(id);
+    return result;
   }
 
   // ============================================================================

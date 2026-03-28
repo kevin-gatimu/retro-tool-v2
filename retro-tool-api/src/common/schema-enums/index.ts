@@ -105,6 +105,7 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   NOTIFICATION_TYPES.TeamJoinApproved,
   NOTIFICATION_TYPES.TeamJoinRejected,
   NOTIFICATION_TYPES.OrgInvite,
+  NOTIFICATION_TYPES.RetroCreated,
   NOTIFICATION_TYPES.RetroLobbyOpen,
   NOTIFICATION_TYPES.RetroStarted,
   NOTIFICATION_TYPES.RetroCompleted,

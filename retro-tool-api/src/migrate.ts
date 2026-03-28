@@ -22,8 +22,25 @@ const IDEMPOTENT_PG_CODES = new Set([
   '42701', // column already exists
   '42P06', // schema already exists
   '42710', // object already exists (index, constraint, etc.)
-  '42704', // object does not exist (handles DROP on missing objects)
 ]);
+
+function shouldSkipStatementError(statement: string, err: unknown): boolean {
+  if (!isPgError(err)) {
+    return false;
+  }
+
+  if (IDEMPOTENT_PG_CODES.has(err.code)) {
+    return true;
+  }
+
+  // `undefined_object` can be safe for DROP statements, but is not safe for
+  // CREATE/ALTER ADD statements because it can mask missing enum/table issues.
+  if (err.code === '42704') {
+    return /^\s*drop\b/i.test(statement);
+  }
+
+  return false;
+}
 
 function shouldUseSsl(databaseUrl: string): boolean {
   const lower = databaseUrl.toLowerCase();
@@ -135,9 +152,9 @@ async function runMigrations() {
         try {
           await client.query(stmt);
         } catch (err: unknown) {
-          if (isPgError(err) && IDEMPOTENT_PG_CODES.has(err.code)) {
+          if (shouldSkipStatementError(stmt, err)) {
             console.warn(
-              `    ⚠ skipped (${err.code}): ${stmt.slice(0, 80).replace(/\n/g, ' ')}…`,
+              `    ⚠ skipped (${(err as { code?: string }).code ?? 'unknown'}): ${stmt.slice(0, 80).replace(/\n/g, ' ')}…`,
             );
             stmtSkipped++;
           } else {

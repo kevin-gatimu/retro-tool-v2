@@ -18,9 +18,12 @@ import { generateId } from '../lib/utils';
 import { AddTeamMemberDto, UpdateTeamMemberDto } from './dto';
 import { CommonService } from '../common/common.service';
 import {
+  ORG_MEMBER_ROLES,
+  TEAM_JOIN_REQUEST_STATUSES,
   TEAM_MEMBER_TAGS,
   TTeamMemberRole,
   EMAIL_LOG_TYPES,
+  USER_STATUSES,
 } from 'src/common/enums';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CacheService } from '../cache/cache.service';
@@ -93,7 +96,7 @@ export class TeamsService {
       id: generateId(),
       teamId: teamId,
       userId: userId,
-      tag: 'team-lead',
+      tag: TEAM_MEMBER_TAGS.Lead,
     });
 
     await this.cacheService.del(
@@ -210,7 +213,10 @@ export class TeamsService {
               .where(
                 and(
                   eq(teamSchema.teamJoinRequest.userId, userId),
-                  eq(teamSchema.teamJoinRequest.status, 'pending'),
+                  eq(
+                    teamSchema.teamJoinRequest.status,
+                    TEAM_JOIN_REQUEST_STATUSES.Pending,
+                  ),
                   inArray(teamSchema.teamJoinRequest.teamId, teamIds),
                 ),
               ),
@@ -339,7 +345,8 @@ export class TeamsService {
       .limit(1);
 
     const orgRole = orgMembership?.role ?? null;
-    const isOrgAdmin = orgRole === 'org-owner' || orgRole === 'org-admin';
+    const isOrgAdmin =
+      orgRole === ORG_MEMBER_ROLES.Owner || orgRole === ORG_MEMBER_ROLES.Admin;
 
     const [teamMembership] = await this.database
       .select()
@@ -367,13 +374,17 @@ export class TeamsService {
         and(
           eq(teamSchema.teamJoinRequest.userId, userId),
           eq(teamSchema.teamJoinRequest.teamId, teamId),
-          eq(teamSchema.teamJoinRequest.status, 'pending'),
+          eq(
+            teamSchema.teamJoinRequest.status,
+            TEAM_JOIN_REQUEST_STATUSES.Pending,
+          ),
         ),
       )
       .limit(1);
 
     const canSeeMembers = isSystemAdmin || isOrgAdmin || isMember;
-    const canManage = isSystemAdmin || isOrgAdmin || myRole === 'team-lead';
+    const canManage =
+      isSystemAdmin || isOrgAdmin || myRole === TEAM_MEMBER_TAGS.Lead;
 
     // Fetch members
     const rawMembers = canSeeMembers
@@ -453,7 +464,10 @@ export class TeamsService {
           .where(
             and(
               eq(teamSchema.teamJoinRequest.teamId, teamId),
-              eq(teamSchema.teamJoinRequest.status, 'pending'),
+              eq(
+                teamSchema.teamJoinRequest.status,
+                TEAM_JOIN_REQUEST_STATUSES.Pending,
+              ),
             ),
           )
       : [];
@@ -717,11 +731,15 @@ export class TeamsService {
     // Auto-approve the user account if it is still pending
     await this.database
       .update(userSchema.user)
-      .set({ status: 'approved', approvedAt: new Date(), approvedById: userId })
+      .set({
+        status: USER_STATUSES.Approved,
+        approvedAt: new Date(),
+        approvedById: userId,
+      })
       .where(
         and(
           eq(userSchema.user.id, data.userId),
-          eq(userSchema.user.status, 'pending'),
+          eq(userSchema.user.status, USER_STATUSES.Pending),
         ),
       );
 
@@ -771,7 +789,11 @@ export class TeamsService {
     // Team leads can only remove regular members, not other leads
     // (Org admins who are also team leads are exempt from this restriction)
     const isLead = await this.commonService.isTeamLead(userId, teamId);
-    if (isLead && member.tag === 'team-lead' && member.userId !== userId) {
+    if (
+      isLead &&
+      member.tag === TEAM_MEMBER_TAGS.Lead &&
+      member.userId !== userId
+    ) {
       const [teamRecord] = await this.database
         .select({ organizationId: teamSchema.team.organizationId })
         .from(teamSchema.team)
@@ -845,7 +867,11 @@ export class TeamsService {
     // Team leads can only update regular members, not other leads
     // (Org admins who are also team leads are exempt from this restriction)
     const isLead = await this.commonService.isTeamLead(userId, teamId);
-    if (isLead && member.tag === 'team-lead' && member.userId !== userId) {
+    if (
+      isLead &&
+      member.tag === TEAM_MEMBER_TAGS.Lead &&
+      member.userId !== userId
+    ) {
       const [teamRecord] = await this.database
         .select({ organizationId: teamSchema.team.organizationId })
         .from(teamSchema.team)
@@ -982,7 +1008,12 @@ export class TeamsService {
 
     const [member] = await this.database
       .insert(teamSchema.teamMember)
-      .values({ id: generateId(), teamId, userId, tag: 'member' })
+      .values({
+        id: generateId(),
+        teamId,
+        userId,
+        tag: TEAM_MEMBER_TAGS.Member,
+      })
       .returning();
 
     await this.cacheService.del(CacheKeys.rbacTeam(teamId, userId));
@@ -1089,7 +1120,10 @@ export class TeamsService {
         and(
           eq(teamSchema.teamJoinRequest.userId, userId),
           eq(teamSchema.teamJoinRequest.teamId, teamId),
-          eq(teamSchema.teamJoinRequest.status, 'pending'),
+          eq(
+            teamSchema.teamJoinRequest.status,
+            TEAM_JOIN_REQUEST_STATUSES.Pending,
+          ),
         ),
       )
       .limit(1);
@@ -1104,7 +1138,7 @@ export class TeamsService {
         id: generateId(),
         teamId,
         userId,
-        status: 'pending',
+        status: TEAM_JOIN_REQUEST_STATUSES.Pending,
         message: message ?? null,
       })
       .returning();
@@ -1279,14 +1313,14 @@ export class TeamsService {
       .limit(1);
 
     if (!request) throw new NotFoundException('Join request not found');
-    if (request.status !== 'pending') {
+    if (request.status !== TEAM_JOIN_REQUEST_STATUSES.Pending) {
       throw new ForbiddenException('Request is no longer pending');
     }
 
     await this.database
       .update(teamSchema.teamJoinRequest)
       .set({
-        status: 'approved',
+        status: TEAM_JOIN_REQUEST_STATUSES.Approved,
         reviewedById: userId,
         reviewedAt: new Date(),
         updatedAt: new Date(),
@@ -1300,18 +1334,22 @@ export class TeamsService {
         id: generateId(),
         teamId,
         userId: request.userId,
-        tag: 'member',
+        tag: TEAM_MEMBER_TAGS.Member,
       })
       .returning();
 
     // Auto-approve the user account if it is still pending
     await this.database
       .update(userSchema.user)
-      .set({ status: 'approved', approvedAt: new Date(), approvedById: userId })
+      .set({
+        status: USER_STATUSES.Approved,
+        approvedAt: new Date(),
+        approvedById: userId,
+      })
       .where(
         and(
           eq(userSchema.user.id, request.userId),
-          eq(userSchema.user.status, 'pending'),
+          eq(userSchema.user.status, USER_STATUSES.Pending),
         ),
       );
 
@@ -1353,7 +1391,10 @@ export class TeamsService {
         .catch(() => undefined);
     }
 
-    return { request: { ...request, status: 'approved' }, member };
+    return {
+      request: { ...request, status: TEAM_JOIN_REQUEST_STATUSES.Approved },
+      member,
+    };
   }
 
   /**
@@ -1390,14 +1431,14 @@ export class TeamsService {
     ]);
 
     if (!request) throw new NotFoundException('Join request not found');
-    if (request.status !== 'pending') {
+    if (request.status !== TEAM_JOIN_REQUEST_STATUSES.Pending) {
       throw new ForbiddenException('Request is no longer pending');
     }
 
     const [updated] = await this.database
       .update(teamSchema.teamJoinRequest)
       .set({
-        status: 'rejected',
+        status: TEAM_JOIN_REQUEST_STATUSES.Rejected,
         reviewedById: userId,
         reviewedAt: new Date(),
         reviewNote: reviewNote ?? null,
@@ -1503,7 +1544,12 @@ export class TeamsService {
         userSchema.user,
         eq(userSchema.user.id, teamSchema.teamJoinRequest.userId),
       )
-      .where(eq(teamSchema.teamJoinRequest.status, 'pending'))
+      .where(
+        eq(
+          teamSchema.teamJoinRequest.status,
+          TEAM_JOIN_REQUEST_STATUSES.Pending,
+        ),
+      )
       .orderBy(desc(teamSchema.teamJoinRequest.createdAt));
 
     return requests.map((r) => ({

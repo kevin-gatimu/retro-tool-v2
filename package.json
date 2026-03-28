@@ -7,6 +7,10 @@
         "lint": "pnpm -r --filter @retro-tool/contracts --filter retro-tool-api --filter retro-tool-ui --filter convex-backend lint",
         "type-check": "pnpm -r --filter @retro-tool/contracts --filter retro-tool-api --filter retro-tool-ui --filter convex-backend type-check",
         "test": "pnpm -r --filter retro-tool-api --filter retro-tool-ui test",
+        "local:up": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml up --build",
+        "local:infra": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml up -d postgres redis convex-backend convex-dashboard",
+        "local:down": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml down",
+        "local:logs": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml logs -f",
         "dev:api": "pnpm --dir retro-tool-api start:dev",
         "dev:ui": "pnpm --dir retro-tool-ui dev",
         "dev:convex": "pnpm --dir convex-backend dev"

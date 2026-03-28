@@ -5,7 +5,12 @@ import { eq, and } from 'drizzle-orm';
 import * as userSchema from '../auth/schema';
 import * as orgSchema from '../organizations/schema';
 import * as teamSchema from '../teams/schema';
-import { TAdminActionLogAction } from './enums';
+import {
+  ORG_MEMBER_ROLES,
+  TAdminActionLogAction,
+  TEAM_MEMBER_TAGS,
+  USER_ROLES,
+} from './enums';
 import { generateId } from 'src/lib/utils';
 import type { OrgContext, TeamContext, UserContext } from '../lib/rbac';
 import { CacheService } from '../cache/cache.service';
@@ -44,12 +49,12 @@ export class CommonService {
   }
 
   async isSuperAdmin(userId: string): Promise<boolean> {
-    return (await this.getUserRole(userId)) === 'super-admin';
+    return (await this.getUserRole(userId)) === USER_ROLES.SuperAdmin;
   }
 
   async isSystemAdmin(userId: string): Promise<boolean> {
     const role = await this.getUserRole(userId);
-    return role === 'super-admin' || role === 'system-admin';
+    return role === USER_ROLES.SuperAdmin || role === USER_ROLES.SystemAdmin;
   }
 
   /**
@@ -83,11 +88,13 @@ export class CommonService {
 
   async isOrgAdmin(userId: string, orgId: string): Promise<boolean> {
     const role = await this.getOrgMemberRole(userId, orgId);
-    return role === 'org-owner' || role === 'org-admin';
+    return role === ORG_MEMBER_ROLES.Owner || role === ORG_MEMBER_ROLES.Admin;
   }
 
   async isOrgOwner(userId: string, orgId: string): Promise<boolean> {
-    return (await this.getOrgMemberRole(userId, orgId)) === 'org-owner';
+    return (
+      (await this.getOrgMemberRole(userId, orgId)) === ORG_MEMBER_ROLES.Owner
+    );
   }
 
   async isOrgMember(userId: string, orgId: string): Promise<boolean> {
@@ -123,7 +130,9 @@ export class CommonService {
   }
 
   async isTeamLead(userId: string, teamId: string): Promise<boolean> {
-    return (await this.getTeamMemberTag(userId, teamId)) === 'team-lead';
+    return (
+      (await this.getTeamMemberTag(userId, teamId)) === TEAM_MEMBER_TAGS.Lead
+    );
   }
 
   async canManageTeam(userId: string, teamId: string): Promise<boolean> {
@@ -200,7 +209,7 @@ export class CommonService {
     const [admin] = await this.database
       .select()
       .from(userSchema.user)
-      .where(eq(userSchema.user.role, 'system-admin'))
+      .where(eq(userSchema.user.role, USER_ROLES.SystemAdmin))
       .limit(1);
 
     if (admin) return { exists: true };
@@ -208,7 +217,7 @@ export class CommonService {
     const [superAdmin] = await this.database
       .select()
       .from(userSchema.user)
-      .where(eq(userSchema.user.role, 'super-admin'))
+      .where(eq(userSchema.user.role, USER_ROLES.SuperAdmin))
       .limit(1);
 
     return { exists: !!superAdmin };
@@ -236,7 +245,7 @@ export class CommonService {
 
     if (!user) {
       return {
-        user: { id: userId, role: 'member' },
+        user: { id: userId, role: USER_ROLES.Member },
         orgRole: null,
         isSuperAdmin: false,
         isSystemAdmin: false,
@@ -262,9 +271,10 @@ export class CommonService {
     const ctx: OrgContext = {
       user: userCtx,
       orgRole: (membership?.role ?? null) as OrgContext['orgRole'],
-      isSuperAdmin: user.role === 'super-admin',
+      isSuperAdmin: user.role === USER_ROLES.SuperAdmin,
       isSystemAdmin:
-        user.role === 'super-admin' || user.role === 'system-admin',
+        user.role === USER_ROLES.SuperAdmin ||
+        user.role === USER_ROLES.SystemAdmin,
     };
 
     await this.cacheService.set(cacheKey, ctx, 120);
@@ -289,7 +299,7 @@ export class CommonService {
 
     if (!user) {
       return {
-        user: { id: userId, role: 'member' },
+        user: { id: userId, role: USER_ROLES.Member },
         orgRole: null,
         teamTag: null,
         isSuperAdmin: false,
@@ -341,9 +351,10 @@ export class CommonService {
       user: userCtx,
       orgRole,
       teamTag: (teamMembership?.tag ?? null) as TeamContext['teamTag'],
-      isSuperAdmin: user.role === 'super-admin',
+      isSuperAdmin: user.role === USER_ROLES.SuperAdmin,
       isSystemAdmin:
-        user.role === 'super-admin' || user.role === 'system-admin',
+        user.role === USER_ROLES.SuperAdmin ||
+        user.role === USER_ROLES.SystemAdmin,
     };
 
     await this.cacheService.set(cacheKey, ctx, 120);

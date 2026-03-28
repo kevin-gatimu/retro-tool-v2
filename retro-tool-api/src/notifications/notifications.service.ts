@@ -1,19 +1,25 @@
 import {
   Injectable,
   Inject,
+  Logger,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, desc, or, and } from 'drizzle-orm';
+import { eq, desc, or, and, ne } from 'drizzle-orm';
 import * as notificationSchema from './schema';
 import * as authSchema from '../auth/schema';
 import * as teamSchema from '../teams/schema';
 import { Notification, NewNotification } from './schema';
 import { NotificationsGateway } from './notifications.gateway';
 import { PushService } from './push.service';
-import { NOTIFICATION_TYPES } from '../common/enums';
+import { NotificationsProjectionSyncService } from './notifications-projection-sync.service';
+import {
+  NOTIFICATION_TYPES,
+  TEAM_MEMBER_TAGS,
+  USER_ROLES,
+} from '../common/enums';
 import { generateId } from '../lib/utils';
 import { CacheService } from '../cache/cache.service';
 import { CacheKeys } from '../cache/cache-keys';
@@ -24,11 +30,14 @@ type Database = NodePgDatabase<
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly gateway: NotificationsGateway,
     private readonly pushService: PushService,
     private readonly cacheService: CacheService,
+    private readonly notificationsProjectionSyncService: NotificationsProjectionSyncService,
   ) {}
 
   async getNotifications(userId: string): Promise<Notification[]> {
@@ -75,6 +84,10 @@ export class NotificationsService {
       .set({ read: true })
       .where(eq(notificationSchema.notification.id, notificationId));
 
+    void this.notificationsProjectionSyncService
+      .syncNotificationReadState(userId, notificationId, true)
+      .catch(() => undefined);
+
     await this.cacheService.del(CacheKeys.notificationList(userId));
     return { success: true };
   }
@@ -84,6 +97,10 @@ export class NotificationsService {
       .update(notificationSchema.notification)
       .set({ read: true })
       .where(eq(notificationSchema.notification.userId, userId));
+
+    void this.notificationsProjectionSyncService
+      .syncAllNotificationsRead(userId)
+      .catch(() => undefined);
 
     await this.cacheService.del(CacheKeys.notificationList(userId));
     return { success: true };
@@ -100,6 +117,10 @@ export class NotificationsService {
 
     await this.cacheService.del(CacheKeys.notificationList(data.userId));
     this.gateway.emitToUser(data.userId, 'notification', created);
+
+    void this.notificationsProjectionSyncService
+      .syncNotificationProjection(created)
+      .catch(() => undefined);
 
     // Also send a browser push notification (fire-and-forget, non-blocking)
     void this.pushService
@@ -126,8 +147,8 @@ export class NotificationsService {
       .from(authSchema.user)
       .where(
         or(
-          eq(authSchema.user.role, 'super-admin'),
-          eq(authSchema.user.role, 'system-admin'),
+          eq(authSchema.user.role, USER_ROLES.SuperAdmin),
+          eq(authSchema.user.role, USER_ROLES.SystemAdmin),
         ),
       );
 
@@ -219,6 +240,52 @@ export class NotificationsService {
     );
   }
 
+  async notifyTeamOfRetroCreated(
+    retroId: string,
+    retroName: string,
+    teamId: string,
+    creatorUserId: string,
+  ): Promise<void> {
+    const members = await this.database
+      .select({ userId: teamSchema.teamMember.userId })
+      .from(teamSchema.teamMember)
+      .where(
+        and(
+          eq(teamSchema.teamMember.teamId, teamId),
+          ne(teamSchema.teamMember.userId, creatorUserId),
+        ),
+      );
+
+    if (members.length === 0) {
+      this.logger.warn(
+        `No recipients found for retro-created notification (retroId=${retroId}, teamId=${teamId})`,
+      );
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      members.map((member) =>
+        this.createAndEmit({
+          userId: member.userId,
+          type: NOTIFICATION_TYPES.RetroCreated,
+          title: 'New retrospective created',
+          message: `"${retroName}" is available for your team.`,
+          link: `/retros/${retroId}`,
+        }),
+      ),
+    );
+
+    const failedCount = results.filter(
+      (result) => result.status === 'rejected',
+    ).length;
+
+    if (failedCount > 0) {
+      this.logger.warn(
+        `Retro-created notification partially failed (retroId=${retroId}, teamId=${teamId}, failures=${failedCount}, total=${results.length})`,
+      );
+    }
+  }
+
   async notifyTeamAdminsOfJoinRequest(
     teamId: string,
     teamName: string,
@@ -231,7 +298,7 @@ export class NotificationsService {
       .where(
         and(
           eq(teamSchema.teamMember.teamId, teamId),
-          eq(teamSchema.teamMember.tag, 'team-lead'),
+          eq(teamSchema.teamMember.tag, TEAM_MEMBER_TAGS.Lead),
         ),
       );
 

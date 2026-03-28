@@ -20,6 +20,15 @@ import {
 import { CacheService } from '../cache/cache.service';
 import { CacheKeys } from '../cache/cache-keys';
 import type { ReportPeriod as Period } from '../common/types';
+import {
+  ACTION_ITEM_STATUSES,
+  ORG_MEMBER_ROLES,
+  RETRO_STATUSES,
+  USER_ROLES,
+  USER_STATUSES,
+  ESTIMATE_ROUND_STATUSES,
+  ESTIMATE_SESSION_STATUSES,
+} from '../common/enums';
 
 type Database = NodePgDatabase<
   typeof retroSchema &
@@ -100,7 +109,10 @@ export class ReportsService {
       .where(eq(authSchema.user.id, userId))
       .limit(1);
 
-    if (user?.role === 'super-admin' || user?.role === 'system-admin') {
+    if (
+      user?.role === USER_ROLES.SuperAdmin ||
+      user?.role === USER_ROLES.SystemAdmin
+    ) {
       return;
     }
 
@@ -117,7 +129,8 @@ export class ReportsService {
 
     if (
       !membership ||
-      !['org-owner', 'org-admin'].includes(membership.role ?? '')
+      (membership.role !== ORG_MEMBER_ROLES.Owner &&
+        membership.role !== ORG_MEMBER_ROLES.Admin)
     ) {
       throw new ForbiddenException('Access denied');
     }
@@ -130,7 +143,10 @@ export class ReportsService {
       .where(eq(authSchema.user.id, userId))
       .limit(1);
 
-    if (user?.role !== 'super-admin' && user?.role !== 'system-admin') {
+    if (
+      user?.role !== USER_ROLES.SuperAdmin &&
+      user?.role !== USER_ROLES.SystemAdmin
+    ) {
       throw new ForbiddenException('Access denied');
     }
   }
@@ -160,7 +176,7 @@ export class ReportsService {
       .where(
         and(
           eq(retroSchema.retrospective.teamId, teamId),
-          eq(retroSchema.retrospective.status, 'completed'),
+          eq(retroSchema.retrospective.status, RETRO_STATUSES.Completed),
           gte(retroSchema.retrospective.completedAt, since),
         ),
       );
@@ -258,10 +274,10 @@ export class ReportsService {
       : [];
 
     const actionItemsCompleted = aiRows.filter(
-      (r) => r.status === 'completed',
+      (r) => r.status === ACTION_ITEM_STATUSES.Completed,
     ).length;
     const actionItemsPending = aiRows.filter(
-      (r) => r.status !== 'completed',
+      (r) => r.status !== ACTION_ITEM_STATUSES.Completed,
     ).length;
 
     const result = {
@@ -300,7 +316,7 @@ export class ReportsService {
       .where(
         and(
           eq(retroSchema.retrospective.teamId, teamId),
-          eq(retroSchema.retrospective.status, 'completed'),
+          eq(retroSchema.retrospective.status, RETRO_STATUSES.Completed),
           gte(retroSchema.retrospective.completedAt, since),
         ),
       );
@@ -368,7 +384,7 @@ export class ReportsService {
 
       if (aiRows.length > 0) {
         const completedCount = aiRows.filter(
-          (r) => r.status === 'completed',
+          (r) => r.status === ACTION_ITEM_STATUSES.Completed,
         ).length;
         completionPoints = Math.min(
           25,
@@ -398,7 +414,7 @@ export class ReportsService {
       .where(
         and(
           eq(retroSchema.retrospective.teamId, teamId),
-          eq(retroSchema.retrospective.status, 'completed'),
+          eq(retroSchema.retrospective.status, RETRO_STATUSES.Completed),
           gte(retroSchema.retrospective.completedAt, quarterSince),
         ),
       );
@@ -442,7 +458,7 @@ export class ReportsService {
       .where(
         and(
           eq(retroSchema.retrospective.teamId, teamId),
-          eq(retroSchema.retrospective.status, 'completed'),
+          eq(retroSchema.retrospective.status, RETRO_STATUSES.Completed),
           gte(retroSchema.retrospective.completedAt, since),
         ),
       );
@@ -474,9 +490,14 @@ export class ReportsService {
       .where(inArray(retroSchema.actionItem.retroId, retroIds));
 
     const total = aiRows.length;
-    const completed = aiRows.filter((r) => r.status === 'completed').length;
+    const completed = aiRows.filter(
+      (r) => r.status === ACTION_ITEM_STATUSES.Completed,
+    ).length;
     const overdue = aiRows.filter(
-      (r) => r.status !== 'completed' && r.dueDate && r.dueDate < now,
+      (r) =>
+        r.status !== ACTION_ITEM_STATUSES.Completed &&
+        r.dueDate &&
+        r.dueDate < now,
     ).length;
     const pending = total - completed;
     const completionRate =
@@ -494,7 +515,7 @@ export class ReportsService {
         completed: 0,
       };
       entry.assigned += 1;
-      if (row.status === 'completed') entry.completed += 1;
+      if (row.status === ACTION_ITEM_STATUSES.Completed) entry.completed += 1;
       assigneeCounts.set(row.assigneeId, entry);
     }
 
@@ -618,7 +639,9 @@ export class ReportsService {
     // If teamId or period is set, we need to join through retrospective
     let userCardRetros: { retroId: string }[];
     if (teamId || since) {
-      const retroWhere = [eq(retroSchema.retrospective.status, 'completed')];
+      const retroWhere = [
+        eq(retroSchema.retrospective.status, RETRO_STATUSES.Completed),
+      ];
       if (teamId) retroWhere.push(eq(retroSchema.retrospective.teamId, teamId));
       if (since)
         retroWhere.push(gte(retroSchema.retrospective.completedAt, since));
@@ -677,7 +700,7 @@ export class ReportsService {
 
       const actionItemsAssigned = aiRows.length;
       const actionItemsCompleted = aiRows.filter(
-        (r) => r.status === 'completed',
+        (r) => r.status === ACTION_ITEM_STATUSES.Completed,
       ).length;
       const completionRate =
         actionItemsAssigned > 0
@@ -719,7 +742,7 @@ export class ReportsService {
 
     const actionItemsAssigned = aiRows.length;
     const actionItemsCompleted = aiRows.filter(
-      (r) => r.status === 'completed',
+      (r) => r.status === ACTION_ITEM_STATUSES.Completed,
     ).length;
     const completionRate =
       actionItemsAssigned > 0
@@ -761,7 +784,10 @@ export class ReportsService {
       .where(
         and(
           eq(estimateSchema.storyEstimateSession.teamId, teamId),
-          eq(estimateSchema.storyEstimateSession.status, 'completed'),
+          eq(
+            estimateSchema.storyEstimateSession.status,
+            ESTIMATE_SESSION_STATUSES.Completed,
+          ),
           gte(estimateSchema.storyEstimateSession.createdAt, since),
         ),
       );
@@ -787,7 +813,10 @@ export class ReportsService {
       .where(
         and(
           inArray(estimateSchema.storyEstimateRound.sessionId, sessionIds),
-          eq(estimateSchema.storyEstimateRound.status, 'revealed'),
+          eq(
+            estimateSchema.storyEstimateRound.status,
+            ESTIMATE_ROUND_STATUSES.Revealed,
+          ),
         ),
       );
     const storiesEstimated = Number(roundsRow?.total ?? 0);
@@ -913,7 +942,7 @@ export class ReportsService {
       .where(
         and(
           inArray(retroSchema.retrospective.teamId, teamIds),
-          eq(retroSchema.retrospective.status, 'completed'),
+          eq(retroSchema.retrospective.status, RETRO_STATUSES.Completed),
           gte(retroSchema.retrospective.completedAt, since),
         ),
       );
@@ -968,10 +997,10 @@ export class ReportsService {
         .from(retroSchema.actionItem)
         .where(inArray(retroSchema.actionItem.retroId, retroIds));
       actionItemsCompleted = aiRows.filter(
-        (r) => r.status === 'completed',
+        (r) => r.status === ACTION_ITEM_STATUSES.Completed,
       ).length;
       actionItemsPending = aiRows.filter(
-        (r) => r.status !== 'completed',
+        (r) => r.status !== ACTION_ITEM_STATUSES.Completed,
       ).length;
     }
 
@@ -1089,7 +1118,7 @@ export class ReportsService {
     const [usersCountRow] = await this.database
       .select({ total: count(authSchema.user.id) })
       .from(authSchema.user)
-      .where(eq(authSchema.user.status, 'approved'));
+      .where(eq(authSchema.user.status, USER_STATUSES.Approved));
     const usersCount = Number(usersCountRow?.total ?? 0);
 
     // Retros and cards in last 30 days
@@ -1098,7 +1127,7 @@ export class ReportsService {
       .from(retroSchema.retrospective)
       .where(
         and(
-          eq(retroSchema.retrospective.status, 'completed'),
+          eq(retroSchema.retrospective.status, RETRO_STATUSES.Completed),
           gte(retroSchema.retrospective.completedAt, since30Days),
         ),
       );
@@ -1162,7 +1191,7 @@ export class ReportsService {
           .where(
             and(
               inArray(retroSchema.retrospective.teamId, orgTeamIds),
-              eq(retroSchema.retrospective.status, 'completed'),
+              eq(retroSchema.retrospective.status, RETRO_STATUSES.Completed),
               gte(retroSchema.retrospective.completedAt, since30Days),
             ),
           );

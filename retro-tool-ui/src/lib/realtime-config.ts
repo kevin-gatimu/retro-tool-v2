@@ -7,6 +7,9 @@ export const estimatesRealtimeBackend: RealtimeBackend =
 export const retrosRealtimeBackend: RealtimeBackend =
   env.VITE_RETROS_REALTIME_BACKEND
 
+export const notificationsRealtimeBackend: RealtimeBackend =
+  env.VITE_NOTIFICATIONS_REALTIME_BACKEND
+
 export function isConvexConfigured() {
   return Boolean(env.VITE_CONVEX_URL)
 }
@@ -17,4 +20,8 @@ export function usesConvexForEstimates() {
 
 export function usesConvexForRetros() {
   return retrosRealtimeBackend === 'convex' && isConvexConfigured()
+}
+
+export function usesConvexForNotifications() {
+  return notificationsRealtimeBackend === 'convex' && isConvexConfigured()
 }

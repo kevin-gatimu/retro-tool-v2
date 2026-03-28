@@ -18,6 +18,7 @@ import * as reminderSchema from './schema';
 import { EmailService } from '../email/email.service';
 import { generateId } from '../lib/utils';
 import { CreateRetroReminderDto, UpdateRetroReminderDto } from './dto';
+import { RETRO_STATUSES } from '../common/enums';
 
 type Database = NodePgDatabase<
   typeof retroSchema &
@@ -61,7 +62,7 @@ export class RetroRemindersService {
       .from(retroSchema.retrospective)
       .where(
         and(
-          eq(retroSchema.retrospective.status, 'draft'),
+          eq(retroSchema.retrospective.status, RETRO_STATUSES.Draft),
           isNull(retroSchema.retrospective.reminderSentAt),
           gte(retroSchema.retrospective.scheduledAt, now),
           lte(retroSchema.retrospective.scheduledAt, oneHourFromNow),

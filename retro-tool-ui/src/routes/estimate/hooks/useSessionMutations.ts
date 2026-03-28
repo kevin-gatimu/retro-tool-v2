@@ -15,10 +15,17 @@ export function useSessionMutations(sessionId: string) {
   const navigate = useNavigate()
   const usesConvexRealtime = usesConvexForEstimates()
 
-  const invalidate = () => {
+  const refetchSession = () => {
     void queryClient.refetchQueries({
       queryKey: ['estimate-session', sessionId],
     })
+  }
+
+  const invalidate = () => {
+    if (usesConvexRealtime) {
+      return
+    }
+    refetchSession()
   }
 
   const castVoteMutation = useMutation({
@@ -47,7 +54,7 @@ export function useSessionMutations(sessionId: string) {
     },
     onError: (error: Error) => {
       // Revert optimistic update on error
-      invalidate()
+      refetchSession()
       toast.error(error.message || 'Failed to cast vote')
     },
   })
@@ -66,7 +73,7 @@ export function useSessionMutations(sessionId: string) {
     },
     onError: (error: Error) => {
       // Revert optimistic update on error
-      invalidate()
+      refetchSession()
       toast.error(error.message || 'Failed to remove vote')
     },
   })

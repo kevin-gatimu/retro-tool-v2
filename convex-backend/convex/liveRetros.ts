@@ -11,6 +11,8 @@ const retroStatus = v.union(
   v.literal('completed'),
 )
 
+// ── Lightweight projection (used by list pages) ──────────────────────────────
+
 export const upsertRetroProjection = mutation({
   args: {
     retroId: v.string(),
@@ -64,6 +66,16 @@ export const deleteRetroProjection = mutation({
     }
 
     await ctx.db.delete(existingProjection._id)
+
+    // Also clean up board snapshots for all users.
+    const boards = await ctx.db
+      .query('liveRetroBoards')
+      .withIndex('by_retro_id', (q) => q.eq('retroId', args.retroId))
+      .collect()
+    for (const board of boards) {
+      await ctx.db.delete(board._id)
+    }
+
     return { retroId: args.retroId, operation: 'deleted' as const }
   },
 })
@@ -106,5 +118,65 @@ export const listRecentRetroProjections = query({
         status: projection.status,
         updatedAt: new Date(projection.updatedAt).toISOString(),
       }))
+  },
+})
+
+// ── Full board snapshot (used by the retro detail page) ──────────────────────
+
+export const upsertRetroBoard = mutation({
+  args: {
+    retroId: v.string(),
+    userId: v.string(),
+    snapshot: v.string(),
+    updatedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = (
+      await ctx.db
+      .query('liveRetroBoards')
+      .withIndex('by_retro_id', (q) => q.eq('retroId', args.retroId))
+      .collect()
+    ).find((board) => board.userId === args.userId)
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        snapshot: args.snapshot,
+        updatedAt: args.updatedAt,
+      })
+      return { retroId: args.retroId, operation: 'updated' as const }
+    }
+
+    await ctx.db.insert('liveRetroBoards', {
+      retroId: args.retroId,
+      userId: args.userId,
+      snapshot: args.snapshot,
+      updatedAt: args.updatedAt,
+    })
+    return { retroId: args.retroId, operation: 'created' as const }
+  },
+})
+
+export const getRetroBoard = query({
+  args: {
+    retroId: v.string(),
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const board = (
+      await ctx.db
+      .query('liveRetroBoards')
+      .withIndex('by_retro_id', (q) => q.eq('retroId', args.retroId))
+      .collect()
+    ).find((item) => item.userId === args.userId)
+
+    if (!board) {
+      return null
+    }
+
+    return {
+      retroId: board.retroId,
+      snapshot: board.snapshot,
+      updatedAt: board.updatedAt,
+    }
   },
 })

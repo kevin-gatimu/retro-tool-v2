@@ -13,6 +13,7 @@ import {
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { authClient } from '@/lib/auth-client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -26,13 +27,18 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { api } from '@/lib/api'
 import { getNotificationSocket } from '@/lib/socket'
+import { usesConvexForNotifications } from '@/lib/realtime-config'
 import { NOTIFICATIONS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { Notification } from '@/common/types/notifications'
+import { NotificationConvexSync } from '@/components/notification-convex-sync'
 
 export function NotificationBell() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
+  const { data: session } = authClient.useSession()
+  const currentUserId = session?.user?.id
+  const usesConvexRealtime = usesConvexForNotifications()
   const {
     isSupported: pushSupported,
     isSubscribed: pushSubscribed,
@@ -45,13 +51,17 @@ export function NotificationBell() {
     queryKey: ['notifications'],
     queryFn: () => api.get<Notification[]>(NOTIFICATIONS_ENDPOINTS.LIST),
     staleTime: 30_000,
-    refetchInterval: 30_000,
+    refetchInterval: usesConvexRealtime ? false : 30_000,
   })
 
   const unreadNotifications = notifications.filter((n) => !n.read)
   const unreadCount = unreadNotifications.length
 
   useEffect(() => {
+    if (usesConvexRealtime) {
+      return
+    }
+
     const socket = getNotificationSocket()
 
     const onNotification = (notification: Notification) => {
@@ -84,7 +94,7 @@ export function NotificationBell() {
     return () => {
       socket.off('notification', onNotification)
     }
-  }, [queryClient, router])
+  }, [queryClient, router, usesConvexRealtime])
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['notifications'] })
@@ -123,6 +133,7 @@ export function NotificationBell() {
         return <Building2 className="h-4 w-4 text-purple-500" />
       case 'estimate_session_created':
         return <Spade className="h-4 w-4 text-amber-500" />
+      case 'retro_created':
       case 'retro_started':
         return <MessageSquare className="h-4 w-4 text-pink-500" />
       default:
@@ -144,7 +155,11 @@ export function NotificationBell() {
   }
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <>
+      {usesConvexRealtime && currentUserId ? (
+        <NotificationConvexSync userId={currentUserId} />
+      ) : null}
+      <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
@@ -246,6 +261,7 @@ export function NotificationBell() {
           </>
         )}
       </DropdownMenuContent>
-    </DropdownMenu>
+      </DropdownMenu>
+    </>
   )
 }

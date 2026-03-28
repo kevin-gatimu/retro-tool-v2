@@ -3,6 +3,7 @@ export type RealtimeBackend = 'socket-io' | 'convex'
 export interface RealtimeFeatureFlags {
   estimatesRealtimeBackend: RealtimeBackend
   retrosRealtimeBackend: RealtimeBackend
+  notificationsRealtimeBackend: RealtimeBackend
 }
 
 export interface ProjectionSyncEnvelope<TPayload> {
@@ -33,5 +34,17 @@ export interface RetroProjectionPayload {
     | 'completed'
   currentDiscussionCardId?: string
   currentDiscussionActionItemId?: string
+  updatedAt: string
+}
+
+export interface NotificationProjectionPayload {
+  notificationId: string
+  userId: string
+  type: string
+  title: string
+  message: string
+  link?: string
+  read: boolean
+  createdAt: string
   updatedAt: string
 }

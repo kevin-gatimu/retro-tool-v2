@@ -1,10 +1,17 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { RetroProjectionPayload } from '@retro-tool/contracts'
 import { useQuery as useConvexQuery } from 'convex/react'
 import { anyApi } from 'convex/server'
+import type { RetroDetail } from '@/common/types/retros'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import type { CarriedForwardItem } from '../types'
 
-const retroProjectionQuery = anyApi.liveRetros.getRetroProjection
+const retroBoardQuery = anyApi.liveRetros.getRetroBoard
+
+type RetroBoardSnapshot = {
+    retro: RetroDetail
+    previousCarriedItems?: CarriedForwardItem[]
+}
 
 interface RetroConvexSyncProps {
     retroId: string
@@ -12,30 +19,45 @@ interface RetroConvexSyncProps {
 
 export function RetroConvexSync({ retroId }: RetroConvexSyncProps) {
     const queryClient = useQueryClient()
-    const lastUpdatedAtRef = useRef<string | null>(null)
-    const projection = useConvexQuery(retroProjectionQuery, {
+    const { data: currentUser } = useCurrentUser()
+    const lastUpdatedAtRef = useRef<number | null>(null)
+    const board = useConvexQuery(retroBoardQuery, {
         retroId,
-    }) as RetroProjectionPayload | null | undefined
+        userId: currentUser?.id ?? '',
+    }) as
+        | { retroId: string; snapshot: string; updatedAt: number }
+        | null
+        | undefined
 
+    // Hydrate TanStack cache from Convex snapshots to avoid REST polling.
     useEffect(() => {
-        if (!projection?.updatedAt) {
+        if (!board?.updatedAt || !board.snapshot) {
             return
         }
 
-        if (
-            lastUpdatedAtRef.current !== null &&
-            lastUpdatedAtRef.current !== projection.updatedAt
-        ) {
-            void queryClient.refetchQueries({
-                queryKey: ['retro', retroId],
-            })
-            void queryClient.invalidateQueries({
-                queryKey: ['retro-previous-carried', retroId],
-            })
+        if (lastUpdatedAtRef.current === board.updatedAt) {
+            return
         }
 
-        lastUpdatedAtRef.current = projection.updatedAt
-    }, [projection?.updatedAt, queryClient, retroId])
+        try {
+            const parsed = JSON.parse(board.snapshot) as RetroBoardSnapshot
+
+            if (parsed?.retro) {
+                queryClient.setQueryData(['retro', retroId], parsed.retro)
+            }
+
+            if (Array.isArray(parsed?.previousCarriedItems)) {
+                queryClient.setQueryData(
+                    ['retro-previous-carried', retroId],
+                    parsed.previousCarriedItems,
+                )
+            }
+
+            lastUpdatedAtRef.current = board.updatedAt
+        } catch {
+            // Ignore malformed snapshots and keep the last known cache values.
+        }
+    }, [board?.updatedAt, board?.snapshot, queryClient, retroId])
 
     return null
 }

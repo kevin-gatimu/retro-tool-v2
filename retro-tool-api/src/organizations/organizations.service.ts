@@ -32,7 +32,13 @@ import { CommonService } from '../common/common.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CacheService } from '../cache/cache.service';
 import { CacheKeys } from '../cache/cache-keys';
-import { EMAIL_LOG_TYPES } from '../common/enums';
+import {
+  EMAIL_LOG_TYPES,
+  ORG_MEMBER_ROLES,
+  TOrgAssignableRole,
+  TOrgMemberRole,
+  USER_STATUSES,
+} from '../common/enums';
 
 @Injectable()
 export class OrganizationsService {
@@ -136,7 +142,7 @@ export class OrganizationsService {
       id: generateId(),
       organizationId: orgId,
       userId,
-      role: 'org-owner',
+      role: ORG_MEMBER_ROLES.Owner,
     });
 
     await this.cacheService.delPattern(CacheKeys.userOrgsPattern(userId));
@@ -567,7 +573,7 @@ export class OrganizationsService {
     userId: string,
     orgId: string,
     memberId: string,
-    role: 'member' | 'org-admin',
+    role: TOrgAssignableRole,
   ) {
     const isAdmin = await this.isSystemAdmin(userId);
     const isOwner = await this.isOrgOwner(userId, orgId);
@@ -649,7 +655,7 @@ export class OrganizationsService {
     userId: string,
     orgId: string,
     email: string,
-    role: 'member' | 'org-admin' | 'org-owner',
+    role: TOrgMemberRole,
   ) {
     const isAdmin = await this.isSystemAdmin(userId);
     const isOrgAdmin = await this.isOrgAdmin(userId, orgId);
@@ -661,7 +667,7 @@ export class OrganizationsService {
     }
 
     // Only org owners (or system admins) can assign the org-owner role
-    if (role === 'org-owner') {
+    if (role === ORG_MEMBER_ROLES.Owner) {
       const isOwner = await this.isOrgOwner(userId, orgId);
       if (!isAdmin && !isOwner) {
         throw new ForbiddenException(
@@ -715,11 +721,15 @@ export class OrganizationsService {
     // Auto-approve pending accounts when added to an org
     await this.database
       .update(userSchema.user)
-      .set({ status: 'approved', approvedAt: new Date(), approvedById: userId })
+      .set({
+        status: USER_STATUSES.Approved,
+        approvedAt: new Date(),
+        approvedById: userId,
+      })
       .where(
         and(
           eq(userSchema.user.id, invitee.id),
-          eq(userSchema.user.status, 'pending'),
+          eq(userSchema.user.status, USER_STATUSES.Pending),
         ),
       );
 

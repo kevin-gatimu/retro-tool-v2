@@ -34,10 +34,13 @@ import {
   BulkUpdateStatusDto,
 } from './dtos';
 import {
+  ADMIN_ACTION_LOG_ACTIONS,
   TUserStatusFilter,
   TUserRoleFilter,
   getAdminActionFromStatus,
   EMAIL_LOG_TYPES,
+  USER_ROLES,
+  USER_STATUSES,
 } from '../common/enums';
 import { CommonService } from '../common/common.service';
 import { CacheService } from '../cache/cache.service';
@@ -73,7 +76,7 @@ export class UsersService {
   }
 
   async searchApproved(search?: string) {
-    const conditions = [eq(userSchema.user.status, 'approved')];
+    const conditions = [eq(userSchema.user.status, USER_STATUSES.Approved)];
 
     if (search && search.length > 0) {
       const term = `%${search}%`;
@@ -117,7 +120,8 @@ export class UsersService {
 
     const isSelf = requesterId === targetId;
     const isAdmin =
-      requester?.role === 'super-admin' || requester?.role === 'system-admin';
+      requester?.role === USER_ROLES.SuperAdmin ||
+      requester?.role === USER_ROLES.SystemAdmin;
 
     if (!isSelf && !isAdmin) {
       throw new ForbiddenException('You can only delete your own account');
@@ -133,11 +137,11 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    if (target.role === 'super-admin') {
+    if (target.role === USER_ROLES.SuperAdmin) {
       throw new ForbiddenException('Super admin accounts cannot be deleted');
     }
 
-    if (target.role === 'system-admin') {
+    if (target.role === USER_ROLES.SystemAdmin) {
       throw new ForbiddenException('System admin accounts cannot be deleted');
     }
 
@@ -148,8 +152,8 @@ export class UsersService {
         .where(
           and(
             or(
-              eq(userSchema.user.role, 'super-admin'),
-              eq(userSchema.user.role, 'system-admin'),
+              eq(userSchema.user.role, USER_ROLES.SuperAdmin),
+              eq(userSchema.user.role, USER_ROLES.SystemAdmin),
             ),
             ne(userSchema.user.id, targetId),
           ),
@@ -164,7 +168,7 @@ export class UsersService {
       await this.commonService.logAdminAction(
         requesterId,
         targetId,
-        'user_deleted',
+        ADMIN_ACTION_LOG_ACTIONS.UserDeleted,
       );
     }
 
@@ -260,22 +264,22 @@ export class UsersService {
     const [pendingCount] = await this.database
       .select({ count: count() })
       .from(userSchema.user)
-      .where(buildWhere(eq(userSchema.user.status, 'pending')));
+      .where(buildWhere(eq(userSchema.user.status, USER_STATUSES.Pending)));
 
     const [approvedCount] = await this.database
       .select({ count: count() })
       .from(userSchema.user)
-      .where(buildWhere(eq(userSchema.user.status, 'approved')));
+      .where(buildWhere(eq(userSchema.user.status, USER_STATUSES.Approved)));
 
     const [suspendedCount] = await this.database
       .select({ count: count() })
       .from(userSchema.user)
-      .where(buildWhere(eq(userSchema.user.status, 'suspended')));
+      .where(buildWhere(eq(userSchema.user.status, USER_STATUSES.Suspended)));
 
     const [rejectedCount] = await this.database
       .select({ count: count() })
       .from(userSchema.user)
-      .where(buildWhere(eq(userSchema.user.status, 'rejected')));
+      .where(buildWhere(eq(userSchema.user.status, USER_STATUSES.Rejected)));
 
     const [adminsCount] = await this.database
       .select({ count: count() })
@@ -283,8 +287,8 @@ export class UsersService {
       .where(
         buildWhere(
           or(
-            eq(userSchema.user.role, 'super-admin'),
-            eq(userSchema.user.role, 'system-admin'),
+            eq(userSchema.user.role, USER_ROLES.SuperAdmin),
+            eq(userSchema.user.role, USER_ROLES.SystemAdmin),
           ) as ReturnType<typeof eq>,
         ),
       );
@@ -327,8 +331,8 @@ export class UsersService {
       .update(userSchema.user)
       .set({
         status: data.status,
-        approvedAt: data.status === 'approved' ? new Date() : null,
-        approvedById: data.status === 'approved' ? adminId : null,
+        approvedAt: data.status === USER_STATUSES.Approved ? new Date() : null,
+        approvedById: data.status === USER_STATUSES.Approved ? adminId : null,
         updatedAt: new Date(),
       })
       .where(eq(userSchema.user.id, targetId))
@@ -343,7 +347,7 @@ export class UsersService {
     );
 
     // Send approval email if status is 'approved'
-    if (data.status === 'approved' && updated) {
+    if (data.status === USER_STATUSES.Approved && updated) {
       const appUrl =
         this.configService.get('frontend.url', { infer: true }) ?? '';
       void this.emailService
@@ -366,21 +370,21 @@ export class UsersService {
   async updateRole(adminId: string, targetId: string, data: UpdateRoleDto) {
     await this.commonService.requireSystemAdmin(adminId);
 
-    if (data.role === 'super-admin') {
+    if (data.role === USER_ROLES.SuperAdmin) {
       throw new ForbiddenException('Cannot assign super-admin role');
     }
 
     const isSuperAdmin = await this.commonService.isSuperAdmin(adminId);
 
-    if (data.role === 'member' && targetId === adminId) {
+    if (data.role === USER_ROLES.Member && targetId === adminId) {
       const otherAdmins = await this.database
         .select()
         .from(userSchema.user)
         .where(
           and(
             or(
-              eq(userSchema.user.role, 'super-admin'),
-              eq(userSchema.user.role, 'system-admin'),
+              eq(userSchema.user.role, USER_ROLES.SuperAdmin),
+              eq(userSchema.user.role, USER_ROLES.SystemAdmin),
             ),
             ne(userSchema.user.id, adminId),
           ),
@@ -400,15 +404,15 @@ export class UsersService {
     if (!target) throw new NotFoundException('User not found');
 
     // System-admin transitions are restricted to super-admin via dedicated flows.
-    if (data.role === 'system-admin' && !isSuperAdmin) {
+    if (data.role === USER_ROLES.SystemAdmin && !isSuperAdmin) {
       throw new ForbiddenException(
         'Only super-admin can promote users to system-admin',
       );
     }
 
     if (
-      target.role === 'system-admin' &&
-      data.role !== 'system-admin' &&
+      target.role === USER_ROLES.SystemAdmin &&
+      data.role !== USER_ROLES.SystemAdmin &&
       !isSuperAdmin
     ) {
       throw new ForbiddenException(
@@ -416,7 +420,7 @@ export class UsersService {
       );
     }
 
-    if (target.role === 'super-admin') {
+    if (target.role === USER_ROLES.SuperAdmin) {
       throw new ForbiddenException('Cannot modify super-admin role');
     }
 
@@ -429,7 +433,7 @@ export class UsersService {
     await this.commonService.logAdminAction(
       adminId,
       targetId,
-      'user_role_changed',
+      ADMIN_ACTION_LOG_ACTIONS.UserRoleChanged,
       {
         previousRole: target.role,
         newRole: data.role,
@@ -451,27 +455,27 @@ export class UsersService {
 
     if (!target) throw new NotFoundException('User not found');
 
-    if (target.role === 'super-admin') {
+    if (target.role === USER_ROLES.SuperAdmin) {
       throw new ForbiddenException('Cannot modify super-admin role');
     }
 
-    if (target.role === 'system-admin') {
+    if (target.role === USER_ROLES.SystemAdmin) {
       return target;
     }
 
     const [updated] = await this.database
       .update(userSchema.user)
-      .set({ role: 'system-admin', updatedAt: new Date() })
+      .set({ role: USER_ROLES.SystemAdmin, updatedAt: new Date() })
       .where(eq(userSchema.user.id, targetId))
       .returning();
 
     await this.commonService.logAdminAction(
       adminId,
       targetId,
-      'user_role_changed',
+      ADMIN_ACTION_LOG_ACTIONS.UserRoleChanged,
       {
         previousRole: target.role,
-        newRole: 'system-admin',
+        newRole: USER_ROLES.SystemAdmin,
       },
     );
 
@@ -490,27 +494,27 @@ export class UsersService {
 
     if (!target) throw new NotFoundException('User not found');
 
-    if (target.role === 'super-admin') {
+    if (target.role === USER_ROLES.SuperAdmin) {
       throw new ForbiddenException('Cannot modify super-admin role');
     }
 
-    if (target.role !== 'system-admin') {
+    if (target.role !== USER_ROLES.SystemAdmin) {
       throw new BadRequestException('Target user is not a system-admin');
     }
 
     const [updated] = await this.database
       .update(userSchema.user)
-      .set({ role: 'member', updatedAt: new Date() })
+      .set({ role: USER_ROLES.Member, updatedAt: new Date() })
       .where(eq(userSchema.user.id, targetId))
       .returning();
 
     await this.commonService.logAdminAction(
       adminId,
       targetId,
-      'user_role_changed',
+      ADMIN_ACTION_LOG_ACTIONS.UserRoleChanged,
       {
         previousRole: target.role,
-        newRole: 'member',
+        newRole: USER_ROLES.Member,
       },
     );
 
@@ -535,11 +539,11 @@ export class UsersService {
 
     const adminIsSuperAdmin = await this.commonService.isSuperAdmin(adminId);
 
-    if (target.role === 'super-admin') {
+    if (target.role === USER_ROLES.SuperAdmin) {
       throw new ForbiddenException('Cannot suspend the super-admin');
     }
 
-    if (target.role === 'system-admin' && !adminIsSuperAdmin) {
+    if (target.role === USER_ROLES.SystemAdmin && !adminIsSuperAdmin) {
       throw new ForbiddenException(
         'Only super-admin can suspend a system-admin',
       );
@@ -548,7 +552,7 @@ export class UsersService {
     const [updated] = await this.database
       .update(userSchema.user)
       .set({
-        status: 'suspended',
+        status: USER_STATUSES.Suspended,
         suspendedAt: new Date(),
         suspendedById: adminId,
         suspendedReason: data.reason ?? null,
@@ -560,7 +564,7 @@ export class UsersService {
     await this.commonService.logAdminAction(
       adminId,
       targetId,
-      'user_suspended',
+      ADMIN_ACTION_LOG_ACTIONS.UserSuspended,
       {
         reason: data.reason,
       },
@@ -581,7 +585,7 @@ export class UsersService {
     if (!target) throw new NotFoundException('User not found');
 
     const adminIsSuperAdmin = await this.commonService.isSuperAdmin(adminId);
-    if (target.role === 'system-admin' && !adminIsSuperAdmin) {
+    if (target.role === USER_ROLES.SystemAdmin && !adminIsSuperAdmin) {
       throw new ForbiddenException(
         'Only super-admin can reactivate a system-admin',
       );
@@ -590,7 +594,7 @@ export class UsersService {
     const [updated] = await this.database
       .update(userSchema.user)
       .set({
-        status: 'approved',
+        status: USER_STATUSES.Approved,
         suspendedAt: null,
         suspendedById: null,
         suspendedReason: null,
@@ -602,7 +606,7 @@ export class UsersService {
     await this.commonService.logAdminAction(
       adminId,
       targetId,
-      'user_reactivated',
+      ADMIN_ACTION_LOG_ACTIONS.UserReactivated,
     );
 
     return updated;
@@ -620,8 +624,8 @@ export class UsersService {
       .filter(
         (u) =>
           u.id !== adminId &&
-          u.role !== 'super-admin' &&
-          u.role !== 'system-admin',
+          u.role !== USER_ROLES.SuperAdmin &&
+          u.role !== USER_ROLES.SystemAdmin,
       )
       .map((u) => u.id);
 
@@ -634,13 +638,13 @@ export class UsersService {
       updatedAt: new Date(),
     };
 
-    if (data.status === 'approved') {
+    if (data.status === USER_STATUSES.Approved) {
       updateData.approvedAt = new Date();
       updateData.approvedById = adminId;
       updateData.suspendedAt = null;
       updateData.suspendedById = null;
       updateData.suspendedReason = null;
-    } else if (data.status === 'suspended') {
+    } else if (data.status === USER_STATUSES.Suspended) {
       updateData.suspendedAt = new Date();
       updateData.suspendedById = adminId;
       updateData.suspendedReason = data.reason ?? null;
@@ -662,7 +666,7 @@ export class UsersService {
       });
 
       // Send approval email if status is 'approved'
-      if (data.status === 'approved') {
+      if (data.status === USER_STATUSES.Approved) {
         const user = targets.find((u) => u.id === targetId);
         if (user) {
           void this.emailService
@@ -829,7 +833,9 @@ export class UsersService {
           ? options.adminRole
           : undefined;
       effectiveAdminRole =
-        requested && requested !== 'super-admin' ? requested : undefined;
+        requested && requested !== USER_ROLES.SuperAdmin
+          ? requested
+          : undefined;
     } else {
       effectiveAdminRole =
         options?.adminRole && options.adminRole !== 'all'
@@ -916,8 +922,8 @@ export class UsersService {
     const [updated] = await this.database
       .update(userSchema.user)
       .set({
-        role: 'system-admin',
-        status: 'approved',
+        role: USER_ROLES.SystemAdmin,
+        status: USER_STATUSES.Approved,
         approvedAt: new Date(),
         updatedAt: new Date(),
       })

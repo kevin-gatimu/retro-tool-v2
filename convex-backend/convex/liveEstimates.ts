@@ -8,6 +8,8 @@ const estimateSessionStatus = v.union(
   v.literal('completed'),
 )
 
+// ── Lightweight projection (used by list pages) ──────────────────────────────
+
 export const upsertSessionProjection = mutation({
   args: {
     sessionId: v.string(),
@@ -39,6 +41,37 @@ export const upsertSessionProjection = mutation({
 
     await ctx.db.insert('liveEstimateSessions', nextProjection)
     return { sessionId: args.sessionId, operation: 'created' as const }
+  },
+})
+
+export const deleteSessionProjection = mutation({
+  args: {
+    sessionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query('liveEstimateSessions')
+      .withIndex('by_session_id', (q) =>
+        q.eq('sessionId', args.sessionId),
+      )
+      .unique()
+
+    if (!existing) {
+      return { sessionId: args.sessionId, operation: 'noop' as const }
+    }
+
+    await ctx.db.delete(existing._id)
+
+    // Also clean up board snapshots for all users.
+    const boards = await ctx.db
+      .query('liveEstimateBoards')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .collect()
+    for (const board of boards) {
+      await ctx.db.delete(board._id)
+    }
+
+    return { sessionId: args.sessionId, operation: 'deleted' as const }
   },
 })
 
@@ -80,5 +113,65 @@ export const listActiveSessionProjections = query({
         status: projection.status,
         updatedAt: new Date(projection.updatedAt).toISOString(),
       }))
+  },
+})
+
+// ── Full board snapshot (used by the estimate detail page) ───────────────────
+
+export const upsertEstimateBoard = mutation({
+  args: {
+    sessionId: v.string(),
+    userId: v.string(),
+    snapshot: v.string(),
+    updatedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = (
+      await ctx.db
+      .query('liveEstimateBoards')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .collect()
+    ).find((board) => board.userId === args.userId)
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        snapshot: args.snapshot,
+        updatedAt: args.updatedAt,
+      })
+      return { sessionId: args.sessionId, operation: 'updated' as const }
+    }
+
+    await ctx.db.insert('liveEstimateBoards', {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      snapshot: args.snapshot,
+      updatedAt: args.updatedAt,
+    })
+    return { sessionId: args.sessionId, operation: 'created' as const }
+  },
+})
+
+export const getEstimateBoard = query({
+  args: {
+    sessionId: v.string(),
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const board = (
+      await ctx.db
+      .query('liveEstimateBoards')
+      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+      .collect()
+    ).find((item) => item.userId === args.userId)
+
+    if (!board) {
+      return null
+    }
+
+    return {
+      sessionId: board.sessionId,
+      snapshot: board.snapshot,
+      updatedAt: board.updatedAt,
+    }
   },
 })

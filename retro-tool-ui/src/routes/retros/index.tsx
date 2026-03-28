@@ -10,7 +10,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -49,6 +49,7 @@ import { RETROS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { Retro } from '@/common/types/retros'
 import { authClient } from '@/lib/auth-client'
 import { usesConvexForRetros } from '@/lib/realtime-config'
+import { getRetroSocket } from '@/lib/socket'
 import { RetroListConvexSync } from './components/retro-list-convex-sync'
 
 const PAGE_SIZE_OPTIONS = [6, 12, 24, 48]
@@ -153,6 +154,24 @@ function RetrosPage() {
 
   const handleRefresh = () =>
     queryClient.invalidateQueries({ queryKey: ['retros', page, limit] })
+
+  useEffect(() => {
+    const socket = getRetroSocket()
+
+    const onRetroListChanged = () => {
+      void queryClient.invalidateQueries({ queryKey: ['retros'] })
+    }
+
+    socket.on('retro-list-changed', onRetroListChanged)
+
+    if (!socket.connected) {
+      socket.connect()
+    }
+
+    return () => {
+      socket.off('retro-list-changed', onRetroListChanged)
+    }
+  }, [queryClient])
 
   return (
     <div className="space-y-6">

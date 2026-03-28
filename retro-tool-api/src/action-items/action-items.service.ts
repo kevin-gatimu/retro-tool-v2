@@ -13,6 +13,7 @@ import * as teamSchema from '../teams/schema';
 import { generateId } from '../lib/utils';
 import { CreateActionItemDto, UpdateActionItemDto } from './dto';
 import { RetrosGateway } from '../retros/retros.gateway';
+import { ACTION_ITEM_STATUSES, RETRO_STATUSES } from '../common/enums';
 
 type Database = NodePgDatabase<typeof retroSchema & typeof teamSchema>;
 
@@ -48,7 +49,7 @@ export class ActionItemsService {
         title: dto.title,
         description: dto.description,
         assigneeId: dto.assigneeId,
-        status: dto.status ?? 'pending',
+        status: dto.status ?? ACTION_ITEM_STATUSES.Pending,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
       })
       .returning();
@@ -142,7 +143,7 @@ export class ActionItemsService {
     // If the action item is now completed, clear currentDiscussionActionItemId
     // on ANY retro that has this item as the current discussion
     // (needed for carried-forward items discussed in a different retro)
-    if (dto.status === 'completed') {
+    if (dto.status === ACTION_ITEM_STATUSES.Completed) {
       await this.database
         .update(retroSchema.retrospective)
         .set({
@@ -159,7 +160,7 @@ export class ActionItemsService {
 
     await this.emitRetroUpdatesForActionItem(
       item.retroId,
-      dto.status === 'completed' ? actionItemId : undefined,
+      dto.status === ACTION_ITEM_STATUSES.Completed ? actionItemId : undefined,
     );
 
     return updated;
@@ -384,8 +385,8 @@ export class ActionItemsService {
         and(
           eq(retroSchema.retrospective.teamId, retro.teamId),
           inArray(retroSchema.retrospective.status, [
-            'discussing',
-            'completed',
+            RETRO_STATUSES.Discussing,
+            RETRO_STATUSES.Completed,
           ]),
         ),
       );

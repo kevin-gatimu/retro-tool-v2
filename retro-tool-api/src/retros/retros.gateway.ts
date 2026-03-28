@@ -147,6 +147,10 @@ export class RetrosGateway implements OnGatewayConnection, OnGatewayDisconnect {
     void this.retrosProjectionSyncService.syncRetroProjection(retroId);
   }
 
+  emitRetroListChanged(): void {
+    this.server.emit('retro-list-changed');
+  }
+
   private extractToken(cookieHeader: string): string | null {
     const match = cookieHeader.match(
       /(?:^|;\s*)better-auth\.session_token=([^;]+)/,

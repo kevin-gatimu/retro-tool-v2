@@ -80,6 +80,10 @@ pnpm test
 Useful focused commands:
 
 ```bash
+pnpm local:up
+pnpm local:infra
+pnpm local:down
+pnpm local:logs
 pnpm dev:api
 pnpm dev:ui
 pnpm dev:convex
@@ -105,8 +109,10 @@ There are two practical ways to run the project locally.
 
 This is the fastest way to boot the whole application with one command.
 
+The Docker workflow reads values from [docker/.env](docker/.env). The committed template is [docker/.env.example](docker/.env.example).
+
 ```bash
-docker compose -f docker/docker-compose.local.yml up --build
+pnpm local:up
 ```
 
 Services exposed by the local stack:
@@ -124,7 +130,8 @@ Services exposed by the local stack:
 Notes:
 
 - The compose file creates a local Postgres server and initializes multiple databases.
-- `CONVEX_SYNC_ADMIN_KEY` is empty by default in the API container config. Convex projection sync will not work until you provide a valid admin key.
+- The local Docker env already sets `CONVEX_SYNC_ADMIN_KEY=replace-me` to match the default admin key shown by the self-hosted Convex dashboard.
+- The local Docker env also enables Convex-backed invalidation in the UI build by default.
 - This path is best when you want runtime parity with the intended container deployment model.
 
 ### Option 2: Hybrid local development with pnpm
@@ -134,7 +141,7 @@ This is the better option when you want live reload while still using local infr
 Start infrastructure first:
 
 ```bash
-docker compose -f docker/docker-compose.local.yml up -d postgres redis convex-backend convex-dashboard
+pnpm local:infra
 ```
 
 Then run the apps directly:
@@ -156,6 +163,8 @@ pnpm dev:convex
 
 No root `.env` file is required.
 
+For the containerized local stack, start from [docker/.env.example](docker/.env.example) and use `docker/.env` as the active local file.
+
 Install dependencies once:
 
 ```bash
@@ -164,11 +173,20 @@ pnpm install
 
 ### 2. API environment
 
-Create the API env file:
+Start from [retro-tool-api/.env.example](retro-tool-api/.env.example) and create `retro-tool-api/.env`.
+
+Recommended local values are already included in that example file.
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item retro-tool-api/.env.example retro-tool-api/.env
+```
+
+On macOS or Linux:
 
 ```bash
-cd retro-tool-api
-cp .env.example .env
+cp retro-tool-api/.env.example retro-tool-api/.env
 ```
 
 Minimum values to review in [retro-tool-api/.env.example](retro-tool-api/.env.example):
@@ -185,9 +203,11 @@ Optional but important for the Convex integration:
 - `CONVEX_SYNC_URL`
 - `CONVEX_SYNC_ADMIN_KEY`
 
+Production-specific values belong in `retro-tool-api/.env.production`.
+
 ### 3. UI environment
 
-The UI uses Vite env vars. Create `retro-tool-ui/.env.local` manually.
+The UI uses Vite env vars. Start from [retro-tool-ui/.env.example](retro-tool-ui/.env.example) and create `retro-tool-ui/.env`.
 
 Recommended local values:
 
@@ -202,13 +222,25 @@ VITE_RETROS_REALTIME_BACKEND=socket-io
 
 If you want to test Convex-backed invalidation locally, switch one or both feature flags to `convex`.
 
+On Windows PowerShell:
+
+```powershell
+Copy-Item retro-tool-ui/.env.example retro-tool-ui/.env
+```
+
+On macOS or Linux:
+
+```bash
+cp retro-tool-ui/.env.example retro-tool-ui/.env
+```
+
 ### 4. Convex environment
 
 Create the Convex env file:
 
 ```bash
 cd convex-backend
-cp .env.example .env.local
+cp .env.example .env
 ```
 
 See [convex-backend/.env.example](convex-backend/.env.example) for the current variables:
@@ -218,22 +250,40 @@ See [convex-backend/.env.example](convex-backend/.env.example) for the current v
 - `CONVEX_CLOUD_URL`
 - `CONVEX_DEPLOYMENT`
 
+Production-specific values belong in `convex-backend/.env.production`.
+
 ## Recommended Local Run Order
 
 ### With Docker only
 
 ```bash
-docker compose -f docker/docker-compose.local.yml up --build
+pnpm local:up
 ```
 
 ### With pnpm app processes
 
 ```bash
 pnpm install
-docker compose -f docker/docker-compose.local.yml up -d postgres redis convex-backend convex-dashboard
+pnpm local:infra
 pnpm dev:api
 pnpm dev:ui
 ```
+
+### With VS Code tasks
+
+The workspace now includes [.vscode/tasks.json](.vscode/tasks.json) with committed local-development tasks.
+
+Available tasks:
+
+- `Local Infra`
+- `API Dev`
+- `UI Dev`
+- `Convex Dev`
+- `Local App Dev`
+- `Local App Dev With Convex`
+- `Local Docker Stack`
+
+Use `Terminal: Run Task` in VS Code and choose the flow you want.
 
 ## Validation Commands
 

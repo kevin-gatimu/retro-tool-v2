@@ -37,6 +37,44 @@ export default defineSchema({
     .index('by_retro_id', ['retroId'])
     .index('by_team_id', ['teamId']),
 
+  // Full retro board snapshot pushed from NestJS after each mutation.
+  // The UI subscribes to this instead of polling the REST API.
+  liveRetroBoards: defineTable({
+    retroId: v.string(),
+    userId: v.string(),
+    // JSON-serialised RetroDetail (cards, votes, comments, action items, etc.)
+    snapshot: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_retro_id', ['retroId'])
+    .index('by_retro_user', ['retroId', 'userId']),
+
+  // Full estimate session snapshot pushed from NestJS after each mutation.
+  liveEstimateBoards: defineTable({
+    sessionId: v.string(),
+    userId: v.string(),
+    // JSON-serialised EstimateSession (rounds, votes, participants, etc.)
+    snapshot: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_session_id', ['sessionId'])
+    .index('by_session_user', ['sessionId', 'userId']),
+
+  liveNotifications: defineTable({
+    notificationId: v.string(),
+    userId: v.string(),
+    type: v.string(),
+    title: v.string(),
+    message: v.string(),
+    link: v.optional(v.string()),
+    read: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_notification_id', ['notificationId'])
+    .index('by_user_id', ['userId'])
+    .index('by_user_read', ['userId', 'read']),
+
   livePresence: defineTable({
     scopeType: v.union(v.literal('estimate'), v.literal('retro')),
     scopeId: v.string(),

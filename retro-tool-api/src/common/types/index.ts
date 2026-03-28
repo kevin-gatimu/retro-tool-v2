@@ -29,3 +29,11 @@ export type ClientData = { userId?: string };
  * Shared period type for reports filters
  */
 export type ReportPeriod = 'week' | 'month' | 'quarter' | 'year';
+
+/**
+ * Shared response shape returned by Convex function endpoints.
+ */
+export type ConvexFunctionResponse = {
+  status: 'success' | 'error';
+  errorMessage?: string;
+};

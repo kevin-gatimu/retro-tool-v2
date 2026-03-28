@@ -4,14 +4,12 @@ import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import type { Config } from '../config/configuration';
+import type { ConvexFunctionResponse } from '../common/types';
 import * as retroSchema from './schema';
+import * as teamSchema from '../teams/schema';
+import { RetrosService } from './retros.service';
 
-type Database = NodePgDatabase<typeof retroSchema>;
-
-interface ConvexFunctionResponse {
-  status: 'success' | 'error';
-  errorMessage?: string;
-}
+type Database = NodePgDatabase<typeof retroSchema & typeof teamSchema>;
 
 @Injectable()
 export class RetrosProjectionSyncService {
@@ -20,6 +18,7 @@ export class RetrosProjectionSyncService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly configService: ConfigService<Config, true>,
+    private readonly retrosService: RetrosService,
   ) {}
 
   async syncRetroProjection(retroId: string): Promise<void> {
@@ -37,7 +36,6 @@ export class RetrosProjectionSyncService {
           retroSchema.retrospective.currentDiscussionCardId,
         currentDiscussionActionItemId:
           retroSchema.retrospective.currentDiscussionActionItemId,
-        updatedAt: retroSchema.retrospective.updatedAt,
       })
       .from(retroSchema.retrospective)
       .where(eq(retroSchema.retrospective.id, retroId))
@@ -47,6 +45,8 @@ export class RetrosProjectionSyncService {
       return;
     }
 
+    const updatedAt = Date.now();
+
     await this.runMutation('liveRetros:upsertRetroProjection', {
       retroId: retro.id,
       teamId: retro.teamId,
@@ -54,8 +54,10 @@ export class RetrosProjectionSyncService {
       currentDiscussionCardId: retro.currentDiscussionCardId ?? undefined,
       currentDiscussionActionItemId:
         retro.currentDiscussionActionItemId ?? undefined,
-      updatedAt: retro.updatedAt.getTime(),
+      updatedAt,
     });
+
+    await this.syncRetroBoardSnapshots(retro.id, retro.teamId, updatedAt);
   }
 
   async deleteRetroProjection(retroId: string): Promise<void> {
@@ -67,6 +69,48 @@ export class RetrosProjectionSyncService {
     await this.runMutation('liveRetros:deleteRetroProjection', {
       retroId,
     });
+  }
+
+  private async syncRetroBoardSnapshots(
+    retroId: string,
+    teamId: string,
+    updatedAt: number,
+  ): Promise<void> {
+    const members = await this.database
+      .select({ userId: teamSchema.teamMember.userId })
+      .from(teamSchema.teamMember)
+      .where(eq(teamSchema.teamMember.teamId, teamId));
+
+    if (members.length === 0) {
+      return;
+    }
+
+    await Promise.all(
+      members.map(async ({ userId }) => {
+        try {
+          const [retro, previousCarriedItems] = await Promise.all([
+            this.retrosService.getRetro(userId, retroId),
+            this.retrosService.getPreviousCarriedForward(userId, retroId),
+          ]);
+
+          await this.runMutation('liveRetros:upsertRetroBoard', {
+            retroId,
+            userId,
+            snapshot: JSON.stringify({
+              retro,
+              previousCarriedItems,
+            }),
+            updatedAt,
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'unknown error';
+          this.logger.warn(
+            `Convex retro board snapshot sync failed for retroId=${retroId} userId=${userId}: ${message}`,
+          );
+        }
+      }),
+    );
   }
 
   private async runMutation(path: string, args: object): Promise<void> {

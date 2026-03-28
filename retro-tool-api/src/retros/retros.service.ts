@@ -1,6 +1,7 @@
 import {
   Injectable,
   Inject,
+  Logger,
   ForbiddenException,
   NotFoundException,
   BadRequestException,
@@ -37,7 +38,15 @@ import { CreateTemplateDto } from './dtos/create-template.dto';
 import { UpdateTemplateDto } from './dtos/update-template.dto';
 import { BUILT_IN_TEMPLATES } from '../common/data/built-in-templates';
 import { NotificationsService } from '../notifications/notifications.service';
-import { EMAIL_LOG_TYPES } from '../common/enums';
+import {
+  ACTION_ITEM_STATUSES,
+  EMAIL_LOG_TYPES,
+  ORG_MEMBER_ROLES,
+  RETRO_STATUSES,
+  RETRO_VOTE_TYPES,
+  TEAM_MEMBER_TAGS,
+  USER_ROLES,
+} from '../common/enums';
 import { generateId } from '../lib/utils';
 import type {
   MergeMetadata,
@@ -85,6 +94,8 @@ const removeMergeMetadata = (content: string): string =>
 
 @Injectable()
 export class RetrosService {
+  private readonly logger = new Logger(RetrosService.name);
+
   constructor(
     @Inject(DATABASE_CONNECTION)
     private readonly database: Database,
@@ -121,7 +132,8 @@ export class RetrosService {
       .limit(1);
 
     const isSystemAdmin =
-      fullUser?.role === 'super-admin' || fullUser?.role === 'system-admin';
+      fullUser?.role === USER_ROLES.SuperAdmin ||
+      fullUser?.role === USER_ROLES.SystemAdmin;
 
     if (isSystemAdmin) {
       return this.database
@@ -216,7 +228,8 @@ export class RetrosService {
       .limit(1);
 
     const isAdmin =
-      fullUser?.role === 'super-admin' || fullUser?.role === 'system-admin';
+      fullUser?.role === USER_ROLES.SuperAdmin ||
+      fullUser?.role === USER_ROLES.SystemAdmin;
 
     const conditions: SQL[] = [];
     const normalizedSearch = search?.trim();
@@ -348,7 +361,8 @@ export class RetrosService {
       .limit(1);
 
     const isSystemAdmin =
-      fullUser?.role === 'super-admin' || fullUser?.role === 'system-admin';
+      fullUser?.role === USER_ROLES.SuperAdmin ||
+      fullUser?.role === USER_ROLES.SystemAdmin;
 
     if (organizationId) {
       if (isSystemAdmin) return;
@@ -364,7 +378,11 @@ export class RetrosService {
         )
         .limit(1);
 
-      if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      if (
+        !membership ||
+        (membership.role !== ORG_MEMBER_ROLES.Owner &&
+          membership.role !== ORG_MEMBER_ROLES.Admin)
+      ) {
         throw new ForbiddenException(
           'Only organization admins can manage organization templates',
         );
@@ -607,7 +625,10 @@ export class RetrosService {
 
     let teamFilter: ReturnType<typeof inArray> | undefined = undefined;
 
-    if (fullUser.role !== 'super-admin' && fullUser.role !== 'system-admin') {
+    if (
+      fullUser.role !== USER_ROLES.SuperAdmin &&
+      fullUser.role !== USER_ROLES.SystemAdmin
+    ) {
       const memberships = await this.database
         .select({ teamId: teamSchema.teamMember.teamId })
         .from(teamSchema.teamMember)
@@ -682,7 +703,7 @@ export class RetrosService {
       templateId: data.templateId,
       isAnonymous: data.isAnonymous ?? true,
       maxVotesPerUser: data.maxVotesPerUser ?? 3,
-      voteType: data.voteType ?? 'multi',
+      voteType: data.voteType ?? RETRO_VOTE_TYPES.Multi,
       timerDuration: data.timerDuration ?? null,
       createdById: userId,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
@@ -693,6 +714,17 @@ export class RetrosService {
       retroId,
       userId,
     });
+
+    // Notify other team members so they can join the newly created retro.
+    void this.notificationsService
+      .notifyTeamOfRetroCreated(retroId, data.name, data.teamId, userId)
+      .catch((error) => {
+        const message =
+          error instanceof Error ? error.message : 'unknown error';
+        this.logger.warn(
+          `Retro-created notifications failed for retroId=${retroId}: ${message}`,
+        );
+      });
 
     await this.invalidateRetroCache(retroId, { invalidateLists: true });
 
@@ -844,7 +876,8 @@ export class RetrosService {
       .limit(1);
 
     const isSystemAdmin =
-      userRecord?.role === 'super-admin' || userRecord?.role === 'system-admin';
+      userRecord?.role === USER_ROLES.SuperAdmin ||
+      userRecord?.role === USER_ROLES.SystemAdmin;
 
     const membership =
       teamMembers.find((member) => member.userId === userId) ?? null;
@@ -872,8 +905,8 @@ export class RetrosService {
       : [undefined];
 
     const isOrgAdmin =
-      orgMembership?.role === 'org-owner' ||
-      orgMembership?.role === 'org-admin';
+      orgMembership?.role === ORG_MEMBER_ROLES.Owner ||
+      orgMembership?.role === ORG_MEMBER_ROLES.Admin;
 
     const teamMemberRoleMap = new Map(
       teamMembers.map((member) => [member.userId, member.role ?? null]),
@@ -897,7 +930,8 @@ export class RetrosService {
 
     const now = new Date();
     const timerRunning = Boolean(retro.timerEndsAt && retro.timerEndsAt > now);
-    const shouldHideAuthor = retro.isAnonymous && retro.status !== 'completed';
+    const shouldHideAuthor =
+      retro.isAnonymous && retro.status !== RETRO_STATUSES.Completed;
 
     const processedCards = cards.map((card) => {
       const cardVotes = votesByCard.get(card.id) ?? [];
@@ -1033,7 +1067,7 @@ export class RetrosService {
         (participant) => participant.userId === userId,
       ),
       isCreator: retro.createdById === userId,
-      isTeamLead: membership?.tag === 'team-lead',
+      isTeamLead: membership?.tag === TEAM_MEMBER_TAGS.Lead,
       isOrgAdmin,
       isSystemAdmin,
       currentUserId: userId,
@@ -1074,14 +1108,14 @@ export class RetrosService {
 
     if (
       !membership ||
-      (membership.tag !== 'team-lead' && retro.createdById !== userId)
+      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
     ) {
       throw new ForbiddenException(
         'Only the creator or team lead can start the lobby',
       );
     }
 
-    if (retro.status !== 'draft') {
+    if (retro.status !== RETRO_STATUSES.Draft) {
       throw new BadRequestException(
         'Retro must be in draft status to start lobby',
       );
@@ -1094,7 +1128,7 @@ export class RetrosService {
     await this.database
       .update(retroSchema.retrospective)
       .set({
-        status: 'waiting',
+        status: RETRO_STATUSES.Waiting,
         lobbyStartedAt: now,
         lobbyAutoStartsAt: autoStartsAt,
         updatedAt: now,
@@ -1145,14 +1179,17 @@ export class RetrosService {
 
     if (
       !membership ||
-      (membership.tag !== 'team-lead' && retro.createdById !== userId)
+      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
     ) {
       throw new ForbiddenException(
         'Only the creator or team lead can start the retrospective',
       );
     }
 
-    if (retro.status !== 'waiting' && retro.status !== 'draft') {
+    if (
+      retro.status !== RETRO_STATUSES.Waiting &&
+      retro.status !== RETRO_STATUSES.Draft
+    ) {
       throw new BadRequestException(
         'Retro must be in waiting or draft status to start',
       );
@@ -1166,7 +1203,7 @@ export class RetrosService {
     await this.database
       .update(retroSchema.retrospective)
       .set({
-        status: 'active',
+        status: RETRO_STATUSES.Active,
         timerStartedAt: now,
         timerEndsAt,
         lobbyAutoStartsAt: null, // Clear the auto-start timer
@@ -1209,14 +1246,14 @@ export class RetrosService {
 
     if (
       !membership ||
-      (membership.tag !== 'team-lead' && retro.createdById !== userId)
+      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
     ) {
       throw new ForbiddenException(
         'Only the creator or team lead can control the retrospective',
       );
     }
 
-    if (retro.status !== 'active') {
+    if (retro.status !== RETRO_STATUSES.Active) {
       throw new BadRequestException(
         'Retrospective must be in active phase before grouping',
       );
@@ -1224,7 +1261,11 @@ export class RetrosService {
 
     await this.database
       .update(retroSchema.retrospective)
-      .set({ status: 'grouping', timerEndsAt: null, updatedAt: new Date() })
+      .set({
+        status: RETRO_STATUSES.Grouping,
+        timerEndsAt: null,
+        updatedAt: new Date(),
+      })
       .where(eq(retroSchema.retrospective.id, retroId));
 
     await this.invalidateRetroCache(retroId, { invalidateLists: true });
@@ -1257,14 +1298,14 @@ export class RetrosService {
 
     if (
       !membership ||
-      (membership.tag !== 'team-lead' && retro.createdById !== userId)
+      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
     ) {
       throw new ForbiddenException(
         'Only the creator or team lead can control the retrospective',
       );
     }
 
-    if (retro.status !== 'grouping') {
+    if (retro.status !== RETRO_STATUSES.Grouping) {
       throw new BadRequestException(
         'Retrospective must be in grouping phase before voting',
       );
@@ -1272,7 +1313,11 @@ export class RetrosService {
 
     await this.database
       .update(retroSchema.retrospective)
-      .set({ status: 'voting', timerEndsAt: null, updatedAt: new Date() })
+      .set({
+        status: RETRO_STATUSES.Voting,
+        timerEndsAt: null,
+        updatedAt: new Date(),
+      })
       .where(eq(retroSchema.retrospective.id, retroId));
 
     await this.invalidateRetroCache(retroId, { invalidateLists: true });
@@ -1305,14 +1350,14 @@ export class RetrosService {
 
     if (
       !membership ||
-      (membership.tag !== 'team-lead' && retro.createdById !== userId)
+      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
     ) {
       throw new ForbiddenException(
         'Only the creator or team lead can control the retrospective',
       );
     }
 
-    if (retro.status !== 'voting') {
+    if (retro.status !== RETRO_STATUSES.Voting) {
       throw new BadRequestException(
         'Retrospective must be in voting phase before discussion',
       );
@@ -1320,7 +1365,7 @@ export class RetrosService {
 
     await this.database
       .update(retroSchema.retrospective)
-      .set({ status: 'discussing', updatedAt: new Date() })
+      .set({ status: RETRO_STATUSES.Discussing, updatedAt: new Date() })
       .where(eq(retroSchema.retrospective.id, retroId));
 
     await this.invalidateRetroCache(retroId, { invalidateLists: true });
@@ -1353,14 +1398,14 @@ export class RetrosService {
 
     if (
       !membership ||
-      (membership.tag !== 'team-lead' && retro.createdById !== userId)
+      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
     ) {
       throw new ForbiddenException(
         'Only the creator or team lead can complete the retrospective',
       );
     }
 
-    if (retro.status !== 'discussing') {
+    if (retro.status !== RETRO_STATUSES.Discussing) {
       throw new BadRequestException(
         'Retrospective must be in discussing phase before completion',
       );
@@ -1369,7 +1414,11 @@ export class RetrosService {
     const now = new Date();
     await this.database
       .update(retroSchema.retrospective)
-      .set({ status: 'completed', completedAt: now, updatedAt: now })
+      .set({
+        status: RETRO_STATUSES.Completed,
+        completedAt: now,
+        updatedAt: now,
+      })
       .where(eq(retroSchema.retrospective.id, retroId));
 
     await this.invalidateRetroCache(retroId, { invalidateLists: true });
@@ -1389,7 +1438,7 @@ export class RetrosService {
       .limit(1);
 
     if (!retro) throw new NotFoundException('Retrospective not found');
-    if (retro.status !== 'completed') {
+    if (retro.status !== RETRO_STATUSES.Completed) {
       throw new BadRequestException(
         'Retrospective must be completed to send report',
       );
@@ -1562,14 +1611,14 @@ export class RetrosService {
 
     if (
       !membership ||
-      (membership.tag !== 'team-lead' && retro.createdById !== userId)
+      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
     ) {
       throw new ForbiddenException(
         'Only the creator or team lead can merge cards',
       );
     }
 
-    if (retro.status !== 'grouping') {
+    if (retro.status !== RETRO_STATUSES.Grouping) {
       throw new BadRequestException(
         'Cards can only be merged in grouping phase',
       );
@@ -1702,14 +1751,14 @@ export class RetrosService {
 
     if (
       !membership ||
-      (membership.tag !== 'team-lead' && retro.createdById !== userId)
+      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
     ) {
       throw new ForbiddenException(
         'Only the creator or team lead can unmerge cards',
       );
     }
 
-    if (retro.status !== 'grouping') {
+    if (retro.status !== RETRO_STATUSES.Grouping) {
       throw new BadRequestException(
         'Cards can only be unmerged in grouping phase',
       );
@@ -1821,7 +1870,10 @@ export class RetrosService {
 
     if (!retro) throw new NotFoundException('Retrospective not found');
 
-    if (retro.status !== 'active' && retro.status !== 'draft') {
+    if (
+      retro.status !== RETRO_STATUSES.Active &&
+      retro.status !== RETRO_STATUSES.Draft
+    ) {
       throw new BadRequestException('Cannot add cards in this phase');
     }
 
@@ -1878,7 +1930,7 @@ export class RetrosService {
       .where(eq(retroSchema.retrospective.id, existingCard.retroId))
       .limit(1);
 
-    if (retro?.status === 'completed') {
+    if (retro?.status === RETRO_STATUSES.Completed) {
       throw new BadRequestException(
         'Cannot edit cards in a completed retrospective',
       );
@@ -1916,7 +1968,7 @@ export class RetrosService {
       .where(eq(retroSchema.retrospective.id, existingCard.retroId))
       .limit(1);
 
-    if (retro?.status === 'completed') {
+    if (retro?.status === RETRO_STATUSES.Completed) {
       throw new BadRequestException(
         'Cannot delete cards in a completed retrospective',
       );
@@ -1955,7 +2007,7 @@ export class RetrosService {
 
     if (!retro) throw new NotFoundException('Retrospective not found');
 
-    if (retro.status !== 'voting') {
+    if (retro.status !== RETRO_STATUSES.Voting) {
       throw new BadRequestException('Voting is not active');
     }
 
@@ -2046,7 +2098,7 @@ export class RetrosService {
       .where(eq(retroSchema.retrospective.id, cardData.retroId))
       .limit(1);
 
-    if (retro?.status !== 'voting') {
+    if (retro?.status !== RETRO_STATUSES.Voting) {
       throw new BadRequestException('Voting is not active');
     }
 
@@ -2169,7 +2221,10 @@ export class RetrosService {
 
     if (!fullUser) throw new NotFoundException('User not found');
 
-    if (fullUser.role === 'super-admin' || fullUser.role === 'system-admin') {
+    if (
+      fullUser.role === USER_ROLES.SuperAdmin ||
+      fullUser.role === USER_ROLES.SystemAdmin
+    ) {
       const [retroCount] = await this.database
         .select({ count: count() })
         .from(retroSchema.retrospective);
@@ -2346,7 +2401,7 @@ export class RetrosService {
 
     if (
       !membership ||
-      (membership.tag !== 'team-lead' && retro.createdById !== userId)
+      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
     ) {
       throw new ForbiddenException(
         'Only the creator or team lead can control the discussion',
@@ -2363,7 +2418,7 @@ export class RetrosService {
   ): Promise<{ success: boolean }> {
     const retro = await this.assertRetroModerator(userId, retroId);
 
-    if (retro.status !== 'discussing') {
+    if (retro.status !== RETRO_STATUSES.Discussing) {
       throw new BadRequestException(
         'Can only set discussion card during the discussing phase',
       );
@@ -2391,7 +2446,7 @@ export class RetrosService {
   ): Promise<{ success: boolean }> {
     const retro = await this.assertRetroModerator(userId, retroId);
 
-    if (retro.status !== 'discussing') {
+    if (retro.status !== RETRO_STATUSES.Discussing) {
       throw new BadRequestException(
         'Can only set discussion action item during the discussing phase',
       );
@@ -2402,7 +2457,7 @@ export class RetrosService {
     // Update the action item status to in_progress
     await this.database
       .update(retroSchema.actionItem)
-      .set({ status: 'in_progress', updatedAt: now })
+      .set({ status: ACTION_ITEM_STATUSES.InProgress, updatedAt: now })
       .where(eq(retroSchema.actionItem.id, actionItemId));
 
     await this.database
@@ -2427,7 +2482,7 @@ export class RetrosService {
   ): Promise<{ success: boolean }> {
     const retro = await this.assertRetroModerator(userId, retroId);
 
-    if (retro.status !== 'discussing') {
+    if (retro.status !== RETRO_STATUSES.Discussing) {
       throw new BadRequestException(
         'Can only mark cards as discussed during the discussing phase',
       );
@@ -2488,13 +2543,16 @@ export class RetrosService {
     }
 
     // Only the retro creator or a team lead can carry forward cards
-    if (retro.createdById !== userId && membership.tag !== 'team-lead') {
+    if (
+      retro.createdById !== userId &&
+      membership.tag !== TEAM_MEMBER_TAGS.Lead
+    ) {
       throw new ForbiddenException(
         'Only the retro creator or team lead can carry forward cards',
       );
     }
 
-    if (retro.status !== 'completed') {
+    if (retro.status !== RETRO_STATUSES.Completed) {
       throw new BadRequestException(
         'Can only carry forward cards after the retro is completed',
       );
@@ -2547,7 +2605,7 @@ export class RetrosService {
         cardId: card.id,
         title: cleanTitle || card.content.substring(0, 255),
         description: `Carried forward from retro — not discussed`,
-        status: 'pending',
+        status: ACTION_ITEM_STATUSES.Pending,
         isCarriedForward: true,
       });
     }
@@ -2588,7 +2646,7 @@ export class RetrosService {
         retroId,
         title: data.title.substring(0, 255),
         description: data.description ?? null,
-        status: 'pending',
+        status: ACTION_ITEM_STATUSES.Pending,
         isCarriedForward: data.isCarriedForward ?? false,
       })
       .returning();
@@ -2615,7 +2673,8 @@ export class RetrosService {
       .limit(1);
 
     const isSystemAdmin =
-      userRecord?.role === 'super-admin' || userRecord?.role === 'system-admin';
+      userRecord?.role === USER_ROLES.SuperAdmin ||
+      userRecord?.role === USER_ROLES.SystemAdmin;
 
     if (!isSystemAdmin) {
       const [membership] = await this.database
@@ -2630,7 +2689,7 @@ export class RetrosService {
         .limit(1);
 
       const isCreator = retro.createdById === userId;
-      const isTeamLead = membership?.tag === 'team-lead';
+      const isTeamLead = membership?.tag === TEAM_MEMBER_TAGS.Lead;
 
       const [teamRecord] = await this.database
         .select({ organizationId: teamSchema.team.organizationId })
@@ -2652,7 +2711,11 @@ export class RetrosService {
               ),
             )
             .limit(1)
-            .then(([m]) => m?.role === 'org-owner' || m?.role === 'org-admin')
+            .then(
+              ([m]) =>
+                m?.role === ORG_MEMBER_ROLES.Owner ||
+                m?.role === ORG_MEMBER_ROLES.Admin,
+            )
         : false;
 
       if (!isCreator && !isTeamLead && !isOrgAdmin) {
@@ -2700,7 +2763,7 @@ export class RetrosService {
       .where(
         and(
           eq(retroSchema.retrospective.teamId, retro.teamId),
-          eq(retroSchema.retrospective.status, 'completed'),
+          eq(retroSchema.retrospective.status, RETRO_STATUSES.Completed),
           lt(retroSchema.retrospective.createdAt, retro.createdAt),
         ),
       )
@@ -2716,7 +2779,10 @@ export class RetrosService {
         and(
           eq(retroSchema.actionItem.retroId, prevRetro.id),
           eq(retroSchema.actionItem.isCarriedForward, true),
-          inArray(retroSchema.actionItem.status, ['pending', 'in_progress']),
+          inArray(retroSchema.actionItem.status, [
+            ACTION_ITEM_STATUSES.Pending,
+            ACTION_ITEM_STATUSES.InProgress,
+          ]),
         ),
       )
       .orderBy(desc(retroSchema.actionItem.createdAt));

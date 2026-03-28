@@ -1,0 +1,98 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Local Infra",
+            "type": "shell",
+            "command": "pnpm",
+            "args": [
+                "local:infra"
+            ],
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "retro-local"
+            }
+        },
+        {
+            "label": "API Dev",
+            "type": "shell",
+            "command": "pnpm",
+            "args": [
+                "dev:api"
+            ],
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "retro-local"
+            }
+        },
+        {
+            "label": "UI Dev",
+            "type": "shell",
+            "command": "pnpm",
+            "args": [
+                "dev:ui"
+            ],
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "retro-local"
+            }
+        },
+        {
+            "label": "Convex Dev",
+            "type": "shell",
+            "command": "pnpm",
+            "args": [
+                "dev:convex"
+            ],
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "retro-local"
+            }
+        },
+        {
+            "label": "Local App Dev",
+            "dependsOrder": "parallel",
+            "dependsOn": [
+                "Local Infra",
+                "API Dev",
+                "UI Dev"
+            ]
+        },
+        {
+            "label": "Local App Dev With Convex",
+            "dependsOrder": "parallel",
+            "dependsOn": [
+                "Local Infra",
+                "API Dev",
+                "UI Dev",
+                "Convex Dev"
+            ]
+        },
+        {
+            "label": "Local Docker Stack",
+            "type": "shell",
+            "command": "pnpm",
+            "args": [
+                "local:up"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "retro-local"
+            }
+        }
+    ]
+}

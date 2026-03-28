@@ -30,7 +30,12 @@ import {
   NewEstimateRoundDto,
   UpdateEstimateStoryDto,
 } from './dtos';
-import { ESTIMATE_SESSION_STATUSES } from '../common/enums';
+import {
+  ESTIMATE_SESSION_STATUSES,
+  ESTIMATE_ROUND_STATUSES,
+  USER_ROLES,
+  type TEstimateRoundStatus,
+} from '../common/enums';
 import type {
   EstimateVoteView,
   SessionDetail,
@@ -167,7 +172,10 @@ export class EstimatesService {
       .where(
         and(
           eq(estimatesSchema.storyEstimateRound.sessionId, sessionId),
-          eq(estimatesSchema.storyEstimateRound.status, 'active'),
+          eq(
+            estimatesSchema.storyEstimateRound.status,
+            ESTIMATE_ROUND_STATUSES.Active,
+          ),
         ),
       )
       .orderBy(desc(estimatesSchema.storyEstimateRound.roundNumber))
@@ -200,7 +208,7 @@ export class EstimatesService {
         ticketNumber: safeTicket,
         storyDescription: data.storyDescription,
         storyLink: data.storyLink,
-        status: 'active',
+        status: ESTIMATE_ROUND_STATUSES.Active,
       })
       .returning();
 
@@ -213,7 +221,7 @@ export class EstimatesService {
 
   private async closeCurrentRound(
     sessionId: string,
-    status: 'revealed' | 'closed' = 'closed',
+    status: TEstimateRoundStatus = ESTIMATE_ROUND_STATUSES.Closed,
   ): Promise<void> {
     const currentRound = await this.getCurrentRoundRecord(sessionId);
     if (!currentRound) return;
@@ -222,7 +230,9 @@ export class EstimatesService {
       .update(estimatesSchema.storyEstimateRound)
       .set({
         status,
-        ...(status === 'revealed' ? { revealedAt: new Date() } : {}),
+        ...(status === ESTIMATE_ROUND_STATUSES.Revealed
+          ? { revealedAt: new Date() }
+          : {}),
         updatedAt: new Date(),
       })
       .where(eq(estimatesSchema.storyEstimateRound.id, currentRound.id));
@@ -412,7 +422,7 @@ export class EstimatesService {
             ticketNumber: 'LEGACY',
             storyDescription: null,
             storyLink: null,
-            status: 'revealed',
+            status: ESTIMATE_ROUND_STATUSES.Revealed,
             revealedAt: row.session.updatedAt,
             createdAt: row.session.createdAt,
             updatedAt: row.session.updatedAt,
@@ -436,14 +446,16 @@ export class EstimatesService {
     const currentRoundId = row.session.currentRoundId;
     const currentRound =
       allRounds.find((round) => round.id === currentRoundId) ??
-      allRounds.find((round) => round.status === 'active') ??
+      allRounds.find(
+        (round) => round.status === ESTIMATE_ROUND_STATUSES.Active,
+      ) ??
       null;
 
     const roundViews = allRounds.map((round) => {
       const roundVoteRows = votesByRound.get(round.id) ?? [];
       const shouldRevealRoundVotes =
         row.session.status === ESTIMATE_SESSION_STATUSES.Completed ||
-        round.status !== 'active' ||
+        round.status !== ESTIMATE_ROUND_STATUSES.Active ||
         (currentRound &&
           round.id === currentRound.id &&
           row.session.status === ESTIMATE_SESSION_STATUSES.Revealed);
@@ -661,7 +673,7 @@ export class EstimatesService {
       .where(eq(estimatesSchema.storyEstimateRound.id, currentRoundId))
       .limit(1);
 
-    if (!round || round.status !== 'active') {
+    if (!round || round.status !== ESTIMATE_ROUND_STATUSES.Active) {
       throw new BadRequestException(
         'This round is not active. Ask the host to start a new round.',
       );
@@ -728,7 +740,7 @@ export class EstimatesService {
       throw new BadRequestException('No active round found for this session');
     }
 
-    await this.closeCurrentRound(sessionId, 'revealed');
+    await this.closeCurrentRound(sessionId, ESTIMATE_ROUND_STATUSES.Revealed);
 
     await this.database
       .update(estimatesSchema.storyEstimateSession)
@@ -782,7 +794,7 @@ export class EstimatesService {
     const nextRoundNumber = (allRounds[0]?.roundNumber ?? 0) + 1;
 
     if (session.currentRoundId) {
-      await this.closeCurrentRound(sessionId, 'closed');
+      await this.closeCurrentRound(sessionId, ESTIMATE_ROUND_STATUSES.Closed);
     }
 
     const createdRound = await this.createRound(sessionId, nextRoundNumber, {
@@ -886,7 +898,7 @@ export class EstimatesService {
   async endSession(sessionId: string, userId: string): Promise<void> {
     await this.assertSessionCreator(sessionId, userId);
 
-    await this.closeCurrentRound(sessionId, 'closed');
+    await this.closeCurrentRound(sessionId, ESTIMATE_ROUND_STATUSES.Closed);
 
     await this.database
       .update(estimatesSchema.storyEstimateSession)
@@ -936,7 +948,8 @@ export class EstimatesService {
       .limit(1);
 
     const isAdmin =
-      fullUser?.role === 'super-admin' || fullUser?.role === 'system-admin';
+      fullUser?.role === USER_ROLES.SuperAdmin ||
+      fullUser?.role === USER_ROLES.SystemAdmin;
 
     // Build team scope
     let allowedTeamIds: string[] | null = null;

@@ -10,7 +10,7 @@ const useSsl =
   lowerUrl.includes('sslmode=verify-full');
 
 export default defineConfig({
-  schema: './src/**/schema/**.ts',
+  schema: ['./src/**/schema/**.ts', './src/common/schema-enums/**/*.ts'],
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {
