@@ -1,4 +1,10 @@
-name: retro-tool-ui ci-cd
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  DEPRECATED — This file is NOT read by GitHub Actions.     ║
+# ║  GitHub only reads workflows from the REPO ROOT at:        ║
+# ║    .github/workflows/deploy-ui.yml                         ║
+# ║  This file is kept for reference only.                     ║
+# ╚══════════════════════════════════════════════════════════════╝
+name: retro-tool-ui ci-cd (DEPRECATED)
 
 on:
   push:

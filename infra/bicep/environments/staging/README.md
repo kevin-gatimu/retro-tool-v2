@@ -448,6 +448,159 @@ For the UI, rebuild with the same `--build-arg` flags as step 8 but with the new
 
 ---
 
+## CI/CD Pipeline
+
+Once infrastructure is live and your initial manual deployment works, the GitHub Actions pipelines automate everything on push.
+
+### Branch strategy
+
+```
+feature/* ──PR──▶ develop ──PR──▶ main
+                   │                 │
+                   ▼                 ▼
+               staging          production
+```
+
+| Branch | Deploys to | Trigger |
+|---|---|---|
+| `develop` | staging | Push (merge/commit) |
+| `main` | production | Push (merge/commit) |
+| `feature/*` | — | PR CI only (lint, type-check, test, build) |
+
+### Create the develop branch (one-time)
+
+```bash
+git checkout main
+git checkout -b develop
+git push -u origin develop
+```
+
+Then set `develop` as the default branch for day-to-day work in GitHub → Settings → General → Default branch.
+
+### Workflow files
+
+All workflows are at the **repo root** `.github/workflows/` (GitHub ignores workflows inside sub-projects):
+
+| File | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | PR to `develop` or `main` | Lint + type-check + test + build for all packages |
+| `deploy-api.yml` | Push to `develop`/`main` (path: `retro-tool-api/**`, `packages/**`) | Validate → Build Docker image → Push to ACR → Run DB migration (K8s Job) → Rolling deploy to AKS |
+| `deploy-ui.yml` | Push to `develop`/`main` (path: `retro-tool-ui/**`, `packages/**`) | Validate → Build Docker image (with VITE build-args) → Push to ACR → Rolling deploy to AKS |
+| `deploy-infra.yml` | Manual (`workflow_dispatch`) | Validate Bicep → What-If preview → Deploy to resource group |
+
+> All deploy workflows can also be triggered manually via **Actions → Run workflow** dropdown.
+
+### Pipeline flow (example: API change)
+
+```
+push to develop
+  └─▶ deploy-api.yml
+       ├─ validate         lint, type-check, test, build
+       ├─ set-env          → "staging"
+       ├─ build-and-push   Docker build → ACR push (tag: staging-abc1234f)
+       ├─ migrate          kubectl create job → node dist/migrate.js → wait → cleanup
+       └─ deploy           kubectl set image → rollout status
+```
+
+### GitHub setup required
+
+#### 1 — Create an Azure AD App Registration for OIDC
+
+```bash
+# Create the app registration
+az ad app create --display-name "retro-tool-github-deploy"
+
+# Note the appId from the output, then create a service principal
+az ad sp create --id <APP_ID>
+
+# Add federated credentials for GitHub OIDC (one per environment)
+# Staging — linked to the develop branch
+az ad app federated-credential create \
+  --id <APP_ID> \
+  --parameters '{
+    "name": "github-staging",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:<OWNER>/<REPO>:environment:staging",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# Production — linked to the main branch
+az ad app federated-credential create \
+  --id <APP_ID> \
+  --parameters '{
+    "name": "github-production",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:<OWNER>/<REPO>:environment:production",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# Grant the SP Contributor role on the resource group
+az role assignment create \
+  --assignee <APP_ID> \
+  --role Contributor \
+  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/retro-tool-staging
+```
+
+#### 2 — Create GitHub Environments
+
+Go to **GitHub → Settings → Environments** and create two environments:
+
+- **staging**
+- **production** (enable "Required reviewers" for approval gate)
+
+#### 3 — Configure secrets and variables
+
+**Repository secrets** (shared across environments):
+
+| Secret | Value |
+|---|---|
+| `AZURE_CLIENT_ID` | App registration appId |
+| `AZURE_TENANT_ID` | Your Azure AD tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | Your subscription ID |
+
+**Per-environment secrets** (set on each environment):
+
+| Secret | Staging value | Production value |
+|---|---|---|
+| `POSTGRES_ADMIN_PASSWORD` | From step 2 | _production password_ |
+
+**Per-environment variables** (set on each environment):
+
+| Variable | Staging value | Production value |
+|---|---|---|
+| `ACR_NAME` | `retrotoolstagingacr` | `retrotoolproductionacr` |
+| `ACR_LOGIN_SERVER` | `retrotoolstagingacr.azurecr.io` | `retrotoolproductionacr.azurecr.io` |
+| `AKS_RESOURCE_GROUP` | `retro-tool-staging` | `retro-tool-production` |
+| `AKS_CLUSTER_NAME` | `retro-tool-staging-aks` | `retro-tool-production-aks` |
+| `AZURE_RESOURCE_GROUP` | `retro-tool-staging` | `retro-tool-production` |
+| `API_URL` | `https://api.staging.yourdomain.com` | `https://api.yourdomain.com` |
+| `CONVEX_URL` | `https://convex-api.staging.yourdomain.com` | `https://convex-api.yourdomain.com` |
+| `ESTIMATES_REALTIME_BACKEND` | `convex` | `convex` |
+| `RETROS_REALTIME_BACKEND` | `convex` | `convex` |
+| `NOTIFICATIONS_REALTIME_BACKEND` | `convex` | `convex` |
+
+### Day-to-day workflow
+
+```bash
+# 1. Create a feature branch
+git checkout develop
+git pull
+git checkout -b feature/my-change
+
+# 2. Make changes, commit, push
+git add .
+git commit -m "feat: my change"
+git push -u origin feature/my-change
+
+# 3. Open PR to develop → CI runs automatically
+#    Merge → deploy-api.yml / deploy-ui.yml triggers → staging deployed
+
+# 4. When staging is verified, open PR from develop → main
+#    Merge → same pipelines trigger → production deployed
+```
+
+---
+
 ## Infrastructure sizing (staging vs production)
 
 | Resource | Staging | Production |

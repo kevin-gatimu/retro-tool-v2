@@ -1,0 +1,146 @@
+name: Deploy UI
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - 'retro-tool-ui/**'
+      - 'packages/shared/contracts/**'
+      - '.github/workflows/deploy-ui.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [staging, production]
+
+concurrency:
+  group: deploy-ui-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22'
+  IMAGE_NAME: retro-tool-ui
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ───────────────────────────── Validate ─────────────────────────────
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter retro-tool-ui lint
+      - run: pnpm --filter retro-tool-ui type-check
+      - run: pnpm --filter retro-tool-ui test
+      - run: pnpm --filter retro-tool-ui build
+
+  # ─────────────────── Determine target environment ───────────────────
+  set-env:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.pick.outputs.environment }}
+    steps:
+      - id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            echo "environment=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ──────────────────── Build & push Docker image ─────────────────────
+  build-and-push:
+    needs: [validate, set-env]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-env.outputs.environment }}
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ vars.ACR_NAME }}
+
+      - name: Set image tag
+        id: meta
+        run: |
+          TAG="${{ needs.set-env.outputs.environment }}-${GITHUB_SHA::8}"
+          IMAGE="${{ vars.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${TAG}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          # UI Dockerfile requires root workspace context (monorepo)
+          context: .
+          file: ./retro-tool-ui/Dockerfile
+          push: true
+          build-args: |
+            VITE_APP_ENV=${{ needs.set-env.outputs.environment == 'production' && 'production' || 'staging' }}
+            VITE_API_URL=${{ vars.API_URL }}
+            VITE_APP_TITLE=Retro Tool
+            VITE_CONVEX_URL=${{ vars.CONVEX_URL }}
+            VITE_ESTIMATES_REALTIME_BACKEND=${{ vars.ESTIMATES_REALTIME_BACKEND || 'socket-io' }}
+            VITE_RETROS_REALTIME_BACKEND=${{ vars.RETROS_REALTIME_BACKEND || 'socket-io' }}
+            VITE_NOTIFICATIONS_REALTIME_BACKEND=${{ vars.NOTIFICATIONS_REALTIME_BACKEND || 'socket-io' }}
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ${{ vars.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ needs.set-env.outputs.environment }}-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────── Deploy ─────────────────────────────────
+  deploy:
+    needs: [set-env, build-and-push]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-env.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+
+      - name: Deploy
+        run: |
+          NAMESPACE="retro-tool-${{ needs.set-env.outputs.environment }}"
+          IMAGE="${{ needs.build-and-push.outputs.image }}"
+
+          kubectl -n "${NAMESPACE}" set image \
+            deployment/retro-tool-ui \
+            retro-tool-ui="${IMAGE}"
+
+          kubectl -n "${NAMESPACE}" rollout status \
+            deployment/retro-tool-ui --timeout=180s

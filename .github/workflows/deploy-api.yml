@@ -1,0 +1,191 @@
+name: Deploy API
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - 'retro-tool-api/**'
+      - 'packages/shared/contracts/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [staging, production]
+
+concurrency:
+  group: deploy-api-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22'
+  IMAGE_NAME: retro-tool-api
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ───────────────────────────── Validate ─────────────────────────────
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter retro-tool-api lint
+      - run: pnpm --filter retro-tool-api type-check
+      - run: pnpm --filter retro-tool-api test -- --runInBand
+      - run: pnpm --filter retro-tool-api build
+
+  # ─────────────────── Determine target environment ───────────────────
+  set-env:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.pick.outputs.environment }}
+    steps:
+      - id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            echo "environment=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ──────────────────── Build & push Docker image ─────────────────────
+  build-and-push:
+    needs: [validate, set-env]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-env.outputs.environment }}
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ vars.ACR_NAME }}
+
+      - name: Set image tag
+        id: meta
+        run: |
+          TAG="${{ needs.set-env.outputs.environment }}-${GITHUB_SHA::8}"
+          IMAGE="${{ vars.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${TAG}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./retro-tool-api
+          file: ./retro-tool-api/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ${{ vars.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ needs.set-env.outputs.environment }}-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ──────────────────── Run DB migrations via K8s Job ─────────────────
+  migrate:
+    needs: [set-env, build-and-push]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-env.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+
+      - name: Run database migration
+        run: |
+          NAMESPACE="retro-tool-${{ needs.set-env.outputs.environment }}"
+          IMAGE="${{ needs.build-and-push.outputs.image }}"
+          JOB_NAME="db-migrate-$(date +%s)"
+
+          # Create migration job that reads DATABASE_URL from the existing secret
+          kubectl -n "${NAMESPACE}" create job "${JOB_NAME}" \
+            --image="${IMAGE}" \
+            -- node dist/migrate.js
+
+          # Patch the job to inject the env var from the K8s secret
+          kubectl -n "${NAMESPACE}" patch job "${JOB_NAME}" --type=json -p='[
+            {
+              "op": "add",
+              "path": "/spec/template/spec/containers/0/envFrom",
+              "value": [{"secretRef": {"name": "retro-tool-api-secrets"}}]
+            }
+          ]'
+
+          # Wait for completion (5 min timeout)
+          kubectl -n "${NAMESPACE}" wait --for=condition=complete \
+            --timeout=300s "job/${JOB_NAME}"
+
+          echo "--- Migration logs ---"
+          kubectl -n "${NAMESPACE}" logs "job/${JOB_NAME}"
+
+          # Cleanup
+          kubectl -n "${NAMESPACE}" delete job "${JOB_NAME}"
+
+  # ─────────────────────────── Deploy ─────────────────────────────────
+  deploy:
+    needs: [set-env, build-and-push, migrate]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-env.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+
+      - name: Deploy with Kustomize
+        run: |
+          NAMESPACE="retro-tool-${{ needs.set-env.outputs.environment }}"
+          IMAGE="${{ needs.build-and-push.outputs.image }}"
+          OVERLAY="deploy/aks/overlays/${{ needs.set-env.outputs.environment }}"
+
+          # Update the image in the deployment
+          kubectl -n "${NAMESPACE}" set image \
+            deployment/retro-tool-api \
+            retro-tool-api="${IMAGE}"
+
+          # Wait for rollout
+          kubectl -n "${NAMESPACE}" rollout status \
+            deployment/retro-tool-api --timeout=180s
