@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: convex-backend
+  namespace: retro-tool
+  labels:
+    app: convex-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: convex-backend
+  template:
+    metadata:
+      labels:
+        app: convex-backend
+    spec:
+      containers:
+        - name: convex-backend
+          image: ghcr.io/get-convex/convex-backend:latest
+          ports:
+            - containerPort: 3210
+              name: api
+            - containerPort: 3211
+              name: site
+          envFrom:
+            - secretRef:
+                name: convex-backend-secret
+          livenessProbe:
+            httpGet:
+              path: /version
+              port: 3210
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /version
+              port: 3210
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+---
+# Service for the Convex HTTP API (used by SDK clients and the NestJS API)
+apiVersion: v1
+kind: Service
+metadata:
+  name: convex-backend-api
+  namespace: retro-tool
+spec:
+  selector:
+    app: convex-backend
+  ports:
+    - name: api
+      port: 3210
+      targetPort: 3210
+---
+# Service for the Convex site/actions runtime
+apiVersion: v1
+kind: Service
+metadata:
+  name: convex-backend-site
+  namespace: retro-tool
+spec:
+  selector:
+    app: convex-backend
+  ports:
+    - name: site
+      port: 3211
+      targetPort: 3211

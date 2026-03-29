@@ -51,7 +51,7 @@ PORT=8000
 
 DATABASE_URL=postgresql://postgres:password@localhost:5432/retro_tool
 
-BETTER_AUTH_SECRET=your-secret-here         # generate with: openssl rand -hex 32
+BETTER_AUTH_SECRET=your-secret-here
 BETTER_AUTH_URL=http://localhost:8000        # must match the server PORT
 
 FRONTEND_URL=http://localhost:5173
@@ -70,6 +70,16 @@ EMAIL_FROM=Retro Tool <noreply@yourdomain.com>
 # VAPID_PUBLIC_KEY=
 # VAPID_PRIVATE_KEY=
 # VAPID_SUBJECT=mailto:admin@yourdomain.com
+```
+
+Generate `BETTER_AUTH_SECRET` with either command:
+
+```bash
+openssl rand -hex 32
+```
+
+```powershell
+$bytes = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes); ($bytes | ForEach-Object { $_.ToString('x2') }) -join ''
 ```
 
 > **Note:** `BETTER_AUTH_URL` must match the URL the server is actually running on (including port).

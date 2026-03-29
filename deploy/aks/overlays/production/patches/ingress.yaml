@@ -1,0 +1,15 @@
+- op: replace
+  path: /spec/rules/0/host
+  value: app.yourdomain.com
+- op: replace
+  path: /spec/rules/1/host
+  value: api.yourdomain.com
+- op: replace
+  path: /spec/rules/2/host
+  value: convex-api.yourdomain.com
+- op: replace
+  path: /spec/rules/3/host
+  value: convex-site.yourdomain.com
+- op: replace
+  path: /spec/rules/4/host
+  value: convex-dashboard.yourdomain.com

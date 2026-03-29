@@ -18,5 +18,11 @@
     },
     "devDependencies": {
         "husky": "^9.1.7"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "esbuild",
+            "lightningcss"
+        ]
     }
 }
