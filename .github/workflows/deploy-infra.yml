@@ -21,6 +21,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    outputs:
+      acrLoginServer: ${{ steps.bicep.outputs.acrLoginServer }}
+      apiUrl: ${{ steps.bicep.outputs.apiUrl }}
+      swaDefaultHostname: ${{ steps.bicep.outputs.swaDefaultHostname }}
+      swaDeploymentToken: ${{ steps.bicep.outputs.swaDeploymentToken }}
+      convexSyncUrl: ${{ steps.bicep.outputs.convexSyncUrl }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,24 +38,42 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Validate Bicep
-        run: |
-          az bicep build \
-            --file infra/bicep/environments/${{ inputs.environment }}/main.bicep
+        run: az bicep build --file infra/bicep/main.bicep
 
       - name: What-If preview
         run: |
           az deployment group what-if \
             --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --template-file infra/bicep/environments/${{ inputs.environment }}/main.bicep \
+            --template-file infra/bicep/main.bicep \
             --parameters \
               environmentName=${{ inputs.environment }} \
-              postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}'
+              postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
+              convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}'
 
       - name: Deploy Bicep
+        id: bicep
         run: |
-          az deployment group create \
+          OUTPUT=$(az deployment group create \
             --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --template-file infra/bicep/environments/${{ inputs.environment }}/main.bicep \
+            --template-file infra/bicep/main.bicep \
             --parameters \
               environmentName=${{ inputs.environment }} \
-              postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}'
+              postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
+              convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}' \
+            --query 'properties.outputs' -o json)
+
+          echo "acrLoginServer=$(echo $OUTPUT | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"
+          echo "apiUrl=$(echo $OUTPUT | jq -r '.apiUrl.value')" >> "$GITHUB_OUTPUT"
+          echo "swaDefaultHostname=$(echo $OUTPUT | jq -r '.swaDefaultHostname.value')" >> "$GITHUB_OUTPUT"
+          echo "swaDeploymentToken=$(echo $OUTPUT | jq -r '.swaDeploymentToken.value')" >> "$GITHUB_OUTPUT"
+          echo "convexSyncUrl=$(echo $OUTPUT | jq -r '.convexSyncUrl.value')" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          echo "### Infrastructure Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ steps.bicep.outputs.apiUrl }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| UI (SWA) | ${{ steps.bicep.outputs.swaDefaultHostname }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Convex | ${{ steps.bicep.outputs.convexSyncUrl }} |" >> $GITHUB_STEP_SUMMARY

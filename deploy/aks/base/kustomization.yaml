@@ -1,9 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - namespace.yaml
-  - retro-tool-api.yaml
-  - retro-tool-ui.yaml
-  - convex-backend.yaml
-  - convex-dashboard.yaml
-  - ingress.yaml
