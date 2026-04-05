@@ -39,9 +39,6 @@ const configSchema = z.object({
     resendApiKey: z.string().optional(),
     fromEmail: z.string().default('noreply@example.com'),
   }),
-  redis: z.object({
-    url: z.string().optional(),
-  }),
   convex: z.object({
     url: z.string().url().optional(),
     adminKey: z.string().optional(),
@@ -94,9 +91,6 @@ export default (): Config => {
     email: {
       resendApiKey: process.env.RESEND_API_KEY,
       fromEmail: process.env.EMAIL_FROM || 'noreply@example.com',
-    },
-    redis: {
-      url: process.env.REDIS_URL,
     },
     convex: {
       url: process.env.CONVEX_SYNC_URL || undefined,

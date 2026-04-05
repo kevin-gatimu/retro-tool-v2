@@ -73,13 +73,6 @@ async function bootstrap() {
   });
 
   app.useWebSocketAdapter(new SocketIoAdapter(app));
-  const socketRedisUrl = configService.get('redis.url', { infer: true });
-  Logger.log(
-    socketRedisUrl
-      ? 'Socket.IO Redis adapter configured (REDIS_URL set)'
-      : 'Socket.IO Redis adapter disabled (REDIS_URL not set)',
-    'Bootstrap',
-  );
   app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe());
 
