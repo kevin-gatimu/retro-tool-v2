@@ -437,7 +437,6 @@ export class UsersService {
       },
     );
 
-    await this.invalidateRbacForUser(targetId);
     return updated;
   }
 
@@ -476,7 +475,6 @@ export class UsersService {
       },
     );
 
-    await this.invalidateRbacForUser(targetId);
     return updated;
   }
 
@@ -515,7 +513,6 @@ export class UsersService {
       },
     );
 
-    await this.invalidateRbacForUser(targetId);
     return updated;
   }
 

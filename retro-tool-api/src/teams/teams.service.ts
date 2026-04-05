@@ -729,12 +729,6 @@ export class TeamsService {
       throw new NotFoundException('Member not found');
     }
 
-    const [teamRecord] = await this.database
-      .select({ organizationId: teamSchema.team.organizationId })
-      .from(teamSchema.team)
-      .where(eq(teamSchema.team.id, teamId))
-      .limit(1);
-
     // Team leads can only remove regular members, not other leads
     // (Org admins who are also team leads are exempt from this restriction)
     const isLead = await this.commonService.isTeamLead(userId, teamId);
@@ -743,13 +737,13 @@ export class TeamsService {
       member.tag === TEAM_MEMBER_TAGS.Lead &&
       member.userId !== userId
     ) {
-      const [teamRecord] = await this.database
+      const [orgLookup] = await this.database
         .select({ organizationId: teamSchema.team.organizationId })
         .from(teamSchema.team)
         .where(eq(teamSchema.team.id, teamId))
         .limit(1);
-      const isOrgAdmin = teamRecord
-        ? await this.commonService.isOrgAdmin(userId, teamRecord.organizationId)
+      const isOrgAdmin = orgLookup
+        ? await this.commonService.isOrgAdmin(userId, orgLookup.organizationId)
         : false;
       if (!isOrgAdmin) {
         throw new ForbiddenException(
@@ -798,12 +792,6 @@ export class TeamsService {
       throw new NotFoundException('Member not found');
     }
 
-    const [teamRecord] = await this.database
-      .select({ organizationId: teamSchema.team.organizationId })
-      .from(teamSchema.team)
-      .where(eq(teamSchema.team.id, teamId))
-      .limit(1);
-
     // Team leads can only update regular members, not other leads
     // (Org admins who are also team leads are exempt from this restriction)
     const isLead = await this.commonService.isTeamLead(userId, teamId);
@@ -812,13 +800,13 @@ export class TeamsService {
       member.tag === TEAM_MEMBER_TAGS.Lead &&
       member.userId !== userId
     ) {
-      const [teamRecord] = await this.database
+      const [orgLookup] = await this.database
         .select({ organizationId: teamSchema.team.organizationId })
         .from(teamSchema.team)
         .where(eq(teamSchema.team.id, teamId))
         .limit(1);
-      const isOrgAdmin = teamRecord
-        ? await this.commonService.isOrgAdmin(userId, teamRecord.organizationId)
+      const isOrgAdmin = orgLookup
+        ? await this.commonService.isOrgAdmin(userId, orgLookup.organizationId)
         : false;
       if (!isOrgAdmin) {
         throw new ForbiddenException(
@@ -873,12 +861,6 @@ export class TeamsService {
       .set({ role: jobRole as TTeamMemberRole })
       .where(eq(teamSchema.teamMember.id, member.id))
       .returning();
-
-    const [teamRecord] = await this.database
-      .select({ organizationId: teamSchema.team.organizationId })
-      .from(teamSchema.team)
-      .where(eq(teamSchema.team.id, teamId))
-      .limit(1);
 
     return updated;
   }
@@ -945,12 +927,6 @@ export class TeamsService {
    * Leave a team
    */
   async leaveTeam(userId: string, teamId: string) {
-    const [teamRecord] = await this.database
-      .select({ organizationId: teamSchema.team.organizationId })
-      .from(teamSchema.team)
-      .where(eq(teamSchema.team.id, teamId))
-      .limit(1);
-
     const [member] = await this.database
       .select()
       .from(teamSchema.teamMember)
@@ -1149,12 +1125,6 @@ export class TeamsService {
    * Cancel / delete a join request (by the requester)
    */
   async cancelJoinRequest(userId: string, teamId: string, requestId: string) {
-    const [teamRecord] = await this.database
-      .select({ organizationId: teamSchema.team.organizationId })
-      .from(teamSchema.team)
-      .where(eq(teamSchema.team.id, teamId))
-      .limit(1);
-
     const [request] = await this.database
       .select()
       .from(teamSchema.teamJoinRequest)
