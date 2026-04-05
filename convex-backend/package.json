@@ -11,7 +11,9 @@
         "type-check": "node -e \"console.log('convex-backend type-check is deferred until Convex generated types are available')\""
     },
     "dependencies": {
-        "convex": "^1.18.0"
+        "convex": "^1.18.0",
+        "@convex-dev/rate-limiter": "^0.3.2",
+        "@convex-dev/aggregate": "^0.2.1"
     },
     "devDependencies": {
         "typescript": "^6.0.2"
