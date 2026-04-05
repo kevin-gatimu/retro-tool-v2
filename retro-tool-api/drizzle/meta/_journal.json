@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1774638512281,
+      "tag": "0000_clean_bill_hollister",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774665600000,
+      "tag": "0001_team_member_tag_alignment",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774692000000,
+      "tag": "0002_notification_type_retro_created",
+      "breakpoints": true
+    }
+  ]
+}
