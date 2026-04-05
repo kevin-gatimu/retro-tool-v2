@@ -10,6 +10,7 @@ param storageGB int = 32
 param backupRetentionDays int = 7
 param geoRedundantBackup string = 'Disabled'
 param tags object = {}
+param convexAciIp string = ''
 
 resource postgresqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
   name: postgresqlServerName
@@ -53,6 +54,16 @@ resource azureServicesFirewallRule 'Microsoft.DBforPostgreSQL/flexibleServers/fi
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'
+  }
+}
+
+// Allow access from Convex ACI (static public IP)
+resource convexAciFirewallRule 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-12-01-preview' = if (!empty(convexAciIp)) {
+  parent: postgresqlServer
+  name: 'AllowConvexACI'
+  properties: {
+    startIpAddress: convexAciIp
+    endIpAddress: convexAciIp
   }
 }
 

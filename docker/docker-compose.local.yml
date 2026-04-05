@@ -69,6 +69,7 @@ services:
       INSTANCE_SECRET: ${CONVEX_INSTANCE_SECRET}
       POSTGRES_URL: ${CONVEX_POSTGRES_URL}
       DO_NOT_REQUIRE_SSL: ${CONVEX_DO_NOT_REQUIRE_SSL}
+      DISABLE_BEACON: ${DISABLE_BEACON:-1}
     restart: on-failure
     depends_on:
       postgres:

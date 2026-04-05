@@ -53,7 +53,8 @@ jobs:
               locationCore='${{ vars.AZURE_LOCATION_CORE }}' \
               locationSwa='${{ vars.AZURE_LOCATION_SWA }}' \
               postgresAdminPassword='${{ secrets.POSTGRES_PASSWORD }}' \
-              convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}'
+              convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}' \
+              convexAciIp='${{ vars.CONVEX_ACI_IP }}'
 
       - name: Deploy Bicep
         id: bicep
@@ -70,6 +71,7 @@ jobs:
               locationSwa='${{ vars.AZURE_LOCATION_SWA }}' \
               postgresAdminPassword='${{ secrets.POSTGRES_PASSWORD }}' \
               convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}' \
+              convexAciIp='${{ vars.CONVEX_ACI_IP }}' \
             --query 'properties.outputs' -o json)
 
           echo "acrLoginServer=$(echo $OUTPUT | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"

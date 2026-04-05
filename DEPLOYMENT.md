@@ -213,10 +213,9 @@ Go to **GitHub → Settings → Environments → [production] → Environment se
 | `MICROSOFT_CLIENT_ID` | OAuth client ID | Azure App Registration |
 | `MICROSOFT_CLIENT_SECRET` | OAuth client secret | Azure App Registration |
 | `RESEND_API_KEY` | Email API key | https://resend.com |
-| `CONVEX_POSTGRES_URL` | Convex PostgreSQL conn string | See Phase 3.6 |
 | `REDIS_URL` | Redis connection string | Leave empty if not using |
-| `CONVEX_SYNC_ADMIN_KEY` | Convex admin key | Generated after first deploy |
-| `CONVEX_DEPLOY_KEY` | Convex deploy key | Generated after first deploy |
+| `CONVEX_INSTANCE_SECRET` | 64-char hex — Bicep param only | `openssl rand -hex 32` |
+| `CONVEX_SYNC_ADMIN_KEY` | Convex admin key — used by API and deploy workflow | See Phase 4.4 |
 | `VAPID_PUBLIC_KEY` | VAPID key | `npx web-push generate-vapid-keys` |
 | `VAPID_PRIVATE_KEY` | VAPID key | `npx web-push generate-vapid-keys` |
 | `VAPID_SUBJECT` | `mailto:you@domain.com` | Your email |
@@ -238,8 +237,9 @@ Go to **GitHub → Settings → Environments → [production] → Environment va
 | `API_WEBAPP_NAME` | `retro-tool-production-api` |
 | `API_URL` | `https://retro-tool-production-api.azurewebsites.net` |
 | `SWA_URL` | `https://<hostname>.azurestaticapps.net` |
-| `CONVEX_SYNC_URL` | `http://retro-tool-production-convex.<region>.azurecontainer.io:3210` |
-| `CONVEX_URL` | Same as `CONVEX_SYNC_URL` |
+| `CONVEX_SYNC_URL` | `http://retro-tool-production-convex.southafricanorth.azurecontainer.io:3210` |
+| `CONVEX_URL` | Same as `CONVEX_SYNC_URL` (used by deploy-ui.yml as `VITE_CONVEX_URL`) |
+| `CONVEX_ACI_IP` | Static public IP of the Convex ACI — `az container show --query "ipAddress.ip"` |
 | `ESTIMATES_REALTIME_BACKEND` | `convex` or `socket-io` |
 | `RETROS_REALTIME_BACKEND` | `convex` or `socket-io` |
 | `NOTIFICATIONS_REALTIME_BACKEND` | `convex` or `socket-io` |
@@ -439,27 +439,42 @@ postgresql://pgadmin:<POSTGRES_PASSWORD>@retro-tool-production-pg.postgres.datab
 
 ### Step 4.4 — Get Convex Admin Key
 
-After the Convex Container Instance is running, you need to get the admin key:
+The Convex admin key (`CONVEX_SYNC_ADMIN_KEY`) is used for two purposes:
 
-**Bash:**
-```bash
-# Check container logs for the admin key
-az container logs \
-  --resource-group retro-tool-api-rg \
-  --name retro-tool-production-convex
+- **API runtime** — the NestJS API calls Convex using this key
+- **CI/CD deploy** — `deploy-convex.yml` deploys Convex functions using this key as `CONVEX_SELF_HOSTED_ADMIN_KEY`
+
+You only need **one secret**: `CONVEX_SYNC_ADMIN_KEY`.
+
+**Option 1 — Generate locally using Docker (recommended, no running container needed):**
+
+```powershell
+docker run --rm `
+  -e INSTANCE_NAME=retro-convex-production `
+  -e INSTANCE_SECRET=<your CONVEX_INSTANCE_SECRET> `
+  --entrypoint="" `
+  ghcr.io/get-convex/convex-backend:latest `
+  ./generate_admin_key.sh
 ```
 
-**PowerShell:**
+**Option 2 — From container logs (if container is running):**
+
 ```powershell
-# Check container logs for the admin key
 az container logs `
   --resource-group retro-tool-api-rg `
   --name retro-tool-production-convex
 ```
 
-Look for a line containing the admin key, then:
-1. Save it as `CONVEX_SYNC_ADMIN_KEY` in GitHub Secrets
-2. Save it as `CONVEX_DEPLOY_KEY` in GitHub Secrets (or generate a deploy key using the admin key)
+**Option 3 — Via HTTP API (if container is running but logs are empty):**
+
+```powershell
+Invoke-RestMethod -Method POST `
+  -Uri "http://retro-tool-production-convex.southafricanorth.azurecontainer.io:3210/instance/generate_admin_key" `
+  -ContentType "application/json" `
+  -Body '{"instanceName":"retro-convex-production","instanceSecret":"<CONVEX_INSTANCE_SECRET>"}'
+```
+
+The output will be in the format `retro-convex-production|<hex>`. Save it as **`CONVEX_SYNC_ADMIN_KEY`** in GitHub Secrets.
 
 ---
 
@@ -524,6 +539,52 @@ The CI workflow (`ci.yml`) runs on all PRs for lint, type-check, test, and build
 
 ---
 
+## Convex Variables Reference
+
+There are three distinct contexts where Convex variables appear. Understanding the difference prevents confusion.
+
+### 1. Bicep / Infrastructure (never set manually)
+
+These are passed directly to the container by Bicep. You only need them as GitHub Secrets to feed into `deploy-infra.yml`.
+
+| Variable | Where used | Source |
+| --- | --- | --- |
+| `INSTANCE_NAME` | Convex container env | Bicep param — defaults to `retro-convex-production` |
+| `INSTANCE_SECRET` | Convex container env | GitHub Secret `CONVEX_INSTANCE_SECRET` → Bicep |
+| `POSTGRES_URL` | Convex container env | Bicep constructs from `postgresServerFqdn` automatically |
+| `DISABLE_BEACON` | Convex container env | Hardcoded `1` in `container-instance.bicep` |
+
+### 2. Runtime (GitHub Secrets & Variables — set once after first deploy)
+
+| Variable | Type | Used by | Value |
+| --- | --- | --- | --- |
+| `CONVEX_SYNC_URL` | GitHub Variable | API app settings, `deploy-convex.yml`, `deploy-ui.yml` | `http://retro-tool-production-convex.southafricanorth.azurecontainer.io:3210` |
+| `CONVEX_URL` | GitHub Variable | `deploy-ui.yml` → `VITE_CONVEX_URL` build arg | Same as `CONVEX_SYNC_URL` |
+| `CONVEX_SYNC_ADMIN_KEY` | GitHub Secret | API app settings + `deploy-convex.yml` | Format: `retro-convex-production` + pipe + hex — see Step 4.4 |
+| `CONVEX_ACI_IP` | GitHub Variable | Bicep → PostgreSQL firewall rule | `az container show --query "ipAddress.ip" -o tsv` |
+
+### 3. Local development only (docker/.env — never in GitHub)
+
+These are only needed when running `npx convex dev` locally against the local Docker container.
+
+| Variable | Value | Purpose |
+| --- | --- | --- |
+| `CONVEX_INSTANCE_NAME` | `convex-local` | Local container instance name |
+| `CONVEX_INSTANCE_SECRET` | 64-char hex | Local container auth |
+| `CONVEX_POSTGRES_URL` | `postgresql://postgres:postgres@postgres:5432` | Local container DB connection |
+| `CONVEX_DO_NOT_REQUIRE_SSL` | `1` | Disable SSL for local postgres |
+| `CONVEX_SYNC_URL` | `http://convex-backend:3210` | API → Convex (internal Docker network) |
+| `CONVEX_SYNC_ADMIN_KEY` | `convex-local` + pipe + hex | API auth with local Convex |
+| `CONVEX_SELF_HOSTED_URL` | `http://127.0.0.1:3210` | CLI (`npx convex dev`) on host machine |
+| `CONVEX_SELF_HOSTED_ADMIN_KEY` | same value as `CONVEX_SYNC_ADMIN_KEY` | CLI auth for `npx convex dev` |
+| `CONVEX_API_PORT` | `3210` | Docker port mapping |
+| `CONVEX_SITE_PORT` | `3211` | Docker port mapping |
+| `CONVEX_DASHBOARD_PORT` | `6791` | Docker port mapping |
+
+> **How `deploy-convex.yml` uses these:** The workflow maps `CONVEX_SYNC_URL` → `CONVEX_SELF_HOSTED_URL` and `CONVEX_SYNC_ADMIN_KEY` → `CONVEX_SELF_HOSTED_ADMIN_KEY` inline. You do not need separate GitHub Secrets for the `CONVEX_SELF_HOSTED_*` names.
+
+---
+
 ## Troubleshooting
 
 ### App Service returns 503
@@ -552,15 +613,158 @@ The CI workflow (`ci.yml`) runs on all PRs for lint, type-check, test, and build
 
 **Fix:** Re-run Deploy UI workflow with correct `API_URL` variable
 
-### Convex container keeps restarting
+### GitHub Actions OIDC login fails — no configured federated identity credentials
 
-**Check logs:**
-- Bash: `az container logs --resource-group <RG> --name <CONTAINER>`
-- PowerShell: `az container logs --resource-group <RG> --name <CONTAINER>`
+**Error:** `The client has no configured federated identity credentials`
 
-**Common cause:** Invalid `POSTGRES_URL` or `INSTANCE_SECRET`
+**Cause:** The federated identity credential was never created on the App Registration.
 
-**Fix:** Verify PostgreSQL connection string includes `?sslmode=require`
+**Fix:** See Phase 1.3 for the full PowerShell commands. Quick version:
+
+```powershell
+$json = @{
+    name = "github-production"
+    issuer = "https://token.actions.githubusercontent.com"
+    subject = "repo:<ORG>/<REPO>:environment:production"
+    audiences = @("api://AzureADTokenExchange")
+} | ConvertTo-Json -Compress
+$tmp = New-TemporaryFile
+$json | Set-Content $tmp.FullName
+az ad app federated-credential create --id <AZURE_CLIENT_ID> --parameters "@$($tmp.FullName)"
+Remove-Item $tmp.FullName
+```
+
+---
+
+### GitHub Actions OIDC login fails — missing service principal
+
+**Error:** `The client application is missing service principal in the tenant`
+
+**Cause:** The App Registration exists but the Service Principal was never created in the tenant.
+
+**Fix:**
+
+```powershell
+az ad sp create --id <AZURE_CLIENT_ID>
+```
+
+Then re-run Phase 1.4 to assign Contributor roles to both resource groups.
+
+---
+
+### GitHub Actions OIDC login still fails after creating credentials
+
+**Cause:** The `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` GitHub Secrets point to a different App Registration (e.g. values copied from `docker/.env` which has separate Azure credentials).
+
+**Fix:** Go to **GitHub → Settings → Environments → production → Secrets** and verify all three match the values in `.env.production.example`.
+
+---
+
+### Docker build fails — drizzle folder not found
+
+**Error:** `failed to calculate checksum: "/workspace/retro-tool-api/drizzle": not found`
+
+**Cause:** The `drizzle/` migrations folder was in `.gitignore` and never committed, so it is absent from the CI build context.
+
+**Fix:** Remove `/drizzle` from both `.gitignore` files and commit the folder:
+
+```bash
+git add retro-tool-api/drizzle/
+git add .gitignore retro-tool-api/.gitignore
+git commit -m "fix: track drizzle migrations in git for CI/CD builds"
+git push
+```
+
+---
+
+### Convex deploy fails — invalid deployment name `convex-local`
+
+**Error:** `InvalidDeploymentName: Couldn't parse deployment name convex-local`
+
+**Cause:** Either `CONVEX_SYNC_ADMIN_KEY` contains the local dev key (`convex-local|...`), or the workflow is using `CONVEX_DEPLOY_KEY` (cloud key) instead of `CONVEX_SELF_HOSTED_ADMIN_KEY` (self-hosted key).
+
+**Fix — correct workflow env vars** (`deploy-convex.yml` must use):
+
+```yaml
+env:
+  CONVEX_SELF_HOSTED_URL: ${{ vars.CONVEX_SYNC_URL }}
+  CONVEX_SELF_HOSTED_ADMIN_KEY: ${{ secrets.CONVEX_SYNC_ADMIN_KEY }}
+```
+
+**Fix — correct secret value** — generate the production key and set `CONVEX_SYNC_ADMIN_KEY`:
+
+```powershell
+docker run --rm `
+  -e INSTANCE_NAME=retro-convex-production `
+  -e INSTANCE_SECRET=<CONVEX_INSTANCE_SECRET> `
+  --entrypoint="" `
+  ghcr.io/get-convex/convex-backend:latest `
+  ./generate_admin_key.sh
+```
+
+The key must start with `retro-convex-production|` not `convex-local|`.
+
+---
+
+### Convex container keeps restarting (CrashLoopBackOff)
+
+**Diagnose:**
+
+```powershell
+az container show `
+  --resource-group retro-tool-api-rg `
+  --name retro-tool-production-convex `
+  --query "{state:instanceView.state, restartCount:containers[0].instanceView.restartCount, currentState:containers[0].instanceView.currentState}" `
+  -o json
+```
+
+If `restartCount` is high and logs return `None`, the container is crashing before writing output.
+
+**Most common cause:** The Convex ACI cannot reach PostgreSQL. Its public IP is not whitelisted in the PostgreSQL firewall. `AllowAzureServices` (0.0.0.0) covers App Service but **not** ACI.
+
+**Fix:**
+
+```powershell
+# Get ACI public IP
+az container show --resource-group retro-tool-api-rg --name retro-tool-production-convex --query "ipAddress.ip" -o tsv
+
+# Add firewall rule
+az postgres flexible-server firewall-rule create `
+  --resource-group retro-tool-api-rg `
+  --name retro-tool-production-pg `
+  --rule-name AllowConvexACI `
+  --start-ip-address <ACI_IP> `
+  --end-ip-address <ACI_IP>
+
+# Restart container
+az container restart --resource-group retro-tool-api-rg --name retro-tool-production-convex
+```
+
+Also add `CONVEX_ACI_IP` as a GitHub Variable so future Bicep deployments include the rule automatically.
+
+---
+
+### How to get the Convex admin key
+
+After the Convex container is running and healthy:
+
+```powershell
+# From container logs
+az container logs --resource-group retro-tool-api-rg --name retro-tool-production-convex
+```
+
+Or generate via the HTTP API if logs are empty:
+
+```powershell
+Invoke-RestMethod -Method POST `
+  -Uri "http://retro-tool-production-convex.southafricanorth.azurecontainer.io:3210/instance/generate_admin_key" `
+  -ContentType "application/json" `
+  -Body '{"instanceName":"retro-convex-production","instanceSecret":"<CONVEX_INSTANCE_SECRET>"}'
+```
+
+The key will be in the format `retro-convex-production|<hex>`. Set it as both `CONVEX_DEPLOY_KEY` and `CONVEX_SYNC_ADMIN_KEY` in GitHub Secrets.
+
+---
 
 ### Database migration fails
 

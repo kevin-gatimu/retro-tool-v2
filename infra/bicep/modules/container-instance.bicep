@@ -76,6 +76,10 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
               name: 'POSTGRES_URL'
               secureValue: convexPostgresUrl
             }
+            {
+              name: 'DISABLE_BEACON'
+              value: '1'
+            }
           ]
         }
       }

@@ -37,6 +37,9 @@ param convexInstanceName string = 'retro-convex-${environmentName}'
 @secure()
 param convexInstanceSecret string
 
+@description('Static public IP of the Convex ACI — add to PostgreSQL firewall. Find with: az container show --resource-group retro-tool-api-rg --name retro-tool-production-convex --query "ipAddress.ip" -o tsv')
+param convexAciIp string = ''
+
 // ───────────────── Naming convention ─────────────────
 var prefix = 'retro-tool-${environmentName}'
 var prefixClean = replace(prefix, '-', '')
@@ -88,6 +91,7 @@ module postgres 'modules/postgresql-flexible-server.bicep' = {
     postgresqlServerName: postgresServerName
     postgresqlAdminUsername: postgresAdminUsername
     postgresqlAdminPassword: postgresAdminPassword
+    convexAciIp: convexAciIp
     tags: tags
   }
 }

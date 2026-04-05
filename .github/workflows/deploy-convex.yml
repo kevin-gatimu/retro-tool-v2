@@ -65,8 +65,8 @@ jobs:
       - name: Push Convex functions
         working-directory: convex-backend
         env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
           CONVEX_SELF_HOSTED_URL: ${{ vars.CONVEX_SYNC_URL }}
+          CONVEX_SELF_HOSTED_ADMIN_KEY: ${{ secrets.CONVEX_SYNC_ADMIN_KEY }}
         run: npx convex deploy
 
       - name: Restart Convex Container Instance
