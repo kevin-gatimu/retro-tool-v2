@@ -23,7 +23,7 @@ type Database = NodePgDatabase<typeof authSchema>;
 })
 export class RetrosGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(RetrosGateway.name);
 

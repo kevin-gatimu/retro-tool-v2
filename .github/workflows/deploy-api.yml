@@ -210,7 +210,6 @@ jobs:
               MICROSOFT_CLIENT_ID='${{ secrets.MICROSOFT_CLIENT_ID }}' \
               MICROSOFT_CLIENT_SECRET='${{ secrets.MICROSOFT_CLIENT_SECRET }}' \
               RESEND_API_KEY='${{ secrets.RESEND_API_KEY }}' \
-              REDIS_URL='${{ secrets.REDIS_URL }}' \
               CONVEX_SYNC_ADMIN_KEY='${{ secrets.CONVEX_SYNC_ADMIN_KEY }}' \
               VAPID_PUBLIC_KEY='${{ secrets.VAPID_PUBLIC_KEY }}' \
               VAPID_PRIVATE_KEY='${{ secrets.VAPID_PRIVATE_KEY }}' \
@@ -233,7 +232,7 @@ jobs:
 
       - name: Health check
         run: |
-          URL="https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net/api/health"
+          URL="https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net/health"
           echo "Waiting for API to be healthy at ${URL}..."
           for i in $(seq 1 30); do
             STATUS=$(curl -s -o /dev/null -w '%{http_code}' "${URL}" || echo "000")

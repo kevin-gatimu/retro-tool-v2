@@ -27,7 +27,7 @@ export class EstimatesGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(EstimatesGateway.name);
 

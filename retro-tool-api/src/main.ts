@@ -26,7 +26,10 @@ async function bootstrap() {
   });
 
   // Set global API prefix to match frontend expectations
-  app.setGlobalPrefix('api');
+  // Exclude health endpoints from the prefix so they're accessible at /health
+  app.setGlobalPrefix('api', {
+    exclude: ['health', 'health/live', 'health/ready'],
+  });
 
   const localServerUrl =
     configService.get('localServerUrl', { infer: true }) ??
