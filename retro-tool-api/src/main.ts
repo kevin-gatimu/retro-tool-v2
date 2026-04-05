@@ -13,6 +13,28 @@ async function bootstrap() {
   // Get configuration service first so CORS can use it immediately
   const configService = app.get(ConfigService<Config>);
 
+  // Redirect OAuth errors that Better Auth sends to the API root back to the frontend.
+  // This happens when the OAuth state cookie is lost (e.g. cross-site ITP) and
+  // Better Auth cannot read the original callbackURL from the state.
+  app.use(
+    (
+      req: { path: string; query: Record<string, string> },
+      res: { redirect: (url: string) => void },
+      next: () => void,
+    ) => {
+      if (req.path === '/' && typeof req.query.error === 'string') {
+        const frontendUrl =
+          configService.get('frontend.url', { infer: true }) ||
+          'http://localhost:5173';
+        res.redirect(
+          `${frontendUrl}/auth/sign-in?error=${encodeURIComponent(req.query.error)}`,
+        );
+        return;
+      }
+      next();
+    },
+  );
+
   // Configure CORS FIRST — before any middleware or module handlers,
   // so preflight OPTIONS requests are handled before better-auth intercepts them
   const allowedOrigins = configService.get('allowedOrigins', {
