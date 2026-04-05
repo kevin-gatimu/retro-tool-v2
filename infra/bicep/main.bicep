@@ -92,6 +92,7 @@ module postgres 'modules/postgresql-flexible-server.bicep' = {
     postgresqlAdminUsername: postgresAdminUsername
     postgresqlAdminPassword: postgresAdminPassword
     convexAciIp: convexAciIp
+    convexDatabaseName: replace(convexInstanceName, '-', '_')
     tags: tags
   }
 }
