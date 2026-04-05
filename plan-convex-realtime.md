@@ -1095,10 +1095,10 @@ Bicep is not used for local runtime. Docker Compose is the local infrastructure 
 
 ### Secrets and observability
 
-- Azure Key Vault for secrets.
+- GitHub Environment secrets for deployment configuration.
 - Log Analytics + Application Insights.
 
-## Production: AKS + Key Vault + Private Networking
+## Production: AKS + Secrets + Private Networking
 
 ### Runtime
 
@@ -1114,7 +1114,7 @@ Bicep is not used for local runtime. Docker Compose is the local infrastructure 
 
 ### Security and reliability
 
-- Key Vault secret delivery.
+- Secrets delivered via CI/CD app settings.
 - Private networking and private endpoints where applicable.
 - Same-region placement for AKS and PostgreSQL.
 - Strict rollout and rollback runbooks.
@@ -1155,7 +1155,6 @@ infra/
       aks.bicep
       acr.bicep
       postgres-flexible-server.bicep
-      keyvault.bicep
       log-analytics.bicep
       app-insights.bicep
       managed-identity.bicep
@@ -1177,7 +1176,7 @@ infra/
 - AKS cluster and node pools.
 - ACR for image storage.
 - PostgreSQL Flexible Server.
-- Key Vault and managed identities.
+- Secrets and managed identities.
 - Networking, private DNS, and private endpoint modules.
 - Monitoring stack.
 
@@ -1297,7 +1296,7 @@ Retro-Tool/
 ### Phase 2: Infrastructure baseline
 
 3. Create Bicep modules and environment entry points.
-4. Provision staging AKS, ACR, Key Vault, PostgreSQL, ingress prerequisites.
+4. Provision staging AKS, ACR, PostgreSQL, ingress prerequisites.
 
 ### Phase 3: Runtime setup
 
@@ -1359,7 +1358,7 @@ Retro-Tool/
 - Migrations target correct databases per environment.
 - Convex fallback path functions during outage drills.
 - p95 session load and mutation-to-visible-update improve versus baseline.
-- Security posture validated (Key Vault only secrets, restricted dashboard, private networking).
+- Security posture validated (GitHub Secrets, restricted dashboard, private networking).
 
 ### Additional validation scenarios
 

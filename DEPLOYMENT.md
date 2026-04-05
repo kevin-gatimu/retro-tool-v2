@@ -14,13 +14,15 @@ Step-by-step instructions to deploy the Retro-Tool application to Azure using Gi
 | **Convex Backend** | Azure Container Instance | Official `ghcr.io/get-convex/convex-backend` image |
 | **Convex Storage** | Same PostgreSQL Flexible Server | Uses server connection (no dedicated database) |
 | **Container Registry** | Azure Container Registry | Stores API Docker images |
-| **Secrets** | Azure Key Vault | Stores passwords & secrets |
+| **Secrets** | GitHub Environments | Secrets and variables for deployments |
 
 ---
 
 ## Prerequisites
 
-- Azure subscription with an existing resource group
+- Azure subscription with two resource groups:
+  - API/Core: `retro-tool-api-rg` in `southafricanorth`
+  - UI: `retro-tool-ui-rg` in `westeurope`
 - GitHub repository for this project
 - Azure CLI installed locally (`az --version`)
 - Node.js 22+ and pnpm 9+
@@ -131,30 +133,46 @@ Remove-Item $tempFile.FullName
 ```bash
 # Get your subscription ID
 SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-RESOURCE_GROUP="<your-resource-group-name>"
+RESOURCE_GROUP_API="retro-tool-api-rg"
+RESOURCE_GROUP_UI="retro-tool-ui-rg"
 SP_OBJECT_ID=$(az ad sp show --id <APP_ID> --query id -o tsv)
 
-# Grant Contributor on the resource group
+# Grant Contributor on the API/Core resource group
 az role assignment create \
   --assignee-object-id "$SP_OBJECT_ID" \
   --assignee-principal-type ServicePrincipal \
   --role "Contributor" \
-  --scope "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}"
+  --scope "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP_API}"
+
+# Grant Contributor on the UI resource group
+az role assignment create \
+  --assignee-object-id "$SP_OBJECT_ID" \
+  --assignee-principal-type ServicePrincipal \
+  --role "Contributor" \
+  --scope "/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP_UI}"
 ```
 
 **PowerShell:**
 ```powershell
 # Get your subscription ID
 $SUBSCRIPTION_ID = az account show --query id -o tsv
-$RESOURCE_GROUP = "<your-resource-group-name>"
+$RESOURCE_GROUP_API = "retro-tool-api-rg"
+$RESOURCE_GROUP_UI = "retro-tool-ui-rg"
 $SP_OBJECT_ID = az ad sp show --id <APP_ID> --query id -o tsv
 
-# Grant Contributor on the resource group
+# Grant Contributor on the API/Core resource group
 az role assignment create `
   --assignee-object-id "$SP_OBJECT_ID" `
   --assignee-principal-type ServicePrincipal `
   --role "Contributor" `
-  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP"
+  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP_API"
+
+# Grant Contributor on the UI resource group
+az role assignment create `
+  --assignee-object-id "$SP_OBJECT_ID" `
+  --assignee-principal-type ServicePrincipal `
+  --role "Contributor" `
+  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP_UI"
 ```
 
 ### Step 1.5 — Note Your Values
@@ -186,7 +204,7 @@ Go to **GitHub → Settings → Environments → [production] → Environment se
 | `AZURE_CLIENT_ID` | From Phase 1.5 | Azure App Registration |
 | `AZURE_TENANT_ID` | From Phase 1.5 | Azure CLI |
 | `AZURE_SUBSCRIPTION_ID` | From Phase 1.5 | Azure CLI |
-| `POSTGRES_ADMIN_PASSWORD` | Strong password | `openssl rand -base64 32` |
+| `POSTGRES_PASSWORD` | Strong password | `openssl rand -base64 32` |
 | `CONVEX_INSTANCE_SECRET` | 64-char hex | `openssl rand -hex 32` |
 | `DATABASE_URL` | PostgreSQL conn string | See Phase 3 outputs |
 | `BETTER_AUTH_SECRET` | Random string | `openssl rand -base64 32` |
@@ -195,6 +213,7 @@ Go to **GitHub → Settings → Environments → [production] → Environment se
 | `MICROSOFT_CLIENT_ID` | OAuth client ID | Azure App Registration |
 | `MICROSOFT_CLIENT_SECRET` | OAuth client secret | Azure App Registration |
 | `RESEND_API_KEY` | Email API key | https://resend.com |
+| `CONVEX_POSTGRES_URL` | Convex PostgreSQL conn string | See Phase 3.6 |
 | `REDIS_URL` | Redis connection string | Leave empty if not using |
 | `CONVEX_SYNC_ADMIN_KEY` | Convex admin key | Generated after first deploy |
 | `CONVEX_DEPLOY_KEY` | Convex deploy key | Generated after first deploy |
@@ -209,7 +228,11 @@ Go to **GitHub → Settings → Environments → [production] → Environment va
 
 | Variable | Example Value |
 |----------|---------------|
-| `AZURE_RESOURCE_GROUP` | `retro-tool-rg` |
+| `AZURE_RESOURCE_GROUP_API` | `retro-tool-api-rg` |
+| `AZURE_RESOURCE_GROUP_UI` | `retro-tool-ui-rg` |
+| `AZURE_DEPLOYMENT_LOCATION` | `southafricanorth` |
+| `AZURE_LOCATION_CORE` | `southafricanorth` |
+| `AZURE_LOCATION_SWA` | `westeurope` |
 | `ACR_NAME` | `retrotoolproductionacr` |
 | `ACR_LOGIN_SERVER` | `retrotoolproductionacr.azurecr.io` |
 | `API_WEBAPP_NAME` | `retro-tool-production-api` |
@@ -220,6 +243,9 @@ Go to **GitHub → Settings → Environments → [production] → Environment va
 | `ESTIMATES_REALTIME_BACKEND` | `convex` or `socket-io` |
 | `RETROS_REALTIME_BACKEND` | `convex` or `socket-io` |
 | `NOTIFICATIONS_REALTIME_BACKEND` | `convex` or `socket-io` |
+| `MICROSOFT_TENANT_ID` | `common` (or your Azure tenant ID for single-tenant) |
+| `EMAIL_FROM` | `Retro Tool <noreply@yourdomain.com>` |
+| `BETTER_AUTH_SESSION_EXPIRES_IN` | `604800` (7 days in seconds — optional, has default) |
 
 > **Note:** Some values (ACR_LOGIN_SERVER, SWA_URL, CONVEX_SYNC_URL) won't be known until infrastructure is deployed in Phase 3. Come back and fill them in after.
 
@@ -232,7 +258,7 @@ Go to **GitHub → Settings → Environments → [production] → Environment va
 ```bash
 # PostgreSQL admin password
 openssl rand -base64 32
-# → Save as POSTGRES_ADMIN_PASSWORD in GitHub Secrets
+# → Save as POSTGRES_PASSWORD in GitHub Secrets
 
 # Convex instance secret
 openssl rand -hex 32
@@ -258,28 +284,46 @@ npx web-push generate-vapid-keys
 
 **Bash:**
 ```bash
-RESOURCE_GROUP="retro-tool-rg"
+az group create -n retro-tool-api-rg -l southafricanorth
+az group create -n retro-tool-ui-rg -l westeurope
+
+RESOURCE_GROUP_API="retro-tool-api-rg"
+RESOURCE_GROUP_UI="retro-tool-ui-rg"
 ENVIRONMENT="production"
 
-az deployment group create \
-  --resource-group "$RESOURCE_GROUP" \
+az deployment sub create \
+  --name main \
+  --location southafricanorth \
   --template-file infra/bicep/main.bicep \
   --parameters \
     environmentName="$ENVIRONMENT" \
+    apiResourceGroupName="$RESOURCE_GROUP_API" \
+    uiResourceGroupName="$RESOURCE_GROUP_UI" \
+    locationCore="southafricanorth" \
+    locationSwa="westeurope" \
     postgresAdminPassword='<YOUR_PASSWORD>' \
     convexInstanceSecret='<YOUR_64_HEX>'
 ```
 
 **PowerShell:**
 ```powershell
-$RESOURCE_GROUP = "retro-tool-rg"
+az group create -n retro-tool-api-rg -l southafricanorth
+az group create -n retro-tool-ui-rg -l westeurope
+
+$RESOURCE_GROUP_API = "retro-tool-api-rg"
+$RESOURCE_GROUP_UI = "retro-tool-ui-rg"
 $ENVIRONMENT = "production"
 
-az deployment group create `
-  --resource-group "$RESOURCE_GROUP" `
+az deployment sub create `
+  --name main `
+  --location southafricanorth `
   --template-file infra/bicep/main.bicep `
   --parameters `
     environmentName="$ENVIRONMENT" `
+    apiResourceGroupName="$RESOURCE_GROUP_API" `
+    uiResourceGroupName="$RESOURCE_GROUP_UI" `
+    locationCore="southafricanorth" `
+    locationSwa="westeurope" `
     postgresAdminPassword='<YOUR_PASSWORD>' `
     convexInstanceSecret='<YOUR_64_HEX>'
 ```
@@ -290,47 +334,59 @@ After deployment completes, run:
 
 **Bash:**
 ```bash
-az deployment group show \
-  --resource-group "$RESOURCE_GROUP" \
+az deployment sub show \
   --name "main" \
   --query 'properties.outputs' -o json
 ```
 
 **PowerShell:**
 ```powershell
-az deployment group show `
-  --resource-group "$RESOURCE_GROUP" `
+az deployment sub show `
   --name "main" `
   --query 'properties.outputs' -o json
 ```
 
-This gives you:
-- `acrLoginServer` → Set as GitHub variable `ACR_LOGIN_SERVER`
-- `apiUrl` → Set as `API_URL`
-- `swaDefaultHostname` → Set as `SWA_URL`
-- `apiWebAppName` → Set as `API_WEBAPP_NAME`
-- `acrName` → Set as `ACR_NAME`
-- `convexSyncUrl` → Set as `CONVEX_SYNC_URL` and `CONVEX_URL`
+This gives you all Bicep outputs. Map them to GitHub as follows:
+
+| Bicep Output         | GitHub Setting                                                        | Type     |
+|----------------------|-----------------------------------------------------------------------|----------|
+| `acrLoginServer`     | Variable `ACR_LOGIN_SERVER`                                           | Variable |
+| `acrName`            | Variable `ACR_NAME`                                                   | Variable |
+| `apiUrl`             | Variable `API_URL`                                                    | Variable |
+| `apiWebAppName`      | Variable `API_WEBAPP_NAME`                                            | Variable |
+| `convexSyncUrl`      | Variables `CONVEX_SYNC_URL` and `CONVEX_URL`                          | Variable |
+| `convexFqdn`         | Used to construct `CONVEX_SYNC_URL` — informational                   | —        |
+| `postgresServerFqdn` | Used to construct `DATABASE_URL` and `CONVEX_POSTGRES_URL` — Step 3.6 | —        |
+| `swaDefaultHostname` | Variable `SWA_URL`                                                    | Variable |
+| `swaName`            | Used in Step 3.5 to fetch `SWA_DEPLOYMENT_TOKEN`                      | —        |
+| `keyVaultName`       | Informational — Key Vault created to store secrets                    | —        |
+| `keyVaultUri`        | Informational — Key Vault URI for reference                           | —        |
 
 ### Step 3.5 — Get SWA Deployment Token
 
-The SWA deployment token is not included in Bicep outputs (secrets can't be outputs). Fetch it manually:
+The SWA deployment token is not included in Bicep outputs (secrets can't be outputs). Use the `swaName` value from Step 3.4 (`retro-tool-production-ui`) and fetch it manually:
 
 **Bash:**
 ```bash
+SWA_NAME=$(az deployment sub show --name main --query 'properties.outputs.swaName.value' -o tsv)
+
 az staticwebapp secrets list \
-  --name retro-tool-production-ui \
+  --resource-group retro-tool-ui-rg \
+  --name "$SWA_NAME" \
   --query 'properties.apiKey' -o tsv
 ```
 
 **PowerShell:**
 ```powershell
+$SWA_NAME = az deployment sub show --name main --query 'properties.outputs.swaName.value' -o tsv
+
 az staticwebapp secrets list `
-  --name retro-tool-production-ui `
+  --resource-group retro-tool-ui-rg `
+  --name $SWA_NAME `
   --query 'properties.apiKey' -o tsv
 ```
 
-Save this value as `SWA_DEPLOYMENT_TOKEN` in GitHub Secrets.
+Save the output value as `SWA_DEPLOYMENT_TOKEN` in GitHub Secrets.
 
 ### Step 3.6 — Update GitHub Variables with Output Values
 
@@ -389,7 +445,7 @@ After the Convex Container Instance is running, you need to get the admin key:
 ```bash
 # Check container logs for the admin key
 az container logs \
-  --resource-group retro-tool-rg \
+  --resource-group retro-tool-api-rg \
   --name retro-tool-production-convex
 ```
 
@@ -397,7 +453,7 @@ az container logs \
 ```powershell
 # Check container logs for the admin key
 az container logs `
-  --resource-group retro-tool-rg `
+  --resource-group retro-tool-api-rg `
   --name retro-tool-production-convex
 ```
 
@@ -449,7 +505,6 @@ The CI workflow (`ci.yml`) runs on all PRs for lint, type-check, test, and build
 | `infra/bicep/modules/app-service.bicep` | App Service Plan + Web App for API |
 | `infra/bicep/modules/container-instance.bicep` | ACI for Convex backend |
 | `infra/bicep/modules/static-web-app.bicep` | Azure Static Web App for UI |
-| `infra/bicep/modules/key-vault.bicep` | Key Vault for secrets |
 
 ### GitHub Workflows
 
@@ -526,7 +581,6 @@ The CI workflow (`ci.yml`) runs on all PRs for lint, type-check, test, and build
 | Azure Database for PostgreSQL | Standard_B2s | ~$50 |
 | Azure Container Instance (Convex) | 1 CPU, 2 GB | ~$35 |
 | Azure Container Registry | Basic | ~$5 |
-| Azure Key Vault | Standard | ~$0.03/secret |
 | **Total** | | **~$145/month** |
 
 > Costs vary by region. Use the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/) for exact estimates.

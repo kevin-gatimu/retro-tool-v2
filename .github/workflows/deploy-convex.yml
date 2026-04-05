@@ -74,7 +74,7 @@ jobs:
       - name: Restart Convex Container Instance
         run: |
           ENV="${{ needs.set-env.outputs.environment }}"
-          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP_API }}"
           CONTAINER_NAME="retro-tool-${ENV}-convex"
 
           az container restart \

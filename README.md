@@ -331,8 +331,8 @@ The repository is currently scaffolded for Azure container deployment, with:
 
 ### Current CI/CD entrypoints
 
-- [retro-tool-api/.github/workflows/main_retro-tool.yml](retro-tool-api/.github/workflows/main_retro-tool.yml)
-- [retro-tool-ui/.github/workflows/azure-static-web-apps-gentle-moss-0c353ee03.yml](retro-tool-ui/.github/workflows/azure-static-web-apps-gentle-moss-0c353ee03.yml)
+- [.github/workflows/deploy-api.yml](.github/workflows/deploy-api.yml)
+- [.github/workflows/deploy-ui.yml](.github/workflows/deploy-ui.yml)
 
 ### Important deployment status
 
@@ -357,7 +357,7 @@ You must replace placeholder values before first deployment, including:
 
 - AKS runs the UI container, API container, and self-hosted Convex services.
 - Azure Database for PostgreSQL Flexible Server stores the durable application and Convex data in separate databases.
-- Azure Key Vault is intended for secret management.
+- GitHub Environment secrets store deployment secrets.
 - Application Insights and Log Analytics are intended for observability.
 
 ## Deployment Checklist

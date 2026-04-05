@@ -42,23 +42,33 @@ jobs:
 
       - name: What-If preview
         run: |
-          az deployment group what-if \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+          az deployment sub what-if \
+            --name main \
+            --location ${{ vars.AZURE_DEPLOYMENT_LOCATION }} \
             --template-file infra/bicep/main.bicep \
             --parameters \
               environmentName=${{ inputs.environment }} \
-              postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
+              apiResourceGroupName='${{ vars.AZURE_RESOURCE_GROUP_API }}' \
+              uiResourceGroupName='${{ vars.AZURE_RESOURCE_GROUP_UI }}' \
+              locationCore='${{ vars.AZURE_LOCATION_CORE }}' \
+              locationSwa='${{ vars.AZURE_LOCATION_SWA }}' \
+              postgresAdminPassword='${{ secrets.POSTGRES_PASSWORD }}' \
               convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}'
 
       - name: Deploy Bicep
         id: bicep
         run: |
-          OUTPUT=$(az deployment group create \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+          OUTPUT=$(az deployment sub create \
+            --name main \
+            --location ${{ vars.AZURE_DEPLOYMENT_LOCATION }} \
             --template-file infra/bicep/main.bicep \
             --parameters \
               environmentName=${{ inputs.environment }} \
-              postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
+              apiResourceGroupName='${{ vars.AZURE_RESOURCE_GROUP_API }}' \
+              uiResourceGroupName='${{ vars.AZURE_RESOURCE_GROUP_UI }}' \
+              locationCore='${{ vars.AZURE_LOCATION_CORE }}' \
+              locationSwa='${{ vars.AZURE_LOCATION_SWA }}' \
+              postgresAdminPassword='${{ secrets.POSTGRES_PASSWORD }}' \
               convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}' \
             --query 'properties.outputs' -o json)
 

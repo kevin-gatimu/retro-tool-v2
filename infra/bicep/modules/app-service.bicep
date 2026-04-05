@@ -13,8 +13,8 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   tags: tags
   kind: 'linux'
   sku: {
-    name: 'P0v4'
-    tier: 'PremiumV4'
+    name: 'P1v3'
+    tier: 'PremiumV3'
   }
   properties: {
     reserved: true // required for Linux

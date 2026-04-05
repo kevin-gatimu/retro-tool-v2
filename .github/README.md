@@ -184,7 +184,7 @@ login → validate Bicep → what-if preview → deploy
 | Parameter                 | Source                                    |
 | ------------------------- | ----------------------------------------- |
 | `environmentName`       | Selected environment                      |
-| `postgresAdminPassword` | GitHub secret `POSTGRES_ADMIN_PASSWORD` |
+| `postgresAdminPassword`   | GitHub secret `POSTGRES_PASSWORD`        |
 
 ---
 
@@ -202,7 +202,7 @@ Optionally add a required reviewer gate on `production`.
 | `AZURE_CLIENT_ID`         | App registration client ID (for OIDC)         |
 | `AZURE_TENANT_ID`         | Azure AD tenant ID                            |
 | `AZURE_SUBSCRIPTION_ID`   | Azure subscription ID                         |
-| `POSTGRES_ADMIN_PASSWORD` | Postgres admin password (infra workflow only) |
+| `POSTGRES_PASSWORD` | Postgres admin password (infra workflow only) |
 
 ### Variables (per environment)
 
@@ -212,7 +212,11 @@ Optionally add a required reviewer gate on `production`.
 | `ACR_LOGIN_SERVER`               | `retrotoolstgacr.azurecr.io`           | API, UI       |
 | `AKS_RESOURCE_GROUP`             | `retro-tool-staging`                   | API, UI       |
 | `AKS_CLUSTER_NAME`               | `retro-tool-staging-aks`               | API, UI       |
-| `AZURE_RESOURCE_GROUP`           | `retro-tool-staging`                   | Infra         |
+| `AZURE_RESOURCE_GROUP_API`       | `retro-tool-api-rg`                    | Infra, API    |
+| `AZURE_RESOURCE_GROUP_UI`        | `retro-tool-ui-rg`                     | Infra         |
+| `AZURE_DEPLOYMENT_LOCATION`      | `southafricanorth`                     | Infra         |
+| `AZURE_LOCATION_CORE`            | `southafricanorth`                     | Infra         |
+| `AZURE_LOCATION_SWA`             | `westeurope`                           | Infra         |
 | `API_URL`                        | `https://api.staging.retrotool.dev`    | UI            |
 | `CONVEX_URL`                     | `https://convex.staging.retrotool.dev` | UI            |
 | `ESTIMATES_REALTIME_BACKEND`     | `socket-io`                            | UI (optional) |

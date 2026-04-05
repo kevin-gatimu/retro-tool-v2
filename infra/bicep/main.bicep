@@ -1,18 +1,27 @@
 // ─────────────────────────────────────────────────────────────
 // Retro-Tool – Azure Infrastructure (main orchestrator)
 // Deploys: PostgreSQL, ACR, App Service, Container Instance,
-//          Static Web App, Key Vault
+//          Static Web App
 // ─────────────────────────────────────────────────────────────
 
-targetScope = 'resourceGroup'
+targetScope = 'subscription'
 
 // ───────────────── Parameters ─────────────────
 @description('Environment name (e.g., staging, production)')
 @allowed(['staging', 'production'])
 param environmentName string
 
-@description('Azure region for all resources')
-param location string = resourceGroup().location
+@description('Azure region for core resources (ACR, App Service, Postgres, ACI)')
+param locationCore string = 'southafricanorth'
+
+@description('Azure region for Static Web App (SWA)')
+param locationSwa string = 'westeurope'
+
+@description('Resource group for API/core resources')
+param apiResourceGroupName string = 'retro-tool-api-rg'
+
+@description('Resource group for UI resources')
+param uiResourceGroupName string = 'retro-tool-ui-rg'
 
 @description('PostgreSQL admin username')
 param postgresAdminUsername string = 'pgadmin'
@@ -34,7 +43,6 @@ var prefixClean = replace(prefix, '-', '')
 
 var postgresServerName = '${prefix}-pg'
 var acrName = '${prefixClean}acr'
-var keyVaultName = '${prefixClean}kv'
 var appServicePlanName = '${prefix}-plan'
 var webAppName = '${prefix}-api'
 var containerGroupName = '${prefix}-convex'
@@ -46,34 +54,37 @@ var tags = {
   managedBy: 'bicep'
 }
 
+resource apiRg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
+  name: apiResourceGroupName
+  location: locationCore
+  tags: tags
+}
+
+resource uiRg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
+  name: uiResourceGroupName
+  location: locationSwa
+  tags: tags
+}
+
 // ───────────────── Modules ─────────────────
 
 // 1. Container Registry
 module acr 'modules/container-registry.bicep' = {
   name: 'deploy-acr'
+  scope: apiRg
   params: {
-    location: location
+    location: locationCore
     acrName: acrName
     tags: tags
   }
 }
 
-// 2. Key Vault
-module kv 'modules/key-vault.bicep' = {
-  name: 'deploy-keyvault'
-  params: {
-    location: location
-    keyVaultName: keyVaultName
-    tenantId: subscription().tenantId
-    tags: tags
-  }
-}
-
-// 3. PostgreSQL Flexible Server
+// 2. PostgreSQL Flexible Server
 module postgres 'modules/postgresql-flexible-server.bicep' = {
   name: 'deploy-postgres'
+  scope: apiRg
   params: {
-    location: location
+    location: locationCore
     postgresqlServerName: postgresServerName
     postgresqlAdminUsername: postgresAdminUsername
     postgresqlAdminPassword: postgresAdminPassword
@@ -81,11 +92,12 @@ module postgres 'modules/postgresql-flexible-server.bicep' = {
   }
 }
 
-// 4. App Service (API)
+// 3. App Service (API)
 module appService 'modules/app-service.bicep' = {
   name: 'deploy-appservice'
+  scope: apiRg
   params: {
-    location: location
+    location: locationCore
     appServicePlanName: appServicePlanName
     webAppName: webAppName
     acrLoginServer: acr.outputs.acrLoginServer
@@ -94,17 +106,19 @@ module appService 'modules/app-service.bicep' = {
   }
 }
 
-// 5. Container Instance (Convex)
+// 4. Container Instance (Convex)
 // ACR credentials are looked up directly via the resource
 resource acrRef 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
+  scope: apiRg
   dependsOn: [acr]
 }
 
 module convex 'modules/container-instance.bicep' = {
   name: 'deploy-convex-aci'
+  scope: apiRg
   params: {
-    location: location
+    location: locationCore
     containerGroupName: containerGroupName
     acrLoginServer: acr.outputs.acrLoginServer
     acrUsername: acrName
@@ -116,49 +130,14 @@ module convex 'modules/container-instance.bicep' = {
   }
 }
 
-// 6. Static Web App (UI)
+// 5. Static Web App (UI)
 module swa 'modules/static-web-app.bicep' = {
   name: 'deploy-swa'
+  scope: uiRg
   params: {
-    location: location
+    location: locationSwa
     staticWebAppName: staticWebAppName
     tags: tags
-  }
-}
-
-// ───────────────── Store secrets in Key Vault ─────────────────
-resource kvDirect 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: keyVaultName
-  dependsOn: [kv]
-}
-
-resource secretPostgresPassword 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: kvDirect
-  name: 'postgres-admin-password'
-  properties: {
-    value: postgresAdminPassword
-  }
-}
-
-resource secretConvexInstanceSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: kvDirect
-  name: 'convex-instance-secret'
-  properties: {
-    value: convexInstanceSecret
-  }
-}
-
-// Grant API Web App's managed identity Key Vault Secrets User role
-resource kvSecretsRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVaultName, webAppName, 'kv-secrets-user')
-  scope: kvDirect
-  properties: {
-    roleDefinitionId: subscriptionResourceId(
-      'Microsoft.Authorization/roleDefinitions',
-      '4633458b-17de-408a-b874-0445c86b69e6' // Key Vault Secrets User
-    )
-    principalId: appService.outputs.webAppPrincipalId
-    principalType: 'ServicePrincipal'
   }
 }
 
@@ -172,5 +151,3 @@ output convexFqdn string = convex.outputs.containerGroupFqdn
 output convexSyncUrl string = 'http://${convex.outputs.containerGroupFqdn}:3210'
 output swaDefaultHostname string = 'https://${swa.outputs.staticWebAppDefaultHostname}'
 output swaName string = swa.outputs.staticWebAppName
-output keyVaultName string = kv.outputs.keyVaultName
-output keyVaultUri string = kv.outputs.keyVaultUri

@@ -120,7 +120,7 @@ jobs:
         run: |
           ENV="${{ needs.set-env.outputs.environment }}"
           IMAGE="${{ needs.build-and-push.outputs.image }}"
-          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP_API }}"
           MIGRATION_NAME="retro-tool-${ENV}-migrate-$(date +%s)"
           ACR_SERVER="${{ vars.ACR_LOGIN_SERVER }}"
           ACR_USER="${{ vars.ACR_NAME }}"
@@ -181,7 +181,7 @@ jobs:
       - name: Configure App Service environment variables
         run: |
           az webapp config appsettings set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP_API }} \
             --name ${{ vars.API_WEBAPP_NAME }} \
             --settings \
               NODE_ENV=production \
@@ -193,12 +193,15 @@ jobs:
               CONVEX_SYNC_URL='${{ vars.CONVEX_SYNC_URL }}' \
               ENABLE_CRON_JOBS='true' \
               WEEKLY_DIGEST_SEND_HOUR='6' \
+              BETTER_AUTH_SESSION_EXPIRES_IN='604800' \
+              MICROSOFT_TENANT_ID='${{ vars.MICROSOFT_TENANT_ID || 'common' }}' \
+              EMAIL_FROM='${{ vars.EMAIL_FROM }}' \
             --output none
 
       - name: Configure App Service secrets
         run: |
           az webapp config appsettings set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP_API }} \
             --name ${{ vars.API_WEBAPP_NAME }} \
             --settings \
               DATABASE_URL='${{ secrets.DATABASE_URL }}' \
@@ -219,7 +222,7 @@ jobs:
       - name: Deploy image to App Service
         run: |
           az webapp config container set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP_API }} \
             --name ${{ vars.API_WEBAPP_NAME }} \
             --container-image-name ${{ needs.build-and-push.outputs.image }} \
             --container-registry-url https://${{ vars.ACR_LOGIN_SERVER }}
@@ -227,7 +230,7 @@ jobs:
       - name: Restart Web App
         run: |
           az webapp restart \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP_API }} \
             --name ${{ vars.API_WEBAPP_NAME }}
 
       - name: Health check

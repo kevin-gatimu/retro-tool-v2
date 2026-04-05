@@ -29,7 +29,7 @@ services:
       context: ../retro-tool-api
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: ${API_DATABASE_URL}
+      DATABASE_URL: ${DATABASE_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       BETTER_AUTH_SESSION_EXPIRES_IN: ${BETTER_AUTH_SESSION_EXPIRES_IN}
@@ -37,23 +37,30 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       LOCAL_SERVER_URL: ${LOCAL_SERVER_URL}
       DEPLOYED_SERVER_URL: ${DEPLOYED_SERVER_URL}
-      REDIS_URL: ${API_REDIS_URL}
+      REDIS_URL: ${REDIS_URL}
       CONVEX_SYNC_URL: ${CONVEX_SYNC_URL}
       CONVEX_SYNC_ADMIN_KEY: ${CONVEX_SYNC_ADMIN_KEY}
       ENABLE_CRON_JOBS: ${ENABLE_CRON_JOBS}
       WEEKLY_DIGEST_SEND_HOUR: ${WEEKLY_DIGEST_SEND_HOUR}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET}
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
       VAPID_SUBJECT: ${VAPID_SUBJECT}
-      PORT: ${API_PORT}
-      NODE_ENV: ${API_NODE_ENV}
+      PORT: ${PORT}
+      NODE_ENV: ${NODE_ENV}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
     ports:
-      - '${API_PORT}:8000'
+      - '${PORT}:8000'
 
   convex-backend:
     image: ghcr.io/get-convex/convex-backend:latest
