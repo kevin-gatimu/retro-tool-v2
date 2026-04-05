@@ -14,7 +14,7 @@ const config = defineConfig({
     tanstackRouter({
       target: 'react',
       autoCodeSplitting: true,
-      routeFileIgnorePattern: '(hooks|helpers|types)',
+      routeFileIgnorePattern: '(hooks|helpers|types|components)',
     }),
     viteReact({
       babel: {
