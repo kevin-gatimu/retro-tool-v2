@@ -73,9 +73,9 @@ export function NotificationBell() {
         description: notification.message,
         action: notification.link
           ? {
-              label: 'View',
-              onClick: () => router.navigate({ to: notification.link! }),
-            }
+            label: 'View',
+            onClick: () => router.navigate({ to: notification.link! }),
+          }
           : undefined,
       })
       // Real-time membership update: when the current user is approved to a team,
@@ -160,107 +160,107 @@ export function NotificationBell() {
         <NotificationConvexSync userId={currentUserId} />
       ) : null}
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
-            >
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </Badge>
-          )}
-          <span className="sr-only">Notifications</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Notifications</span>
-          {unreadCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto p-1 text-xs"
-              onClick={() => markAllReadMutation.mutate()}
-              disabled={markAllReadMutation.isPending}
-            >
-              <CheckCheck className="mr-1 h-3 w-3" />
-              Mark all read
-            </Button>
-          )}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <ScrollArea className="h-75">
-          {unreadNotifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Bell className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
-                No unread notifications
-              </p>
-            </div>
-          ) : (
-            unreadNotifications.map((notif) => (
-              <DropdownMenuItem
-                key={notif.id}
-                className={`flex items-start gap-3 p-3 cursor-pointer ${!notif.read ? 'bg-muted/50' : ''}`}
-                onClick={() => {
-                  if (!notif.read) markReadMutation.mutate(notif.id)
-                  if (notif.link) {
-                    setIsOpen(false)
-                    router.navigate({ to: notif.link })
-                  }
-                }}
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
               >
-                <div className="shrink-0 mt-0.5">{getIcon(notif.type)}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{notif.title}</p>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {notif.message}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formatTime(notif.createdAt)}
-                  </p>
-                </div>
-                {!notif.read && (
-                  <div className="shrink-0">
-                    <div className="h-2 w-2 rounded-full bg-blue-500" />
-                  </div>
-                )}
-              </DropdownMenuItem>
-            ))
-          )}
-        </ScrollArea>
-
-        {pushSupported && (
-          <>
-            <DropdownMenuSeparator />
-            <div className="px-3 py-2">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Badge>
+            )}
+            <span className="sr-only">Notifications</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-80">
+          <DropdownMenuLabel className="flex items-center justify-between">
+            <span>Notifications</span>
+            {unreadCount > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full justify-start h-auto py-1.5 text-xs text-muted-foreground"
-                onClick={() =>
-                  pushSubscribed ? unsubscribePush() : subscribePush()
-                }
-                disabled={pushLoading}
+                className="h-auto p-1 text-xs"
+                onClick={() => markAllReadMutation.mutate()}
+                disabled={markAllReadMutation.isPending}
               >
-                {pushSubscribed ? (
-                  <>
-                    <BellOff className="mr-2 h-3 w-3" />
-                    Disable browser notifications
-                  </>
-                ) : (
-                  <>
-                    <Bell className="mr-2 h-3 w-3" />
-                    Enable browser notifications
-                  </>
-                )}
+                <CheckCheck className="mr-1 h-3 w-3" />
+                Mark all read
               </Button>
-            </div>
-          </>
-        )}
-      </DropdownMenuContent>
+            )}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <ScrollArea className="h-75">
+            {unreadNotifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Bell className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  No unread notifications
+                </p>
+              </div>
+            ) : (
+              unreadNotifications.map((notif) => (
+                <DropdownMenuItem
+                  key={notif.id}
+                  className={`flex items-start gap-3 p-3 cursor-pointer ${!notif.read ? 'bg-muted/50' : ''}`}
+                  onClick={() => {
+                    if (!notif.read) markReadMutation.mutate(notif.id)
+                    if (notif.link) {
+                      setIsOpen(false)
+                      router.navigate({ to: notif.link })
+                    }
+                  }}
+                >
+                  <div className="shrink-0 mt-0.5">{getIcon(notif.type)}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{notif.title}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {notif.message}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatTime(notif.createdAt)}
+                    </p>
+                  </div>
+                  {!notif.read && (
+                    <div className="shrink-0">
+                      <div className="h-2 w-2 rounded-full bg-blue-500" />
+                    </div>
+                  )}
+                </DropdownMenuItem>
+              ))
+            )}
+          </ScrollArea>
+
+          {pushSupported && (
+            <>
+              <DropdownMenuSeparator />
+              <div className="px-3 py-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start h-auto py-1.5 text-xs text-muted-foreground"
+                  onClick={() =>
+                    pushSubscribed ? unsubscribePush() : subscribePush()
+                  }
+                  disabled={pushLoading}
+                >
+                  {pushSubscribed ? (
+                    <>
+                      <BellOff className="mr-2 h-3 w-3" />
+                      Disable browser notifications
+                    </>
+                  ) : (
+                    <>
+                      <Bell className="mr-2 h-3 w-3" />
+                      Enable browser notifications
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
+        </DropdownMenuContent>
       </DropdownMenu>
     </>
   )
