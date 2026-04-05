@@ -16,7 +16,6 @@ import { SessionsModule } from './sessions/sessions.module';
 import { RetroRemindersModule } from './retro-reminders/retro-reminders.module';
 import { WeeklyDigestsModule } from './weekly-digests/weekly-digests.module';
 import { ActionItemsModule } from './action-items/action-items.module';
-import { CacheModule } from './cache/cache.module';
 import { LastActiveInterceptor } from './common/interceptors/last-active.interceptor';
 import configuration from './config/configuration';
 import { HealthController } from './health.controller';
@@ -29,7 +28,6 @@ import { HealthController } from './health.controller';
       envFilePath: ['.env'],
     }),
     ScheduleModule.forRoot(),
-    CacheModule,
     AuthModule,
     DatabaseModule,
     UsersModule,

@@ -15,8 +15,6 @@ import * as authSchema from '../auth/schema';
 import { eq } from 'drizzle-orm';
 import { EstimatesService } from './estimates.service';
 import { EstimatesProjectionSyncService } from './estimates-projection-sync.service';
-import { CacheService } from '../cache/cache.service';
-import { CacheKeys } from '../cache/cache-keys';
 import { NewEstimateRoundDto, UpdateEstimateStoryDto } from './dtos';
 import type { ClientData, WsSessionData } from '../common/types';
 
@@ -37,7 +35,6 @@ export class EstimatesGateway
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly estimatesService: EstimatesService,
     private readonly estimatesProjectionSyncService: EstimatesProjectionSyncService,
-    private readonly cacheService: CacheService,
   ) {}
 
   async handleConnection(client: Socket): Promise<void> {
@@ -50,33 +47,24 @@ export class EstimatesGateway
         return;
       }
 
-      const cacheKey = CacheKeys.wsSession(token);
-      let sessionData = await this.cacheService.get<WsSessionData>(cacheKey);
+      const [session] = await this.database
+        .select({
+          userId: authSchema.session.userId,
+          expiresAt: authSchema.session.expiresAt,
+        })
+        .from(authSchema.session)
+        .where(eq(authSchema.session.token, token))
+        .limit(1);
 
-      if (!sessionData) {
-        const [session] = await this.database
-          .select({
-            userId: authSchema.session.userId,
-            expiresAt: authSchema.session.expiresAt,
-          })
-          .from(authSchema.session)
-          .where(eq(authSchema.session.token, token))
-          .limit(1);
-
-        if (!session || session.expiresAt < new Date()) {
-          client.disconnect();
-          return;
-        }
-
-        sessionData = {
-          userId: session.userId,
-          expiresAt: session.expiresAt.toISOString(),
-        };
-        await this.cacheService.set(cacheKey, sessionData, 300);
-      } else if (new Date(sessionData.expiresAt) < new Date()) {
+      if (!session || session.expiresAt < new Date()) {
         client.disconnect();
         return;
       }
+
+      const sessionData: WsSessionData = {
+        userId: session.userId,
+        expiresAt: session.expiresAt.toISOString(),
+      };
 
       (client.data as ClientData).userId = sessionData.userId;
       this.logger.log(`Client connected: userId=${sessionData.userId}`);

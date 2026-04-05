@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsGateway } from './notifications.gateway';
 import { DATABASE_CONNECTION } from '../database/database-connection';
-import { CacheService } from '../cache/cache.service';
 
 describe('NotificationsGateway', () => {
   let gateway: NotificationsGateway;
@@ -11,10 +10,6 @@ describe('NotificationsGateway', () => {
       providers: [
         NotificationsGateway,
         { provide: DATABASE_CONNECTION, useValue: {} },
-        {
-          provide: CacheService,
-          useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
-        },
       ],
     }).compile();
 

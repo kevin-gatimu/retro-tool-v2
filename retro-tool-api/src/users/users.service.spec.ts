@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { CommonService } from '../common/common.service';
-import { CacheService } from '../cache/cache.service';
 import { EmailService } from '../email/email.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -18,14 +17,6 @@ describe('UsersService', () => {
           provide: CommonService,
           useValue: {
             getUserFromBetterAuth: jest.fn(),
-          },
-        },
-        {
-          provide: CacheService,
-          useValue: {
-            get: jest.fn(),
-            set: jest.fn(),
-            del: jest.fn(),
           },
         },
         {

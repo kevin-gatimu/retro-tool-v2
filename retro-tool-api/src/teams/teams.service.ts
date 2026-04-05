@@ -26,8 +26,6 @@ import {
   USER_STATUSES,
 } from 'src/common/enums';
 import { NotificationsService } from '../notifications/notifications.service';
-import { CacheService } from '../cache/cache.service';
-import { CacheKeys } from '../cache/cache-keys';
 
 @Injectable()
 export class TeamsService {
@@ -38,7 +36,6 @@ export class TeamsService {
     >,
     private readonly commonService: CommonService,
     private readonly notificationsService: NotificationsService,
-    private readonly cacheService: CacheService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService<Config>,
   ) {}
@@ -99,13 +96,6 @@ export class TeamsService {
       tag: TEAM_MEMBER_TAGS.Lead,
     });
 
-    await this.cacheService.del(
-      CacheKeys.orgTeams(data.organizationId, userId, 1, 10, undefined),
-    );
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsOrgPattern(data.organizationId),
-    );
-
     if (!team) {
       throw new ConflictException('Failed to create team');
     }
@@ -143,30 +133,6 @@ export class TeamsService {
     }
 
     const normalizedSearch = search?.trim();
-    const cacheKey = CacheKeys.orgTeams(
-      orgId,
-      userId,
-      page,
-      limit,
-      normalizedSearch,
-    );
-    const cached = await this.cacheService.get<{
-      teams: Array<
-        typeof teamSchema.team.$inferSelect & {
-          isMember: boolean;
-          hasPendingRequest: boolean;
-          myPendingRequestId: string | null;
-        }
-      >;
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
-    }>(cacheKey);
-
-    if (cached) {
-      return cached;
-    }
 
     const offset = (page - 1) * limit;
 
@@ -239,7 +205,6 @@ export class TeamsService {
       totalPages: Math.ceil(totalCount.count / limit),
     };
 
-    await this.cacheService.set(cacheKey, result, 120);
     return result;
   }
 
@@ -536,10 +501,6 @@ export class TeamsService {
       throw new NotFoundException('Team not found');
     }
 
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsOrgPattern(team.organizationId),
-    );
-
     return team;
   }
 
@@ -573,11 +534,6 @@ export class TeamsService {
       .delete(teamSchema.team)
       .where(eq(teamSchema.team.id, teamId))
       .returning();
-
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsOrgPattern(team.organizationId),
-    );
-    await this.cacheService.delPattern(CacheKeys.reportsAllPattern());
 
     return deletedTeam;
   }
@@ -743,13 +699,6 @@ export class TeamsService {
         ),
       );
 
-    await this.cacheService.del(CacheKeys.rbacTeam(teamId, data.userId));
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsPattern(team.organizationId, data.userId),
-    );
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsOrgPattern(team.organizationId),
-    );
     return member;
   }
 
@@ -814,15 +763,6 @@ export class TeamsService {
       .where(eq(teamSchema.teamMember.id, member.id))
       .returning();
 
-    await this.cacheService.del(CacheKeys.rbacTeam(teamId, memberId));
-    if (teamRecord) {
-      await this.cacheService.delPattern(
-        CacheKeys.orgTeamsPattern(teamRecord.organizationId, memberId),
-      );
-      await this.cacheService.delPattern(
-        CacheKeys.orgTeamsOrgPattern(teamRecord.organizationId),
-      );
-    }
     return deletedMember;
   }
 
@@ -896,15 +836,6 @@ export class TeamsService {
       .where(eq(teamSchema.teamMember.id, member.id))
       .returning();
 
-    await this.cacheService.del(CacheKeys.rbacTeam(teamId, memberId));
-    if (teamRecord) {
-      await this.cacheService.delPattern(
-        CacheKeys.orgTeamsPattern(teamRecord.organizationId, memberId),
-      );
-      await this.cacheService.delPattern(
-        CacheKeys.orgTeamsOrgPattern(teamRecord.organizationId),
-      );
-    }
     return updatedMember;
   }
 
@@ -948,15 +879,6 @@ export class TeamsService {
       .from(teamSchema.team)
       .where(eq(teamSchema.team.id, teamId))
       .limit(1);
-
-    if (teamRecord) {
-      await this.cacheService.delPattern(
-        CacheKeys.orgTeamsPattern(teamRecord.organizationId, memberId),
-      );
-      await this.cacheService.delPattern(
-        CacheKeys.orgTeamsOrgPattern(teamRecord.organizationId),
-      );
-    }
 
     return updated;
   }
@@ -1016,13 +938,6 @@ export class TeamsService {
       })
       .returning();
 
-    await this.cacheService.del(CacheKeys.rbacTeam(teamId, userId));
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsPattern(team.organizationId, userId),
-    );
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsOrgPattern(team.organizationId),
-    );
     return member;
   }
 
@@ -1054,15 +969,6 @@ export class TeamsService {
       .delete(teamSchema.teamMember)
       .where(eq(teamSchema.teamMember.id, member.id));
 
-    await this.cacheService.del(CacheKeys.rbacTeam(teamId, userId));
-    if (teamRecord) {
-      await this.cacheService.delPattern(
-        CacheKeys.orgTeamsPattern(teamRecord.organizationId, userId),
-      );
-      await this.cacheService.delPattern(
-        CacheKeys.orgTeamsOrgPattern(teamRecord.organizationId),
-      );
-    }
     return { message: 'Left team successfully' };
   }
 
@@ -1142,10 +1048,6 @@ export class TeamsService {
         message: message ?? null,
       })
       .returning();
-
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsPattern(team.organizationId, userId),
-    );
 
     const [requester] = await this.database
       .select({ name: userSchema.user.name })
@@ -1276,12 +1178,6 @@ export class TeamsService {
       .delete(teamSchema.teamJoinRequest)
       .where(eq(teamSchema.teamJoinRequest.id, requestId));
 
-    if (teamRecord) {
-      await this.cacheService.delPattern(
-        CacheKeys.orgTeamsPattern(teamRecord.organizationId, request.userId),
-      );
-    }
-
     return { message: 'Join request cancelled' };
   }
 
@@ -1352,14 +1248,6 @@ export class TeamsService {
           eq(userSchema.user.status, USER_STATUSES.Pending),
         ),
       );
-
-    await this.cacheService.del(CacheKeys.rbacTeam(teamId, request.userId));
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsPattern(team.organizationId, request.userId),
-    );
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsOrgPattern(team.organizationId),
-    );
 
     void this.notificationsService
       .notifyUserOfJoinApproval(request.userId, teamId, team.name)
@@ -1446,10 +1334,6 @@ export class TeamsService {
       })
       .where(eq(teamSchema.teamJoinRequest.id, requestId))
       .returning();
-
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsPattern(team.organizationId, request.userId),
-    );
 
     void this.notificationsService
       .notifyUserOfJoinRejection(request.userId, team?.name ?? 'the team')

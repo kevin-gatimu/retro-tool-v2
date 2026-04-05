@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EstimatesGateway } from './estimates.gateway';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { EstimatesService } from './estimates.service';
-import { CacheService } from '../cache/cache.service';
 import { EstimatesProjectionSyncService } from './estimates-projection-sync.service';
 
 describe('EstimatesGateway', () => {
@@ -15,10 +14,6 @@ describe('EstimatesGateway', () => {
         { provide: DATABASE_CONNECTION, useValue: {} },
         { provide: EstimatesService, useValue: {} },
         { provide: EstimatesProjectionSyncService, useValue: {} },
-        {
-          provide: CacheService,
-          useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
-        },
       ],
     }).compile();
 

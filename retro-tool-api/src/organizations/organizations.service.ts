@@ -30,8 +30,6 @@ import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CommonService } from '../common/common.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { CacheService } from '../cache/cache.service';
-import { CacheKeys } from '../cache/cache-keys';
 import {
   EMAIL_LOG_TYPES,
   ORG_MEMBER_ROLES,
@@ -49,7 +47,6 @@ export class OrganizationsService {
     >,
     private readonly commonService: CommonService,
     private readonly notificationsService: NotificationsService,
-    private readonly cacheService: CacheService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService<Config>,
   ) {}
@@ -145,8 +142,6 @@ export class OrganizationsService {
       role: ORG_MEMBER_ROLES.Owner,
     });
 
-    await this.cacheService.delPattern(CacheKeys.userOrgsPattern(userId));
-
     if (!org) {
       throw new ConflictException('Failed to create organization');
     }
@@ -161,20 +156,6 @@ export class OrganizationsService {
     search?: string,
   ) {
     const normalizedSearch = search?.trim();
-    const cacheKey = CacheKeys.userOrgs(userId, page, limit, normalizedSearch);
-    const cached = await this.cacheService.get<{
-      organizations: Array<
-        typeof orgSchema.organization.$inferSelect & { memberCount: number }
-      >;
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
-    }>(cacheKey);
-
-    if (cached) {
-      return cached;
-    }
 
     const offset = (page - 1) * limit;
 
@@ -225,7 +206,6 @@ export class OrganizationsService {
       totalPages: Math.ceil(totalCount.count / limit),
     };
 
-    await this.cacheService.set(cacheKey, result, 120);
     return result;
   }
 
@@ -374,9 +354,6 @@ export class OrganizationsService {
       throw new NotFoundException('Organization not found');
     }
 
-    await this.cacheService.delPattern(CacheKeys.orgTeamsOrgPattern(orgId));
-    await this.cacheService.delPattern(CacheKeys.userOrgsPattern(org.ownerId));
-
     return org;
   }
 
@@ -398,8 +375,6 @@ export class OrganizationsService {
     if (!org) {
       throw new NotFoundException('Organization not found');
     }
-
-    await this.cacheService.delPattern(CacheKeys.reportsAllPattern());
 
     return org;
   }
@@ -519,11 +494,6 @@ export class OrganizationsService {
       })
       .returning();
 
-    await this.cacheService.del(CacheKeys.rbacOrg(orgId, data.userId));
-    await this.cacheService.delPattern(CacheKeys.userOrgsPattern(data.userId));
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsPattern(orgId, data.userId),
-    );
     return member;
   }
 
@@ -561,11 +531,6 @@ export class OrganizationsService {
       .where(eq(orgSchema.organizationMember.id, member.id))
       .returning();
 
-    await this.cacheService.del(CacheKeys.rbacOrg(orgId, memberId));
-    await this.cacheService.delPattern(CacheKeys.userOrgsPattern(memberId));
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsPattern(orgId, memberId),
-    );
     return deleted;
   }
 
@@ -605,7 +570,6 @@ export class OrganizationsService {
       .where(eq(orgSchema.organizationMember.id, member.id))
       .returning();
 
-    await this.cacheService.del(CacheKeys.rbacOrg(orgId, memberId));
     return updated;
   }
 
@@ -643,11 +607,6 @@ export class OrganizationsService {
       .delete(orgSchema.organizationMember)
       .where(eq(orgSchema.organizationMember.id, member.id));
 
-    await this.cacheService.del(CacheKeys.rbacOrg(orgId, userId));
-    await this.cacheService.delPattern(CacheKeys.userOrgsPattern(userId));
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsPattern(orgId, userId),
-    );
     return { message: 'Left organization successfully' };
   }
 
@@ -732,12 +691,6 @@ export class OrganizationsService {
           eq(userSchema.user.status, USER_STATUSES.Pending),
         ),
       );
-
-    await this.cacheService.del(CacheKeys.rbacOrg(orgId, invitee.id));
-    await this.cacheService.delPattern(CacheKeys.userOrgsPattern(invitee.id));
-    await this.cacheService.delPattern(
-      CacheKeys.orgTeamsPattern(orgId, invitee.id),
-    );
 
     void this.notificationsService
       .notifyUserOfOrgInvite(invitee.id, orgId, org?.name ?? 'the organisation')

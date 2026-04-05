@@ -3,7 +3,6 @@ import { OrganizationsService } from './organizations.service';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { CommonService } from '../common/common.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { CacheService } from '../cache/cache.service';
 import { EmailService } from '../email/email.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -26,14 +25,6 @@ describe('OrganizationsService', () => {
           useValue: {
             createNotification: jest.fn(),
             sendNotifications: jest.fn(),
-          },
-        },
-        {
-          provide: CacheService,
-          useValue: {
-            get: jest.fn(),
-            set: jest.fn(),
-            del: jest.fn(),
           },
         },
         {

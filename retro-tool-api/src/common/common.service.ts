@@ -13,8 +13,6 @@ import {
 } from './enums';
 import { generateId } from 'src/lib/utils';
 import type { OrgContext, TeamContext, UserContext } from '../lib/rbac';
-import { CacheService } from '../cache/cache.service';
-import { CacheKeys } from '../cache/cache-keys';
 
 @Injectable()
 export class CommonService {
@@ -23,29 +21,21 @@ export class CommonService {
     private readonly database: NodePgDatabase<
       typeof userSchema & typeof orgSchema & typeof teamSchema
     >,
-    private readonly cacheService: CacheService,
   ) {}
 
   /**
    * SYSTEM-LEVEL CHECKS
-   * Cached via userRole key (TTL: 120s).
    */
 
-  /** Fetch + cache the user's system role string. */
+  /** Fetch the user's system role string. */
   private async getUserRole(userId: string): Promise<string | null> {
-    const cacheKey = CacheKeys.userRole(userId);
-    const cached = await this.cacheService.get<string>(cacheKey);
-    if (cached !== null) return cached;
-
     const [user] = await this.database
       .select({ role: userSchema.user.role })
       .from(userSchema.user)
       .where(eq(userSchema.user.id, userId))
       .limit(1);
 
-    const role = user?.role ?? null;
-    if (role) await this.cacheService.set(cacheKey, role, 120);
-    return role;
+    return user?.role ?? null;
   }
 
   async isSuperAdmin(userId: string): Promise<boolean> {
@@ -59,19 +49,13 @@ export class CommonService {
 
   /**
    * ORGANIZATION-LEVEL CHECKS
-   * Cached via rbacOrg key (TTL: 120s). Shares cache with buildOrgContext.
    */
 
-  /** Fetch + cache the user's org membership role string. */
+  /** Fetch the user's org membership role string. */
   private async getOrgMemberRole(
     userId: string,
     orgId: string,
   ): Promise<string | null> {
-    // Try to reuse the full OrgContext cache first
-    const cacheKey = CacheKeys.rbacOrg(orgId, userId);
-    const cached = await this.cacheService.get<OrgContext>(cacheKey);
-    if (cached) return cached.orgRole;
-
     const [member] = await this.database
       .select({ role: orgSchema.organizationMember.role })
       .from(orgSchema.organizationMember)
@@ -103,18 +87,13 @@ export class CommonService {
 
   /**
    * TEAM-LEVEL CHECKS
-   * Cached via rbacTeam key (TTL: 120s). Shares cache with buildTeamContext.
    */
 
-  /** Fetch + cache the user's team membership tag. */
+  /** Fetch the user's team membership tag. */
   private async getTeamMemberTag(
     userId: string,
     teamId: string,
   ): Promise<string | null> {
-    const cacheKey = CacheKeys.rbacTeam(teamId, userId);
-    const cached = await this.cacheService.get<TeamContext>(cacheKey);
-    if (cached) return cached.teamTag;
-
     const [member] = await this.database
       .select({ tag: teamSchema.teamMember.tag })
       .from(teamSchema.teamMember)
@@ -233,10 +212,6 @@ export class CommonService {
    * Pass this to canPerformOrgAction() / isOrgAdmin() / etc.
    */
   async buildOrgContext(userId: string, orgId: string): Promise<OrgContext> {
-    const cacheKey = CacheKeys.rbacOrg(orgId, userId);
-    const cached = await this.cacheService.get<OrgContext>(cacheKey);
-    if (cached) return cached;
-
     const [user] = await this.database
       .select({ id: userSchema.user.id, role: userSchema.user.role })
       .from(userSchema.user)
@@ -277,7 +252,6 @@ export class CommonService {
         user.role === USER_ROLES.SystemAdmin,
     };
 
-    await this.cacheService.set(cacheKey, ctx, 120);
     return ctx;
   }
 
@@ -287,10 +261,6 @@ export class CommonService {
    * Pass this to canPerformTeamAction() / isTeamLead() / etc.
    */
   async buildTeamContext(userId: string, teamId: string): Promise<TeamContext> {
-    const cacheKey = CacheKeys.rbacTeam(teamId, userId);
-    const cached = await this.cacheService.get<TeamContext>(cacheKey);
-    if (cached) return cached;
-
     const [user] = await this.database
       .select({ id: userSchema.user.id, role: userSchema.user.role })
       .from(userSchema.user)
@@ -357,7 +327,6 @@ export class CommonService {
         user.role === USER_ROLES.SystemAdmin,
     };
 
-    await this.cacheService.set(cacheKey, ctx, 120);
     return ctx;
   }
 }

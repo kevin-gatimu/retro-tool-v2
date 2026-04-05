@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReportsService } from './reports.service';
 import { DATABASE_CONNECTION } from '../database/database-connection';
-import { CacheService } from '../cache/cache.service';
 
 describe('ReportsService', () => {
   let service: ReportsService;
@@ -11,14 +10,6 @@ describe('ReportsService', () => {
       providers: [
         ReportsService,
         { provide: DATABASE_CONNECTION, useValue: {} },
-        {
-          provide: CacheService,
-          useValue: {
-            get: jest.fn(),
-            set: jest.fn(),
-            del: jest.fn(),
-          },
-        },
       ],
     }).compile();
 

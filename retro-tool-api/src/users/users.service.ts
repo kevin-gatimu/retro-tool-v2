@@ -43,8 +43,6 @@ import {
   USER_STATUSES,
 } from '../common/enums';
 import { CommonService } from '../common/common.service';
-import { CacheService } from '../cache/cache.service';
-import { CacheKeys } from '../cache/cache-keys';
 
 type Database = NodePgDatabase<
   typeof userSchema & typeof orgSchema & typeof teamSchema
@@ -56,7 +54,6 @@ export class UsersService {
     @Inject(DATABASE_CONNECTION)
     private readonly database: Database,
     private readonly commonService: CommonService,
-    private readonly cacheService: CacheService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService<Config>,
   ) {}
@@ -930,14 +927,6 @@ export class UsersService {
       .where(eq(userSchema.user.id, userId))
       .returning();
 
-    await this.invalidateRbacForUser(userId);
     return updated;
-  }
-
-  private async invalidateRbacForUser(userId: string): Promise<void> {
-    await Promise.all([
-      this.cacheService.del(CacheKeys.userRole(userId)),
-      this.cacheService.delPattern(CacheKeys.rbacUserPattern(userId)),
-    ]);
   }
 }

@@ -17,8 +17,6 @@ import {
   OrgOverview,
   SystemOverview,
 } from './schema';
-import { CacheService } from '../cache/cache.service';
-import { CacheKeys } from '../cache/cache-keys';
 import type { ReportPeriod as Period } from '../common/types';
 import {
   ACTION_ITEM_STATUSES,
@@ -62,7 +60,6 @@ function scoreDescription(score: number): string {
 export class ReportsService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
-    private readonly cacheService: CacheService,
   ) {}
 
   private async assertTeamMember(
@@ -159,15 +156,6 @@ export class ReportsService {
   ): Promise<TeamMetrics> {
     await this.assertTeamMember(userId, teamId);
 
-    const cachePeriod = filterUserId
-      ? `${period}:user:${filterUserId}`
-      : period;
-    const cacheKey = CacheKeys.teamMetrics(teamId, cachePeriod, userId);
-    const cached = await this.cacheService.get<TeamMetrics>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     const since = periodStart(period);
 
     const retros = await this.database
@@ -202,7 +190,6 @@ export class ReportsService {
         actionItemsPending: 0,
       };
 
-      await this.cacheService.set(cacheKey, emptyResult, 300);
       return emptyResult;
     }
 
@@ -291,7 +278,6 @@ export class ReportsService {
       actionItemsPending,
     };
 
-    await this.cacheService.set(cacheKey, result, 300);
     return result;
   }
 
@@ -301,12 +287,6 @@ export class ReportsService {
     period: Period = 'month',
   ): Promise<HealthScore> {
     await this.assertTeamMember(userId, teamId);
-
-    const cacheKey = CacheKeys.healthScore(teamId, period);
-    const cached = await this.cacheService.get<HealthScore>(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
     const since = periodStart(period);
 
@@ -433,7 +413,6 @@ export class ReportsService {
       trend,
     };
 
-    await this.cacheService.set(cacheKey, result, 300);
     return result;
   }
 
@@ -443,12 +422,6 @@ export class ReportsService {
     period: Period = 'month',
   ): Promise<ActionItemAnalytics> {
     await this.assertTeamMember(userId, teamId);
-
-    const cacheKey = CacheKeys.actionItemAnalytics(teamId, period);
-    const cached = await this.cacheService.get<ActionItemAnalytics>(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
     const since = periodStart(period);
 
@@ -473,7 +446,6 @@ export class ReportsService {
         topAssignees: [],
       };
 
-      await this.cacheService.set(cacheKey, emptyResult, 300);
       return emptyResult;
     }
 
@@ -551,7 +523,6 @@ export class ReportsService {
       topAssignees,
     };
 
-    await this.cacheService.set(cacheKey, result, 300);
     return result;
   }
 
@@ -560,13 +531,6 @@ export class ReportsService {
     orgId: string,
   ): Promise<TemplateUsageMetrics[]> {
     await this.assertOrgMember(userId, orgId);
-
-    const cacheKey = CacheKeys.templateUsageMetrics(orgId);
-    const cached =
-      await this.cacheService.get<TemplateUsageMetrics[]>(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
     const templates = await this.database
       .select({ id: retroSchema.template.id, name: retroSchema.template.name })
@@ -605,7 +569,6 @@ export class ReportsService {
       }),
     );
 
-    await this.cacheService.set(cacheKey, result, 600);
     return result;
   }
 
@@ -614,12 +577,6 @@ export class ReportsService {
     period?: Period,
     teamId?: string,
   ): Promise<UserStats> {
-    const cacheKey = CacheKeys.userStats(userId, period, teamId);
-    const cached = await this.cacheService.get<UserStats>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     const since = period ? periodStart(period) : undefined;
 
     // Teams count
@@ -661,7 +618,6 @@ export class ReportsService {
           actionItemsCompleted: 0,
           completionRate: 0,
         };
-        await this.cacheService.set(cacheKey, emptyResult, 300);
         return emptyResult;
       }
 
@@ -715,7 +671,6 @@ export class ReportsService {
         actionItemsCompleted,
         completionRate,
       };
-      await this.cacheService.set(cacheKey, result, 300);
       return result;
     }
 
@@ -758,7 +713,6 @@ export class ReportsService {
       completionRate,
     };
 
-    await this.cacheService.set(cacheKey, result, 300);
     return result;
   }
 
@@ -768,12 +722,6 @@ export class ReportsService {
     period: Period = 'month',
   ): Promise<EstimateKPIs> {
     await this.assertTeamMember(userId, teamId);
-
-    const cacheKey = CacheKeys.estimateKPIs(teamId, period);
-    const cached = await this.cacheService.get<EstimateKPIs>(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
     const since = periodStart(period);
 
@@ -802,7 +750,6 @@ export class ReportsService {
         participationRate: 0,
         avgVotesPerStory: 0,
       };
-      await this.cacheService.set(cacheKey, emptyResult, 300);
       return emptyResult;
     }
 
@@ -855,7 +802,6 @@ export class ReportsService {
       avgVotesPerStory,
     };
 
-    await this.cacheService.set(cacheKey, kpiResult, 300);
     return kpiResult;
   }
 
@@ -870,18 +816,6 @@ export class ReportsService {
     await this.assertOrgAdmin(userId, orgId);
 
     const normalizedTbSearch = tbSearch?.trim();
-
-    const cacheKey = CacheKeys.orgOverview(
-      orgId,
-      period,
-      tbPage,
-      tbLimit,
-      normalizedTbSearch,
-    );
-    const cached = await this.cacheService.get<OrgOverview>(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
     const since = periodStart(period);
 
@@ -910,7 +844,6 @@ export class ReportsService {
         teamBreakdownTotalPages: 0,
       };
 
-      await this.cacheService.set(cacheKey, emptyResult, 300);
       return emptyResult;
     }
 
@@ -1074,7 +1007,6 @@ export class ReportsService {
       teamBreakdownTotalPages: Math.ceil(tbTotal / tbLimit),
     };
 
-    await this.cacheService.set(cacheKey, result, 300);
     return result;
   }
 
@@ -1087,16 +1019,6 @@ export class ReportsService {
     await this.assertSystemAdmin(userId);
 
     const normalizedObSearch = obSearch?.trim();
-
-    const cacheKey = CacheKeys.systemOverview(
-      obPage,
-      obLimit,
-      normalizedObSearch,
-    );
-    const cached = await this.cacheService.get<SystemOverview>(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
     const since30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -1246,7 +1168,6 @@ export class ReportsService {
       orgBreakdownTotalPages: Math.ceil(obTotal / obLimit),
     };
 
-    await this.cacheService.set(cacheKey, result, 300);
     return result;
   }
 }

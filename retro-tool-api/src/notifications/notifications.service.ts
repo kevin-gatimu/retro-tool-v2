@@ -21,8 +21,6 @@ import {
   USER_ROLES,
 } from '../common/enums';
 import { generateId } from '../lib/utils';
-import { CacheService } from '../cache/cache.service';
-import { CacheKeys } from '../cache/cache-keys';
 
 type Database = NodePgDatabase<
   typeof notificationSchema & typeof authSchema & typeof teamSchema
@@ -36,23 +34,16 @@ export class NotificationsService {
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly gateway: NotificationsGateway,
     private readonly pushService: PushService,
-    private readonly cacheService: CacheService,
     private readonly notificationsProjectionSyncService: NotificationsProjectionSyncService,
   ) {}
 
   async getNotifications(userId: string): Promise<Notification[]> {
-    const cacheKey = CacheKeys.notificationList(userId);
-    const cached = await this.cacheService.get<Notification[]>(cacheKey);
-    if (cached) return cached;
-
     const notifications = await this.database
       .select()
       .from(notificationSchema.notification)
       .where(eq(notificationSchema.notification.userId, userId))
       .orderBy(desc(notificationSchema.notification.createdAt))
       .limit(50);
-
-    await this.cacheService.set(cacheKey, notifications, 30);
     return notifications;
   }
 
@@ -88,7 +79,6 @@ export class NotificationsService {
       .syncNotificationReadState(userId, notificationId, true)
       .catch(() => undefined);
 
-    await this.cacheService.del(CacheKeys.notificationList(userId));
     return { success: true };
   }
 
@@ -102,7 +92,6 @@ export class NotificationsService {
       .syncAllNotificationsRead(userId)
       .catch(() => undefined);
 
-    await this.cacheService.del(CacheKeys.notificationList(userId));
     return { success: true };
   }
 
@@ -115,7 +104,6 @@ export class NotificationsService {
       .values({ id, ...data })
       .returning();
 
-    await this.cacheService.del(CacheKeys.notificationList(data.userId));
     this.gateway.emitToUser(data.userId, 'notification', created);
 
     void this.notificationsProjectionSyncService

@@ -3,7 +3,6 @@ import { TeamsService } from './teams.service';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { CommonService } from '../common/common.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { CacheService } from '../cache/cache.service';
 import { EmailService } from '../email/email.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -25,15 +24,6 @@ describe('TeamsService', () => {
         {
           provide: NotificationsService,
           useValue: {},
-        },
-        {
-          provide: CacheService,
-          useValue: {
-            get: jest.fn(),
-            set: jest.fn(),
-            del: jest.fn(),
-            delPattern: jest.fn(),
-          },
         },
         {
           provide: EmailService,
