@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RetrosController } from './retros.controller';
 import { RetrosService } from './retros.service';
 import { RetrosGateway } from './retros.gateway';
+import { RetrosProjectionSyncService } from './retros-projection-sync.service';
 
 describe('RetrosController', () => {
   let controller: RetrosController;
@@ -18,6 +19,7 @@ describe('RetrosController', () => {
             emitCardMoved: jest.fn(),
           },
         },
+        { provide: RetrosProjectionSyncService, useValue: {} },
       ],
     }).compile();
 

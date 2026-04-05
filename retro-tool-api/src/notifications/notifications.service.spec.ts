@@ -4,6 +4,7 @@ import { DATABASE_CONNECTION } from '../database/database-connection';
 import { NotificationsGateway } from './notifications.gateway';
 import { CacheService } from '../cache/cache.service';
 import { PushService } from './push.service';
+import { NotificationsProjectionSyncService } from './notifications-projection-sync.service';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
@@ -22,6 +23,14 @@ describe('NotificationsService', () => {
             set: jest.fn(),
             del: jest.fn(),
             delPattern: jest.fn(),
+          },
+        },
+        {
+          provide: NotificationsProjectionSyncService,
+          useValue: {
+            syncNotificationReadState: jest.fn(),
+            syncAllNotificationsRead: jest.fn(),
+            syncNotificationProjection: jest.fn(),
           },
         },
       ],
