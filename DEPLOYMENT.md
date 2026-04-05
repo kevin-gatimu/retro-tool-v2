@@ -532,6 +532,14 @@ The CI workflow (`ci.yml`) runs on all PRs for lint, type-check, test, and build
 - Bash: `az webapp log tail --resource-group <RG> --name <WEBAPP>`
 - PowerShell: `az webapp log tail --resource-group <RG> --name <WEBAPP>`
 
+**Container config (verify image + port):**
+- Bash: `az webapp config container show --resource-group <RG> --name <WEBAPP>`
+- PowerShell: `az webapp config container show --resource-group <RG> --name <WEBAPP>`
+
+**Verify runtime app settings:**
+- Bash: `az webapp config appsettings list --resource-group <RG> --name <WEBAPP> --query "[?name=='PORT' || name=='WEBSITES_PORT' || name=='NODE_ENV']"`
+- PowerShell: `az webapp config appsettings list --resource-group <RG> --name <WEBAPP> --query "[?name=='PORT' || name=='WEBSITES_PORT' || name=='NODE_ENV']"`
+
 **Common cause:** `DATABASE_URL` not set or PostgreSQL firewall blocking
 
 **Fix:** Ensure "Allow Azure Services" firewall rule is enabled on PostgreSQL

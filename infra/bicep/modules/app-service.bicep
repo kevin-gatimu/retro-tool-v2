@@ -38,7 +38,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
       http20Enabled: true
-      healthCheckPath: '/health'
+      healthCheckPath: '/api/health'
       appSettings: [
         {
           name: 'DOCKER_REGISTRY_SERVER_URL'

@@ -233,7 +233,7 @@ jobs:
 
       - name: Health check
         run: |
-          URL="https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net/health"
+          URL="https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net/api/health"
           echo "Waiting for API to be healthy at ${URL}..."
           for i in $(seq 1 30); do
             STATUS=$(curl -s -o /dev/null -w '%{http_code}' "${URL}" || echo "000")
