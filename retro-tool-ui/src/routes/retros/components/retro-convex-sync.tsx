@@ -31,7 +31,11 @@ export function RetroConvexSync({ retroId }: RetroConvexSyncProps) {
 
     // Hydrate TanStack cache from Convex snapshots to avoid REST polling.
     useEffect(() => {
-        if (!board?.updatedAt || !board.snapshot) {
+        if (!board) {
+            return
+        }
+
+        if (board.snapshot.length === 0) {
             return
         }
 
@@ -42,11 +46,9 @@ export function RetroConvexSync({ retroId }: RetroConvexSyncProps) {
         try {
             const parsed = JSON.parse(board.snapshot) as RetroBoardSnapshot
 
-            if (parsed?.retro) {
-                queryClient.setQueryData(['retro', retroId], parsed.retro)
-            }
+            queryClient.setQueryData(['retro', retroId], parsed.retro)
 
-            if (Array.isArray(parsed?.previousCarriedItems)) {
+            if (Array.isArray(parsed.previousCarriedItems)) {
                 queryClient.setQueryData(
                     ['retro-previous-carried', retroId],
                     parsed.previousCarriedItems,

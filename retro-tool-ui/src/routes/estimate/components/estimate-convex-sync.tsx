@@ -31,7 +31,11 @@ export function EstimateConvexSync({
 
     // Hydrate TanStack cache from Convex snapshots to avoid REST polling.
     useEffect(() => {
-        if (!board?.updatedAt || !board.snapshot) {
+        if (!board) {
+            return
+        }
+
+        if (board.snapshot.length === 0) {
             return
         }
 
@@ -42,12 +46,10 @@ export function EstimateConvexSync({
         try {
             const parsed = JSON.parse(board.snapshot) as EstimateBoardSnapshot
 
-            if (parsed?.session) {
-                queryClient.setQueryData(
-                    ['estimate-session', sessionId],
-                    parsed.session,
-                )
-            }
+            queryClient.setQueryData(
+                ['estimate-session', sessionId],
+                parsed.session,
+            )
 
             lastUpdatedAtRef.current = board.updatedAt
         } catch {

@@ -37,7 +37,7 @@ export function NotificationBell() {
   const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
   const { data: session } = authClient.useSession()
-  const currentUserId = session?.user?.id
+  const currentUserId = session ? session.user.id : null
   const usesConvexRealtime = usesConvexForNotifications()
   const {
     isSupported: pushSupported,
