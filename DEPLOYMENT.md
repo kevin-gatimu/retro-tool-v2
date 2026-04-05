@@ -392,14 +392,50 @@ Save the output value as `SWA_DEPLOYMENT_TOKEN` in GitHub Secrets.
 
 Go back to **Phase 2.3** and fill in the values you got from the Bicep outputs.
 
-Also set `DATABASE_URL` as a secret:
+Also set `DATABASE_URL` as a GitHub Secret:
 ```
 postgresql://pgadmin:<POSTGRES_PASSWORD>@retro-tool-production-pg.postgres.database.azure.com:5432/retro_tool_db?sslmode=require
 ```
 
-And set `CONVEX_POSTGRES_URL` as a secret (note: no database name, Convex manages its own tables):
+#### Set CONVEX_ACI_IP (critical — required for PostgreSQL firewall rule)
+
+The Convex Container Instance has a static public IP that must be whitelisted in the PostgreSQL firewall. This is **not automatically set** — you must capture it and set it as a GitHub Variable so future Bicep deployments include the firewall rule.
+
+```bash
+# Get the Convex ACI public IP
+az container show \
+  --resource-group retro-tool-api-rg \
+  --name retro-tool-production-convex \
+  --query "ipAddress.ip" -o tsv
 ```
-postgresql://pgadmin:<POSTGRES_PASSWORD>@retro-tool-production-pg.postgres.database.azure.com:5432?sslmode=require
+
+```powershell
+# PowerShell
+az container show `
+  --resource-group retro-tool-api-rg `
+  --name retro-tool-production-convex `
+  --query "ipAddress.ip" -o tsv
+```
+
+Save the output as a **GitHub Variable** named `CONVEX_ACI_IP`.
+
+> **Current production value:** `20.87.58.95`
+>
+> **Why this matters:** Azure Container Instances are NOT covered by the "Allow Azure Services" PostgreSQL firewall rule. Without this, the Convex container cannot connect to PostgreSQL and will crash-loop with 200+ restarts.
+
+If the Convex container was already deployed but crashing, add the firewall rule manually and then restart:
+
+```bash
+az postgres flexible-server firewall-rule create \
+  --resource-group retro-tool-api-rg \
+  --name retro-tool-production-pg \
+  --rule-name AllowConvexACI \
+  --start-ip-address 20.87.58.95 \
+  --end-ip-address 20.87.58.95
+
+az container restart \
+  --resource-group retro-tool-api-rg \
+  --name retro-tool-production-convex
 ```
 
 ---
