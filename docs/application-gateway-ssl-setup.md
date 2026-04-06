@@ -21,7 +21,7 @@ Your production UI is loaded over HTTPS, but Convex backend uses HTTP WebSockets
 
 ## 🚀 Step-by-Step Deployment
 
-###**1. Generate Self-Signed SSL Certificate (Testing Only)**
+### **1. Generate Self-Signed SSL Certificate (Testing Only)**
 
 ```powershell
 # Run the certificate generation script
@@ -48,25 +48,27 @@ Add these two secrets:
 | `APP_GATEWAY_SSL_CERT_DATA` | Contents of `infra/ssl-certs/cert.b64` |
 | `APP_GATEWAY_SSL_CERT_PASSWORD` | Contents of `infra/ssl-certs/cert-password.txt` |
 
+**To copy cert.b64 to clipboard (Windows):**
+```powershell
+Get-Content "infra/ssl-certs/cert.b64" | Set-Clipboard
+```
+
 ---
 
-### **3. Update GitHub Actions Workflow**
+### **3. Grant Service Principal Permissions**
 
-Open `.github/workflows/deploy-infra.yml` and update the Bicep deployment step to include the new parameters:
+Your GitHub Actions service principal needs permissions to deploy resources and create role assignments:
 
-```yaml
-- name: Deploy infrastructure
-  run: |
-    az deployment sub create \
-      --location southafricanorth \
-      --template-file infra/bicep/main.bicep \
-      --parameters \
-        environmentName=${{ inputs.environment }} \
-        postgresAdminPassword='${{ secrets.POSTGRES_ADMIN_PASSWORD }}' \
-        convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}' \
-        appGatewaySslCertData='${{ secrets.APP_GATEWAY_SSL_CERT_DATA }}' \
-        appGatewaySslCertPassword='${{ secrets.APP_GATEWAY_SSL_CERT_PASSWORD }}'
+```powershell
+# Run the permissions script
+pwsh scripts/grant-sp-permissions.ps1
+
+# Wait 2-3 minutes for permissions to propagate
 ```
+
+This grants:
+- ✅ **Contributor** role (deploy resources)
+- ✅ **User Access Administrator** role (create role assignments)
 
 ---
 
@@ -100,15 +102,20 @@ az deployment sub create \
 
 ### **5. Get Application Gateway URL**
 
-After deployment, get the new HTTPS URL:
+After deployment completes, get the new HTTPS URL:
 
 ```powershell
-# Get Bicep deployment outputs
+# Get Bicep deployment outputs (using the deployment name from workflow)
 az deployment sub show \
-  --name deploy-infrastructure \
+  --name main \
   --query 'properties.outputs.convexSyncUrl.value' \
   -o tsv
 ```
+
+**Or from GitHub Actions outputs:**
+The deployment outputs are shown in the workflow summary:
+- Look for `convexSyncUrl` in the job outputs
+- Or check the "Summary" step in the workflow logs
 
 Expected output:
 ```
