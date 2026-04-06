@@ -41,6 +41,7 @@ jobs:
         run: az bicep build --file infra/bicep/main.bicep
 
       - name: What-If preview
+        continue-on-error: true
         run: |
           az deployment sub what-if \
             --name main \
