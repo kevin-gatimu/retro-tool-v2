@@ -60,6 +60,17 @@ lerna-debug.log*
 !**/.env.example
 !**/.env.*.example
 
+# SSL certificates (DO NOT COMMIT)
+infra/ssl-certs/
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+cert-password.txt
+cert.b64
+
 # temp directory
 .temp
 .tmp

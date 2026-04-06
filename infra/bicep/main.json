@@ -1,0 +1,1208 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.41.2.15936",
+      "templateHash": "11608575871565361892"
+    }
+  },
+  "parameters": {
+    "environmentName": {
+      "type": "string",
+      "allowedValues": [
+        "staging",
+        "production"
+      ],
+      "metadata": {
+        "description": "Environment name (e.g., staging, production)"
+      }
+    },
+    "locationCore": {
+      "type": "string",
+      "defaultValue": "southafricanorth",
+      "metadata": {
+        "description": "Azure region for core resources (ACR, App Service, Postgres, ACI)"
+      }
+    },
+    "locationSwa": {
+      "type": "string",
+      "defaultValue": "westeurope",
+      "metadata": {
+        "description": "Azure region for Static Web App (SWA)"
+      }
+    },
+    "apiResourceGroupName": {
+      "type": "string",
+      "defaultValue": "retro-tool-api-rg",
+      "metadata": {
+        "description": "Resource group for API/core resources"
+      }
+    },
+    "uiResourceGroupName": {
+      "type": "string",
+      "defaultValue": "retro-tool-ui-rg",
+      "metadata": {
+        "description": "Resource group for UI resources"
+      }
+    },
+    "postgresAdminUsername": {
+      "type": "string",
+      "defaultValue": "pgadmin",
+      "metadata": {
+        "description": "PostgreSQL admin username"
+      }
+    },
+    "postgresAdminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "PostgreSQL admin password"
+      }
+    },
+    "convexInstanceName": {
+      "type": "string",
+      "defaultValue": "[format('retro-convex-{0}', parameters('environmentName'))]",
+      "metadata": {
+        "description": "Convex instance name"
+      }
+    },
+    "convexInstanceSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Convex instance secret (64-char hex)"
+      }
+    },
+    "convexAciIp": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Static public IP of the Convex ACI — add to PostgreSQL firewall. Find with: az container show --resource-group retro-tool-api-rg --name retro-tool-production-convex --query \"ipAddress.ip\" -o tsv"
+      }
+    },
+    "appGatewaySslCertData": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SSL Certificate data (base64-encoded PFX) for Application Gateway"
+      }
+    },
+    "appGatewaySslCertPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SSL Certificate password for Application Gateway"
+      }
+    }
+  },
+  "variables": {
+    "prefix": "[format('retro-tool-{0}', parameters('environmentName'))]",
+    "prefixClean": "[replace(variables('prefix'), '-', '')]",
+    "postgresServerName": "[format('{0}-pg', variables('prefix'))]",
+    "acrName": "[format('{0}acr', variables('prefixClean'))]",
+    "appServicePlanName": "[format('{0}-plan', variables('prefix'))]",
+    "webAppName": "[format('{0}-api', variables('prefix'))]",
+    "containerGroupName": "[format('{0}-convex', variables('prefix'))]",
+    "appGatewayName": "[format('{0}-convex-gateway', variables('prefix'))]",
+    "staticWebAppName": "[format('{0}-ui', variables('prefix'))]",
+    "tags": {
+      "project": "retro-tool",
+      "environment": "[parameters('environmentName')]",
+      "managedBy": "bicep"
+    }
+  },
+  "resources": {
+    "apiRg": {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2022-09-01",
+      "name": "[parameters('apiResourceGroupName')]",
+      "location": "[parameters('locationCore')]",
+      "tags": "[variables('tags')]"
+    },
+    "uiRg": {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2022-09-01",
+      "name": "[parameters('uiResourceGroupName')]",
+      "location": "[parameters('locationSwa')]",
+      "tags": "[variables('tags')]"
+    },
+    "acrRef": {
+      "existing": true,
+      "type": "Microsoft.ContainerRegistry/registries",
+      "apiVersion": "2023-07-01",
+      "resourceGroup": "[parameters('apiResourceGroupName')]",
+      "name": "[variables('acrName')]",
+      "dependsOn": [
+        "acr",
+        "apiRg"
+      ]
+    },
+    "acr": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "deploy-acr",
+      "resourceGroup": "[parameters('apiResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('locationCore')]"
+          },
+          "acrName": {
+            "value": "[variables('acrName')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "7923073295367925124"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "acrName": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2023-07-01",
+              "name": "[parameters('acrName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Premium"
+              },
+              "properties": {
+                "adminUserEnabled": true,
+                "publicNetworkAccess": "Enabled",
+                "policies": {
+                  "retentionPolicy": {
+                    "days": 30,
+                    "status": "enabled"
+                  }
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "acrId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]"
+            },
+            "acrLoginServer": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer]"
+            },
+            "acrName": {
+              "type": "string",
+              "value": "[parameters('acrName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "apiRg"
+      ]
+    },
+    "postgres": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "deploy-postgres",
+      "resourceGroup": "[parameters('apiResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('locationCore')]"
+          },
+          "postgresqlServerName": {
+            "value": "[variables('postgresServerName')]"
+          },
+          "postgresqlAdminUsername": {
+            "value": "[parameters('postgresAdminUsername')]"
+          },
+          "postgresqlAdminPassword": {
+            "value": "[parameters('postgresAdminPassword')]"
+          },
+          "convexAciIp": {
+            "value": "[parameters('convexAciIp')]"
+          },
+          "convexDatabaseName": {
+            "value": "[replace(parameters('convexInstanceName'), '-', '_')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "14472506315631318109"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "postgresqlServerName": {
+              "type": "string"
+            },
+            "postgresqlAdminUsername": {
+              "type": "string"
+            },
+            "postgresqlAdminPassword": {
+              "type": "securestring"
+            },
+            "postgresqlVersion": {
+              "type": "string",
+              "defaultValue": "16"
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "Standard_B2s"
+            },
+            "skuTier": {
+              "type": "string",
+              "defaultValue": "Burstable"
+            },
+            "storageGB": {
+              "type": "int",
+              "defaultValue": 32
+            },
+            "backupRetentionDays": {
+              "type": "int",
+              "defaultValue": 7
+            },
+            "geoRedundantBackup": {
+              "type": "string",
+              "defaultValue": "Disabled"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "convexAciIp": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "convexDatabaseName": {
+              "type": "string",
+              "defaultValue": ""
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+              "apiVersion": "2023-12-01-preview",
+              "name": "[parameters('postgresqlServerName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "[parameters('skuName')]",
+                "tier": "[parameters('skuTier')]"
+              },
+              "properties": {
+                "version": "[parameters('postgresqlVersion')]",
+                "administratorLogin": "[parameters('postgresqlAdminUsername')]",
+                "administratorLoginPassword": "[parameters('postgresqlAdminPassword')]",
+                "storage": {
+                  "storageSizeGB": "[parameters('storageGB')]"
+                },
+                "backup": {
+                  "backupRetentionDays": "[parameters('backupRetentionDays')]",
+                  "geoRedundantBackup": "[parameters('geoRedundantBackup')]"
+                },
+                "highAvailability": {
+                  "mode": "Disabled"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+              "apiVersion": "2023-12-01-preview",
+              "name": "[format('{0}/{1}', parameters('postgresqlServerName'), 'retro_tool_db')]",
+              "properties": {
+                "charset": "UTF8",
+                "collation": "en_US.utf8"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresqlServerName'))]"
+              ]
+            },
+            {
+              "condition": "[not(empty(parameters('convexDatabaseName')))]",
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+              "apiVersion": "2023-12-01-preview",
+              "name": "[format('{0}/{1}', parameters('postgresqlServerName'), if(not(empty(parameters('convexDatabaseName'))), parameters('convexDatabaseName'), 'convex'))]",
+              "properties": {
+                "charset": "UTF8",
+                "collation": "en_US.utf8"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresqlServerName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+              "apiVersion": "2023-12-01-preview",
+              "name": "[format('{0}/{1}', parameters('postgresqlServerName'), 'AllowAzureServices')]",
+              "properties": {
+                "startIpAddress": "0.0.0.0",
+                "endIpAddress": "0.0.0.0"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresqlServerName'))]"
+              ]
+            },
+            {
+              "condition": "[not(empty(parameters('convexAciIp')))]",
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+              "apiVersion": "2023-12-01-preview",
+              "name": "[format('{0}/{1}', parameters('postgresqlServerName'), 'AllowConvexACI')]",
+              "properties": {
+                "startIpAddress": "[parameters('convexAciIp')]",
+                "endIpAddress": "[parameters('convexAciIp')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresqlServerName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "postgresqlServerId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresqlServerName'))]"
+            },
+            "postgresqlServerName": {
+              "type": "string",
+              "value": "[parameters('postgresqlServerName')]"
+            },
+            "postgresqlServerFqdn": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresqlServerName')), '2023-12-01-preview').fullyQualifiedDomainName]"
+            },
+            "postgresqlPort": {
+              "type": "int",
+              "value": 5432
+            },
+            "apiDatabaseName": {
+              "type": "string",
+              "value": "retro_tool_db"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "apiRg"
+      ]
+    },
+    "appService": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "deploy-appservice",
+      "resourceGroup": "[parameters('apiResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('locationCore')]"
+          },
+          "appServicePlanName": {
+            "value": "[variables('appServicePlanName')]"
+          },
+          "webAppName": {
+            "value": "[variables('webAppName')]"
+          },
+          "acrLoginServer": {
+            "value": "[reference('acr').outputs.acrLoginServer.value]"
+          },
+          "acrName": {
+            "value": "[reference('acr').outputs.acrName.value]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "15977591685401043852"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "appServicePlanName": {
+              "type": "string"
+            },
+            "webAppName": {
+              "type": "string"
+            },
+            "acrLoginServer": {
+              "type": "string"
+            },
+            "acrName": {
+              "type": "string"
+            },
+            "dockerImageAndTag": {
+              "type": "string",
+              "defaultValue": "retro-tool-api:latest"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('appServicePlanName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "linux",
+              "sku": {
+                "name": "P1v3",
+                "tier": "PremiumV3"
+              },
+              "properties": {
+                "reserved": true
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('webAppName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+                "httpsOnly": true,
+                "siteConfig": {
+                  "linuxFxVersion": "[format('DOCKER|{0}/{1}', parameters('acrLoginServer'), parameters('dockerImageAndTag'))]",
+                  "alwaysOn": true,
+                  "ftpsState": "Disabled",
+                  "minTlsVersion": "1.2",
+                  "http20Enabled": true,
+                  "healthCheckPath": "/health",
+                  "appSettings": [
+                    {
+                      "name": "DOCKER_REGISTRY_SERVER_URL",
+                      "value": "[format('https://{0}', parameters('acrLoginServer'))]"
+                    },
+                    {
+                      "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+                      "value": "false"
+                    },
+                    {
+                      "name": "WEBSITES_PORT",
+                      "value": "8000"
+                    },
+                    {
+                      "name": "NODE_ENV",
+                      "value": "production"
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(resourceId('Microsoft.Web/sites', parameters('webAppName')), 'acrpull', parameters('acrName'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]",
+                "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2023-12-01', 'full').identity.principalId]",
+                "principalType": "ServicePrincipal"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "webAppId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Web/sites', parameters('webAppName'))]"
+            },
+            "webAppName": {
+              "type": "string",
+              "value": "[parameters('webAppName')]"
+            },
+            "webAppDefaultHostname": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2023-12-01').defaultHostName]"
+            },
+            "webAppPrincipalId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('webAppName')), '2023-12-01', 'full').identity.principalId]"
+            },
+            "appServicePlanId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "acr",
+        "apiRg"
+      ]
+    },
+    "convex": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "deploy-convex-aci",
+      "resourceGroup": "[parameters('apiResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('locationCore')]"
+          },
+          "containerGroupName": {
+            "value": "[variables('containerGroupName')]"
+          },
+          "acrLoginServer": {
+            "value": "[reference('acr').outputs.acrLoginServer.value]"
+          },
+          "acrUsername": {
+            "value": "[variables('acrName')]"
+          },
+          "acrPassword": {
+            "value": "[listCredentials('acrRef', '2023-07-01').passwords[0].value]"
+          },
+          "convexInstanceName": {
+            "value": "[parameters('convexInstanceName')]"
+          },
+          "convexInstanceSecret": {
+            "value": "[parameters('convexInstanceSecret')]"
+          },
+          "convexPostgresUrl": {
+            "value": "[format('postgresql://{0}:{1}@{2}:5432?sslmode=require', parameters('postgresAdminUsername'), parameters('postgresAdminPassword'), reference('postgres').outputs.postgresqlServerFqdn.value)]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "15546358078961281213"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "containerGroupName": {
+              "type": "string"
+            },
+            "acrLoginServer": {
+              "type": "string"
+            },
+            "acrUsername": {
+              "type": "string"
+            },
+            "acrPassword": {
+              "type": "securestring"
+            },
+            "convexImageTag": {
+              "type": "string",
+              "defaultValue": "latest"
+            },
+            "convexInstanceName": {
+              "type": "string"
+            },
+            "convexInstanceSecret": {
+              "type": "securestring"
+            },
+            "convexPostgresUrl": {
+              "type": "securestring"
+            },
+            "cpuCores": {
+              "type": "int",
+              "defaultValue": 1
+            },
+            "memoryGB": {
+              "type": "int",
+              "defaultValue": 2
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ContainerInstance/containerGroups",
+              "apiVersion": "2023-05-01",
+              "name": "[parameters('containerGroupName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "osType": "Linux",
+                "restartPolicy": "Always",
+                "ipAddress": {
+                  "type": "Public",
+                  "dnsNameLabel": "[parameters('containerGroupName')]",
+                  "ports": [
+                    {
+                      "port": 3210,
+                      "protocol": "TCP"
+                    },
+                    {
+                      "port": 3211,
+                      "protocol": "TCP"
+                    }
+                  ]
+                },
+                "imageRegistryCredentials": [
+                  {
+                    "server": "[parameters('acrLoginServer')]",
+                    "username": "[parameters('acrUsername')]",
+                    "password": "[parameters('acrPassword')]"
+                  }
+                ],
+                "containers": [
+                  {
+                    "name": "convex-backend",
+                    "properties": {
+                      "image": "[format('ghcr.io/get-convex/convex-backend:{0}', parameters('convexImageTag'))]",
+                      "resources": {
+                        "requests": {
+                          "cpu": "[parameters('cpuCores')]",
+                          "memoryInGB": "[parameters('memoryGB')]"
+                        }
+                      },
+                      "ports": [
+                        {
+                          "port": 3210,
+                          "protocol": "TCP"
+                        },
+                        {
+                          "port": 3211,
+                          "protocol": "TCP"
+                        }
+                      ],
+                      "environmentVariables": [
+                        {
+                          "name": "INSTANCE_NAME",
+                          "value": "[parameters('convexInstanceName')]"
+                        },
+                        {
+                          "name": "INSTANCE_SECRET",
+                          "secureValue": "[parameters('convexInstanceSecret')]"
+                        },
+                        {
+                          "name": "POSTGRES_URL",
+                          "secureValue": "[parameters('convexPostgresUrl')]"
+                        },
+                        {
+                          "name": "DISABLE_BEACON",
+                          "value": "1"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "outputs": {
+            "containerGroupId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerGroupName'))]"
+            },
+            "containerGroupName": {
+              "type": "string",
+              "value": "[parameters('containerGroupName')]"
+            },
+            "containerGroupFqdn": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerGroupName')), '2023-05-01').ipAddress.fqdn]"
+            },
+            "convexSyncUrl": {
+              "type": "string",
+              "value": "[format('https://{0}:3210', reference(resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerGroupName')), '2023-05-01').ipAddress.fqdn)]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "acr",
+        "apiRg",
+        "postgres"
+      ]
+    },
+    "appGateway": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "deploy-app-gateway",
+      "resourceGroup": "[parameters('apiResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('locationCore')]"
+          },
+          "appGatewayName": {
+            "value": "[variables('appGatewayName')]"
+          },
+          "convexBackendFqdn": {
+            "value": "[reference('convex').outputs.containerGroupFqdn.value]"
+          },
+          "convexBackendPort": {
+            "value": 3210
+          },
+          "sslCertificateData": {
+            "value": "[parameters('appGatewaySslCertData')]"
+          },
+          "sslCertificatePassword": {
+            "value": "[parameters('appGatewaySslCertPassword')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "16363546129193301"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "appGatewayName": {
+              "type": "string"
+            },
+            "convexBackendFqdn": {
+              "type": "string"
+            },
+            "convexBackendPort": {
+              "type": "int",
+              "defaultValue": 3210
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "sslCertificateData": {
+              "type": "securestring"
+            },
+            "sslCertificatePassword": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}-vnet', parameters('appGatewayName'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "addressSpace": {
+                  "addressPrefixes": [
+                    "10.0.0.0/16"
+                  ]
+                },
+                "subnets": [
+                  {
+                    "name": "appGatewaySubnet",
+                    "properties": {
+                      "addressPrefix": "10.0.0.0/24"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Network/publicIPAddresses",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}-pip', parameters('appGatewayName'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Standard"
+              },
+              "properties": {
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                  "domainNameLabel": "[parameters('appGatewayName')]"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Network/applicationGateways",
+              "apiVersion": "2023-05-01",
+              "name": "[parameters('appGatewayName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "Standard_v2",
+                  "tier": "Standard_v2",
+                  "capacity": 1
+                },
+                "gatewayIPConfigurations": [
+                  {
+                    "name": "appGatewayIpConfig",
+                    "properties": {
+                      "subnet": {
+                        "id": "[format('{0}/subnets/appGatewaySubnet', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('appGatewayName'))))]"
+                      }
+                    }
+                  }
+                ],
+                "frontendIPConfigurations": [
+                  {
+                    "name": "appGatewayFrontendIP",
+                    "properties": {
+                      "publicIPAddress": {
+                        "id": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('appGatewayName')))]"
+                      }
+                    }
+                  }
+                ],
+                "frontendPorts": [
+                  {
+                    "name": "port_443",
+                    "properties": {
+                      "port": 443
+                    }
+                  },
+                  {
+                    "name": "port_80",
+                    "properties": {
+                      "port": 80
+                    }
+                  }
+                ],
+                "backendAddressPools": [
+                  {
+                    "name": "convexBackendPool",
+                    "properties": {
+                      "backendAddresses": [
+                        {
+                          "fqdn": "[parameters('convexBackendFqdn')]"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "backendHttpSettingsCollection": [
+                  {
+                    "name": "convexHttpSettings",
+                    "properties": {
+                      "port": "[parameters('convexBackendPort')]",
+                      "protocol": "Http",
+                      "cookieBasedAffinity": "Disabled",
+                      "requestTimeout": 30,
+                      "pickHostNameFromBackendAddress": true
+                    }
+                  }
+                ],
+                "httpListeners": [
+                  {
+                    "name": "httpsListener",
+                    "properties": {
+                      "frontendIPConfiguration": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', parameters('appGatewayName'), 'appGatewayFrontendIP')]"
+                      },
+                      "frontendPort": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/frontendPorts', parameters('appGatewayName'), 'port_443')]"
+                      },
+                      "protocol": "Https",
+                      "sslCertificate": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/sslCertificates', parameters('appGatewayName'), 'appGatewaySslCert')]"
+                      }
+                    }
+                  },
+                  {
+                    "name": "httpListener",
+                    "properties": {
+                      "frontendIPConfiguration": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', parameters('appGatewayName'), 'appGatewayFrontendIP')]"
+                      },
+                      "frontendPort": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/frontendPorts', parameters('appGatewayName'), 'port_80')]"
+                      },
+                      "protocol": "Http"
+                    }
+                  }
+                ],
+                "requestRoutingRules": [
+                  {
+                    "name": "httpsRule",
+                    "properties": {
+                      "ruleType": "Basic",
+                      "priority": 100,
+                      "httpListener": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('appGatewayName'), 'httpsListener')]"
+                      },
+                      "backendAddressPool": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/backendAddressPools', parameters('appGatewayName'), 'convexBackendPool')]"
+                      },
+                      "backendHttpSettings": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/backendHttpSettingsCollection', parameters('appGatewayName'), 'convexHttpSettings')]"
+                      }
+                    }
+                  },
+                  {
+                    "name": "httpToHttpsRedirect",
+                    "properties": {
+                      "ruleType": "Basic",
+                      "priority": 200,
+                      "httpListener": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('appGatewayName'), 'httpListener')]"
+                      },
+                      "redirectConfiguration": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/redirectConfigurations', parameters('appGatewayName'), 'httpToHttps')]"
+                      }
+                    }
+                  }
+                ],
+                "redirectConfigurations": [
+                  {
+                    "name": "httpToHttps",
+                    "properties": {
+                      "redirectType": "Permanent",
+                      "targetListener": {
+                        "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('appGatewayName'), 'httpsListener')]"
+                      },
+                      "includePath": true,
+                      "includeQueryString": true
+                    }
+                  }
+                ],
+                "sslCertificates": [
+                  {
+                    "name": "appGatewaySslCert",
+                    "properties": {
+                      "data": "[parameters('sslCertificateData')]",
+                      "password": "[parameters('sslCertificatePassword')]"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('appGatewayName')))]",
+                "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('appGatewayName')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "appGatewayId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/applicationGateways', parameters('appGatewayName'))]"
+            },
+            "appGatewayName": {
+              "type": "string",
+              "value": "[parameters('appGatewayName')]"
+            },
+            "appGatewayFqdn": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('appGatewayName'))), '2023-05-01').dnsSettings.fqdn]"
+            },
+            "convexHttpsUrl": {
+              "type": "string",
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('appGatewayName'))), '2023-05-01').dnsSettings.fqdn)]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "apiRg",
+        "convex"
+      ]
+    },
+    "swa": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "deploy-swa",
+      "resourceGroup": "[parameters('uiResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('locationSwa')]"
+          },
+          "staticWebAppName": {
+            "value": "[variables('staticWebAppName')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "7539683212987289868"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "staticWebAppName": {
+              "type": "string"
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "Standard"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/staticSites",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('staticWebAppName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "[parameters('skuName')]",
+                "tier": "[parameters('skuName')]"
+              },
+              "properties": {
+                "stagingEnvironmentPolicy": "Enabled",
+                "allowConfigFileUpdates": true,
+                "buildProperties": {
+                  "skipGithubActionWorkflowGeneration": true
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "staticWebAppId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Web/staticSites', parameters('staticWebAppName'))]"
+            },
+            "staticWebAppName": {
+              "type": "string",
+              "value": "[parameters('staticWebAppName')]"
+            },
+            "staticWebAppDefaultHostname": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Web/staticSites', parameters('staticWebAppName')), '2023-12-01').defaultHostname]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "uiRg"
+      ]
+    }
+  },
+  "outputs": {
+    "acrLoginServer": {
+      "type": "string",
+      "value": "[reference('acr').outputs.acrLoginServer.value]"
+    },
+    "acrName": {
+      "type": "string",
+      "value": "[reference('acr').outputs.acrName.value]"
+    },
+    "postgresServerFqdn": {
+      "type": "string",
+      "value": "[reference('postgres').outputs.postgresqlServerFqdn.value]"
+    },
+    "apiUrl": {
+      "type": "string",
+      "value": "[format('https://{0}', reference('appService').outputs.webAppDefaultHostname.value)]"
+    },
+    "apiWebAppName": {
+      "type": "string",
+      "value": "[reference('appService').outputs.webAppName.value]"
+    },
+    "convexFqdn": {
+      "type": "string",
+      "value": "[reference('convex').outputs.containerGroupFqdn.value]"
+    },
+    "convexDirectUrl": {
+      "type": "string",
+      "value": "[format('http://{0}:3210', reference('convex').outputs.containerGroupFqdn.value)]"
+    },
+    "convexGatewayFqdn": {
+      "type": "string",
+      "value": "[reference('appGateway').outputs.appGatewayFqdn.value]"
+    },
+    "convexSyncUrl": {
+      "type": "string",
+      "value": "[reference('appGateway').outputs.convexHttpsUrl.value]"
+    },
+    "swaDefaultHostname": {
+      "type": "string",
+      "value": "[format('https://{0}', reference('swa').outputs.staticWebAppDefaultHostname.value)]"
+    },
+    "swaName": {
+      "type": "string",
+      "value": "[reference('swa').outputs.staticWebAppName.value]"
+    }
+  }
+}

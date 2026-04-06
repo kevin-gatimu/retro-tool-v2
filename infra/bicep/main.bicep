@@ -40,6 +40,14 @@ param convexInstanceSecret string
 @description('Static public IP of the Convex ACI — add to PostgreSQL firewall. Find with: az container show --resource-group retro-tool-api-rg --name retro-tool-production-convex --query "ipAddress.ip" -o tsv')
 param convexAciIp string = ''
 
+@description('SSL Certificate data (base64-encoded PFX) for Application Gateway')
+@secure()
+param appGatewaySslCertData string
+
+@description('SSL Certificate password for Application Gateway')
+@secure()
+param appGatewaySslCertPassword string
+
 // ───────────────── Naming convention ─────────────────
 var prefix = 'retro-tool-${environmentName}'
 var prefixClean = replace(prefix, '-', '')
@@ -49,6 +57,7 @@ var acrName = '${prefixClean}acr'
 var appServicePlanName = '${prefix}-plan'
 var webAppName = '${prefix}-api'
 var containerGroupName = '${prefix}-convex'
+var appGatewayName = '${prefix}-convex-gateway'
 var staticWebAppName = '${prefix}-ui'
 
 var tags = {
@@ -135,7 +144,22 @@ module convex 'modules/container-instance.bicep' = {
   }
 }
 
-// 5. Static Web App (UI)
+// 5. Application Gateway (SSL termination for Convex)
+module appGateway 'modules/application-gateway.bicep' = {
+  name: 'deploy-app-gateway'
+  scope: apiRg
+  params: {
+    location: locationCore
+    appGatewayName: appGatewayName
+    convexBackendFqdn: convex.outputs.containerGroupFqdn
+    convexBackendPort: 3210
+    sslCertificateData: appGatewaySslCertData
+    sslCertificatePassword: appGatewaySslCertPassword
+    tags: tags
+  }
+}
+
+// 6. Static Web App (UI)
 module swa 'modules/static-web-app.bicep' = {
   name: 'deploy-swa'
   scope: uiRg
@@ -153,6 +177,8 @@ output postgresServerFqdn string = postgres.outputs.postgresqlServerFqdn
 output apiUrl string = 'https://${appService.outputs.webAppDefaultHostname}'
 output apiWebAppName string = appService.outputs.webAppName
 output convexFqdn string = convex.outputs.containerGroupFqdn
-output convexSyncUrl string = 'http://${convex.outputs.containerGroupFqdn}:3210'
+output convexDirectUrl string = 'http://${convex.outputs.containerGroupFqdn}:3210'
+output convexGatewayFqdn string = appGateway.outputs.appGatewayFqdn
+output convexSyncUrl string = appGateway.outputs.convexHttpsUrl
 output swaDefaultHostname string = 'https://${swa.outputs.staticWebAppDefaultHostname}'
 output swaName string = swa.outputs.staticWebAppName
