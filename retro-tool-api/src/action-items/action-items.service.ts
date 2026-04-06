@@ -13,7 +13,11 @@ import * as teamSchema from '../teams/schema';
 import { generateId } from '../lib/utils';
 import { CreateActionItemDto, UpdateActionItemDto } from './dto';
 import { RetrosGateway } from '../retros/retros.gateway';
-import { ACTION_ITEM_STATUSES, RETRO_STATUSES } from '../common/enums';
+import {
+  ACTION_ITEM_STATUSES,
+  RETRO_STATUSES,
+  type TActionItemStatus,
+} from '../common/enums';
 
 type Database = NodePgDatabase<typeof retroSchema & typeof teamSchema>;
 
@@ -40,6 +44,8 @@ export class ActionItemsService {
     if (!isMember) throw new ForbiddenException('Not a team member');
 
     const id = generateId();
+    const status = (dto.status ??
+      ACTION_ITEM_STATUSES.Pending) as TActionItemStatus;
     const [created] = await this.database
       .insert(retroSchema.actionItem)
       .values({
@@ -49,7 +55,7 @@ export class ActionItemsService {
         title: dto.title,
         description: dto.description,
         assigneeId: dto.assigneeId,
-        status: dto.status ?? ACTION_ITEM_STATUSES.Pending,
+        status,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
       })
       .returning();
@@ -130,10 +136,14 @@ export class ActionItemsService {
       : false;
     if (!isMember) throw new ForbiddenException('Not a team member');
 
+    const status = (dto.status ?? undefined) as TActionItemStatus | undefined;
     const [updated] = await this.database
       .update(retroSchema.actionItem)
       .set({
-        ...dto,
+        title: dto.title,
+        description: dto.description,
+        assigneeId: dto.assigneeId,
+        status,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         updatedAt: new Date(),
       })

@@ -47,6 +47,7 @@ import {
   TEAM_MEMBER_TAGS,
   USER_ROLES,
 } from '../common/enums';
+import type { TRetroVoteType } from '../common/enums';
 import { generateId } from '../lib/utils';
 import type {
   MergeMetadata,
@@ -696,6 +697,8 @@ export class RetrosService {
 
     const retroId = generateId();
 
+    const voteType = (data.voteType ??
+      RETRO_VOTE_TYPES.Multi) as TRetroVoteType;
     await this.database.insert(retroSchema.retrospective).values({
       id: retroId,
       name: data.name,
@@ -703,7 +706,7 @@ export class RetrosService {
       templateId: data.templateId,
       isAnonymous: data.isAnonymous ?? true,
       maxVotesPerUser: data.maxVotesPerUser ?? 3,
-      voteType: data.voteType ?? RETRO_VOTE_TYPES.Multi,
+      voteType,
       timerDuration: data.timerDuration ?? null,
       createdById: userId,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
