@@ -1,0 +1,1 @@
+ALTER TYPE "public"."notification_type" ADD VALUE 'retro_created' BEFORE 'retro_lobby_open';

@@ -1,11 +1,17 @@
 import { z } from 'zod';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ACTION_ITEM_STATUSES,
+  type TActionItemStatus,
+} from '../../common/enums';
 
 export const updateActionItemSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
   assigneeId: z.string().min(1).optional(),
-  status: z.enum(['pending', 'in_progress', 'completed']).optional(),
+  status: z
+    .enum(Object.values(ACTION_ITEM_STATUSES) as [string, ...string[]])
+    .optional(),
   dueDate: z.string().datetime().optional(),
 });
 
@@ -23,9 +29,9 @@ export class UpdateActionItemDtoClass {
 
   @ApiPropertyOptional({
     description: 'Status',
-    enum: ['pending', 'in_progress', 'completed'],
+    enum: Object.values(ACTION_ITEM_STATUSES),
   })
-  status?: 'pending' | 'in_progress' | 'completed';
+  status?: TActionItemStatus;
 
   @ApiPropertyOptional({ description: 'Due date (ISO 8601)' })
   dueDate?: string;

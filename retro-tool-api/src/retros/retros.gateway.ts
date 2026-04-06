@@ -14,6 +14,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as authSchema from '../auth/schema';
 import { eq } from 'drizzle-orm';
 import type { ClientData, WsSessionData } from '../common/types';
+import { type TRetroStatus } from '../common/enums';
 import { RetrosProjectionSyncService } from './retros-projection-sync.service';
 
 type Database = NodePgDatabase<typeof authSchema>;
@@ -63,7 +64,11 @@ export class RetrosGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       (client.data as ClientData).userId = sessionData.userId;
       this.logger.log(`Client connected: userId=${sessionData.userId}`);
-    } catch {
+    } catch (error) {
+      this.logger.error(
+        'WS handleConnection failed',
+        error instanceof Error ? error.stack : String(error),
+      );
       client.disconnect();
     }
   }
@@ -98,16 +103,7 @@ export class RetrosGateway implements OnGatewayConnection, OnGatewayDisconnect {
     void this.retrosProjectionSyncService.syncRetroProjection(retroId);
   }
 
-  emitRetroStatusChanged(
-    retroId: string,
-    status:
-      | 'waiting'
-      | 'active'
-      | 'grouping'
-      | 'voting'
-      | 'discussing'
-      | 'completed',
-  ): void {
+  emitRetroStatusChanged(retroId: string, status: TRetroStatus): void {
     this.server
       .to(`retro:${retroId}`)
       .emit('retro-changed', { retroId, status });

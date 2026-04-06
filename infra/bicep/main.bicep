@@ -2,6 +2,7 @@
 // Retro-Tool – Azure Infrastructure (main orchestrator)
 // Deploys: PostgreSQL, ACR, App Service, Container Instance,
 //          Static Web App
+// SSL termination is handled by Caddy sidecar inside the ACI
 // ─────────────────────────────────────────────────────────────
 
 targetScope = 'subscription'
@@ -40,13 +41,8 @@ param convexInstanceSecret string
 @description('Static public IP of the Convex ACI — add to PostgreSQL firewall. Find with: az container show --resource-group retro-tool-api-rg --name retro-tool-production-convex --query "ipAddress.ip" -o tsv')
 param convexAciIp string = ''
 
-@description('SSL Certificate data (base64-encoded PFX) for Application Gateway')
-@secure()
-param appGatewaySslCertData string
-
-@description('SSL Certificate password for Application Gateway')
-@secure()
-param appGatewaySslCertPassword string
+@description('Email address for Let\'s Encrypt certificate registration (used by Caddy)')
+param caddyAcmeEmail string
 
 // ───────────────── Naming convention ─────────────────
 var prefix = 'retro-tool-${environmentName}'
@@ -57,7 +53,6 @@ var acrName = '${prefixClean}acr'
 var appServicePlanName = '${prefix}-plan'
 var webAppName = '${prefix}-api'
 var containerGroupName = '${prefix}-convex'
-var appGatewayName = '${prefix}-convex-gateway'
 var staticWebAppName = '${prefix}-ui'
 
 var tags = {
@@ -140,26 +135,12 @@ module convex 'modules/container-instance.bicep' = {
     convexInstanceName: convexInstanceName
     convexInstanceSecret: convexInstanceSecret
     convexPostgresUrl: 'postgresql://${postgresAdminUsername}:${postgresAdminPassword}@${postgres.outputs.postgresqlServerFqdn}:5432?sslmode=require'
+    caddyAcmeEmail: caddyAcmeEmail
     tags: tags
   }
 }
 
-// 5. Application Gateway (SSL termination for Convex)
-module appGateway 'modules/application-gateway.bicep' = {
-  name: 'deploy-app-gateway'
-  scope: apiRg
-  params: {
-    location: locationCore
-    appGatewayName: appGatewayName
-    convexBackendFqdn: convex.outputs.containerGroupFqdn
-    convexBackendPort: 3210
-    sslCertificateData: appGatewaySslCertData
-    sslCertificatePassword: appGatewaySslCertPassword
-    tags: tags
-  }
-}
-
-// 6. Static Web App (UI)
+// 5. Static Web App (UI)
 module swa 'modules/static-web-app.bicep' = {
   name: 'deploy-swa'
   scope: uiRg
@@ -177,8 +158,6 @@ output postgresServerFqdn string = postgres.outputs.postgresqlServerFqdn
 output apiUrl string = 'https://${appService.outputs.webAppDefaultHostname}'
 output apiWebAppName string = appService.outputs.webAppName
 output convexFqdn string = convex.outputs.containerGroupFqdn
-output convexDirectUrl string = 'http://${convex.outputs.containerGroupFqdn}:3210'
-output convexGatewayFqdn string = appGateway.outputs.appGatewayFqdn
-output convexSyncUrl string = appGateway.outputs.convexHttpsUrl
+output convexSyncUrl string = convex.outputs.convexSyncUrl
 output swaDefaultHostname string = 'https://${swa.outputs.staticWebAppDefaultHostname}'
 output swaName string = swa.outputs.staticWebAppName

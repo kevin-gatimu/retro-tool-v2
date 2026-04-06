@@ -12,7 +12,11 @@ param convexInstanceSecret string
 param convexPostgresUrl string
 param cpuCores int = 1
 param memoryGB int = 2
+param caddyAcmeEmail string
 param tags object = {}
+
+// Constructed FQDN — ACI always uses this pattern
+var containerFqdn = '${containerGroupName}.${location}.azurecontainer.io'
 
 resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
   name: containerGroupName
@@ -26,11 +30,11 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
       dnsNameLabel: containerGroupName
       ports: [
         {
-          port: 3210
+          port: 80
           protocol: 'TCP'
         }
         {
-          port: 3211
+          port: 443
           protocol: 'TCP'
         }
       ]
@@ -43,6 +47,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
       }
     ]
     containers: [
+      // ── Convex backend (internal only — not exposed publicly) ──
       {
         name: 'convex-backend'
         properties: {
@@ -83,6 +88,42 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
           ]
         }
       }
+      // ── Caddy sidecar — SSL termination + auto Let's Encrypt cert ──
+      // Listens on 443, proxies to convex-backend on localhost:3210.
+      // On first start it gets a real cert from Let's Encrypt automatically.
+      // Containers in the same group share localhost.
+      {
+        name: 'caddy'
+        properties: {
+          image: 'caddy:alpine'
+          command: [
+            'caddy'
+            'reverse-proxy'
+            '--from'
+            containerFqdn
+            '--to'
+            'localhost:3210'
+            '--email'
+            caddyAcmeEmail
+          ]
+          resources: {
+            requests: {
+              cpu: json('0.25')
+              memoryInGB: json('0.5')
+            }
+          }
+          ports: [
+            {
+              port: 80
+              protocol: 'TCP'
+            }
+            {
+              port: 443
+              protocol: 'TCP'
+            }
+          ]
+        }
+      }
     ]
   }
 }
@@ -90,4 +131,4 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
 output containerGroupId string = containerGroup.id
 output containerGroupName string = containerGroup.name
 output containerGroupFqdn string = containerGroup.properties.ipAddress.fqdn
-output convexSyncUrl string = 'https://${containerGroup.properties.ipAddress.fqdn}:3210'
+output convexSyncUrl string = 'https://${containerGroup.properties.ipAddress.fqdn}'

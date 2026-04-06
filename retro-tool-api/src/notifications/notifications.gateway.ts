@@ -61,7 +61,11 @@ export class NotificationsGateway
       (client.data as ClientData).userId = sessionData.userId;
       await client.join(`user:${sessionData.userId}`);
       this.logger.log(`Client connected: userId=${sessionData.userId}`);
-    } catch {
+    } catch (error) {
+      this.logger.error(
+        'WS handleConnection failed',
+        error instanceof Error ? error.stack : String(error),
+      );
       client.disconnect();
     }
   }

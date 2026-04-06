@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { RETRO_VOTE_TYPES, type TRetroVoteType } from '../../common/enums';
 
 export const createRetroSchema = z.object({
   name: z.string().min(1).max(200),
@@ -7,7 +8,9 @@ export const createRetroSchema = z.object({
   templateId: z.string().min(1),
   isAnonymous: z.boolean().default(true),
   maxVotesPerUser: z.number().int().min(1).max(10).default(3),
-  voteType: z.enum(['multi', 'single']).default('multi'),
+  voteType: z
+    .enum(Object.values(RETRO_VOTE_TYPES) as [string, ...string[]])
+    .default(RETRO_VOTE_TYPES.Multi),
   timerDuration: z.number().int().min(60).max(3600).optional(),
   scheduledAt: z.iso.datetime().optional(), // ISO-8601 planned start time
 });
@@ -36,10 +39,10 @@ export class CreateRetroDtoClass {
 
   @ApiPropertyOptional({
     description: 'Vote type',
-    enum: ['multi', 'single'],
-    default: 'multi',
+    enum: Object.values(RETRO_VOTE_TYPES),
+    default: RETRO_VOTE_TYPES.Multi,
   })
-  voteType?: string;
+  voteType?: TRetroVoteType;
 
   @ApiPropertyOptional({
     description: 'Timer duration in seconds (60–3600)',
