@@ -133,10 +133,6 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
                   name: 'caddy-cert-data'
                   mountPath: '/data'
                 }
-                {
-                  name: 'caddy-cert-data'
-                  mountPath: '/config'
-                }
               ]
             : []
         }

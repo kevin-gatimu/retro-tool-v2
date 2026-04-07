@@ -212,39 +212,48 @@ Set these in each environment.
 
 ## 7) Required GitHub Environment Variables
 
-Set these in each environment.
+Set these in each environment. Values marked `← from output` are only available after Step 8.1 (Deploy Infrastructure) completes.
 
 ### 7.1 Infra workflow variables
 
-1. AZURE_RESOURCE_GROUP_API
-2. AZURE_RESOURCE_GROUP_UI
-3. AZURE_DEPLOYMENT_LOCATION
-4. AZURE_LOCATION_CORE
-5. AZURE_LOCATION_SWA
-6. CONVEX_ACI_IP
-7. CADDY_ACME_EMAIL
-8. CADDY_PERSIST_CERTIFICATES
-9. CADDY_CERT_STORAGE_ACCOUNT_NAME
-10. CADDY_CERT_STORAGE_SHARE_NAME
+| Variable | Production value | Notes |
+| --- | --- | --- |
+| `AZURE_RESOURCE_GROUP_API` | `retro-tool-api-rg` | Created in Step 3.3 |
+| `AZURE_RESOURCE_GROUP_UI` | `retro-tool-ui-rg` | Created in Step 3.3 |
+| `AZURE_DEPLOYMENT_LOCATION` | `southafricanorth` | Subscription-level deployment location |
+| `AZURE_LOCATION_CORE` | `southafricanorth` | Region for API, DB, Convex, ACR |
+| `AZURE_LOCATION_SWA` | `westeurope` | Region for Static Web App |
+| `CONVEX_ACI_IP` | `← from output` | Set after first infra deploy; used for PostgreSQL firewall rule |
+| `CADDY_ACME_EMAIL` | `your@email.com` | Let's Encrypt registration email |
+| `CADDY_PERSIST_CERTIFICATES` | `true` | Set after running Step 8.0 script |
+| `CADDY_CERT_STORAGE_ACCOUNT_NAME` | `← from Step 8.0 script` | |
+| `CADDY_CERT_STORAGE_SHARE_NAME` | `← from Step 8.0 script` | |
+
+> **Set 7.1 variables (except `CONVEX_ACI_IP`) before running Deploy Infrastructure.**
+> `CONVEX_ACI_IP` is only known after first deploy — leave empty on first run, then update and re-run.
 
 ### 7.2 API workflow variables
 
-1. ACR_NAME
-2. ACR_LOGIN_SERVER
-3. API_WEBAPP_NAME
-4. AZURE_RESOURCE_GROUP_API
-5. SWA_URL
-6. CONVEX_SYNC_URL
-7. MICROSOFT_TENANT_ID
-8. EMAIL_FROM
+| Variable | Production value | Notes |
+| --- | --- | --- |
+| `AZURE_RESOURCE_GROUP_API` | `retro-tool-api-rg` | Same as 7.1 |
+| `ACR_NAME` | `← from output` | e.g. `retrotoolproductionacr` |
+| `ACR_LOGIN_SERVER` | `← from output` | e.g. `retrotoolproductionacr.azurecr.io` |
+| `API_WEBAPP_NAME` | `← from output` | e.g. `retro-tool-production-api` |
+| `SWA_URL` | `← from output` | e.g. `https://victorious-coast-xxx.azurestaticapps.net` |
+| `CONVEX_SYNC_URL` | `← from output` | e.g. `https://convex-api.yourdomain.com` |
+| `MICROSOFT_TENANT_ID` | `common` | Or your tenant ID for single-tenant |
+| `EMAIL_FROM` | `Retro Tool <noreply@yourdomain.com>` | Must be verified domain in Resend for production |
 
 ### 7.3 UI workflow variables
 
-1. API_URL
-2. VITE_CONVEX_URL (or fallback to CONVEX_SYNC_URL)
-3. ESTIMATES_REALTIME_BACKEND
-4. RETROS_REALTIME_BACKEND
-5. NOTIFICATIONS_REALTIME_BACKEND
+| Variable | Production value | Notes |
+| --- | --- | --- |
+| `API_URL` | `← from output` | e.g. `https://retro-tool-production-api.azurewebsites.net` |
+| `VITE_CONVEX_URL` | `← from output` | Same as `CONVEX_SYNC_URL` |
+| `ESTIMATES_REALTIME_BACKEND` | `convex` | |
+| `RETROS_REALTIME_BACKEND` | `convex` | |
+| `NOTIFICATIONS_REALTIME_BACKEND` | `convex` | |
 
 ---
 
