@@ -15,6 +15,7 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private resend: Resend | null = null;
   private readonly fromEmail: string;
+  private readonly sandboxTo: string | null;
 
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
@@ -24,6 +25,8 @@ export class EmailService {
     this.fromEmail =
       configService.get('email', { infer: true })?.fromEmail ??
       'noreply@example.com';
+    this.sandboxTo =
+      configService.get('email', { infer: true })?.sandboxTo ?? null;
     if (apiKey) {
       this.resend = new Resend(apiKey);
     } else {
@@ -50,14 +53,20 @@ export class EmailService {
     }
 
     const logId = generateId();
+    const recipient = this.sandboxTo ?? params.to;
+    if (this.sandboxTo) {
+      this.logger.warn(
+        `[Email] SANDBOX_REDIRECT type=${params.type} originalTo=${params.to} redirectTo=${recipient}`,
+      );
+    }
     this.logger.log(
-      `[Email] SENDING type=${params.type} to=${params.to} subject="${params.subject}"`,
+      `[Email] SENDING type=${params.type} to=${recipient} subject="${params.subject}"`,
     );
 
     try {
       const { data, error } = await this.resend.emails.send({
         from: this.fromEmail,
-        to: params.to,
+        to: recipient,
         subject: params.subject,
         html: params.html,
       });
@@ -67,14 +76,14 @@ export class EmailService {
       }
 
       this.logger.log(
-        `[Email] DELIVERED type=${params.type} to=${params.to} resendId=${data?.id ?? 'unknown'}`,
+        `[Email] DELIVERED type=${params.type} to=${recipient} resendId=${data?.id ?? 'unknown'}`,
       );
 
       await this.database.insert(emailSchema.emailLog).values({
         id: logId,
         userId: params.userId,
         type: params.type,
-        recipientEmail: params.to,
+        recipientEmail: recipient,
         subject: params.subject,
         htmlBody: params.html,
         status: 'sent',
@@ -86,7 +95,7 @@ export class EmailService {
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       this.logger.error(
-        `[Email] FAILED type=${params.type} to=${params.to} reason="${reason}"`,
+        `[Email] FAILED type=${params.type} to=${recipient} reason="${reason}"`,
       );
 
       try {
@@ -94,7 +103,7 @@ export class EmailService {
           id: logId,
           userId: params.userId,
           type: params.type,
-          recipientEmail: params.to,
+          recipientEmail: recipient,
           subject: params.subject,
           htmlBody: params.html,
           status: 'failed',

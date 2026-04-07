@@ -237,9 +237,13 @@ Go to **GitHub → Settings → Environments → [production] → Environment va
 | `API_WEBAPP_NAME` | `retro-tool-production-api` |
 | `API_URL` | `https://retro-tool-production-api.azurewebsites.net` |
 | `SWA_URL` | `https://<hostname>.azurestaticapps.net` |
-| `CONVEX_SYNC_URL` | `http://retro-tool-production-convex.southafricanorth.azurecontainer.io:3210` |
-| `CONVEX_URL` | Same as `CONVEX_SYNC_URL` (used by deploy-ui.yml as `VITE_CONVEX_URL`) |
+| `CONVEX_SYNC_URL` | `https://retro-tool-production-convex.southafricanorth.azurecontainer.io` |
+| `VITE_CONVEX_URL` | Same as `CONVEX_SYNC_URL` (used by deploy-ui.yml for browser Convex URL) |
 | `CONVEX_ACI_IP` | Static public IP of the Convex ACI — `az container show --query "ipAddress.ip"` |
+| `CADDY_ACME_EMAIL` | `ops@yourdomain.com` |
+| `CADDY_PERSIST_CERTIFICATES` | `true` (recommended for production) |
+| `CADDY_CERT_STORAGE_ACCOUNT_NAME` | `retrotoolcaddycerts` |
+| `CADDY_CERT_STORAGE_SHARE_NAME` | `caddy-data` |
 | `ESTIMATES_REALTIME_BACKEND` | `convex` or `socket-io` |
 | `RETROS_REALTIME_BACKEND` | `convex` or `socket-io` |
 | `NOTIFICATIONS_REALTIME_BACKEND` | `convex` or `socket-io` |
@@ -248,6 +252,12 @@ Go to **GitHub → Settings → Environments → [production] → Environment va
 | `BETTER_AUTH_SESSION_EXPIRES_IN` | `604800` (7 days in seconds — optional, has default) |
 
 > **Note:** Some values (ACR_LOGIN_SERVER, SWA_URL, CONVEX_SYNC_URL) won't be known until infrastructure is deployed in Phase 3. Come back and fill them in after.
+
+Add this as an Environment secret when cert persistence is enabled:
+
+| Secret | Value |
+| --- | --- |
+| `CADDY_CERT_STORAGE_ACCOUNT_KEY` | Azure Storage account key for the Caddy file share |
 
 ---
 
@@ -301,8 +311,16 @@ az deployment sub create \
     uiResourceGroupName="$RESOURCE_GROUP_UI" \
     locationCore="southafricanorth" \
     locationSwa="westeurope" \
+    caddyAcmeEmail='ops@yourdomain.com' \
     postgresAdminPassword='<YOUR_PASSWORD>' \
     convexInstanceSecret='<YOUR_64_HEX>'
+
+# Optional (recommended in production): persist Caddy certificates.
+# Add these when you have an Azure File Share ready:
+#   caddyPersistCertificates=true
+#   caddyCertStorageAccountName='<STORAGE_ACCOUNT_NAME>'
+#   caddyCertStorageShareName='caddy-data'
+#   caddyCertStorageAccountKey='<STORAGE_ACCOUNT_KEY>'
 ```
 
 **PowerShell:**
@@ -324,8 +342,16 @@ az deployment sub create `
     uiResourceGroupName="$RESOURCE_GROUP_UI" `
     locationCore="southafricanorth" `
     locationSwa="westeurope" `
+    caddyAcmeEmail='ops@yourdomain.com' `
     postgresAdminPassword='<YOUR_PASSWORD>' `
     convexInstanceSecret='<YOUR_64_HEX>'
+
+# Optional (recommended in production): persist Caddy certificates.
+# Add these when you have an Azure File Share ready:
+#   caddyPersistCertificates=true
+#   caddyCertStorageAccountName='<STORAGE_ACCOUNT_NAME>'
+#   caddyCertStorageShareName='caddy-data'
+#   caddyCertStorageAccountKey='<STORAGE_ACCOUNT_KEY>'
 ```
 
 ### Step 3.4 — Capture Output Values
@@ -354,7 +380,7 @@ This gives you all Bicep outputs. Map them to GitHub as follows:
 | `acrName`            | Variable `ACR_NAME`                                                   | Variable |
 | `apiUrl`             | Variable `API_URL`                                                    | Variable |
 | `apiWebAppName`      | Variable `API_WEBAPP_NAME`                                            | Variable |
-| `convexSyncUrl`      | Variables `CONVEX_SYNC_URL` and `CONVEX_URL`                          | Variable |
+| `convexSyncUrl`      | Variables `CONVEX_SYNC_URL` and `VITE_CONVEX_URL`                     | Variable |
 | `convexFqdn`         | Used to construct `CONVEX_SYNC_URL` — informational                   | —        |
 | `postgresServerFqdn` | Used to construct `DATABASE_URL` and `CONVEX_POSTGRES_URL` — Step 3.6 | —        |
 | `swaDefaultHostname` | Variable `SWA_URL`                                                    | Variable |
@@ -459,7 +485,7 @@ az container restart \
 2. Click **Run workflow** → environment: `production`
 3. The workflow will:
    - Validate (lint, type-check, test)
-   - Build Vite app with env vars (API_URL, CONVEX_URL, etc.)
+  - Build Vite app with env vars (API_URL, VITE_CONVEX_URL, etc.)
    - Deploy to Azure Static Web App
 
 ### Step 4.3 — Deploy Convex
@@ -606,8 +632,8 @@ These are passed directly to the container by Bicep. You only need them as GitHu
 
 | Variable | Type | Used by | Value |
 | --- | --- | --- | --- |
-| `CONVEX_SYNC_URL` | GitHub Variable | API app settings, `deploy-convex.yml`, `deploy-ui.yml` | `http://retro-tool-production-convex.southafricanorth.azurecontainer.io:3210` |
-| `CONVEX_URL` | GitHub Variable | `deploy-ui.yml` → `VITE_CONVEX_URL` build arg | Same as `CONVEX_SYNC_URL` |
+| `CONVEX_SYNC_URL` | GitHub Variable | API app settings and `deploy-convex.yml` | `https://retro-tool-production-convex.southafricanorth.azurecontainer.io` |
+| `VITE_CONVEX_URL` | GitHub Variable | `deploy-ui.yml` → browser Convex URL (`VITE_CONVEX_URL`) | Same as `CONVEX_SYNC_URL` |
 | `CONVEX_SYNC_ADMIN_KEY` | GitHub Secret | API app settings + `deploy-convex.yml` | Format: `retro-convex-production` + pipe + hex — see Step 4.4 |
 | `CONVEX_ACI_IP` | GitHub Variable | Bicep → PostgreSQL firewall rule | `az container show --query "ipAddress.ip" -o tsv` |
 
@@ -814,7 +840,8 @@ Use this checklist when deploying Convex to a new environment:
 - [ ] Container is in `Running` state (not `CrashLoopBackOff`)
 - [ ] HTTP check returns `200`
 - [ ] `CONVEX_SYNC_ADMIN_KEY` generated and saved to GitHub Secrets
-- [ ] `CONVEX_SYNC_URL` GitHub Variable set to `http://retro-tool-production-convex.southafricanorth.azurecontainer.io:3210`
+- [ ] `CONVEX_SYNC_URL` GitHub Variable set to `https://retro-tool-production-convex.southafricanorth.azurecontainer.io`
+- [ ] `VITE_CONVEX_URL` GitHub Variable set to the same HTTPS URL
 - [ ] Deploy Convex workflow run successfully
 
 ---
@@ -915,7 +942,7 @@ git push
 
 **Error:** `InvalidDeploymentName: Couldn't parse deployment name convex-local`
 
-**Cause:** Either `CONVEX_SYNC_ADMIN_KEY` contains the local dev key (`convex-local|...`), or the workflow is using `CONVEX_DEPLOY_KEY` (cloud key) instead of `CONVEX_SELF_HOSTED_ADMIN_KEY` (self-hosted key).
+**Cause:** Either `CONVEX_SYNC_ADMIN_KEY` contains the local dev key (`convex-local|...`), or the workflow is using the wrong key for `CONVEX_SELF_HOSTED_ADMIN_KEY`.
 
 **Fix — correct workflow env vars** (`deploy-convex.yml` must use):
 

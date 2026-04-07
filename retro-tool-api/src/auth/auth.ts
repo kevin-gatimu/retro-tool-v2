@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { betterAuth } from 'better-auth';
 import { createEmailService } from '../lib/email';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';

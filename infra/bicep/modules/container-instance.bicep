@@ -13,6 +13,11 @@ param convexPostgresUrl string
 param cpuCores int = 1
 param memoryGB int = 2
 param caddyAcmeEmail string
+param caddyPersistCertificates bool = false
+param caddyCertStorageAccountName string = ''
+@secure()
+param caddyCertStorageAccountKey string = ''
+param caddyCertStorageShareName string = ''
 param tags object = {}
 
 // Constructed FQDN — ACI always uses this pattern
@@ -122,9 +127,33 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
               protocol: 'TCP'
             }
           ]
+          volumeMounts: caddyPersistCertificates
+            ? [
+                {
+                  name: 'caddy-cert-data'
+                  mountPath: '/data'
+                }
+                {
+                  name: 'caddy-cert-data'
+                  mountPath: '/config'
+                }
+              ]
+            : []
         }
       }
     ]
+    volumes: caddyPersistCertificates
+      ? [
+          {
+            name: 'caddy-cert-data'
+            azureFile: {
+              shareName: caddyCertStorageShareName
+              storageAccountName: caddyCertStorageAccountName
+              storageAccountKey: caddyCertStorageAccountKey
+            }
+          }
+        ]
+      : []
   }
 }
 

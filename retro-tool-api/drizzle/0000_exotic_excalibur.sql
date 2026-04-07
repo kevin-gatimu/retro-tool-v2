@@ -5,7 +5,7 @@ CREATE TYPE "public"."admin_action_log_action" AS ENUM('user_approved', 'user_re
 CREATE TYPE "public"."email_log_status" AS ENUM('sent', 'bounced', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."email_log_type" AS ENUM('verification', 'weekly_digest', 'retro_reminder', 'team_activity', 'account_approved', 'org_invite', 'retro_report');--> statement-breakpoint
 CREATE TYPE "public"."estimate_session_status" AS ENUM('waiting', 'voting', 'revealed', 'completed');--> statement-breakpoint
-CREATE TYPE "public"."notification_type" AS ENUM('user_signup', 'team_join_request', 'team_join_approved', 'team_join_rejected', 'org_invite', 'retro_lobby_open', 'retro_started', 'retro_completed', 'action_item_assigned', 'action_item_due_soon', 'estimate_session_created');--> statement-breakpoint
+CREATE TYPE "public"."notification_type" AS ENUM('user_signup', 'team_join_request', 'team_join_approved', 'team_join_rejected', 'org_invite', 'retro_created', 'retro_lobby_open', 'retro_started', 'retro_completed', 'action_item_assigned', 'action_item_due_soon', 'estimate_session_created');--> statement-breakpoint
 CREATE TYPE "public"."org_member_role" AS ENUM('org-owner', 'org-admin', 'member');--> statement-breakpoint
 CREATE TYPE "public"."retro_reminder_type" AS ENUM('before_retro', 'after_retro', 'custom');--> statement-breakpoint
 CREATE TYPE "public"."retro_status" AS ENUM('draft', 'waiting', 'active', 'grouping', 'voting', 'discussing', 'completed');--> statement-breakpoint

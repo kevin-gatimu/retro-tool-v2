@@ -134,9 +134,10 @@ jobs:
             --registry-password "${ACR_PWD}" \
             --environment-variables \
               NODE_ENV=production \
+              CONVEX_INSTANCE_NAME='convex-local' \
             --secure-environment-variables \
               DATABASE_URL='${{ secrets.DATABASE_URL }}' \
-            --command-line "node dist/migrate.js" \
+            --command-line "sh -c 'node dist/ensure-convex-database.js && node dist/migrate.js'" \
             --restart-policy Never \
             --os-type Linux \
             --cpu 1 \

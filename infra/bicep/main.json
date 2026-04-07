@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "11608575871565361892"
+      "templateHash": "16916548568615720901"
     }
   },
   "parameters": {
@@ -63,9 +63,9 @@
     },
     "convexInstanceName": {
       "type": "string",
-      "defaultValue": "[format('retro-convex-{0}', parameters('environmentName'))]",
+      "defaultValue": "convex-local",
       "metadata": {
-        "description": "Convex instance name"
+        "description": "Convex instance name (kept aligned with local for parity)"
       }
     },
     "convexInstanceSecret": {
@@ -81,16 +81,38 @@
         "description": "Static public IP of the Convex ACI — add to PostgreSQL firewall. Find with: az container show --resource-group retro-tool-api-rg --name retro-tool-production-convex --query \"ipAddress.ip\" -o tsv"
       }
     },
-    "appGatewaySslCertData": {
-      "type": "securestring",
+    "caddyAcmeEmail": {
+      "type": "string",
       "metadata": {
-        "description": "SSL Certificate data (base64-encoded PFX) for Application Gateway"
+        "description": "Email address for Let's Encrypt certificate registration (used by Caddy)"
       }
     },
-    "appGatewaySslCertPassword": {
-      "type": "securestring",
+    "caddyPersistCertificates": {
+      "type": "bool",
+      "defaultValue": false,
       "metadata": {
-        "description": "SSL Certificate password for Application Gateway"
+        "description": "Enable Azure File persistence for Caddy certificates to avoid Let's Encrypt re-issuance on restarts"
+      }
+    },
+    "caddyCertStorageAccountName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Storage account name for Caddy cert persistence (required when caddyPersistCertificates=true)"
+      }
+    },
+    "caddyCertStorageShareName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure file share name for Caddy cert persistence (required when caddyPersistCertificates=true)"
+      }
+    },
+    "caddyCertStorageAccountKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Storage account key for Caddy cert persistence (required when caddyPersistCertificates=true)"
       }
     }
   },
@@ -102,7 +124,6 @@
     "appServicePlanName": "[format('{0}-plan', variables('prefix'))]",
     "webAppName": "[format('{0}-api', variables('prefix'))]",
     "containerGroupName": "[format('{0}-convex', variables('prefix'))]",
-    "appGatewayName": "[format('{0}-convex-gateway', variables('prefix'))]",
     "staticWebAppName": "[format('{0}-ui', variables('prefix'))]",
     "tags": {
       "project": "retro-tool",
@@ -622,6 +643,21 @@
           "convexPostgresUrl": {
             "value": "[format('postgresql://{0}:{1}@{2}:5432?sslmode=require', parameters('postgresAdminUsername'), parameters('postgresAdminPassword'), reference('postgres').outputs.postgresqlServerFqdn.value)]"
           },
+          "caddyAcmeEmail": {
+            "value": "[parameters('caddyAcmeEmail')]"
+          },
+          "caddyPersistCertificates": {
+            "value": "[parameters('caddyPersistCertificates')]"
+          },
+          "caddyCertStorageAccountName": {
+            "value": "[parameters('caddyCertStorageAccountName')]"
+          },
+          "caddyCertStorageShareName": {
+            "value": "[parameters('caddyCertStorageShareName')]"
+          },
+          "caddyCertStorageAccountKey": {
+            "value": "[parameters('caddyCertStorageAccountKey')]"
+          },
           "tags": {
             "value": "[variables('tags')]"
           }
@@ -633,7 +669,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.41.2.15936",
-              "templateHash": "15546358078961281213"
+              "templateHash": "13188380018261530922"
             }
           },
           "parameters": {
@@ -673,10 +709,32 @@
               "type": "int",
               "defaultValue": 2
             },
+            "caddyAcmeEmail": {
+              "type": "string"
+            },
+            "caddyPersistCertificates": {
+              "type": "bool",
+              "defaultValue": false
+            },
+            "caddyCertStorageAccountName": {
+              "type": "string",
+              "defaultValue": ""
+            },
+            "caddyCertStorageAccountKey": {
+              "type": "securestring",
+              "defaultValue": ""
+            },
+            "caddyCertStorageShareName": {
+              "type": "string",
+              "defaultValue": ""
+            },
             "tags": {
               "type": "object",
               "defaultValue": {}
             }
+          },
+          "variables": {
+            "containerFqdn": "[format('{0}.{1}.azurecontainer.io', parameters('containerGroupName'), parameters('location'))]"
           },
           "resources": [
             {
@@ -693,11 +751,11 @@
                   "dnsNameLabel": "[parameters('containerGroupName')]",
                   "ports": [
                     {
-                      "port": 3210,
+                      "port": 80,
                       "protocol": "TCP"
                     },
                     {
-                      "port": 3211,
+                      "port": 443,
                       "protocol": "TCP"
                     }
                   ]
@@ -749,8 +807,42 @@
                         }
                       ]
                     }
+                  },
+                  {
+                    "name": "caddy",
+                    "properties": {
+                      "image": "caddy:alpine",
+                      "command": [
+                        "caddy",
+                        "reverse-proxy",
+                        "--from",
+                        "[variables('containerFqdn')]",
+                        "--to",
+                        "localhost:3210",
+                        "--email",
+                        "[parameters('caddyAcmeEmail')]"
+                      ],
+                      "resources": {
+                        "requests": {
+                          "cpu": "[json('0.25')]",
+                          "memoryInGB": "[json('0.5')]"
+                        }
+                      },
+                      "ports": [
+                        {
+                          "port": 80,
+                          "protocol": "TCP"
+                        },
+                        {
+                          "port": 443,
+                          "protocol": "TCP"
+                        }
+                      ],
+                      "volumeMounts": "[if(parameters('caddyPersistCertificates'), createArray(createObject('name', 'caddy-cert-data', 'mountPath', '/data'), createObject('name', 'caddy-cert-data', 'mountPath', '/config')), createArray())]"
+                    }
                   }
-                ]
+                ],
+                "volumes": "[if(parameters('caddyPersistCertificates'), createArray(createObject('name', 'caddy-cert-data', 'azureFile', createObject('shareName', parameters('caddyCertStorageShareName'), 'storageAccountName', parameters('caddyCertStorageAccountName'), 'storageAccountKey', parameters('caddyCertStorageAccountKey')))), createArray())]"
               }
             }
           ],
@@ -769,7 +861,7 @@
             },
             "convexSyncUrl": {
               "type": "string",
-              "value": "[format('https://{0}:3210', reference(resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerGroupName')), '2023-05-01').ipAddress.fqdn)]"
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerGroupName')), '2023-05-01').ipAddress.fqdn)]"
             }
           }
         }
@@ -778,297 +870,6 @@
         "acr",
         "apiRg",
         "postgres"
-      ]
-    },
-    "appGateway": {
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "deploy-app-gateway",
-      "resourceGroup": "[parameters('apiResourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "location": {
-            "value": "[parameters('locationCore')]"
-          },
-          "appGatewayName": {
-            "value": "[variables('appGatewayName')]"
-          },
-          "convexBackendFqdn": {
-            "value": "[reference('convex').outputs.containerGroupFqdn.value]"
-          },
-          "convexBackendPort": {
-            "value": 3210
-          },
-          "sslCertificateData": {
-            "value": "[parameters('appGatewaySslCertData')]"
-          },
-          "sslCertificatePassword": {
-            "value": "[parameters('appGatewaySslCertPassword')]"
-          },
-          "tags": {
-            "value": "[variables('tags')]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.41.2.15936",
-              "templateHash": "16363546129193301"
-            }
-          },
-          "parameters": {
-            "location": {
-              "type": "string"
-            },
-            "appGatewayName": {
-              "type": "string"
-            },
-            "convexBackendFqdn": {
-              "type": "string"
-            },
-            "convexBackendPort": {
-              "type": "int",
-              "defaultValue": 3210
-            },
-            "tags": {
-              "type": "object",
-              "defaultValue": {}
-            },
-            "sslCertificateData": {
-              "type": "securestring"
-            },
-            "sslCertificatePassword": {
-              "type": "securestring"
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.Network/virtualNetworks",
-              "apiVersion": "2023-05-01",
-              "name": "[format('{0}-vnet', parameters('appGatewayName'))]",
-              "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
-              "properties": {
-                "addressSpace": {
-                  "addressPrefixes": [
-                    "10.0.0.0/16"
-                  ]
-                },
-                "subnets": [
-                  {
-                    "name": "appGatewaySubnet",
-                    "properties": {
-                      "addressPrefix": "10.0.0.0/24"
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "type": "Microsoft.Network/publicIPAddresses",
-              "apiVersion": "2023-05-01",
-              "name": "[format('{0}-pip', parameters('appGatewayName'))]",
-              "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
-              "sku": {
-                "name": "Standard"
-              },
-              "properties": {
-                "publicIPAllocationMethod": "Static",
-                "dnsSettings": {
-                  "domainNameLabel": "[parameters('appGatewayName')]"
-                }
-              }
-            },
-            {
-              "type": "Microsoft.Network/applicationGateways",
-              "apiVersion": "2023-05-01",
-              "name": "[parameters('appGatewayName')]",
-              "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
-              "properties": {
-                "sku": {
-                  "name": "Standard_v2",
-                  "tier": "Standard_v2",
-                  "capacity": 1
-                },
-                "gatewayIPConfigurations": [
-                  {
-                    "name": "appGatewayIpConfig",
-                    "properties": {
-                      "subnet": {
-                        "id": "[format('{0}/subnets/appGatewaySubnet', resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('appGatewayName'))))]"
-                      }
-                    }
-                  }
-                ],
-                "frontendIPConfigurations": [
-                  {
-                    "name": "appGatewayFrontendIP",
-                    "properties": {
-                      "publicIPAddress": {
-                        "id": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('appGatewayName')))]"
-                      }
-                    }
-                  }
-                ],
-                "frontendPorts": [
-                  {
-                    "name": "port_443",
-                    "properties": {
-                      "port": 443
-                    }
-                  },
-                  {
-                    "name": "port_80",
-                    "properties": {
-                      "port": 80
-                    }
-                  }
-                ],
-                "backendAddressPools": [
-                  {
-                    "name": "convexBackendPool",
-                    "properties": {
-                      "backendAddresses": [
-                        {
-                          "fqdn": "[parameters('convexBackendFqdn')]"
-                        }
-                      ]
-                    }
-                  }
-                ],
-                "backendHttpSettingsCollection": [
-                  {
-                    "name": "convexHttpSettings",
-                    "properties": {
-                      "port": "[parameters('convexBackendPort')]",
-                      "protocol": "Http",
-                      "cookieBasedAffinity": "Disabled",
-                      "requestTimeout": 30,
-                      "pickHostNameFromBackendAddress": true
-                    }
-                  }
-                ],
-                "httpListeners": [
-                  {
-                    "name": "httpsListener",
-                    "properties": {
-                      "frontendIPConfiguration": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', parameters('appGatewayName'), 'appGatewayFrontendIP')]"
-                      },
-                      "frontendPort": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/frontendPorts', parameters('appGatewayName'), 'port_443')]"
-                      },
-                      "protocol": "Https",
-                      "sslCertificate": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/sslCertificates', parameters('appGatewayName'), 'appGatewaySslCert')]"
-                      }
-                    }
-                  },
-                  {
-                    "name": "httpListener",
-                    "properties": {
-                      "frontendIPConfiguration": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', parameters('appGatewayName'), 'appGatewayFrontendIP')]"
-                      },
-                      "frontendPort": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/frontendPorts', parameters('appGatewayName'), 'port_80')]"
-                      },
-                      "protocol": "Http"
-                    }
-                  }
-                ],
-                "requestRoutingRules": [
-                  {
-                    "name": "httpsRule",
-                    "properties": {
-                      "ruleType": "Basic",
-                      "priority": 100,
-                      "httpListener": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('appGatewayName'), 'httpsListener')]"
-                      },
-                      "backendAddressPool": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/backendAddressPools', parameters('appGatewayName'), 'convexBackendPool')]"
-                      },
-                      "backendHttpSettings": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/backendHttpSettingsCollection', parameters('appGatewayName'), 'convexHttpSettings')]"
-                      }
-                    }
-                  },
-                  {
-                    "name": "httpToHttpsRedirect",
-                    "properties": {
-                      "ruleType": "Basic",
-                      "priority": 200,
-                      "httpListener": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('appGatewayName'), 'httpListener')]"
-                      },
-                      "redirectConfiguration": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/redirectConfigurations', parameters('appGatewayName'), 'httpToHttps')]"
-                      }
-                    }
-                  }
-                ],
-                "redirectConfigurations": [
-                  {
-                    "name": "httpToHttps",
-                    "properties": {
-                      "redirectType": "Permanent",
-                      "targetListener": {
-                        "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('appGatewayName'), 'httpsListener')]"
-                      },
-                      "includePath": true,
-                      "includeQueryString": true
-                    }
-                  }
-                ],
-                "sslCertificates": [
-                  {
-                    "name": "appGatewaySslCert",
-                    "properties": {
-                      "data": "[parameters('sslCertificateData')]",
-                      "password": "[parameters('sslCertificatePassword')]"
-                    }
-                  }
-                ]
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('appGatewayName')))]",
-                "[resourceId('Microsoft.Network/virtualNetworks', format('{0}-vnet', parameters('appGatewayName')))]"
-              ]
-            }
-          ],
-          "outputs": {
-            "appGatewayId": {
-              "type": "string",
-              "value": "[resourceId('Microsoft.Network/applicationGateways', parameters('appGatewayName'))]"
-            },
-            "appGatewayName": {
-              "type": "string",
-              "value": "[parameters('appGatewayName')]"
-            },
-            "appGatewayFqdn": {
-              "type": "string",
-              "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('appGatewayName'))), '2023-05-01').dnsSettings.fqdn]"
-            },
-            "convexHttpsUrl": {
-              "type": "string",
-              "value": "[format('https://{0}', reference(resourceId('Microsoft.Network/publicIPAddresses', format('{0}-pip', parameters('appGatewayName'))), '2023-05-01').dnsSettings.fqdn)]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "apiRg",
-        "convex"
       ]
     },
     "swa": {
@@ -1184,17 +985,9 @@
       "type": "string",
       "value": "[reference('convex').outputs.containerGroupFqdn.value]"
     },
-    "convexDirectUrl": {
-      "type": "string",
-      "value": "[format('http://{0}:3210', reference('convex').outputs.containerGroupFqdn.value)]"
-    },
-    "convexGatewayFqdn": {
-      "type": "string",
-      "value": "[reference('appGateway').outputs.appGatewayFqdn.value]"
-    },
     "convexSyncUrl": {
       "type": "string",
-      "value": "[reference('appGateway').outputs.convexHttpsUrl.value]"
+      "value": "[reference('convex').outputs.convexSyncUrl.value]"
     },
     "swaDefaultHostname": {
       "type": "string",

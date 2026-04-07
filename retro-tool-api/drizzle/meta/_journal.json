@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1774638512281,
-      "tag": "0000_clean_bill_hollister",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1774665600000,
-      "tag": "0001_team_member_tag_alignment",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1774692000000,
-      "tag": "0002_notification_type_retro_created",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1775490413601,
-      "tag": "0003_long_sunfire",
+      "when": 1775512824095,
+      "tag": "0000_exotic_excalibur",
       "breakpoints": true
     }
   ]

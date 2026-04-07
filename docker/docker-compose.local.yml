@@ -16,7 +16,7 @@ services:
       retries: 20
       start_period: 5s
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - retro-tool-postgres-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
 
   redis:
@@ -70,6 +70,7 @@ services:
       POSTGRES_URL: ${CONVEX_POSTGRES_URL}
       DO_NOT_REQUIRE_SSL: ${CONVEX_DO_NOT_REQUIRE_SSL}
       DISABLE_BEACON: ${DISABLE_BEACON:-1}
+      CONVEX_BETTER_AUTH_URL: ${CONVEX_BETTER_AUTH_URL}
     restart: on-failure
     depends_on:
       postgres:
@@ -103,4 +104,4 @@ services:
       - '${UI_PORT}:80'
 
 volumes:
-  postgres-data:
+  retro-tool-postgres-data:

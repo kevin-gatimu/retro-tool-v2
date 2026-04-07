@@ -13,7 +13,7 @@ export class SocketIoAdapter extends IoAdapter {
     const configService = app.get(ConfigService<Config>);
     this.allowedOrigins = configService.get('allowedOrigins', {
       infer: true,
-    }) ?? ['http://localhost:3000', 'http://localhost:8000'];
+    })!;
   }
 
   createIOServer(port: number, options?: ServerOptions): Server {

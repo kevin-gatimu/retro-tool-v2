@@ -31,8 +31,8 @@ param postgresAdminUsername string = 'pgadmin'
 @secure()
 param postgresAdminPassword string
 
-@description('Convex instance name')
-param convexInstanceName string = 'retro-convex-${environmentName}'
+@description('Convex instance name (kept aligned with local for parity)')
+param convexInstanceName string = 'convex-local'
 
 @description('Convex instance secret (64-char hex)')
 @secure()
@@ -43,6 +43,19 @@ param convexAciIp string = ''
 
 @description('Email address for Let\'s Encrypt certificate registration (used by Caddy)')
 param caddyAcmeEmail string
+
+@description('Enable Azure File persistence for Caddy certificates to avoid Let\'s Encrypt re-issuance on restarts')
+param caddyPersistCertificates bool = false
+
+@description('Storage account name for Caddy cert persistence (required when caddyPersistCertificates=true)')
+param caddyCertStorageAccountName string = ''
+
+@description('Azure file share name for Caddy cert persistence (required when caddyPersistCertificates=true)')
+param caddyCertStorageShareName string = ''
+
+@description('Storage account key for Caddy cert persistence (required when caddyPersistCertificates=true)')
+@secure()
+param caddyCertStorageAccountKey string = ''
 
 // ───────────────── Naming convention ─────────────────
 var prefix = 'retro-tool-${environmentName}'
@@ -136,6 +149,10 @@ module convex 'modules/container-instance.bicep' = {
     convexInstanceSecret: convexInstanceSecret
     convexPostgresUrl: 'postgresql://${postgresAdminUsername}:${postgresAdminPassword}@${postgres.outputs.postgresqlServerFqdn}:5432?sslmode=require'
     caddyAcmeEmail: caddyAcmeEmail
+    caddyPersistCertificates: caddyPersistCertificates
+    caddyCertStorageAccountName: caddyCertStorageAccountName
+    caddyCertStorageShareName: caddyCertStorageShareName
+    caddyCertStorageAccountKey: caddyCertStorageAccountKey
     tags: tags
   }
 }

@@ -143,7 +143,7 @@ Same logic as the API workflow.
   | `VITE_APP_ENV`                        | `staging` or `production`              |
   | `VITE_API_URL`                        | GitHub environment variable `API_URL`    |
   | `VITE_APP_TITLE`                      | `Retro Tool`                             |
-  | `VITE_CONVEX_URL`                     | GitHub environment variable `CONVEX_URL` |
+  | `VITE_CONVEX_URL`                     | GitHub environment variable `VITE_CONVEX_URL` (fallback: `CONVEX_SYNC_URL`) |
   | `VITE_ESTIMATES_REALTIME_BACKEND`     | Defaults to `socket-io`                  |
   | `VITE_RETROS_REALTIME_BACKEND`        | Defaults to `socket-io`                  |
   | `VITE_NOTIFICATIONS_REALTIME_BACKEND` | Defaults to `socket-io`                  |
@@ -218,7 +218,7 @@ Optionally add a required reviewer gate on `production`.
 | `AZURE_LOCATION_CORE`            | `southafricanorth`                     | Infra         |
 | `AZURE_LOCATION_SWA`             | `westeurope`                           | Infra         |
 | `API_URL`                        | `https://api.staging.retrotool.dev`    | UI            |
-| `CONVEX_URL`                     | `https://convex.staging.retrotool.dev` | UI            |
+| `VITE_CONVEX_URL`                | `https://convex.staging.retrotool.dev` | UI            |
 | `ESTIMATES_REALTIME_BACKEND`     | `socket-io`                            | UI (optional) |
 | `RETROS_REALTIME_BACKEND`        | `socket-io`                            | UI (optional) |
 | `NOTIFICATIONS_REALTIME_BACKEND` | `socket-io`                            | UI (optional) |

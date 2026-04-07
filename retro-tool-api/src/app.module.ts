@@ -19,13 +19,21 @@ import { ActionItemsModule } from './action-items/action-items.module';
 import { LastActiveInterceptor } from './common/interceptors/last-active.interceptor';
 import configuration from './config/configuration';
 import { HealthController } from './health.controller';
+import { join } from 'path';
+import { config as loadDotenv } from 'dotenv';
+
+loadDotenv({
+  path: join(__dirname, '../.env'),
+  override: true,
+});
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
-      envFilePath: ['.env'],
+      // Resolve .env relative to the package root for both src and dist runtime.
+      envFilePath: [join(__dirname, '../.env')],
     }),
     ScheduleModule.forRoot(),
     AuthModule,

@@ -106,6 +106,23 @@ az deployment sub create \
 
 The deployment will restart the container group with both `convex-backend` and `caddy` containers running.
 
+If you want persistent certificates (recommended for production), include:
+
+```bash
+az deployment sub create \
+  --location southafricanorth \
+  --template-file infra/bicep/main.bicep \
+  --parameters \
+      environmentName=production \
+      caddyAcmeEmail=your@email.com \
+      caddyPersistCertificates=true \
+      caddyCertStorageAccountName=retrotoolcaddycerts \
+      caddyCertStorageShareName=caddy-data \
+      caddyCertStorageAccountKey=<storage-account-key> \
+      postgresAdminPassword=<your-pg-password> \
+      convexInstanceSecret=<your-64-char-hex-secret>
+```
+
 ### Step 4 — Wait for Caddy to Get a Certificate
 
 The ACI FQDN is:
@@ -165,6 +182,21 @@ az storage share create \
 ```
 
 **Add to `container-instance.bicep`** — add a volume mount to the Caddy container and a volume referencing the file share so certificates persist across restarts. This prevents Caddy from requesting a new cert every time the container group restarts.
+
+This repository now supports this natively using these parameters in `main.bicep`:
+
+- `caddyPersistCertificates=true`
+- `caddyCertStorageAccountName=<storage account name>`
+- `caddyCertStorageShareName=<file share name>`
+- `caddyCertStorageAccountKey=<storage account key>`
+
+If you deploy via GitHub Actions, set these environment entries:
+
+- Variable `CADDY_ACME_EMAIL`
+- Variable `CADDY_PERSIST_CERTIFICATES` (`true`/`false`)
+- Variable `CADDY_CERT_STORAGE_ACCOUNT_NAME`
+- Variable `CADDY_CERT_STORAGE_SHARE_NAME`
+- Secret `CADDY_CERT_STORAGE_ACCOUNT_KEY`
 
 ---
 

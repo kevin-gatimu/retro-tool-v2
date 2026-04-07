@@ -265,7 +265,7 @@ The response is cached client-side until the token expires.
 // convex-backend/convex/auth.config.ts
 const authConfig: AuthConfig = {
   providers: [{
-    domain: (import.meta as any).env?.Convex_BETTER_AUTH_URL ?? '',
+    domain: (import.meta as any).env?.CONVEX_BETTER_AUTH_URL ?? '',
     applicationID: "retro-tool",
   }],
 }
@@ -278,16 +278,16 @@ On key rotation, Convex automatically re-fetches the JWKS endpoint.
 
 ```bash
 # Local dev (connect to self-hosted Convex):
-npx convex env set Convex_BETTER_AUTH_URL http://localhost:8000/api/auth
+npx convex env set CONVEX_BETTER_AUTH_URL http://localhost:8000/api/auth
 
 # Staging / production:
-npx convex env set Convex_BETTER_AUTH_URL https://api.retro-tool.com/api/auth
+npx convex env set CONVEX_BETTER_AUTH_URL https://api.retro-tool.com/api/auth
 ```
 
 > **Docker Compose note:** Inside Docker, the Convex container cannot reach `localhost:8000`.
 > Use the Docker service hostname instead:
 > ```bash
-> npx convex env set Convex_BETTER_AUTH_URL http://api:3000/api/auth
+> npx convex env set CONVEX_BETTER_AUTH_URL http://api:3000/api/auth
 > ```
 
 ### Auth Guard in Convex Functions
@@ -360,15 +360,15 @@ export default app;
 
 | Variable | Required | Example | Notes |
 |---|---|---|---|
-| `CONVEX_URL` | Yes | `http://localhost:3210` | Convex backend URL |
-| `CONVEX_ADMIN_KEY` | Yes | `prod:abc123...` | From `npx convex deploy` output |
+| `CONVEX_SYNC_URL` | Yes | `http://localhost:3210` | Convex backend sync URL used by API |
+| `CONVEX_SYNC_ADMIN_KEY` | Yes | `convex-local\|abc123...` | From `./generate_admin_key.sh` output |
 | `BETTER_AUTH_URL` | Yes | `http://localhost:8000/api/auth` | Must match issuer in JWT config |
 
 ### Convex (`npx convex env set ...`)
 
 | Variable | Required | Example | Notes |
 |---|---|---|---|
-| `Convex_BETTER_AUTH_URL` | Yes (for auth) | `http://localhost:8000/api/auth` | Must be reachable FROM Convex container |
+| `CONVEX_BETTER_AUTH_URL` | Yes (for auth) | `http://localhost:8000/api/auth` | Must be reachable FROM Convex container |
 
 ### UI (`retro-tool-ui/.env`)
 
@@ -386,10 +386,10 @@ export default app;
 ### First-Time Setup
 
 - [ ] `pnpm --dir convex-backend add @convex-dev/rate-limiter @convex-dev/aggregate`
-- [ ] Set `CONVEX_URL` and `CONVEX_ADMIN_KEY` in `retro-tool-api/.env`
+- [ ] Set `CONVEX_SYNC_URL` and `CONVEX_SYNC_ADMIN_KEY` in `retro-tool-api/.env`
 - [ ] Set `VITE_CONVEX_URL` in `retro-tool-ui/.env`
 - [ ] Run `pnpm --dir convex-backend exec convex dev --once` to push functions and regenerate `_generated/api.d.ts`
-- [ ] Set `Convex_BETTER_AUTH_URL` via `npx convex env set ...`
+- [ ] Set `CONVEX_BETTER_AUTH_URL` via `npx convex env set ...`
 - [ ] Run the Drizzle migration to create the `jwks` table (`npx drizzle-kit push` or apply migration file)
 - [ ] Enable at least `VITE_RETROS_REALTIME_BACKEND=convex` in UI env
 

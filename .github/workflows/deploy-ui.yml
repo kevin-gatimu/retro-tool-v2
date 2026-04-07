@@ -79,7 +79,7 @@ jobs:
           VITE_APP_ENV: ${{ needs.set-env.outputs.environment }}
           VITE_API_URL: ${{ vars.API_URL }}
           VITE_APP_TITLE: Retro Tool
-          VITE_CONVEX_URL: ${{ vars.CONVEX_URL }}
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL || vars.CONVEX_SYNC_URL }}
           VITE_ESTIMATES_REALTIME_BACKEND: ${{ vars.ESTIMATES_REALTIME_BACKEND || 'socket-io' }}
           VITE_RETROS_REALTIME_BACKEND: ${{ vars.RETROS_REALTIME_BACKEND || 'socket-io' }}
           VITE_NOTIFICATIONS_REALTIME_BACKEND: ${{ vars.NOTIFICATIONS_REALTIME_BACKEND || 'socket-io' }}

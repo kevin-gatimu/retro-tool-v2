@@ -54,10 +54,14 @@ jobs:
               locationCore='${{ vars.AZURE_LOCATION_CORE }}' \
               locationSwa='${{ vars.AZURE_LOCATION_SWA }}' \
               postgresAdminPassword='${{ secrets.POSTGRES_PASSWORD }}' \
+              convexInstanceName='convex-local' \
               convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}' \
               convexAciIp='${{ vars.CONVEX_ACI_IP }}' \
-              appGatewaySslCertData='${{ secrets.APP_GATEWAY_SSL_CERT_DATA }}' \
-              appGatewaySslCertPassword='${{ secrets.APP_GATEWAY_SSL_CERT_PASSWORD }}'
+              caddyAcmeEmail='${{ vars.CADDY_ACME_EMAIL }}' \
+              caddyPersistCertificates=${{ vars.CADDY_PERSIST_CERTIFICATES || 'false' }} \
+              caddyCertStorageAccountName='${{ vars.CADDY_CERT_STORAGE_ACCOUNT_NAME || '' }}' \
+              caddyCertStorageShareName='${{ vars.CADDY_CERT_STORAGE_SHARE_NAME || '' }}' \
+              caddyCertStorageAccountKey='${{ secrets.CADDY_CERT_STORAGE_ACCOUNT_KEY || '' }}'
 
       - name: Deploy Bicep
         id: bicep
@@ -73,10 +77,14 @@ jobs:
               locationCore='${{ vars.AZURE_LOCATION_CORE }}' \
               locationSwa='${{ vars.AZURE_LOCATION_SWA }}' \
               postgresAdminPassword='${{ secrets.POSTGRES_PASSWORD }}' \
+              convexInstanceName='convex-local' \
               convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}' \
               convexAciIp='${{ vars.CONVEX_ACI_IP }}' \
-              appGatewaySslCertData='${{ secrets.APP_GATEWAY_SSL_CERT_DATA }}' \
-              appGatewaySslCertPassword='${{ secrets.APP_GATEWAY_SSL_CERT_PASSWORD }}' \
+              caddyAcmeEmail='${{ vars.CADDY_ACME_EMAIL }}' \
+              caddyPersistCertificates=${{ vars.CADDY_PERSIST_CERTIFICATES || 'false' }} \
+              caddyCertStorageAccountName='${{ vars.CADDY_CERT_STORAGE_ACCOUNT_NAME || '' }}' \
+              caddyCertStorageShareName='${{ vars.CADDY_CERT_STORAGE_SHARE_NAME || '' }}' \
+              caddyCertStorageAccountKey='${{ secrets.CADDY_CERT_STORAGE_ACCOUNT_KEY || '' }}' \
             --query 'properties.outputs' -o json)
 
           echo "acrLoginServer=$(echo $OUTPUT | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"

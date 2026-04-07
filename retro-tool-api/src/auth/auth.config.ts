@@ -49,9 +49,7 @@ export function createAuth(configService: ConfigService<Config>) {
   const db = drizzle(pool, { schema });
 
   // Get allowed origins from config
-  const allowedOrigins = configService.get('allowedOrigins', {
-    infer: true,
-  }) ?? [frontendUrl || 'http://localhost:5173', `http://localhost:${port}`];
+  const allowedOrigins = configService.get('allowedOrigins', { infer: true })!;
 
   // Use BETTER_AUTH_URL if set (required for production); fall back to localhost for local dev
   const authUrl = authConfig?.url || `http://localhost:${port}`;
