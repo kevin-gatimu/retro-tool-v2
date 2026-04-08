@@ -203,8 +203,8 @@ In your GitHub repository go to **Settings → Environments** and create two env
 |---|---|
 | `AZURE_RESOURCE_GROUP` | Resource group for all resources (e.g. `retro-tool-production-rg`) |
 | `AZURE_LOCATION` | Azure region for all resources (e.g. `uksouth`) |
-| `ACR_NAME` | Azure Container Registry name (e.g. `retrotoolproductionacr`) |
-| `ACR_LOGIN_SERVER` | ACR login server (e.g. `retrotoolproductionacr.azurecr.io`) |
+| `ACR_NAME` | Azure Container Registry name from infra outputs (e.g. `retrotoolproductionacrabc123`) |
+| `ACR_LOGIN_SERVER` | ACR login server from infra outputs (e.g. `retrotoolproductionacrabc123.azurecr.io`) |
 | `API_WEBAPP_NAME` | App Service name (e.g. `retro-tool-production-api`) |
 | `API_URL` | Full API URL (e.g. `https://retro-tool-production-api.azurewebsites.net`) |
 | `SWA_URL` | Static Web App URL (e.g. `https://wonderful-stone-abc123.azurestaticapps.net`) |

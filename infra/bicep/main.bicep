@@ -43,9 +43,10 @@ var swaSkuName = isProduction ? 'Standard' : 'Free'
 // ───────────────── Naming convention ─────────────────
 var prefix = 'retro-tool-${environmentName}'
 var prefixClean = replace(prefix, '-', '')
+var acrSuffix = substring(uniqueString(subscription().subscriptionId, resourceGroupName, environmentName), 0, 6)
 
 var postgresServerName = '${prefix}-pg'
-var acrName = '${prefixClean}acr'
+var acrName = '${prefixClean}acr${acrSuffix}'
 var appServicePlanName = '${prefix}-plan'
 var webAppName = '${prefix}-api'
 var staticWebAppName = '${prefix}-ui'
