@@ -6,6 +6,18 @@ param acrName string
 param dockerImageAndTag string = 'retro-tool-api:latest'
 param tags object = {}
 
+@description('App Service Plan SKU name. Use F1 for staging, P0v4 for production.')
+param appServicePlanSkuName string = 'P0v4'
+
+@description('App Service Plan SKU tier. Use Free for staging, PremiumV4 for production.')
+param appServicePlanSkuTier string = 'PremiumV4'
+
+@description('Enable zone redundancy (production only — not supported on Free tier).')
+param zoneRedundant bool = false
+
+// alwaysOn is not supported on the Free (F1) tier
+var alwaysOn = appServicePlanSkuTier != 'Free'
+
 // App Service Plan (Linux)
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: appServicePlanName
@@ -13,11 +25,12 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   tags: tags
   kind: 'linux'
   sku: {
-    name: 'P1v3'
-    tier: 'PremiumV3'
+    name: appServicePlanSkuName
+    tier: appServicePlanSkuTier
   }
   properties: {
     reserved: true // required for Linux
+    zoneRedundant: zoneRedundant
   }
 }
 
@@ -34,11 +47,11 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'DOCKER|${acrLoginServer}/${dockerImageAndTag}'
-      alwaysOn: true
+      alwaysOn: alwaysOn
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
       http20Enabled: true
-      healthCheckPath: '/health'
+      healthCheckPath: alwaysOn ? '/health' : null
       appSettings: [
         {
           name: 'DOCKER_REGISTRY_SERVER_URL'

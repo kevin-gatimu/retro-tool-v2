@@ -199,9 +199,10 @@ Optionally add a required reviewer gate on `production`.
 
 | Secret                      | Description                                   |
 | --------------------------- | --------------------------------------------- |
-| `AZURE_CLIENT_ID`         | App registration client ID (for OIDC)         |
+| `AZURE_CLIENT_ID`         | Shared app registration client ID (OIDC + Better Auth Microsoft login) |
 | `AZURE_TENANT_ID`         | Azure AD tenant ID                            |
 | `AZURE_SUBSCRIPTION_ID`   | Azure subscription ID                         |
+| `MICROSOFT_CLIENT_SECRET` | Client secret for the same app registration (used by Better Auth Microsoft provider) |
 | `POSTGRES_PASSWORD` | Postgres admin password (infra workflow only) |
 
 ### Variables (per environment)

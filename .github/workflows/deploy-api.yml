@@ -2,7 +2,7 @@ name: Deploy API
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'retro-tool-api/**'
       - 'packages/shared/contracts/**'
@@ -54,6 +54,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "staging" ]; then
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
           else
             echo "environment=production" >> "$GITHUB_OUTPUT"
           fi
@@ -118,7 +120,7 @@ jobs:
         run: |
           ENV="${{ needs.set-env.outputs.environment }}"
           IMAGE="${{ needs.build-and-push.outputs.image }}"
-          RG="${{ vars.AZURE_RESOURCE_GROUP_API }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
           MIGRATION_NAME="retro-tool-${ENV}-migrate-$(date +%s)"
           ACR_SERVER="${{ vars.ACR_LOGIN_SERVER }}"
           ACR_USER="${{ vars.ACR_NAME }}"
@@ -134,10 +136,9 @@ jobs:
             --registry-password "${ACR_PWD}" \
             --environment-variables \
               NODE_ENV=production \
-              CONVEX_INSTANCE_NAME='convex-local' \
             --secure-environment-variables \
               DATABASE_URL='${{ secrets.DATABASE_URL }}' \
-            --command-line "sh -c 'node dist/ensure-convex-database.js && node dist/migrate.js'" \
+            --command-line "node dist/migrate.js" \
             --restart-policy Never \
             --os-type Linux \
             --cpu 1 \
@@ -180,7 +181,7 @@ jobs:
       - name: Configure App Service environment variables
         run: |
           az webapp config appsettings set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP_API }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
             --name ${{ vars.API_WEBAPP_NAME }} \
             --settings \
               NODE_ENV=production \
@@ -200,7 +201,7 @@ jobs:
       - name: Configure App Service secrets
         run: |
           az webapp config appsettings set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP_API }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
             --name ${{ vars.API_WEBAPP_NAME }} \
             --settings \
               DATABASE_URL='${{ secrets.DATABASE_URL }}' \
@@ -208,7 +209,7 @@ jobs:
               BETTER_AUTH_URL='https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
               GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' \
               GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}' \
-              MICROSOFT_CLIENT_ID='${{ secrets.MICROSOFT_CLIENT_ID }}' \
+              MICROSOFT_CLIENT_ID='${{ secrets.AZURE_CLIENT_ID }}' \
               MICROSOFT_CLIENT_SECRET='${{ secrets.MICROSOFT_CLIENT_SECRET }}' \
               RESEND_API_KEY='${{ secrets.RESEND_API_KEY }}' \
               CONVEX_SYNC_ADMIN_KEY='${{ secrets.CONVEX_SYNC_ADMIN_KEY }}' \
@@ -220,7 +221,7 @@ jobs:
       - name: Deploy image to App Service
         run: |
           az webapp config container set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP_API }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
             --name ${{ vars.API_WEBAPP_NAME }} \
             --container-image-name ${{ needs.build-and-push.outputs.image }} \
             --container-registry-url https://${{ vars.ACR_LOGIN_SERVER }}
@@ -228,7 +229,7 @@ jobs:
       - name: Restart Web App
         run: |
           az webapp restart \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP_API }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
             --name ${{ vars.API_WEBAPP_NAME }}
 
       - name: Health check

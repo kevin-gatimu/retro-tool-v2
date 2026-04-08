@@ -25,8 +25,6 @@ jobs:
       acrLoginServer: ${{ steps.bicep.outputs.acrLoginServer }}
       apiUrl: ${{ steps.bicep.outputs.apiUrl }}
       swaDefaultHostname: ${{ steps.bicep.outputs.swaDefaultHostname }}
-      swaDeploymentToken: ${{ steps.bicep.outputs.swaDeploymentToken }}
-      convexSyncUrl: ${{ steps.bicep.outputs.convexSyncUrl }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,53 +43,31 @@ jobs:
         run: |
           az deployment sub what-if \
             --name main \
-            --location ${{ vars.AZURE_DEPLOYMENT_LOCATION }} \
+            --location ${{ vars.AZURE_LOCATION }} \
             --template-file infra/bicep/main.bicep \
             --parameters \
               environmentName=${{ inputs.environment }} \
-              apiResourceGroupName='${{ vars.AZURE_RESOURCE_GROUP_API }}' \
-              uiResourceGroupName='${{ vars.AZURE_RESOURCE_GROUP_UI }}' \
-              locationCore='${{ vars.AZURE_LOCATION_CORE }}' \
-              locationSwa='${{ vars.AZURE_LOCATION_SWA }}' \
-              postgresAdminPassword='${{ secrets.POSTGRES_PASSWORD }}' \
-              convexInstanceName='convex-local' \
-              convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}' \
-              convexAciIp='${{ vars.CONVEX_ACI_IP }}' \
-              caddyAcmeEmail='${{ vars.CADDY_ACME_EMAIL }}' \
-              caddyPersistCertificates=${{ vars.CADDY_PERSIST_CERTIFICATES || 'false' }} \
-              caddyCertStorageAccountName='${{ vars.CADDY_CERT_STORAGE_ACCOUNT_NAME || '' }}' \
-              caddyCertStorageShareName='${{ vars.CADDY_CERT_STORAGE_SHARE_NAME || '' }}' \
-              caddyCertStorageAccountKey='${{ secrets.CADDY_CERT_STORAGE_ACCOUNT_KEY || '' }}'
+              resourceGroupName='${{ vars.AZURE_RESOURCE_GROUP }}' \
+              location='${{ vars.AZURE_LOCATION }}' \
+              postgresAdminPassword='${{ secrets.POSTGRES_PASSWORD }}'
 
       - name: Deploy Bicep
         id: bicep
         run: |
           OUTPUT=$(az deployment sub create \
             --name main \
-            --location ${{ vars.AZURE_DEPLOYMENT_LOCATION }} \
+            --location ${{ vars.AZURE_LOCATION }} \
             --template-file infra/bicep/main.bicep \
             --parameters \
               environmentName=${{ inputs.environment }} \
-              apiResourceGroupName='${{ vars.AZURE_RESOURCE_GROUP_API }}' \
-              uiResourceGroupName='${{ vars.AZURE_RESOURCE_GROUP_UI }}' \
-              locationCore='${{ vars.AZURE_LOCATION_CORE }}' \
-              locationSwa='${{ vars.AZURE_LOCATION_SWA }}' \
+              resourceGroupName='${{ vars.AZURE_RESOURCE_GROUP }}' \
+              location='${{ vars.AZURE_LOCATION }}' \
               postgresAdminPassword='${{ secrets.POSTGRES_PASSWORD }}' \
-              convexInstanceName='convex-local' \
-              convexInstanceSecret='${{ secrets.CONVEX_INSTANCE_SECRET }}' \
-              convexAciIp='${{ vars.CONVEX_ACI_IP }}' \
-              caddyAcmeEmail='${{ vars.CADDY_ACME_EMAIL }}' \
-              caddyPersistCertificates=${{ vars.CADDY_PERSIST_CERTIFICATES || 'false' }} \
-              caddyCertStorageAccountName='${{ vars.CADDY_CERT_STORAGE_ACCOUNT_NAME || '' }}' \
-              caddyCertStorageShareName='${{ vars.CADDY_CERT_STORAGE_SHARE_NAME || '' }}' \
-              caddyCertStorageAccountKey='${{ secrets.CADDY_CERT_STORAGE_ACCOUNT_KEY || '' }}' \
             --query 'properties.outputs' -o json)
 
           echo "acrLoginServer=$(echo $OUTPUT | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"
           echo "apiUrl=$(echo $OUTPUT | jq -r '.apiUrl.value')" >> "$GITHUB_OUTPUT"
           echo "swaDefaultHostname=$(echo $OUTPUT | jq -r '.swaDefaultHostname.value')" >> "$GITHUB_OUTPUT"
-          echo "swaDeploymentToken=$(echo $OUTPUT | jq -r '.swaDeploymentToken.value')" >> "$GITHUB_OUTPUT"
-          echo "convexSyncUrl=$(echo $OUTPUT | jq -r '.convexSyncUrl.value')" >> "$GITHUB_OUTPUT"
 
       - name: Summary
         run: |
@@ -101,4 +77,3 @@ jobs:
           echo "|----------|-----|" >> $GITHUB_STEP_SUMMARY
           echo "| API | ${{ steps.bicep.outputs.apiUrl }} |" >> $GITHUB_STEP_SUMMARY
           echo "| UI (SWA) | ${{ steps.bicep.outputs.swaDefaultHostname }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Convex | ${{ steps.bicep.outputs.convexSyncUrl }} |" >> $GITHUB_STEP_SUMMARY

@@ -2,7 +2,7 @@ name: Deploy UI
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'retro-tool-ui/**'
       - 'packages/shared/contracts/**'
@@ -52,6 +52,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "staging" ]; then
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
           else
             echo "environment=production" >> "$GITHUB_OUTPUT"
           fi

@@ -4,14 +4,12 @@ param postgresqlAdminUsername string
 @secure()
 param postgresqlAdminPassword string
 param postgresqlVersion string = '16'
-param skuName string = 'Standard_B2s'
+param skuName string = 'Standard_B1ms'
 param skuTier string = 'Burstable'
 param storageGB int = 32
 param backupRetentionDays int = 7
 param geoRedundantBackup string = 'Disabled'
 param tags object = {}
-param convexAciIp string = ''
-param convexDatabaseName string = ''
 
 resource postgresqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
   name: postgresqlServerName
@@ -38,7 +36,6 @@ resource postgresqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-
   }
 }
 
-// Create api_db database
 resource apiDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview' = {
   parent: postgresqlServer
   name: 'retro_tool_db'
@@ -48,33 +45,13 @@ resource apiDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-1
   }
 }
 
-// Create Convex database (name derived from INSTANCE_NAME with hyphens replaced by underscores)
-resource convexDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01-preview' = if (!empty(convexDatabaseName)) {
-  parent: postgresqlServer
-  name: !empty(convexDatabaseName) ? convexDatabaseName : 'convex'
-  properties: {
-    charset: 'UTF8'
-    collation: 'en_US.utf8'
-  }
-}
-
-// Allow access from Azure services
+// Allow access from Azure services (App Service, ACI migrations)
 resource azureServicesFirewallRule 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-12-01-preview' = {
   parent: postgresqlServer
   name: 'AllowAzureServices'
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'
-  }
-}
-
-// Allow access from Convex ACI (static public IP)
-resource convexAciFirewallRule 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-12-01-preview' = if (!empty(convexAciIp)) {
-  parent: postgresqlServer
-  name: 'AllowConvexACI'
-  properties: {
-    startIpAddress: convexAciIp
-    endIpAddress: convexAciIp
   }
 }
 

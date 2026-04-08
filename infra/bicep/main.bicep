@@ -1,8 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // Retro-Tool – Azure Infrastructure (main orchestrator)
-// Deploys: PostgreSQL, ACR, App Service, Container Instance,
-//          Static Web App
-// SSL termination is handled by Caddy sidecar inside the ACI
+// Deploys: PostgreSQL (shared), ACR, App Service, Static Web App
+//
+// Staging  → Free F1 App Service, Free SWA
+// Production → Premium V4 P0V4 App Service (zone-redundant), Standard SWA
+//
+// All resources share a single resource group per environment:
+//   retro-tool-staging-rg / retro-tool-production-rg
 // ─────────────────────────────────────────────────────────────
 
 targetScope = 'subscription'
@@ -12,17 +16,11 @@ targetScope = 'subscription'
 @allowed(['staging', 'production'])
 param environmentName string
 
-@description('Azure region for core resources (ACR, App Service, Postgres, ACI)')
-param locationCore string = 'southafricanorth'
+@description('Azure region for all resources')
+param location string = 'uksouth'
 
-@description('Azure region for Static Web App (SWA)')
-param locationSwa string = 'westeurope'
-
-@description('Resource group for API/core resources')
-param apiResourceGroupName string = 'retro-tool-api-rg'
-
-@description('Resource group for UI resources')
-param uiResourceGroupName string = 'retro-tool-ui-rg'
+@description('Resource group for all resources (API, UI, database, registry)')
+param resourceGroupName string = 'retro-tool-${environmentName}-rg'
 
 @description('PostgreSQL admin username')
 param postgresAdminUsername string = 'pgadmin'
@@ -31,31 +29,16 @@ param postgresAdminUsername string = 'pgadmin'
 @secure()
 param postgresAdminPassword string
 
-@description('Convex instance name (kept aligned with local for parity)')
-param convexInstanceName string = 'convex-local'
+// ───────────────── Environment-derived config ─────────────────
+var isProduction = environmentName == 'production'
 
-@description('Convex instance secret (64-char hex)')
-@secure()
-param convexInstanceSecret string
+// App Service SKU: Free F1 for staging, Premium V4 P0V4 for production
+var appServiceSkuName = isProduction ? 'P0v4' : 'F1'
+var appServiceSkuTier = isProduction ? 'PremiumV4' : 'Free'
+var appServiceZoneRedundant = isProduction
 
-@description('Static public IP of the Convex ACI — add to PostgreSQL firewall. Find with: az container show --resource-group retro-tool-api-rg --name retro-tool-production-convex --query "ipAddress.ip" -o tsv')
-param convexAciIp string = ''
-
-@description('Email address for Let\'s Encrypt certificate registration (used by Caddy)')
-param caddyAcmeEmail string
-
-@description('Enable Azure File persistence for Caddy certificates to avoid Let\'s Encrypt re-issuance on restarts')
-param caddyPersistCertificates bool = false
-
-@description('Storage account name for Caddy cert persistence (required when caddyPersistCertificates=true)')
-param caddyCertStorageAccountName string = ''
-
-@description('Azure file share name for Caddy cert persistence (required when caddyPersistCertificates=true)')
-param caddyCertStorageShareName string = ''
-
-@description('Storage account key for Caddy cert persistence (required when caddyPersistCertificates=true)')
-@secure()
-param caddyCertStorageAccountKey string = ''
+// Static Web App SKU: Free for staging, Standard for production
+var swaSkuName = isProduction ? 'Standard' : 'Free'
 
 // ───────────────── Naming convention ─────────────────
 var prefix = 'retro-tool-${environmentName}'
@@ -65,105 +48,74 @@ var postgresServerName = '${prefix}-pg'
 var acrName = '${prefixClean}acr'
 var appServicePlanName = '${prefix}-plan'
 var webAppName = '${prefix}-api'
-var containerGroupName = '${prefix}-convex'
 var staticWebAppName = '${prefix}-ui'
 
 var tags = {
   project: 'retro-tool'
   environment: environmentName
   managedBy: 'bicep'
+  Production: 'Production'
 }
 
-resource apiRg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
-  name: apiResourceGroupName
-  location: locationCore
-  tags: tags
-}
-
-resource uiRg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
-  name: uiResourceGroupName
-  location: locationSwa
+resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
+  name: resourceGroupName
+  location: location
   tags: tags
 }
 
 // ───────────────── Modules ─────────────────
 
-// 1. Container Registry
+// 1. Container Registry (shared by both environments for API images)
 module acr 'modules/container-registry.bicep' = {
   name: 'deploy-acr'
-  scope: apiRg
+  scope: rg
   params: {
-    location: locationCore
+    location: location
     acrName: acrName
     tags: tags
   }
 }
 
 // 2. PostgreSQL Flexible Server
+// Note: both staging and production point to the same physical server via
+// their DATABASE_URL secret. Run infra once; reuse the server across envs.
 module postgres 'modules/postgresql-flexible-server.bicep' = {
   name: 'deploy-postgres'
-  scope: apiRg
+  scope: rg
   params: {
-    location: locationCore
+    location: location
     postgresqlServerName: postgresServerName
     postgresqlAdminUsername: postgresAdminUsername
     postgresqlAdminPassword: postgresAdminPassword
-    convexAciIp: convexAciIp
-    convexDatabaseName: replace(convexInstanceName, '-', '_')
     tags: tags
   }
 }
 
-// 3. App Service (API)
+// 3. App Service (NestJS API)
 module appService 'modules/app-service.bicep' = {
   name: 'deploy-appservice'
-  scope: apiRg
+  scope: rg
   params: {
-    location: locationCore
+    location: location
     appServicePlanName: appServicePlanName
     webAppName: webAppName
     acrLoginServer: acr.outputs.acrLoginServer
     acrName: acr.outputs.acrName
+    appServicePlanSkuName: appServiceSkuName
+    appServicePlanSkuTier: appServiceSkuTier
+    zoneRedundant: appServiceZoneRedundant
     tags: tags
   }
 }
 
-// 4. Container Instance (Convex)
-// ACR credentials are looked up directly via the resource
-resource acrRef 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
-  name: acrName
-  scope: apiRg
-  dependsOn: [acr]
-}
-
-module convex 'modules/container-instance.bicep' = {
-  name: 'deploy-convex-aci'
-  scope: apiRg
-  params: {
-    location: locationCore
-    containerGroupName: containerGroupName
-    acrLoginServer: acr.outputs.acrLoginServer
-    acrUsername: acrName
-    acrPassword: acrRef.listCredentials().passwords[0].value
-    convexInstanceName: convexInstanceName
-    convexInstanceSecret: convexInstanceSecret
-    convexPostgresUrl: 'postgresql://${postgresAdminUsername}:${postgresAdminPassword}@${postgres.outputs.postgresqlServerFqdn}:5432?sslmode=require'
-    caddyAcmeEmail: caddyAcmeEmail
-    caddyPersistCertificates: caddyPersistCertificates
-    caddyCertStorageAccountName: caddyCertStorageAccountName
-    caddyCertStorageShareName: caddyCertStorageShareName
-    caddyCertStorageAccountKey: caddyCertStorageAccountKey
-    tags: tags
-  }
-}
-
-// 5. Static Web App (UI)
+// 4. Static Web App (React UI)
 module swa 'modules/static-web-app.bicep' = {
   name: 'deploy-swa'
-  scope: uiRg
+  scope: rg
   params: {
-    location: locationSwa
+    location: location
     staticWebAppName: staticWebAppName
+    skuName: swaSkuName
     tags: tags
   }
 }
@@ -174,7 +126,5 @@ output acrName string = acr.outputs.acrName
 output postgresServerFqdn string = postgres.outputs.postgresqlServerFqdn
 output apiUrl string = 'https://${appService.outputs.webAppDefaultHostname}'
 output apiWebAppName string = appService.outputs.webAppName
-output convexFqdn string = convex.outputs.containerGroupFqdn
-output convexSyncUrl string = convex.outputs.convexSyncUrl
 output swaDefaultHostname string = 'https://${swa.outputs.staticWebAppDefaultHostname}'
 output swaName string = swa.outputs.staticWebAppName

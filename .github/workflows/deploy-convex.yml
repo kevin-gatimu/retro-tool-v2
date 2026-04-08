@@ -2,7 +2,7 @@ name: Deploy Convex
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'convex-backend/**'
       - '.github/workflows/deploy-convex.yml'
@@ -19,7 +19,6 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
@@ -33,11 +32,13 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "staging" ]; then
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
           else
             echo "environment=production" >> "$GITHUB_OUTPUT"
           fi
 
-  # ─── Push Convex functions & update Container Instance ──────────────
+  # ─────────────────── Deploy Convex functions to Convex Cloud ────────
   deploy:
     needs: [set-env]
     runs-on: ubuntu-latest
@@ -55,42 +56,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Azure login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Push Convex functions
+      - name: Deploy Convex functions
         working-directory: convex-backend
         env:
-          CONVEX_SELF_HOSTED_URL: ${{ vars.CONVEX_SYNC_URL }}
-          CONVEX_SELF_HOSTED_ADMIN_KEY: ${{ secrets.CONVEX_SYNC_ADMIN_KEY }}
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
         run: npx convex deploy
-
-      - name: Restart Convex Container Instance
-        run: |
-          ENV="${{ needs.set-env.outputs.environment }}"
-          RG="${{ vars.AZURE_RESOURCE_GROUP_API }}"
-          CONTAINER_NAME="retro-tool-${ENV}-convex"
-
-          az container restart \
-            --resource-group "${RG}" \
-            --name "${CONTAINER_NAME}"
-
-      - name: Health check
-        run: |
-          CONVEX_URL="${{ vars.CONVEX_SYNC_URL }}"
-          echo "Checking Convex at ${CONVEX_URL}..."
-          for i in $(seq 1 20); do
-            STATUS=$(curl -s -o /dev/null -w '%{http_code}' "${CONVEX_URL}" || echo "000")
-            if [ "$STATUS" = "200" ] || [ "$STATUS" = "101" ] || [ "$STATUS" = "426" ]; then
-              echo "Convex backend is responding (HTTP $STATUS)"
-              exit 0
-            fi
-            echo "Attempt $i: HTTP $STATUS — retrying..."
-            sleep 10
-          done
-          echo "Health check did not pass after 20 attempts — check manually"
-          exit 1
