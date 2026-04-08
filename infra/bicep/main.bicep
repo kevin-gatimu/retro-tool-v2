@@ -32,10 +32,10 @@ param postgresAdminPassword string
 // ───────────────── Environment-derived config ─────────────────
 var isProduction = environmentName == 'production'
 
-// App Service SKU: Free F1 for staging, Premium V4 P0V4 for production
-var appServiceSkuName = isProduction ? 'P0v4' : 'F1'
-var appServiceSkuTier = isProduction ? 'PremiumV4' : 'Free'
-var appServiceZoneRedundant = isProduction
+// App Service SKU: Free F1 for staging, Premium V3 P1V3 for production (temporary fallback)
+var appServiceSkuName = isProduction ? 'P1v3' : 'F1'
+var appServiceSkuTier = isProduction ? 'PremiumV3' : 'Free'
+var appServiceZoneRedundant = false
 
 // Static Web App SKU: Free for staging, Standard for production
 var swaSkuName = isProduction ? 'Standard' : 'Free'

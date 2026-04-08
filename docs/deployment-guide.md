@@ -5,7 +5,7 @@ This guide covers deploying Retro Tool to Azure. There are two environments:
 | Environment | Branch | App Service | Static Web App |
 |---|---|---|---|
 | **Staging** | `staging` | Free F1 | Free |
-| **Production** | `main` | Premium V4 P0V4 (zone-redundant) | Standard |
+| **Production** | `main` | Premium V3 P1V3 (temporary fallback) | Standard |
 
 Both environments share a single PostgreSQL Flexible Server (deployed with production infrastructure).
 
@@ -20,6 +20,21 @@ Convex functions are deployed to **Convex Cloud** (not self-hosted).
 - A Convex Cloud account and project per environment
 - A Resend account for transactional email
 - VAPID keys generated (`npx web-push generate-vapid-keys`)
+
+---
+
+## Region Availability Checks (Before Deploy)
+
+Run these commands before infrastructure deployment to confirm App Service SKU regional availability in your current subscription:
+
+Bash / PowerShell:
+
+```bash
+az appservice list-locations --sku P0v4
+az appservice list-locations --sku P1v3
+```
+
+If your target region is listed but deployment still fails, you likely have a subscription quota issue (for example, PremiumV4 quota set to 0), not a regional availability issue.
 
 ---
 
