@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     outputs:
-      acrLoginServer: ${{ steps.bicep.outputs.acrLoginServer }}
       apiUrl: ${{ steps.bicep.outputs.apiUrl }}
       swaDefaultHostname: ${{ steps.bicep.outputs.swaDefaultHostname }}
     steps:
@@ -67,7 +66,6 @@ jobs:
               postgresAdminPassword='${{ secrets.POSTGRES_PASSWORD }}' \
             --query 'properties.outputs' -o json)
 
-          echo "acrLoginServer=$(echo $OUTPUT | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"
           echo "apiUrl=$(echo $OUTPUT | jq -r '.apiUrl.value')" >> "$GITHUB_OUTPUT"
           echo "swaDefaultHostname=$(echo $OUTPUT | jq -r '.swaDefaultHostname.value')" >> "$GITHUB_OUTPUT"
 

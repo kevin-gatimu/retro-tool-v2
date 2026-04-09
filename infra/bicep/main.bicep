@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // Retro-Tool – Azure Infrastructure (main orchestrator)
-// Deploys: PostgreSQL (shared), ACR, App Service, Static Web App
+// Deploys: PostgreSQL, App Service (code deploy), Static Web App
 //
 // Staging  → Free F1 App Service, Free SWA
 // Production → Standard S1 App Service, Standard SWA
@@ -19,7 +19,7 @@ param environmentName string
 @description('Azure region for all resources')
 param location string = 'eastus2'
 
-@description('Resource group for all resources (API, UI, database, registry)')
+@description('Resource group for all resources (API, UI, database)')
 param resourceGroupName string = 'retro-tool-${environmentName}-rg'
 
 @description('PostgreSQL admin username')
@@ -36,17 +36,14 @@ var uniqueSuffix = substring(uniqueString(subscription().subscriptionId, resourc
 // App Service SKU: Free F1 for staging, Standard S1 for production
 var appServiceSkuName = isProduction ? 'S1' : 'F1'
 var appServiceSkuTier = isProduction ? 'Standard' : 'Free'
-var appServiceZoneRedundant = false
 
 // Static Web App SKU: Free for staging, Standard for production
 var swaSkuName = isProduction ? 'Standard' : 'Free'
 
 // ───────────────── Naming convention ─────────────────
 var prefix = 'retro-tool-${environmentName}'
-var prefixClean = replace(prefix, '-', '')
 
 var postgresServerName = '${prefix}-pg-${uniqueSuffix}'
-var acrName = '${prefixClean}acr${uniqueSuffix}'
 var appServicePlanName = '${prefix}-plan'
 var webAppName = '${prefix}-api-${uniqueSuffix}'
 var staticWebAppName = '${prefix}-ui'
@@ -66,20 +63,7 @@ resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
 
 // ───────────────── Modules ─────────────────
 
-// 1. Container Registry (shared by both environments for API images)
-module acr 'modules/container-registry.bicep' = {
-  name: 'deploy-acr'
-  scope: rg
-  params: {
-    location: location
-    acrName: acrName
-    tags: tags
-  }
-}
-
-// 2. PostgreSQL Flexible Server
-// Note: both staging and production point to the same physical server via
-// their DATABASE_URL secret. Run infra once; reuse the server across envs.
+// 1. PostgreSQL Flexible Server
 module postgres 'modules/postgresql-flexible-server.bicep' = {
   name: 'deploy-postgres'
   scope: rg
@@ -92,7 +76,7 @@ module postgres 'modules/postgresql-flexible-server.bicep' = {
   }
 }
 
-// 3. App Service (NestJS API)
+// 2. App Service (NestJS API — code deploy via zip)
 module appService 'modules/app-service.bicep' = {
   name: 'deploy-appservice'
   scope: rg
@@ -100,16 +84,13 @@ module appService 'modules/app-service.bicep' = {
     location: location
     appServicePlanName: appServicePlanName
     webAppName: webAppName
-    acrLoginServer: acr.outputs.acrLoginServer
-    acrName: acr.outputs.acrName
     appServicePlanSkuName: appServiceSkuName
     appServicePlanSkuTier: appServiceSkuTier
-    zoneRedundant: appServiceZoneRedundant
     tags: tags
   }
 }
 
-// 4. Static Web App (React UI)
+// 3. Static Web App (React UI)
 module swa 'modules/static-web-app.bicep' = {
   name: 'deploy-swa'
   scope: rg
@@ -122,8 +103,6 @@ module swa 'modules/static-web-app.bicep' = {
 }
 
 // ───────────────── Outputs ─────────────────
-output acrLoginServer string = acr.outputs.acrLoginServer
-output acrName string = acr.outputs.acrName
 output postgresServerFqdn string = postgres.outputs.postgresqlServerFqdn
 output apiUrl string = 'https://${appService.outputs.webAppDefaultHostname}'
 output apiWebAppName string = appService.outputs.webAppName
