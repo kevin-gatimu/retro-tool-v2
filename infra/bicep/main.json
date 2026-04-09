@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "16958411134207617300"
+      "templateHash": "14675335017897000990"
     }
   },
   "parameters": {
@@ -50,8 +50,8 @@
   "variables": {
     "isProduction": "[equals(parameters('environmentName'), 'production')]",
     "uniqueSuffix": "[substring(uniqueString(subscription().subscriptionId, parameters('resourceGroupName'), parameters('environmentName')), 0, 6)]",
-    "locationCore": "[if(equals(toLower(parameters('location')), 'westeurope'), 'uksouth', parameters('location'))]",
-    "locationSwa": "westeurope",
+    "coreLocation": "[if(equals(toLower(parameters('location')), 'westeurope'), 'uksouth', parameters('location'))]",
+    "swaLocation": "westeurope",
     "appServiceSkuName": "[if(variables('isProduction'), 'P1v3', 'F1')]",
     "appServiceSkuTier": "[if(variables('isProduction'), 'PremiumV3', 'Free')]",
     "appServiceZoneRedundant": false,
@@ -75,7 +75,7 @@
       "type": "Microsoft.Resources/resourceGroups",
       "apiVersion": "2022-09-01",
       "name": "[parameters('resourceGroupName')]",
-      "location": "[variables('locationCore')]",
+      "location": "[variables('coreLocation')]",
       "tags": "[variables('tags')]"
     },
     {
@@ -90,7 +90,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[variables('locationCore')]"
+            "value": "[variables('coreLocation')]"
           },
           "acrName": {
             "value": "[variables('acrName')]"
@@ -175,7 +175,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[variables('locationCore')]"
+            "value": "[variables('coreLocation')]"
           },
           "postgresqlServerName": {
             "value": "[variables('postgresServerName')]"
@@ -334,7 +334,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[variables('locationCore')]"
+            "value": "[variables('coreLocation')]"
           },
           "appServicePlanName": {
             "value": "[variables('appServicePlanName')]"
@@ -535,7 +535,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[variables('locationSwa')]"
+            "value": "[variables('swaLocation')]"
           },
           "staticWebAppName": {
             "value": "[variables('staticWebAppName')]"
