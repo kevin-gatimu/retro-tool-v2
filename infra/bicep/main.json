@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "8128571296833204619"
+      "templateHash": "3139662113161116849"
     }
   },
   "parameters": {
@@ -50,6 +50,8 @@
   "variables": {
     "isProduction": "[equals(parameters('environmentName'), 'production')]",
     "uniqueSuffix": "[substring(uniqueString(subscription().subscriptionId, parameters('resourceGroupName'), parameters('environmentName')), 0, 6)]",
+    "coreLocation": "[if(equals(toLower(parameters('location')), 'westeurope'), 'uksouth', parameters('location'))]",
+    "swaLocation": "westeurope",
     "appServiceSkuName": "[if(variables('isProduction'), 'S1', 'F1')]",
     "appServiceSkuTier": "[if(variables('isProduction'), 'Standard', 'Free')]",
     "appServiceZoneRedundant": false,
@@ -73,7 +75,7 @@
       "type": "Microsoft.Resources/resourceGroups",
       "apiVersion": "2022-09-01",
       "name": "[parameters('resourceGroupName')]",
-      "location": "[parameters('location')]",
+      "location": "[variables('coreLocation')]",
       "tags": "[variables('tags')]"
     },
     {
@@ -88,7 +90,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[parameters('location')]"
+            "value": "[variables('coreLocation')]"
           },
           "acrName": {
             "value": "[variables('acrName')]"
@@ -173,7 +175,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[parameters('location')]"
+            "value": "[variables('coreLocation')]"
           },
           "postgresqlServerName": {
             "value": "[variables('postgresServerName')]"
@@ -332,7 +334,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[parameters('location')]"
+            "value": "[variables('coreLocation')]"
           },
           "appServicePlanName": {
             "value": "[variables('appServicePlanName')]"
@@ -533,7 +535,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[parameters('location')]"
+            "value": "[variables('swaLocation')]"
           },
           "staticWebAppName": {
             "value": "[variables('staticWebAppName')]"

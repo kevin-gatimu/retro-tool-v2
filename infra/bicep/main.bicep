@@ -32,6 +32,10 @@ param postgresAdminPassword string
 // ───────────────── Environment-derived config ─────────────────
 var isProduction = environmentName == 'production'
 var uniqueSuffix = substring(uniqueString(subscription().subscriptionId, resourceGroupName, environmentName), 0, 6)
+// Postgres is currently offer-restricted for this subscription in westeurope.
+// Keep UI in westeurope (supported by Static Web Apps) and route core to uksouth.
+var coreLocation = toLower(location) == 'westeurope' ? 'uksouth' : location
+var swaLocation = 'westeurope'
 
 // App Service SKU: Free F1 for staging, Standard S1 for production
 var appServiceSkuName = isProduction ? 'S1' : 'F1'
@@ -60,7 +64,7 @@ var tags = {
 
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   name: resourceGroupName
-  location: location
+  location: coreLocation
   tags: tags
 }
 
@@ -71,7 +75,7 @@ module acr 'modules/container-registry.bicep' = {
   name: 'deploy-acr'
   scope: rg
   params: {
-    location: location
+    location: coreLocation
     acrName: acrName
     tags: tags
   }
@@ -84,7 +88,7 @@ module postgres 'modules/postgresql-flexible-server.bicep' = {
   name: 'deploy-postgres'
   scope: rg
   params: {
-    location: location
+    location: coreLocation
     postgresqlServerName: postgresServerName
     postgresqlAdminUsername: postgresAdminUsername
     postgresqlAdminPassword: postgresAdminPassword
@@ -97,7 +101,7 @@ module appService 'modules/app-service.bicep' = {
   name: 'deploy-appservice'
   scope: rg
   params: {
-    location: location
+    location: coreLocation
     appServicePlanName: appServicePlanName
     webAppName: webAppName
     acrLoginServer: acr.outputs.acrLoginServer
@@ -114,7 +118,7 @@ module swa 'modules/static-web-app.bicep' = {
   name: 'deploy-swa'
   scope: rg
   params: {
-    location: location
+    location: swaLocation
     staticWebAppName: staticWebAppName
     skuName: swaSkuName
     tags: tags
