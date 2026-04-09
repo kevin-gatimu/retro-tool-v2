@@ -37,9 +37,9 @@ var uniqueSuffix = substring(uniqueString(subscription().subscriptionId, resourc
 var coreLocation = toLower(location) == 'westeurope' ? 'uksouth' : location
 var swaLocation = 'westeurope'
 
-// App Service SKU: Free F1 for staging, Premium V3 P1V3 for production
-var appServiceSkuName = isProduction ? 'P1v3' : 'F1'
-var appServiceSkuTier = isProduction ? 'PremiumV3' : 'Free'
+// App Service SKU: Free F1 for staging, Standard S1 for production (quota-safe fallback)
+var appServiceSkuName = isProduction ? 'S1' : 'F1'
+var appServiceSkuTier = isProduction ? 'Standard' : 'Free'
 var appServiceZoneRedundant = false
 
 // Static Web App SKU: Free for staging, Standard for production
