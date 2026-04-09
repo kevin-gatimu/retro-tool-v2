@@ -17,7 +17,7 @@ targetScope = 'subscription'
 param environmentName string
 
 @description('Azure region for all resources')
-param location string = 'westeurope'
+param location string = 'eastus'
 
 @description('Resource group for all resources (API, UI, database, registry)')
 param resourceGroupName string = 'retro-tool-${environmentName}-rg'
@@ -32,10 +32,6 @@ param postgresAdminPassword string
 // ───────────────── Environment-derived config ─────────────────
 var isProduction = environmentName == 'production'
 var uniqueSuffix = substring(uniqueString(subscription().subscriptionId, resourceGroupName, environmentName), 0, 6)
-// Postgres is currently offer-restricted for this subscription in westeurope.
-// Keep UI in westeurope (supported by Static Web Apps) and route core to uksouth.
-var coreLocation = toLower(location) == 'westeurope' ? 'uksouth' : location
-var swaLocation = 'westeurope'
 
 // App Service SKU: Free F1 for staging, Standard S1 for production
 var appServiceSkuName = isProduction ? 'S1' : 'F1'
@@ -64,7 +60,7 @@ var tags = {
 
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   name: resourceGroupName
-  location: coreLocation
+  location: location
   tags: tags
 }
 
@@ -75,7 +71,7 @@ module acr 'modules/container-registry.bicep' = {
   name: 'deploy-acr'
   scope: rg
   params: {
-    location: coreLocation
+    location: location
     acrName: acrName
     tags: tags
   }
@@ -88,7 +84,7 @@ module postgres 'modules/postgresql-flexible-server.bicep' = {
   name: 'deploy-postgres'
   scope: rg
   params: {
-    location: coreLocation
+    location: location
     postgresqlServerName: postgresServerName
     postgresqlAdminUsername: postgresAdminUsername
     postgresqlAdminPassword: postgresAdminPassword
@@ -101,7 +97,7 @@ module appService 'modules/app-service.bicep' = {
   name: 'deploy-appservice'
   scope: rg
   params: {
-    location: coreLocation
+    location: location
     appServicePlanName: appServicePlanName
     webAppName: webAppName
     acrLoginServer: acr.outputs.acrLoginServer
@@ -118,7 +114,7 @@ module swa 'modules/static-web-app.bicep' = {
   name: 'deploy-swa'
   scope: rg
   params: {
-    location: swaLocation
+    location: location
     staticWebAppName: staticWebAppName
     skuName: swaSkuName
     tags: tags
