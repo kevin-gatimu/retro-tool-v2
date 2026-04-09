@@ -3,7 +3,7 @@
 // Deploys: PostgreSQL (shared), ACR, App Service, Static Web App
 //
 // Staging  → Free F1 App Service, Free SWA
-// Production → Premium V4 P0V4 App Service (zone-redundant), Standard SWA
+// Production → Premium V3 P1V3 App Service (temporary fallback), Standard SWA
 //
 // All resources share a single resource group per environment:
 //   retro-tool-staging-rg / retro-tool-production-rg
@@ -31,6 +31,12 @@ param postgresAdminPassword string
 
 // ───────────────── Environment-derived config ─────────────────
 var isProduction = environmentName == 'production'
+var uniqueSuffix = substring(uniqueString(subscription().subscriptionId, resourceGroupName, environmentName), 0, 6)
+
+// westeurope is valid for SWA, but PostgreSQL can be offer-restricted there for some subscriptions.
+// If location is set to westeurope, deploy core resources in uksouth while keeping SWA in westeurope.
+var locationCore = toLower(location) == 'westeurope' ? 'uksouth' : location
+var locationSwa = 'westeurope'
 
 // App Service SKU: Free F1 for staging, Premium V3 P1V3 for production (temporary fallback)
 var appServiceSkuName = isProduction ? 'P1v3' : 'F1'
@@ -43,12 +49,11 @@ var swaSkuName = isProduction ? 'Standard' : 'Free'
 // ───────────────── Naming convention ─────────────────
 var prefix = 'retro-tool-${environmentName}'
 var prefixClean = replace(prefix, '-', '')
-var acrSuffix = substring(uniqueString(subscription().subscriptionId, resourceGroupName, environmentName), 0, 6)
 
-var postgresServerName = '${prefix}-pg'
-var acrName = '${prefixClean}acr${acrSuffix}'
+var postgresServerName = '${prefix}-pg-${uniqueSuffix}'
+var acrName = '${prefixClean}acr${uniqueSuffix}'
 var appServicePlanName = '${prefix}-plan'
-var webAppName = '${prefix}-api'
+var webAppName = '${prefix}-api-${uniqueSuffix}'
 var staticWebAppName = '${prefix}-ui'
 
 var tags = {
@@ -60,7 +65,7 @@ var tags = {
 
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   name: resourceGroupName
-  location: location
+  location: locationCore
   tags: tags
 }
 
@@ -71,7 +76,7 @@ module acr 'modules/container-registry.bicep' = {
   name: 'deploy-acr'
   scope: rg
   params: {
-    location: location
+    location: locationCore
     acrName: acrName
     tags: tags
   }
@@ -84,7 +89,7 @@ module postgres 'modules/postgresql-flexible-server.bicep' = {
   name: 'deploy-postgres'
   scope: rg
   params: {
-    location: location
+    location: locationCore
     postgresqlServerName: postgresServerName
     postgresqlAdminUsername: postgresAdminUsername
     postgresqlAdminPassword: postgresAdminPassword
@@ -97,7 +102,7 @@ module appService 'modules/app-service.bicep' = {
   name: 'deploy-appservice'
   scope: rg
   params: {
-    location: location
+    location: locationCore
     appServicePlanName: appServicePlanName
     webAppName: webAppName
     acrLoginServer: acr.outputs.acrLoginServer
@@ -114,7 +119,7 @@ module swa 'modules/static-web-app.bicep' = {
   name: 'deploy-swa'
   scope: rg
   params: {
-    location: location
+    location: locationSwa
     staticWebAppName: staticWebAppName
     skuName: swaSkuName
     tags: tags

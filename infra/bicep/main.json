@@ -1,12 +1,11 @@
 {
   "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
-  "languageVersion": "2.0",
   "contentVersion": "1.0.0.0",
   "metadata": {
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "16916548568615720901"
+      "templateHash": "16958411134207617300"
     }
   },
   "parameters": {
@@ -20,32 +19,18 @@
         "description": "Environment name (e.g., staging, production)"
       }
     },
-    "locationCore": {
+    "location": {
       "type": "string",
-      "defaultValue": "southafricanorth",
+      "defaultValue": "uksouth",
       "metadata": {
-        "description": "Azure region for core resources (ACR, App Service, Postgres, ACI)"
+        "description": "Azure region for all resources"
       }
     },
-    "locationSwa": {
+    "resourceGroupName": {
       "type": "string",
-      "defaultValue": "westeurope",
+      "defaultValue": "[format('retro-tool-{0}-rg', parameters('environmentName'))]",
       "metadata": {
-        "description": "Azure region for Static Web App (SWA)"
-      }
-    },
-    "apiResourceGroupName": {
-      "type": "string",
-      "defaultValue": "retro-tool-api-rg",
-      "metadata": {
-        "description": "Resource group for API/core resources"
-      }
-    },
-    "uiResourceGroupName": {
-      "type": "string",
-      "defaultValue": "retro-tool-ui-rg",
-      "metadata": {
-        "description": "Resource group for UI resources"
+        "description": "Resource group for all resources (API, UI, database, registry)"
       }
     },
     "postgresAdminUsername": {
@@ -60,108 +45,44 @@
       "metadata": {
         "description": "PostgreSQL admin password"
       }
-    },
-    "convexInstanceName": {
-      "type": "string",
-      "defaultValue": "convex-local",
-      "metadata": {
-        "description": "Convex instance name (kept aligned with local for parity)"
-      }
-    },
-    "convexInstanceSecret": {
-      "type": "securestring",
-      "metadata": {
-        "description": "Convex instance secret (64-char hex)"
-      }
-    },
-    "convexAciIp": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Static public IP of the Convex ACI — add to PostgreSQL firewall. Find with: az container show --resource-group retro-tool-api-rg --name retro-tool-production-convex --query \"ipAddress.ip\" -o tsv"
-      }
-    },
-    "caddyAcmeEmail": {
-      "type": "string",
-      "metadata": {
-        "description": "Email address for Let's Encrypt certificate registration (used by Caddy)"
-      }
-    },
-    "caddyPersistCertificates": {
-      "type": "bool",
-      "defaultValue": false,
-      "metadata": {
-        "description": "Enable Azure File persistence for Caddy certificates to avoid Let's Encrypt re-issuance on restarts"
-      }
-    },
-    "caddyCertStorageAccountName": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Storage account name for Caddy cert persistence (required when caddyPersistCertificates=true)"
-      }
-    },
-    "caddyCertStorageShareName": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Azure file share name for Caddy cert persistence (required when caddyPersistCertificates=true)"
-      }
-    },
-    "caddyCertStorageAccountKey": {
-      "type": "securestring",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Storage account key for Caddy cert persistence (required when caddyPersistCertificates=true)"
-      }
     }
   },
   "variables": {
+    "isProduction": "[equals(parameters('environmentName'), 'production')]",
+    "uniqueSuffix": "[substring(uniqueString(subscription().subscriptionId, parameters('resourceGroupName'), parameters('environmentName')), 0, 6)]",
+    "locationCore": "[if(equals(toLower(parameters('location')), 'westeurope'), 'uksouth', parameters('location'))]",
+    "locationSwa": "westeurope",
+    "appServiceSkuName": "[if(variables('isProduction'), 'P1v3', 'F1')]",
+    "appServiceSkuTier": "[if(variables('isProduction'), 'PremiumV3', 'Free')]",
+    "appServiceZoneRedundant": false,
+    "swaSkuName": "[if(variables('isProduction'), 'Standard', 'Free')]",
     "prefix": "[format('retro-tool-{0}', parameters('environmentName'))]",
     "prefixClean": "[replace(variables('prefix'), '-', '')]",
-    "postgresServerName": "[format('{0}-pg', variables('prefix'))]",
-    "acrName": "[format('{0}acr', variables('prefixClean'))]",
+    "postgresServerName": "[format('{0}-pg-{1}', variables('prefix'), variables('uniqueSuffix'))]",
+    "acrName": "[format('{0}acr{1}', variables('prefixClean'), variables('uniqueSuffix'))]",
     "appServicePlanName": "[format('{0}-plan', variables('prefix'))]",
-    "webAppName": "[format('{0}-api', variables('prefix'))]",
-    "containerGroupName": "[format('{0}-convex', variables('prefix'))]",
+    "webAppName": "[format('{0}-api-{1}', variables('prefix'), variables('uniqueSuffix'))]",
     "staticWebAppName": "[format('{0}-ui', variables('prefix'))]",
     "tags": {
       "project": "retro-tool",
       "environment": "[parameters('environmentName')]",
-      "managedBy": "bicep"
+      "managedBy": "bicep",
+      "Production": "Production"
     }
   },
-  "resources": {
-    "apiRg": {
+  "resources": [
+    {
       "type": "Microsoft.Resources/resourceGroups",
       "apiVersion": "2022-09-01",
-      "name": "[parameters('apiResourceGroupName')]",
-      "location": "[parameters('locationCore')]",
+      "name": "[parameters('resourceGroupName')]",
+      "location": "[variables('locationCore')]",
       "tags": "[variables('tags')]"
     },
-    "uiRg": {
-      "type": "Microsoft.Resources/resourceGroups",
-      "apiVersion": "2022-09-01",
-      "name": "[parameters('uiResourceGroupName')]",
-      "location": "[parameters('locationSwa')]",
-      "tags": "[variables('tags')]"
-    },
-    "acrRef": {
-      "existing": true,
-      "type": "Microsoft.ContainerRegistry/registries",
-      "apiVersion": "2023-07-01",
-      "resourceGroup": "[parameters('apiResourceGroupName')]",
-      "name": "[variables('acrName')]",
-      "dependsOn": [
-        "acr",
-        "apiRg"
-      ]
-    },
-    "acr": {
+    {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "deploy-acr",
-      "resourceGroup": "[parameters('apiResourceGroupName')]",
+      "resourceGroup": "[parameters('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
           "scope": "inner"
@@ -169,7 +90,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[parameters('locationCore')]"
+            "value": "[variables('locationCore')]"
           },
           "acrName": {
             "value": "[variables('acrName')]"
@@ -239,14 +160,14 @@
         }
       },
       "dependsOn": [
-        "apiRg"
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('resourceGroupName'))]"
       ]
     },
-    "postgres": {
+    {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "deploy-postgres",
-      "resourceGroup": "[parameters('apiResourceGroupName')]",
+      "resourceGroup": "[parameters('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
           "scope": "inner"
@@ -254,7 +175,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[parameters('locationCore')]"
+            "value": "[variables('locationCore')]"
           },
           "postgresqlServerName": {
             "value": "[variables('postgresServerName')]"
@@ -264,12 +185,6 @@
           },
           "postgresqlAdminPassword": {
             "value": "[parameters('postgresAdminPassword')]"
-          },
-          "convexAciIp": {
-            "value": "[parameters('convexAciIp')]"
-          },
-          "convexDatabaseName": {
-            "value": "[replace(parameters('convexInstanceName'), '-', '_')]"
           },
           "tags": {
             "value": "[variables('tags')]"
@@ -282,7 +197,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.41.2.15936",
-              "templateHash": "14472506315631318109"
+              "templateHash": "3170238276818084001"
             }
           },
           "parameters": {
@@ -304,7 +219,7 @@
             },
             "skuName": {
               "type": "string",
-              "defaultValue": "Standard_B2s"
+              "defaultValue": "Standard_B1ms"
             },
             "skuTier": {
               "type": "string",
@@ -325,14 +240,6 @@
             "tags": {
               "type": "object",
               "defaultValue": {}
-            },
-            "convexAciIp": {
-              "type": "string",
-              "defaultValue": ""
-            },
-            "convexDatabaseName": {
-              "type": "string",
-              "defaultValue": ""
             }
           },
           "resources": [
@@ -375,38 +282,12 @@
               ]
             },
             {
-              "condition": "[not(empty(parameters('convexDatabaseName')))]",
-              "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
-              "apiVersion": "2023-12-01-preview",
-              "name": "[format('{0}/{1}', parameters('postgresqlServerName'), if(not(empty(parameters('convexDatabaseName'))), parameters('convexDatabaseName'), 'convex'))]",
-              "properties": {
-                "charset": "UTF8",
-                "collation": "en_US.utf8"
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresqlServerName'))]"
-              ]
-            },
-            {
               "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
               "apiVersion": "2023-12-01-preview",
               "name": "[format('{0}/{1}', parameters('postgresqlServerName'), 'AllowAzureServices')]",
               "properties": {
                 "startIpAddress": "0.0.0.0",
                 "endIpAddress": "0.0.0.0"
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresqlServerName'))]"
-              ]
-            },
-            {
-              "condition": "[not(empty(parameters('convexAciIp')))]",
-              "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
-              "apiVersion": "2023-12-01-preview",
-              "name": "[format('{0}/{1}', parameters('postgresqlServerName'), 'AllowConvexACI')]",
-              "properties": {
-                "startIpAddress": "[parameters('convexAciIp')]",
-                "endIpAddress": "[parameters('convexAciIp')]"
               },
               "dependsOn": [
                 "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresqlServerName'))]"
@@ -438,14 +319,14 @@
         }
       },
       "dependsOn": [
-        "apiRg"
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('resourceGroupName'))]"
       ]
     },
-    "appService": {
+    {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "deploy-appservice",
-      "resourceGroup": "[parameters('apiResourceGroupName')]",
+      "resourceGroup": "[parameters('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
           "scope": "inner"
@@ -453,7 +334,7 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[parameters('locationCore')]"
+            "value": "[variables('locationCore')]"
           },
           "appServicePlanName": {
             "value": "[variables('appServicePlanName')]"
@@ -462,10 +343,19 @@
             "value": "[variables('webAppName')]"
           },
           "acrLoginServer": {
-            "value": "[reference('acr').outputs.acrLoginServer.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'deploy-acr'), '2025-04-01').outputs.acrLoginServer.value]"
           },
           "acrName": {
-            "value": "[reference('acr').outputs.acrName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'deploy-acr'), '2025-04-01').outputs.acrName.value]"
+          },
+          "appServicePlanSkuName": {
+            "value": "[variables('appServiceSkuName')]"
+          },
+          "appServicePlanSkuTier": {
+            "value": "[variables('appServiceSkuTier')]"
+          },
+          "zoneRedundant": {
+            "value": "[variables('appServiceZoneRedundant')]"
           },
           "tags": {
             "value": "[variables('tags')]"
@@ -478,7 +368,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.41.2.15936",
-              "templateHash": "15977591685401043852"
+              "templateHash": "17814128417775098187"
             }
           },
           "parameters": {
@@ -504,7 +394,31 @@
             "tags": {
               "type": "object",
               "defaultValue": {}
+            },
+            "appServicePlanSkuName": {
+              "type": "string",
+              "defaultValue": "P0v4",
+              "metadata": {
+                "description": "App Service Plan SKU name. Use F1 for staging, P0v4 for production."
+              }
+            },
+            "appServicePlanSkuTier": {
+              "type": "string",
+              "defaultValue": "PremiumV4",
+              "metadata": {
+                "description": "App Service Plan SKU tier. Use Free for staging, PremiumV4 for production."
+              }
+            },
+            "zoneRedundant": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable zone redundancy (production only — not supported on Free tier)."
+              }
             }
+          },
+          "variables": {
+            "alwaysOn": "[not(equals(parameters('appServicePlanSkuTier'), 'Free'))]"
           },
           "resources": [
             {
@@ -515,11 +429,12 @@
               "tags": "[parameters('tags')]",
               "kind": "linux",
               "sku": {
-                "name": "P1v3",
-                "tier": "PremiumV3"
+                "name": "[parameters('appServicePlanSkuName')]",
+                "tier": "[parameters('appServicePlanSkuTier')]"
               },
               "properties": {
-                "reserved": true
+                "reserved": true,
+                "zoneRedundant": "[parameters('zoneRedundant')]"
               }
             },
             {
@@ -536,11 +451,11 @@
                 "httpsOnly": true,
                 "siteConfig": {
                   "linuxFxVersion": "[format('DOCKER|{0}/{1}', parameters('acrLoginServer'), parameters('dockerImageAndTag'))]",
-                  "alwaysOn": true,
+                  "alwaysOn": "[variables('alwaysOn')]",
                   "ftpsState": "Disabled",
                   "minTlsVersion": "1.2",
                   "http20Enabled": true,
-                  "healthCheckPath": "/health",
+                  "healthCheckPath": "[if(variables('alwaysOn'), '/health', null())]",
                   "appSettings": [
                     {
                       "name": "DOCKER_REGISTRY_SERVER_URL",
@@ -604,279 +519,15 @@
         }
       },
       "dependsOn": [
-        "acr",
-        "apiRg"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'deploy-acr')]",
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('resourceGroupName'))]"
       ]
     },
-    "convex": {
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "deploy-convex-aci",
-      "resourceGroup": "[parameters('apiResourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "location": {
-            "value": "[parameters('locationCore')]"
-          },
-          "containerGroupName": {
-            "value": "[variables('containerGroupName')]"
-          },
-          "acrLoginServer": {
-            "value": "[reference('acr').outputs.acrLoginServer.value]"
-          },
-          "acrUsername": {
-            "value": "[variables('acrName')]"
-          },
-          "acrPassword": {
-            "value": "[listCredentials('acrRef', '2023-07-01').passwords[0].value]"
-          },
-          "convexInstanceName": {
-            "value": "[parameters('convexInstanceName')]"
-          },
-          "convexInstanceSecret": {
-            "value": "[parameters('convexInstanceSecret')]"
-          },
-          "convexPostgresUrl": {
-            "value": "[format('postgresql://{0}:{1}@{2}:5432?sslmode=require', parameters('postgresAdminUsername'), parameters('postgresAdminPassword'), reference('postgres').outputs.postgresqlServerFqdn.value)]"
-          },
-          "caddyAcmeEmail": {
-            "value": "[parameters('caddyAcmeEmail')]"
-          },
-          "caddyPersistCertificates": {
-            "value": "[parameters('caddyPersistCertificates')]"
-          },
-          "caddyCertStorageAccountName": {
-            "value": "[parameters('caddyCertStorageAccountName')]"
-          },
-          "caddyCertStorageShareName": {
-            "value": "[parameters('caddyCertStorageShareName')]"
-          },
-          "caddyCertStorageAccountKey": {
-            "value": "[parameters('caddyCertStorageAccountKey')]"
-          },
-          "tags": {
-            "value": "[variables('tags')]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.41.2.15936",
-              "templateHash": "13188380018261530922"
-            }
-          },
-          "parameters": {
-            "location": {
-              "type": "string"
-            },
-            "containerGroupName": {
-              "type": "string"
-            },
-            "acrLoginServer": {
-              "type": "string"
-            },
-            "acrUsername": {
-              "type": "string"
-            },
-            "acrPassword": {
-              "type": "securestring"
-            },
-            "convexImageTag": {
-              "type": "string",
-              "defaultValue": "latest"
-            },
-            "convexInstanceName": {
-              "type": "string"
-            },
-            "convexInstanceSecret": {
-              "type": "securestring"
-            },
-            "convexPostgresUrl": {
-              "type": "securestring"
-            },
-            "cpuCores": {
-              "type": "int",
-              "defaultValue": 1
-            },
-            "memoryGB": {
-              "type": "int",
-              "defaultValue": 2
-            },
-            "caddyAcmeEmail": {
-              "type": "string"
-            },
-            "caddyPersistCertificates": {
-              "type": "bool",
-              "defaultValue": false
-            },
-            "caddyCertStorageAccountName": {
-              "type": "string",
-              "defaultValue": ""
-            },
-            "caddyCertStorageAccountKey": {
-              "type": "securestring",
-              "defaultValue": ""
-            },
-            "caddyCertStorageShareName": {
-              "type": "string",
-              "defaultValue": ""
-            },
-            "tags": {
-              "type": "object",
-              "defaultValue": {}
-            }
-          },
-          "variables": {
-            "containerFqdn": "[format('{0}.{1}.azurecontainer.io', parameters('containerGroupName'), parameters('location'))]"
-          },
-          "resources": [
-            {
-              "type": "Microsoft.ContainerInstance/containerGroups",
-              "apiVersion": "2023-05-01",
-              "name": "[parameters('containerGroupName')]",
-              "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
-              "properties": {
-                "osType": "Linux",
-                "restartPolicy": "Always",
-                "ipAddress": {
-                  "type": "Public",
-                  "dnsNameLabel": "[parameters('containerGroupName')]",
-                  "ports": [
-                    {
-                      "port": 80,
-                      "protocol": "TCP"
-                    },
-                    {
-                      "port": 443,
-                      "protocol": "TCP"
-                    }
-                  ]
-                },
-                "imageRegistryCredentials": [
-                  {
-                    "server": "[parameters('acrLoginServer')]",
-                    "username": "[parameters('acrUsername')]",
-                    "password": "[parameters('acrPassword')]"
-                  }
-                ],
-                "containers": [
-                  {
-                    "name": "convex-backend",
-                    "properties": {
-                      "image": "[format('ghcr.io/get-convex/convex-backend:{0}', parameters('convexImageTag'))]",
-                      "resources": {
-                        "requests": {
-                          "cpu": "[parameters('cpuCores')]",
-                          "memoryInGB": "[parameters('memoryGB')]"
-                        }
-                      },
-                      "ports": [
-                        {
-                          "port": 3210,
-                          "protocol": "TCP"
-                        },
-                        {
-                          "port": 3211,
-                          "protocol": "TCP"
-                        }
-                      ],
-                      "environmentVariables": [
-                        {
-                          "name": "INSTANCE_NAME",
-                          "value": "[parameters('convexInstanceName')]"
-                        },
-                        {
-                          "name": "INSTANCE_SECRET",
-                          "secureValue": "[parameters('convexInstanceSecret')]"
-                        },
-                        {
-                          "name": "POSTGRES_URL",
-                          "secureValue": "[parameters('convexPostgresUrl')]"
-                        },
-                        {
-                          "name": "DISABLE_BEACON",
-                          "value": "1"
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "name": "caddy",
-                    "properties": {
-                      "image": "caddy:alpine",
-                      "command": [
-                        "caddy",
-                        "reverse-proxy",
-                        "--from",
-                        "[variables('containerFqdn')]",
-                        "--to",
-                        "localhost:3210",
-                        "--email",
-                        "[parameters('caddyAcmeEmail')]"
-                      ],
-                      "resources": {
-                        "requests": {
-                          "cpu": "[json('0.25')]",
-                          "memoryInGB": "[json('0.5')]"
-                        }
-                      },
-                      "ports": [
-                        {
-                          "port": 80,
-                          "protocol": "TCP"
-                        },
-                        {
-                          "port": 443,
-                          "protocol": "TCP"
-                        }
-                      ],
-                      "volumeMounts": "[if(parameters('caddyPersistCertificates'), createArray(createObject('name', 'caddy-cert-data', 'mountPath', '/data'), createObject('name', 'caddy-cert-data', 'mountPath', '/config')), createArray())]"
-                    }
-                  }
-                ],
-                "volumes": "[if(parameters('caddyPersistCertificates'), createArray(createObject('name', 'caddy-cert-data', 'azureFile', createObject('shareName', parameters('caddyCertStorageShareName'), 'storageAccountName', parameters('caddyCertStorageAccountName'), 'storageAccountKey', parameters('caddyCertStorageAccountKey')))), createArray())]"
-              }
-            }
-          ],
-          "outputs": {
-            "containerGroupId": {
-              "type": "string",
-              "value": "[resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerGroupName'))]"
-            },
-            "containerGroupName": {
-              "type": "string",
-              "value": "[parameters('containerGroupName')]"
-            },
-            "containerGroupFqdn": {
-              "type": "string",
-              "value": "[reference(resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerGroupName')), '2023-05-01').ipAddress.fqdn]"
-            },
-            "convexSyncUrl": {
-              "type": "string",
-              "value": "[format('https://{0}', reference(resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerGroupName')), '2023-05-01').ipAddress.fqdn)]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "acr",
-        "apiRg",
-        "postgres"
-      ]
-    },
-    "swa": {
+    {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "deploy-swa",
-      "resourceGroup": "[parameters('uiResourceGroupName')]",
+      "resourceGroup": "[parameters('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
           "scope": "inner"
@@ -884,10 +535,13 @@
         "mode": "Incremental",
         "parameters": {
           "location": {
-            "value": "[parameters('locationSwa')]"
+            "value": "[variables('locationSwa')]"
           },
           "staticWebAppName": {
             "value": "[variables('staticWebAppName')]"
+          },
+          "skuName": {
+            "value": "[variables('swaSkuName')]"
           },
           "tags": {
             "value": "[variables('tags')]"
@@ -956,46 +610,38 @@
         }
       },
       "dependsOn": [
-        "uiRg"
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('resourceGroupName'))]"
       ]
     }
-  },
+  ],
   "outputs": {
     "acrLoginServer": {
       "type": "string",
-      "value": "[reference('acr').outputs.acrLoginServer.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'deploy-acr'), '2025-04-01').outputs.acrLoginServer.value]"
     },
     "acrName": {
       "type": "string",
-      "value": "[reference('acr').outputs.acrName.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'deploy-acr'), '2025-04-01').outputs.acrName.value]"
     },
     "postgresServerFqdn": {
       "type": "string",
-      "value": "[reference('postgres').outputs.postgresqlServerFqdn.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'deploy-postgres'), '2025-04-01').outputs.postgresqlServerFqdn.value]"
     },
     "apiUrl": {
       "type": "string",
-      "value": "[format('https://{0}', reference('appService').outputs.webAppDefaultHostname.value)]"
+      "value": "[format('https://{0}', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'deploy-appservice'), '2025-04-01').outputs.webAppDefaultHostname.value)]"
     },
     "apiWebAppName": {
       "type": "string",
-      "value": "[reference('appService').outputs.webAppName.value]"
-    },
-    "convexFqdn": {
-      "type": "string",
-      "value": "[reference('convex').outputs.containerGroupFqdn.value]"
-    },
-    "convexSyncUrl": {
-      "type": "string",
-      "value": "[reference('convex').outputs.convexSyncUrl.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'deploy-appservice'), '2025-04-01').outputs.webAppName.value]"
     },
     "swaDefaultHostname": {
       "type": "string",
-      "value": "[format('https://{0}', reference('swa').outputs.staticWebAppDefaultHostname.value)]"
+      "value": "[format('https://{0}', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'deploy-swa'), '2025-04-01').outputs.staticWebAppDefaultHostname.value)]"
     },
     "swaName": {
       "type": "string",
-      "value": "[reference('swa').outputs.staticWebAppName.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'deploy-swa'), '2025-04-01').outputs.staticWebAppName.value]"
     }
   }
 }
