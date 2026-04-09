@@ -41,8 +41,9 @@ jobs:
       - name: What-If preview
         continue-on-error: true
         run: |
+          DEPLOYMENT_NAME="main-${{ inputs.environment }}-${{ github.run_id }}"
           az deployment sub what-if \
-            --name main \
+            --name "${DEPLOYMENT_NAME}" \
             --location ${{ vars.AZURE_LOCATION }} \
             --template-file infra/bicep/main.bicep \
             --parameters \
@@ -54,8 +55,9 @@ jobs:
       - name: Deploy Bicep
         id: bicep
         run: |
+          DEPLOYMENT_NAME="main-${{ inputs.environment }}-${{ github.run_id }}"
           OUTPUT=$(az deployment sub create \
-            --name main \
+            --name "${DEPLOYMENT_NAME}" \
             --location ${{ vars.AZURE_LOCATION }} \
             --template-file infra/bicep/main.bicep \
             --parameters \
