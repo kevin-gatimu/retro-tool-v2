@@ -33,9 +33,9 @@ param postgresAdminPassword string
 var isProduction = environmentName == 'production'
 var uniqueSuffix = substring(uniqueString(subscription().subscriptionId, resourceGroupName, environmentName), 0, 6)
 
-// App Service SKU: Free F1 for staging, Standard S1 for production
-var appServiceSkuName = isProduction ? 'S1' : 'F1'
-var appServiceSkuTier = isProduction ? 'Standard' : 'Free'
+// App Service SKU: Free F1 for staging, Basic B1 for production
+var appServiceSkuName = isProduction ? 'B1' : 'F1'
+var appServiceSkuTier = isProduction ? 'Basic' : 'Free'
 var appServiceZoneRedundant = false
 
 // Static Web App SKU: Free for staging, Standard for production

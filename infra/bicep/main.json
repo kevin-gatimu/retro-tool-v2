@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "1966992025061837854"
+      "templateHash": "9571147190141897240"
     }
   },
   "parameters": {
@@ -50,8 +50,8 @@
   "variables": {
     "isProduction": "[equals(parameters('environmentName'), 'production')]",
     "uniqueSuffix": "[substring(uniqueString(subscription().subscriptionId, parameters('resourceGroupName'), parameters('environmentName')), 0, 6)]",
-    "appServiceSkuName": "[if(variables('isProduction'), 'S1', 'F1')]",
-    "appServiceSkuTier": "[if(variables('isProduction'), 'Standard', 'Free')]",
+    "appServiceSkuName": "[if(variables('isProduction'), 'B1', 'F1')]",
+    "appServiceSkuTier": "[if(variables('isProduction'), 'Basic', 'Free')]",
     "appServiceZoneRedundant": false,
     "swaSkuName": "[if(variables('isProduction'), 'Standard', 'Free')]",
     "prefix": "[format('retro-tool-{0}', parameters('environmentName'))]",
