@@ -120,10 +120,10 @@ One server shared between staging and production (separate databases or the same
 
 | Property | Value |
 |---|---|
-| Compute tier | Burstable |
-| Compute size | Standard_B1ms |
-| vCPU | 1 |
-| RAM | 2 GB |
+| Compute tier | General Purpose |
+| Compute size | Standard_D2ds_v4 |
+| vCPU | 2 |
+| RAM | 8 GB |
 | Storage | 32 GB |
 | PostgreSQL version | 16 |
 | High availability | Disabled |

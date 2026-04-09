@@ -4,8 +4,8 @@ param postgresqlAdminUsername string
 @secure()
 param postgresqlAdminPassword string
 param postgresqlVersion string = '16'
-param skuName string = 'Standard_B1ms'
-param skuTier string = 'Burstable'
+param skuName string = 'Standard_D2ds_v4'
+param skuTier string = 'GeneralPurpose'
 param storageGB int = 32
 param backupRetentionDays int = 7
 param geoRedundantBackup string = 'Disabled'
