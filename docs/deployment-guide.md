@@ -202,7 +202,7 @@ In your GitHub repository go to **Settings → Environments** and create two env
 | Variable | Description |
 |---|---|
 | `AZURE_RESOURCE_GROUP` | Resource group for all resources (e.g. `retro-tool-production-rg`) |
-| `AZURE_LOCATION` | Azure region for all resources (e.g. `uksouth`) |
+| `AZURE_LOCATION` | Azure region for all resources (e.g. `eastus2`) |
 | `ACR_NAME` | Azure Container Registry name from infra outputs (e.g. `retrotoolproductionacrabc123`) |
 | `ACR_LOGIN_SERVER` | ACR login server from infra outputs (e.g. `retrotoolproductionacrabc123.azurecr.io`) |
 | `API_WEBAPP_NAME` | App Service name (e.g. `retro-tool-production-api`) |

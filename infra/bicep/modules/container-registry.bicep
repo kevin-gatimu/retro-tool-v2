@@ -7,17 +7,11 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
   location: location
   tags: tags
   sku: {
-    name: 'Premium'
+    name: 'Standard'
   }
   properties: {
     adminUserEnabled: true
     publicNetworkAccess: 'Enabled'
-    policies: {
-      retentionPolicy: {
-        days: 30
-        status: 'enabled'
-      }
-    }
   }
 }
 

@@ -1,6 +1,6 @@
 # Azure Cloud Resources
 
-This document describes every Azure resource deployed for Retro Tool, the configuration choices, and approximate monthly costs in GBP (UK South region, April 2026 pricing).
+This document describes every Azure resource deployed for Retro Tool, the configuration choices, and approximate monthly costs in GBP (East US 2 region, April 2026 pricing).
 
 > Costs are estimates based on Azure public pricing. Actual bills depend on usage, reserved instances, and Azure discounts.
 
@@ -27,7 +27,7 @@ This document describes every Azure resource deployed for Retro Tool, the config
 | Property | Value |
 |---|---|
 | SKU | Free |
-| Region | UK South |
+| Region | East US 2 |
 | Bandwidth | 100 GB/month included |
 | Custom domains | 2 |
 | Tags | `Production: Production` |
@@ -42,7 +42,7 @@ This document describes every Azure resource deployed for Retro Tool, the config
 |---|---|
 | SKU | F1 (Free) |
 | OS | Linux |
-| Region | UK South |
+| Region | East US 2 |
 | vCPU | Shared |
 | RAM | 1 GB |
 | Storage | 1 GB |
@@ -65,7 +65,7 @@ This document describes every Azure resource deployed for Retro Tool, the config
 | Property | Value |
 |---|---|
 | SKU | Standard |
-| Region | UK South |
+| Region | East US 2 |
 | Bandwidth | 100 GB/month included |
 | Custom domains | Unlimited |
 | Staging environments | Up to 10 |
@@ -81,7 +81,7 @@ This document describes every Azure resource deployed for Retro Tool, the config
 |---|---|
 | SKU | P0v4 (Premium V4) |
 | OS | Linux |
-| Region | UK South |
+| Region | East US 2 |
 | vCPU | 1 vCPU |
 | RAM | 4 GB |
 | Storage | 250 GB |
@@ -99,21 +99,18 @@ This document describes every Azure resource deployed for Retro Tool, the config
 
 ## Shared Resources
 
-### Azure Container Registry — Premium
+### Azure Container Registry — Standard
 
 Used by both staging and production to store the NestJS API Docker images.
 
 | Property | Value |
 |---|---|
-| SKU | Premium |
-| Region | UK South |
-| Storage included | 500 GB |
-| Geo-replication | Not enabled |
-| Retention policy | 30 days |
+| SKU | Standard |
+| Region | East US 2 |
+| Storage included | 100 GB |
+| Geo-replication | Not supported |
 
-**Cost: ~£33/month**
-
-> Premium SKU is required for features like geo-replication, private link, and dedicated throughput. If geo-replication is not needed, downgrading to Standard (~£17/month) is possible.
+**Cost: ~£17/month**
 
 ---
 
@@ -132,7 +129,7 @@ One server shared between staging and production (separate databases or the same
 | High availability | Disabled |
 | Backup retention | 7 days |
 | Geo-redundant backup | Disabled |
-| Region | UK South |
+| Region | East US 2 |
 | Workload type | Dev/Test |
 
 **Cost: ~£13–£15/month**
