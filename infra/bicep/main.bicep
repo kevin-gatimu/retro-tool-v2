@@ -17,7 +17,7 @@ targetScope = 'subscription'
 param environmentName string
 
 @description('Azure region for all resources')
-param location string = 'eastus'
+param location string = 'eastus2'
 
 @description('Resource group for all resources (API, UI, database, registry)')
 param resourceGroupName string = 'retro-tool-${environmentName}-rg'

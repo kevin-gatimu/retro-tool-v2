@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "2965655335826060215"
+      "templateHash": "1966992025061837854"
     }
   },
   "parameters": {
@@ -21,7 +21,7 @@
     },
     "location": {
       "type": "string",
-      "defaultValue": "eastus",
+      "defaultValue": "eastus2",
       "metadata": {
         "description": "Azure region for all resources"
       }
