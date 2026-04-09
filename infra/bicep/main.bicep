@@ -33,12 +33,7 @@ param postgresAdminPassword string
 var isProduction = environmentName == 'production'
 var uniqueSuffix = substring(uniqueString(subscription().subscriptionId, resourceGroupName, environmentName), 0, 6)
 
-// westeurope is valid for SWA, but PostgreSQL can be offer-restricted there for some subscriptions.
-// If location is set to westeurope, deploy core resources in uksouth while keeping SWA in westeurope.
-var locationCore = toLower(location) == 'westeurope' ? 'uksouth' : location
-var locationSwa = 'westeurope'
-
-// App Service SKU: Free F1 for staging, Premium V3 P1V3 for production (temporary fallback)
+// App Service SKU: Free F1 for staging, Premium V3 P1V3 for production
 var appServiceSkuName = isProduction ? 'P1v3' : 'F1'
 var appServiceSkuTier = isProduction ? 'PremiumV3' : 'Free'
 var appServiceZoneRedundant = false
@@ -65,7 +60,7 @@ var tags = {
 
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   name: resourceGroupName
-  location: locationCore
+  location: location
   tags: tags
 }
 
@@ -76,7 +71,7 @@ module acr 'modules/container-registry.bicep' = {
   name: 'deploy-acr'
   scope: rg
   params: {
-    location: locationCore
+    location: location
     acrName: acrName
     tags: tags
   }
@@ -89,7 +84,7 @@ module postgres 'modules/postgresql-flexible-server.bicep' = {
   name: 'deploy-postgres'
   scope: rg
   params: {
-    location: locationCore
+    location: location
     postgresqlServerName: postgresServerName
     postgresqlAdminUsername: postgresAdminUsername
     postgresqlAdminPassword: postgresAdminPassword
@@ -102,7 +97,7 @@ module appService 'modules/app-service.bicep' = {
   name: 'deploy-appservice'
   scope: rg
   params: {
-    location: locationCore
+    location: location
     appServicePlanName: appServicePlanName
     webAppName: webAppName
     acrLoginServer: acr.outputs.acrLoginServer
@@ -119,7 +114,7 @@ module swa 'modules/static-web-app.bicep' = {
   name: 'deploy-swa'
   scope: rg
   params: {
-    location: locationSwa
+    location: location
     staticWebAppName: staticWebAppName
     skuName: swaSkuName
     tags: tags
