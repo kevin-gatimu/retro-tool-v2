@@ -42,7 +42,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter retro-tool-api lint
       - run: pnpm --filter retro-tool-api type-check
-      - run: pnpm --filter retro-tool-api test -- --runInBand
+      - run: pnpm --filter retro-tool-api test:ci
       - run: pnpm --filter retro-tool-api build
 
   # ─────────────────── Determine target environment ───────────────────
