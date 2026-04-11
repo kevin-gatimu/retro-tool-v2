@@ -7,11 +7,9 @@
     "vite.config.js"
   ],
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
     "target": "ES2022",
     "jsx": "react-jsx",
     "module": "ESNext",
-    "baseUrl": ".",
     "paths": {
       "#/*": ["./src/*"],
       "@/*": ["./src/*"]
