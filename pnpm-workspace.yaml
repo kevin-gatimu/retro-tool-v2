@@ -3,3 +3,13 @@ packages:
   - 'retro-tool-ui'
   - 'convex-backend'
   - 'packages/*/*'
+allowBuilds:
+  '@nestjs/core': true
+  '@scarf/scarf': false
+  esbuild: true
+  lightningcss: true
+  unrs-resolver: true
+managePackageManagerVersions: false
+minimumReleaseAge: 0
+
+resolutionMode: highest

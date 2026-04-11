@@ -1,7 +1,7 @@
 {
     "name": "retro-tool",
     "private": true,
-    "packageManager": "pnpm@9.15.0",
+    "packageManager": "pnpm@11.0.0-rc.0",
     "scripts": {
         "prepare": "husky",
         "build": "pnpm -r --filter @retro-tool/contracts --filter retro-tool-api --filter retro-tool-ui --filter convex-backend build",
@@ -40,12 +40,6 @@
         ],
         "convex-backend/**/*.ts": [
             "pnpm --filter convex-backend lint"
-        ]
-    },
-    "pnpm": {
-        "onlyBuiltDependencies": [
-            "esbuild",
-            "lightningcss"
         ]
     }
 }
