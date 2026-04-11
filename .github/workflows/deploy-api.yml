@@ -20,7 +20,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: '22'
+  NODE_VERSION: '24'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 permissions:
   id-token: write
@@ -123,6 +124,13 @@ jobs:
 
       - name: Build API
         run: pnpm --filter retro-tool-api build
+
+      - name: Migration preflight
+        working-directory: retro-tool-api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          node -e "const raw = process.env.DATABASE_URL || ''; if (!raw) { console.error('DATABASE_URL is missing'); process.exit(1); } try { const url = new URL(raw); console.log('Migration target host: ' + url.hostname + ':' + (url.port || '5432')); } catch { console.error('DATABASE_URL is set but not a valid URL'); process.exit(1); }"
 
       - name: Run migrations
         working-directory: retro-tool-api
