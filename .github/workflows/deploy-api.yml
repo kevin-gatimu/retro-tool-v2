@@ -86,6 +86,13 @@ jobs:
       - name: Build API
         run: pnpm --filter retro-tool-api build
 
+      - name: Verify build entrypoint
+        run: |
+          test -f retro-tool-api/dist/main.js || {
+            echo "Expected retro-tool-api/dist/main.js after build, but it is missing.";
+            exit 1;
+          }
+
       - name: Package for deployment
         id: pkg
         run: |
@@ -124,6 +131,13 @@ jobs:
 
       - name: Build API
         run: pnpm --filter retro-tool-api build
+
+      - name: Verify build entrypoint
+        run: |
+          test -f retro-tool-api/dist/main.js || {
+            echo "Expected retro-tool-api/dist/main.js after build, but it is missing.";
+            exit 1;
+          }
 
       - name: Migration preflight
         working-directory: retro-tool-api
@@ -222,3 +236,45 @@ jobs:
           done
           echo "Health check failed after 30 attempts"
           exit 1
+
+      - name: Collect Kudu runtime logs on failure
+        if: ${{ failure() && !cancelled() }}
+        continue-on-error: true
+        run: |
+          APP_NAME="${{ vars.API_WEBAPP_NAME }}"
+          RG_NAME="${{ vars.AZURE_RESOURCE_GROUP }}"
+          LOG_ROOT="https://${APP_NAME}.scm.azurewebsites.net/api/logs/docker"
+
+          echo "Deployment failed. Fetching Kudu runtime logs from ${LOG_ROOT}..."
+
+          KUDU_USER=$(az webapp deployment list-publishing-credentials \
+            --resource-group "${RG_NAME}" \
+            --name "${APP_NAME}" \
+            --query publishingUserName -o tsv 2>/dev/null)
+
+          KUDU_PASS=$(az webapp deployment list-publishing-credentials \
+            --resource-group "${RG_NAME}" \
+            --name "${APP_NAME}" \
+            --query publishingPassword -o tsv 2>/dev/null)
+
+          if [ -z "${KUDU_USER}" ] || [ -z "${KUDU_PASS}" ]; then
+            echo "Could not retrieve Kudu publishing credentials."
+            exit 0
+          fi
+
+          curl -fsSL -u "${KUDU_USER}:${KUDU_PASS}" "${LOG_ROOT}/zip" -o kudu-docker-logs.zip || true
+
+          if [ -s kudu-docker-logs.zip ]; then
+            mkdir -p kudu-docker-logs
+            unzip -o -q kudu-docker-logs.zip -d kudu-docker-logs || true
+
+            echo "----- Kudu Docker logs (tail 200 lines per file) -----"
+            find kudu-docker-logs -type f | while read -r file; do
+              echo ""
+              echo "### ${file}"
+              tail -n 200 "${file}" || true
+            done
+          else
+            echo "Kudu zip endpoint did not return logs; printing raw docker logs index."
+            curl -sS -u "${KUDU_USER}:${KUDU_PASS}" "${LOG_ROOT}" || true
+          fi
