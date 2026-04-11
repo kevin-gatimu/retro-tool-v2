@@ -99,15 +99,20 @@ jobs:
           ARTIFACT="retro-tool-api-${{ needs.set-env.outputs.environment }}-${GITHUB_SHA::8}.zip"
           DEPLOY_DIR=".deploy-api-package"
           rm -rf "${DEPLOY_DIR}"
+          mkdir -p "${DEPLOY_DIR}"
 
-          # Create a self-contained production dependency tree for this package.
-          pnpm --filter retro-tool-api deploy --prod --legacy "${DEPLOY_DIR}"
-
-          # pnpm deploy respects ignore files, so copy compiled output explicitly.
+          # Build a portable package tree for App Service.
+          cp retro-tool-api/package.json "${DEPLOY_DIR}/package.json"
           cp -R retro-tool-api/dist "${DEPLOY_DIR}/dist"
 
+          # Avoid pnpm symlinked node_modules in deploy artifacts; use npm runtime tree.
+          (
+            cd "${DEPLOY_DIR}"
+            npm install --omit=dev --ignore-scripts --no-audit --no-fund
+          )
+
           # Verify a known Nest runtime dependency resolves in the packaged tree.
-          node -e "require('./${DEPLOY_DIR}/node_modules/@nestjs/common'); require('./${DEPLOY_DIR}/node_modules/uid'); console.log('packaged runtime deps OK')"
+          node -e "require('./${DEPLOY_DIR}/node_modules/@nestjs/common'); require('./${DEPLOY_DIR}/node_modules/uid'); require('./${DEPLOY_DIR}/node_modules/load-esm'); require('./${DEPLOY_DIR}/node_modules/iterare'); console.log('packaged runtime deps OK')"
 
           # Smoke boot the packaged app with dummy values to catch missing module/runtime issues early.
           SMOKE_PORT=18080
