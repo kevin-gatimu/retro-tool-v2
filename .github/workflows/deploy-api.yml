@@ -215,13 +215,13 @@ jobs:
         env:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
           API_WEBAPP_NAME: ${{ vars.API_WEBAPP_NAME }}
-          SWA_URL: ${{ vars.SWA_URL }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL || vars.SWA_URL }}
           CONVEX_SYNC_URL: ${{ vars.CONVEX_SYNC_URL }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
         run: |
-          for key in AZURE_RESOURCE_GROUP API_WEBAPP_NAME SWA_URL CONVEX_SYNC_URL EMAIL_FROM DATABASE_URL BETTER_AUTH_SECRET; do
+          for key in AZURE_RESOURCE_GROUP API_WEBAPP_NAME FRONTEND_URL CONVEX_SYNC_URL EMAIL_FROM DATABASE_URL BETTER_AUTH_SECRET; do
             if [ -z "${!key}" ]; then
               echo "Required deploy config is missing: ${key}"
               exit 1
@@ -243,8 +243,8 @@ jobs:
             --settings \
               NODE_ENV=production \
               PORT=8080 \
-              FRONTEND_URL='${{ vars.SWA_URL }}' \
-              ALLOWED_ORIGINS='${{ vars.SWA_URL }}' \
+              FRONTEND_URL='${{ vars.FRONTEND_URL || vars.SWA_URL }}' \
+              ALLOWED_ORIGINS='${{ vars.FRONTEND_URL || vars.SWA_URL }}' \
               LOCAL_SERVER_URL='https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
               DEPLOYED_SERVER_URL='https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
               CONVEX_SYNC_URL='${{ vars.CONVEX_SYNC_URL }}' \
