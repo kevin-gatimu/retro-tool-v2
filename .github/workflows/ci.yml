@@ -39,7 +39,7 @@ jobs:
         run: pnpm type-check
 
       - name: Test
-        run: pnpm test
+        run: pnpm --filter retro-tool-api test && pnpm --filter retro-tool-ui test
 
       - name: Build
         run: pnpm build
