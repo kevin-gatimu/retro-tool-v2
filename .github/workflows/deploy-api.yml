@@ -97,8 +97,19 @@ jobs:
         id: pkg
         run: |
           ARTIFACT="retro-tool-api-${{ needs.set-env.outputs.environment }}-${GITHUB_SHA::8}.zip"
-          cd retro-tool-api
-          # Include compiled output and production node_modules
+          DEPLOY_DIR=".deploy-api-package"
+          rm -rf "${DEPLOY_DIR}"
+
+          # Create a self-contained production dependency tree for this package.
+          pnpm --filter retro-tool-api deploy --prod --legacy "${DEPLOY_DIR}"
+
+          # pnpm deploy respects ignore files, so copy compiled output explicitly.
+          cp -R retro-tool-api/dist "${DEPLOY_DIR}/dist"
+
+          # Verify a known Nest runtime dependency resolves in the packaged tree.
+          node -e "require('./${DEPLOY_DIR}/node_modules/@nestjs/common'); require('./${DEPLOY_DIR}/node_modules/uid'); console.log('packaged runtime deps OK')"
+
+          cd "${DEPLOY_DIR}"
           zip -r "../${ARTIFACT}" dist/ node_modules/ package.json
           echo "artifact-name=${ARTIFACT}" >> "$GITHUB_OUTPUT"
 
@@ -259,12 +270,13 @@ jobs:
 
           if [ -z "${KUDU_USER}" ] || [ -z "${KUDU_PASS}" ]; then
             echo "Could not retrieve Kudu publishing credentials."
-            exit 0
+            KUDU_HTTP_CODE="000"
+          else
+            KUDU_HTTP_CODE=$(curl -sS -u "${KUDU_USER}:${KUDU_PASS}" \
+              -w '%{http_code}' -o kudu-docker-logs.zip "${LOG_ROOT}/zip" || true)
           fi
 
-          curl -fsSL -u "${KUDU_USER}:${KUDU_PASS}" "${LOG_ROOT}/zip" -o kudu-docker-logs.zip || true
-
-          if [ -s kudu-docker-logs.zip ]; then
+          if [ "${KUDU_HTTP_CODE}" = "200" ] && [ -s kudu-docker-logs.zip ]; then
             mkdir -p kudu-docker-logs
             unzip -o -q kudu-docker-logs.zip -d kudu-docker-logs || true
 
@@ -275,6 +287,30 @@ jobs:
               tail -n 200 "${file}" || true
             done
           else
-            echo "Kudu zip endpoint did not return logs; printing raw docker logs index."
-            curl -sS -u "${KUDU_USER}:${KUDU_PASS}" "${LOG_ROOT}" || true
+            echo "Kudu docker log download failed (HTTP ${KUDU_HTTP_CODE})."
+            echo "If HTTP 401, SCM basic auth is likely disabled for this app."
+
+            echo "----- Azure deployment logs (CLI) -----"
+            az webapp log deployment show \
+              --resource-group "${RG_NAME}" \
+              --name "${APP_NAME}" || true
+
+            echo "----- Azure webapp logs zip (CLI fallback) -----"
+            az webapp log download \
+              --resource-group "${RG_NAME}" \
+              --name "${APP_NAME}" \
+              --log-file webapp-logs.zip || true
+
+            if [ -s webapp-logs.zip ]; then
+              mkdir -p webapp-logs
+              unzip -o -q webapp-logs.zip -d webapp-logs || true
+
+              find webapp-logs -type f | while read -r file; do
+                echo ""
+                echo "### ${file}"
+                tail -n 200 "${file}" || true
+              done
+            else
+              echo "No webapp logs zip was produced by Azure CLI fallback."
+            fi
           fi
