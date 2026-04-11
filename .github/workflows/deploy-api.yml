@@ -129,7 +129,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NODE_ENV: production
-        run: node dist/migrate.js
+        run: pnpm db:migrate
 
   # ─────────────────────────── Deploy to App Service ──────────────────
   deploy:
