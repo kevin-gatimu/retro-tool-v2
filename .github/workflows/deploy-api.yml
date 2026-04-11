@@ -169,7 +169,7 @@ jobs:
               BETTER_AUTH_URL='https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
               GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' \
               GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}' \
-              MICROSOFT_CLIENT_ID='${{ secrets.AZURE_CLIENT_ID }}' \
+              MICROSOFT_CLIENT_ID='${{ secrets.MICROSOFT_CLIENT_ID }}' \
               MICROSOFT_CLIENT_SECRET='${{ secrets.MICROSOFT_CLIENT_SECRET }}' \
               RESEND_API_KEY='${{ secrets.RESEND_API_KEY }}' \
               CONVEX_SYNC_ADMIN_KEY='${{ secrets.CONVEX_SYNC_ADMIN_KEY }}' \
