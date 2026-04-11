@@ -109,6 +109,47 @@ jobs:
           # Verify a known Nest runtime dependency resolves in the packaged tree.
           node -e "require('./${DEPLOY_DIR}/node_modules/@nestjs/common'); require('./${DEPLOY_DIR}/node_modules/uid'); console.log('packaged runtime deps OK')"
 
+          # Smoke boot the packaged app with dummy values to catch missing module/runtime issues early.
+          SMOKE_PORT=18080
+          (
+            cd "${DEPLOY_DIR}"
+            PORT="${SMOKE_PORT}" \
+            NODE_ENV=production \
+            DATABASE_URL="postgresql://smoke:smoke@127.0.0.1:5432/smoke" \
+            BETTER_AUTH_SECRET="smoke-secret" \
+            BETTER_AUTH_URL="http://127.0.0.1:${SMOKE_PORT}" \
+            FRONTEND_URL="http://localhost:5173" \
+            ALLOWED_ORIGINS="http://localhost:5173" \
+            LOCAL_SERVER_URL="http://127.0.0.1:${SMOKE_PORT}" \
+            DEPLOYED_SERVER_URL="http://127.0.0.1:${SMOKE_PORT}" \
+            EMAIL_FROM="smoke@example.com" \
+            node dist/main > ../smoke-start.log 2>&1 &
+            APP_PID=$!
+
+            for i in $(seq 1 20); do
+              if curl -fsS "http://127.0.0.1:${SMOKE_PORT}/health" >/dev/null; then
+                echo "Packaged app smoke boot passed."
+                kill "${APP_PID}" || true
+                wait "${APP_PID}" 2>/dev/null || true
+                exit 0
+              fi
+
+              if ! kill -0 "${APP_PID}" 2>/dev/null; then
+                echo "Packaged app exited during smoke boot."
+                cat ../smoke-start.log
+                exit 1
+              fi
+
+              sleep 1
+            done
+
+            echo "Packaged app did not become healthy in time."
+            cat ../smoke-start.log
+            kill "${APP_PID}" || true
+            wait "${APP_PID}" 2>/dev/null || true
+            exit 1
+          )
+
           cd "${DEPLOY_DIR}"
           zip -r "../${ARTIFACT}" dist/ node_modules/ package.json
           echo "artifact-name=${ARTIFACT}" >> "$GITHUB_OUTPUT"
@@ -170,6 +211,23 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ needs.set-env.outputs.environment }}
     steps:
+      - name: Validate required deploy config
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_WEBAPP_NAME: ${{ vars.API_WEBAPP_NAME }}
+          SWA_URL: ${{ vars.SWA_URL }}
+          CONVEX_SYNC_URL: ${{ vars.CONVEX_SYNC_URL }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+        run: |
+          for key in AZURE_RESOURCE_GROUP API_WEBAPP_NAME SWA_URL CONVEX_SYNC_URL EMAIL_FROM DATABASE_URL BETTER_AUTH_SECRET; do
+            if [ -z "${!key}" ]; then
+              echo "Required deploy config is missing: ${key}"
+              exit 1
+            fi
+          done
+
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
