@@ -80,15 +80,73 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate required UI build config
+        env:
+          VITE_APP_TITLE: ${{ vars.VITE_APP_TITLE }}
+          VITE_APP_ENV: ${{ vars.VITE_APP_ENV }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
+          VITE_ESTIMATES_REALTIME_BACKEND: ${{ vars.VITE_ESTIMATES_REALTIME_BACKEND }}
+          VITE_RETROS_REALTIME_BACKEND: ${{ vars.VITE_RETROS_REALTIME_BACKEND }}
+          VITE_NOTIFICATIONS_REALTIME_BACKEND: ${{ vars.VITE_NOTIFICATIONS_REALTIME_BACKEND }}
+        run: |
+          for key in \
+            VITE_APP_TITLE \
+            VITE_APP_ENV \
+            VITE_API_URL \
+            VITE_CONVEX_URL \
+            VITE_ESTIMATES_REALTIME_BACKEND \
+            VITE_RETROS_REALTIME_BACKEND \
+            VITE_NOTIFICATIONS_REALTIME_BACKEND; do
+            if [ -z "${!key}" ]; then
+              echo "Required UI build variable is missing: ${key}"
+              exit 1
+            fi
+          done
+
+          case "${VITE_APP_ENV}" in
+            local|development|staging|production) ;;
+            *)
+              echo "Invalid VITE_APP_ENV: ${VITE_APP_ENV}. Allowed: local|development|staging|production"
+              exit 1
+              ;;
+          esac
+
+          case "${VITE_ESTIMATES_REALTIME_BACKEND}" in
+            socket-io|convex) ;;
+            *)
+              echo "Invalid VITE_ESTIMATES_REALTIME_BACKEND: ${VITE_ESTIMATES_REALTIME_BACKEND}. Allowed: socket-io|convex"
+              exit 1
+              ;;
+          esac
+
+          case "${VITE_RETROS_REALTIME_BACKEND}" in
+            socket-io|convex) ;;
+            *)
+              echo "Invalid VITE_RETROS_REALTIME_BACKEND: ${VITE_RETROS_REALTIME_BACKEND}. Allowed: socket-io|convex"
+              exit 1
+              ;;
+          esac
+
+          case "${VITE_NOTIFICATIONS_REALTIME_BACKEND}" in
+            socket-io|convex) ;;
+            *)
+              echo "Invalid VITE_NOTIFICATIONS_REALTIME_BACKEND: ${VITE_NOTIFICATIONS_REALTIME_BACKEND}. Allowed: socket-io|convex"
+              exit 1
+              ;;
+          esac
+
+          node -e "new URL(process.env.VITE_API_URL); new URL(process.env.VITE_CONVEX_URL); console.log('UI env URLs look valid')"
+
       - name: Build UI
         env:
-          VITE_APP_ENV: ${{ needs.set-env.outputs.environment }}
-          VITE_API_URL: ${{ vars.API_URL }}
-          VITE_APP_TITLE: Retro Tool
-          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL || vars.CONVEX_SYNC_URL }}
-          VITE_ESTIMATES_REALTIME_BACKEND: ${{ vars.ESTIMATES_REALTIME_BACKEND || 'socket-io' }}
-          VITE_RETROS_REALTIME_BACKEND: ${{ vars.RETROS_REALTIME_BACKEND || 'socket-io' }}
-          VITE_NOTIFICATIONS_REALTIME_BACKEND: ${{ vars.NOTIFICATIONS_REALTIME_BACKEND || 'socket-io' }}
+          VITE_APP_TITLE: ${{ vars.VITE_APP_TITLE }}
+          VITE_APP_ENV: ${{ vars.VITE_APP_ENV }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
+          VITE_ESTIMATES_REALTIME_BACKEND: ${{ vars.VITE_ESTIMATES_REALTIME_BACKEND }}
+          VITE_RETROS_REALTIME_BACKEND: ${{ vars.VITE_RETROS_REALTIME_BACKEND }}
+          VITE_NOTIFICATIONS_REALTIME_BACKEND: ${{ vars.VITE_NOTIFICATIONS_REALTIME_BACKEND }}
         run: pnpm --filter retro-tool-ui build
 
       - name: Deploy to Azure Static Web App
