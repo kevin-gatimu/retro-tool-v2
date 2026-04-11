@@ -13,25 +13,23 @@ export function useSignUp({
       name,
       email,
       password,
-      adminExists,
     }: {
       name: string
       email: string
       password: string
-      adminExists: boolean
     }) => {
       const result = await authClient.signUp.email({ name, email, password })
       if (result.error)
         throw new Error(result.error.message ?? 'Sign up failed')
 
+      // Always attempt bootstrap — backend returns 400 if an admin already exists,
+      // which we catch and treat as "not the first user".
       let isFirstUser = false
-      if (!adminExists) {
-        try {
-          await api.post(USERS_ENDPOINTS.ADMIN_BOOTSTRAP)
-          isFirstUser = true
-        } catch {
-          // ignore if admin already exists
-        }
+      try {
+        await api.post(USERS_ENDPOINTS.ADMIN_BOOTSTRAP)
+        isFirstUser = true
+      } catch {
+        // Admin already exists — normal pending sign-up.
       }
 
       return { isFirstUser }

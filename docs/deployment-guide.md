@@ -1,13 +1,15 @@
 # Deployment Guide
 
-This guide covers deploying Retro Tool to Azure. There are two environments:
+This guide covers deploying Retro Tool to Azure. Resources are created manually via the Azure Portal. CI/CD pipelines handle code deployments only.
+
+Two environments:
 
 | Environment | Branch | App Service | Static Web App |
 |---|---|---|---|
 | **Staging** | `staging` | Free F1 | Free |
-| **Production** | `main` | Premium V3 P1V3 (temporary fallback) | Standard |
+| **Production** | `main` | Free F1 (upgrade to S1 once Standard VM quota approved) | Free |
 
-Both environments share a single PostgreSQL Flexible Server (deployed with production infrastructure).
+Both environments share a single PostgreSQL Flexible Server.
 
 Convex functions are deployed to **Convex Cloud** (not self-hosted).
 
@@ -16,6 +18,7 @@ Convex functions are deployed to **Convex Cloud** (not self-hosted).
 ## Prerequisites
 
 - Azure CLI installed (`az` available in your terminal)
+- Azure account with an active subscription
 - GitHub repository with Actions enabled
 - A Convex Cloud account and project per environment
 - A Resend account for transactional email
@@ -23,77 +26,41 @@ Convex functions are deployed to **Convex Cloud** (not self-hosted).
 
 ---
 
-## Region Availability Checks (Before Deploy)
-
-Run these commands before infrastructure deployment to confirm App Service SKU regional availability in your current subscription:
-
-Bash / PowerShell:
-
-```bash
-az appservice list-locations --sku P0v4
-az appservice list-locations --sku P1v3
-```
-
-If your target region is listed but deployment still fails, you likely have a subscription quota issue (for example, PremiumV4 quota set to 0), not a regional availability issue.
-
----
-
 ## Step 1 — Login to Azure CLI and Select Subscription
-
-Run in Bash:
-
-```bash
-# Login interactively (opens browser)
-az login
-
-# List all subscriptions you have access to
-az account list --output table
-
-# Set the subscription you want to deploy to
-az account set --subscription "<subscription-name-or-id>"
-
-# Confirm the active subscription
-az account show --output table
-```
-
-Run in PowerShell:
-
-```powershell
-# Login interactively (opens browser)
-az login
-
-# List all subscriptions you have access to
-az account list --output table
-
-# Set the subscription you want to deploy to
-az account set --subscription "<subscription-name-or-id>"
-
-# Confirm the active subscription
-az account show --output table
-```
-
-If you are using a service account or CI machine without a browser, use device code flow.
 
 Bash:
 
 ```bash
-az login --use-device-code
+az login
+az account list --output table
+az account set --subscription "<subscription-name-or-id>"
+az account show --output table
 ```
 
 PowerShell:
 
 ```powershell
+az login
+az account list --output table
+az account set --subscription "<subscription-name-or-id>"
+az account show --output table
+```
+
+No browser available:
+
+```bash
 az login --use-device-code
 ```
 
 ---
 
-## Step 2 — Create Azure App Registration + Service Principal (OIDC + Better Auth)
+## Step 2 — Create Azure App Registration (OIDC + Microsoft OAuth)
+
+One app registration shared by GitHub Actions OIDC and Better Auth Microsoft login.
 
 Bash:
 
 ```bash
-# Create one app registration shared by GitHub Actions OIDC and Better Auth Microsoft login
 az ad app create --display-name "retro-tool"
 
 APP_ID=$(az ad app list --display-name "retro-tool" --query '[0].appId' -o tsv)
@@ -103,14 +70,12 @@ SP_OBJECT_ID=$(az ad sp show --id $APP_ID --query id -o tsv)
 SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 TENANT_ID=$(az account show --query tenantId -o tsv)
 
-# Grant Contributor at subscription scope
 az role assignment create \
   --assignee-object-id $SP_OBJECT_ID \
   --role Contributor \
   --scope /subscriptions/$SUBSCRIPTION_ID \
   --assignee-principal-type ServicePrincipal
 
-# Also grant User Access Administrator (needed for ACR role assignments)
 az role assignment create \
   --assignee-object-id $SP_OBJECT_ID \
   --role "User Access Administrator" \
@@ -121,15 +86,16 @@ echo "Client ID: $APP_ID"
 echo "Tenant ID: $TENANT_ID"
 echo "Subscription ID: $SUBSCRIPTION_ID"
 
-# Create a client secret for Better Auth Microsoft login (save this value now)
-MICROSOFT_CLIENT_SECRET=$(az ad app credential reset --id $APP_ID --append --display-name "better-auth-login" --query password -o tsv)
+MICROSOFT_CLIENT_SECRET=$(az ad app credential reset \
+  --id $APP_ID --append \
+  --display-name "better-auth-login" \
+  --query password -o tsv)
 echo "MICROSOFT_CLIENT_SECRET: $MICROSOFT_CLIENT_SECRET"
 ```
 
 PowerShell:
 
 ```powershell
-# Create one app registration shared by GitHub Actions OIDC and Better Auth Microsoft login
 az ad app create --display-name "retro-tool"
 
 $APP_ID = az ad app list --display-name "retro-tool" --query '[0].appId' -o tsv
@@ -139,14 +105,12 @@ $SP_OBJECT_ID = az ad sp show --id $APP_ID --query id -o tsv
 $SUBSCRIPTION_ID = az account show --query id -o tsv
 $TENANT_ID = az account show --query tenantId -o tsv
 
-# Grant Contributor at subscription scope
 az role assignment create `
   --assignee-object-id $SP_OBJECT_ID `
   --role Contributor `
   --scope /subscriptions/$SUBSCRIPTION_ID `
   --assignee-principal-type ServicePrincipal
 
-# Also grant User Access Administrator (needed for ACR role assignments)
 az role assignment create `
   --assignee-object-id $SP_OBJECT_ID `
   --role "User Access Administrator" `
@@ -157,141 +121,190 @@ Write-Host "Client ID: $APP_ID"
 Write-Host "Tenant ID: $TENANT_ID"
 Write-Host "Subscription ID: $SUBSCRIPTION_ID"
 
-# Create a client secret for Better Auth Microsoft login (save this value now)
-$MICROSOFT_CLIENT_SECRET = az ad app credential reset --id $APP_ID --append --display-name "better-auth-login" --query password -o tsv
+$MICROSOFT_CLIENT_SECRET = az ad app credential reset `
+  --id $APP_ID --append `
+  --display-name "better-auth-login" `
+  --query password -o tsv
 Write-Host "MICROSOFT_CLIENT_SECRET: $MICROSOFT_CLIENT_SECRET"
 ```
 
-Add a **federated credential** for each GitHub environment in the Azure Portal:
+Then in the Azure Portal:
 > App registrations → your app → Certificates & secrets → Federated credentials → Add credential
 
 - **Issuer**: `https://token.actions.githubusercontent.com`
 - **Subject**: `repo:<org>/<repo>:environment:production` (repeat for `staging`)
 
-Add a **Web redirect URI** to the same app registration for Better Auth Microsoft callback:
+Add a **Web redirect URI** for Microsoft OAuth callback:
 
 - `https://<api-webapp-name>.azurewebsites.net/api/auth/callback/microsoft`
 
 ---
 
-## Step 3 — Configure GitHub Environments
+## Step 3 — Create Azure Resources via Portal
 
-In your GitHub repository go to **Settings → Environments** and create two environments: `staging` and `production`.
+All resources go in one resource group per environment.
 
-### Secrets (both environments)
+### 3a — Resource Group
 
-| Secret | Description |
+**Home → Resource groups → Create**
+
+| Field | Value |
 |---|---|
-| `AZURE_CLIENT_ID` | Shared app registration Client ID (used for OIDC and Better Auth Microsoft login) |
-| `AZURE_TENANT_ID` | Azure tenant ID |
-| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
-| `POSTGRES_PASSWORD` | PostgreSQL admin password |
-| `DATABASE_URL` | Full PostgreSQL connection string (`postgresql://pgadmin:<password>@<fqdn>:5432/retro_tool_db?sslmode=require`) |
-| `BETTER_AUTH_SECRET` | Random 32-char secret |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-| `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth client secret |
-| `RESEND_API_KEY` | Resend API key |
-| `CONVEX_DEPLOY_KEY` | Convex Cloud deploy key for the environment |
-| `VAPID_PUBLIC_KEY` | VAPID public key |
-| `VAPID_PRIVATE_KEY` | VAPID private key |
-| `VAPID_SUBJECT` | VAPID subject (e.g. `mailto:admin@yourdomain.com`) |
+| Name | `retro-tool-production-rg` |
+| Region | East US 2 |
 
-### Variables (both environments)
+### 3b — PostgreSQL Flexible Server
 
-| Variable | Description |
+**Home → Create a resource → Azure Database for PostgreSQL Flexible Server**
+
+| Field | Value |
 |---|---|
-| `AZURE_RESOURCE_GROUP` | Resource group for all resources (e.g. `retro-tool-production-rg`) |
-| `AZURE_LOCATION` | Azure region for all resources (e.g. `eastus2`) |
-| `ACR_NAME` | Azure Container Registry name from infra outputs (e.g. `retrotoolproductionacrabc123`) |
-| `ACR_LOGIN_SERVER` | ACR login server from infra outputs (e.g. `retrotoolproductionacrabc123.azurecr.io`) |
-| `API_WEBAPP_NAME` | App Service name (e.g. `retro-tool-production-api`) |
-| `API_URL` | Full API URL (e.g. `https://retro-tool-production-api.azurewebsites.net`) |
-| `SWA_URL` | Static Web App URL (e.g. `https://wonderful-stone-abc123.azurestaticapps.net`) |
-| `MICROSOFT_TENANT_ID` | Microsoft OAuth tenant (use `common` for multi-tenant) |
-| `EMAIL_FROM` | Sender address (e.g. `noreply@yourdomain.com`) |
+| Resource group | `retro-tool-production-rg` |
+| Server name | `retro-tool-production-pg` |
+| Region | East US 2 |
+| PostgreSQL version | 16 |
+| Workload type | Development |
+| Compute tier | General Purpose |
+| Compute size | Standard_D2ds_v4 |
+| Storage | 32 GB |
+| Admin username | `pgadmin` |
+| Admin password | (save this) |
+| High availability | Disabled |
+
+Under **Networking** → enable **Allow public access from Azure services** ✓
+
+After creation go to **Databases** → create a database named `retro_tool_db`.
+
+Outputs to save:
+
+- Hostname: `retro-tool-production-pg.postgres.database.azure.com`
+- `DATABASE_URL`:
+  ```
+  postgresql://pgadmin:<password>@retro-tool-production-pg.postgres.database.azure.com:5432/retro_tool_db?sslmode=require
+  ```
+
+### 3c — App Service (API)
+
+**Home → Create a resource → Web App**
+
+| Field | Value |
+|---|---|
+| Resource group | `retro-tool-production-rg` |
+| Name | `retro-tool-production-api` |
+| Publish | **Code** |
+| Runtime stack | Node 22 LTS |
+| OS | Linux |
+| Region | East US 2 |
+| Pricing plan | Free F1 |
+
+Outputs to save:
+
+- App name: `retro-tool-production-api`
+- URL: `https://retro-tool-production-api.azurewebsites.net`
+
+### 3d — Static Web App (UI)
+
+**Home → Create a resource → Static Web App**
+
+| Field | Value |
+|---|---|
+| Resource group | `retro-tool-production-rg` |
+| Name | `retro-tool-production-ui` |
+| Plan type | Free |
+| Region | East US 2 |
+| Deployment source | **Other** |
+| Deployment authorization policy | **Deployment token** |
+
+After creation:
+
+- Copy the default hostname (e.g. `wonderful-stone-abc123.azurestaticapps.net`)
+- Go to **Manage deployment token** → copy the token
+
+---
+
+## Step 4 — Set Up Convex Cloud
+
+1. Go to [dashboard.convex.dev](https://dashboard.convex.dev) and create a project per environment (e.g. `retro-tool-production`, `retro-tool-staging`).
+2. From the project dashboard copy:
+   - **Convex Cloud URL** (e.g. `https://neat-cod-843.eu-west-1.convex.cloud`) → `CONVEX_SYNC_URL`
+   - **Deploy key** from Settings → Deploy Keys (starts with `prod:...`) → `CONVEX_SYNC_ADMIN_KEY` (used by the API at runtime) and `CONVEX_DEPLOY_KEY` (used by CI to push functions)
+
+---
+
+## Step 5 — Configure GitHub Environments
+
+**Settings → Environments** → create `staging` and `production`.
+
+### Secrets
+
+| Secret | Where to get it |
+|---|---|
+| `AZURE_CLIENT_ID` | App registration Client ID from Step 2 |
+| `AZURE_TENANT_ID` | Tenant ID from Step 2 |
+| `AZURE_SUBSCRIPTION_ID` | Subscription ID from Step 2 |
+| `DATABASE_URL` | Connection string from Step 3b |
+| `BETTER_AUTH_SECRET` | Generate: `openssl rand -base64 32` |
+| `MICROSOFT_CLIENT_SECRET` | Client secret from Step 2 |
+| `GOOGLE_CLIENT_SECRET` | Google Cloud Console |
+| `RESEND_API_KEY` | Resend dashboard |
+| `CONVEX_SYNC_ADMIN_KEY` | Convex deploy key (`prod:...`) from Step 4 |
+| `CONVEX_DEPLOY_KEY` | Same Convex deploy key — used by CI |
+| `VAPID_PRIVATE_KEY` | From `npx web-push generate-vapid-keys` |
+| `SWA_DEPLOYMENT_TOKEN` | From Step 3d |
+
+### Variables
+
+| Variable | Value |
+|---|---|
+| `AZURE_RESOURCE_GROUP` | `retro-tool-production-rg` |
+| `AZURE_LOCATION` | `eastus2` |
+| `API_WEBAPP_NAME` | `retro-tool-production-api` |
+| `API_URL` | `https://retro-tool-production-api.azurewebsites.net` |
+| `SWA_URL` | `https://<swa-hostname>.azurestaticapps.net` |
+| `CONVEX_SYNC_URL` | `https://neat-cod-843.eu-west-1.convex.cloud` |
+| `MICROSOFT_TENANT_ID` | `common` |
+| `EMAIL_FROM` | e.g. `noreply@yourdomain.com` |
+| `VAPID_PUBLIC_KEY` | From `npx web-push generate-vapid-keys` |
+| `VAPID_SUBJECT` | e.g. `mailto:noreply@yourdomain.com` |
 | `ESTIMATES_REALTIME_BACKEND` | `socket-io` |
 | `RETROS_REALTIME_BACKEND` | `socket-io` |
 | `NOTIFICATIONS_REALTIME_BACKEND` | `socket-io` |
 
-> **Staging note**: `DATABASE_URL` in both environments should point to the **same PostgreSQL server** deployed with production infrastructure (different database names if needed).
-
-> **Microsoft login note**: do not create a separate `MICROSOFT_CLIENT_ID` secret. The deployment workflow maps `MICROSOFT_CLIENT_ID` from `AZURE_CLIENT_ID` automatically.
+> `MICROSOFT_CLIENT_ID` is not a separate secret — the pipeline reuses `AZURE_CLIENT_ID`.
 
 ---
 
-## Step 4 — Deploy Infrastructure
+## Step 6 — Configure App Service Environment Variables
 
-Run the **Deploy Infrastructure** workflow manually from GitHub Actions, targeting `production` first:
+In the Azure Portal go to **App Service → Configuration → Application settings** and add all vars from [retro-tool-api/.env.production](../retro-tool-api/.env.production).
 
-```
-Actions → Deploy Infrastructure → Run workflow → environment: production
-```
+Set the secrets section values directly here (not in the file):
 
-This creates:
-
-- Resource groups
-- Azure Container Registry
-- PostgreSQL Flexible Server (shared)
-- App Service Plan + Web App
-- Static Web App
-
-After it completes, copy the outputs (ACR login server, API URL, SWA hostname) into your GitHub environment **Variables**.
-
-Repeat for `staging` (skips creating a new PostgreSQL server if you reuse the production one via `DATABASE_URL`).
+- `DATABASE_URL`
+- `BETTER_AUTH_SECRET`
+- `MICROSOFT_CLIENT_SECRET`
+- `GOOGLE_CLIENT_SECRET`
+- `RESEND_API_KEY`
+- `VAPID_PRIVATE_KEY`
+- `CONVEX_SYNC_ADMIN_KEY`
 
 ---
 
-## Step 5 — Get the SWA Deployment Token
+## Step 7 — First API Deploy
 
-Bash:
+Push to `main` or trigger **Deploy API** manually in GitHub Actions. The pipeline will:
 
-```bash
-az staticwebapp secrets list \
-  --name retro-tool-production-ui \
-  --resource-group retro-tool-production-rg \
-  --query "properties.apiKey" -o tsv
-```
-
-PowerShell:
-
-```powershell
-az staticwebapp secrets list `
-  --name retro-tool-production-ui `
-  --resource-group retro-tool-production-rg `
-  --query "properties.apiKey" -o tsv
-```
-
-Add this as the `SWA_DEPLOYMENT_TOKEN` secret in the GitHub environment.
+1. Lint, type-check, test, build
+2. Package `dist/` + `node_modules/` + `package.json` into a zip
+3. Run DB migrations directly on the runner (`node dist/migrate.js`)
+4. Upload zip to App Service via `az webapp deploy`
+5. Health check at `/health`
 
 ---
 
-## Step 6 — Set Up Convex Cloud
+## Step 8 — First UI Deploy
 
-1. Go to [dashboard.convex.dev](https://dashboard.convex.dev) and create a project for each environment (e.g. `retro-tool-production`, `retro-tool-staging`).
-2. Copy the **Deploy Key** for each project from Project Settings → Deploy keys.
-3. Add it as the `CONVEX_DEPLOY_KEY` secret in the corresponding GitHub environment.
-4. Copy the **Deployment URL** (e.g. `https://your-project.convex.cloud`) and add it as `VITE_CONVEX_URL` variable (for the UI build) and `CONVEX_SYNC_URL` variable (for the API).
-
----
-
-## Step 7 — Build the API Docker Image
-
-The first deploy of the API pipeline will:
-
-1. Build the NestJS Docker image and push it to ACR
-2. Run DB migrations via a one-off ACI container
-3. Deploy the image to App Service
-
-Trigger it manually or push to `main` (production) / `staging` (staging) with changes under `retro-tool-api/`.
-
----
-
-## Step 8 — Deploy the UI
-
-Push to `main` or `staging` with changes under `retro-tool-ui/`, or trigger **Deploy UI** manually.
-
-The build injects Vite environment variables from GitHub Variables at build time.
+Push to `main` or trigger **Deploy UI** manually. Vite builds with env vars injected from GitHub Variables and deploys to the Static Web App via the deployment token.
 
 ---
 
@@ -303,14 +316,24 @@ The build injects Vite environment variables from GitHub Variables at build time
 | Push to `staging` (API changes) | Deploy API → staging |
 | Push to `main` (UI changes) | Deploy UI → production |
 | Push to `staging` (UI changes) | Deploy UI → staging |
-| Push to `main` (convex-backend changes) | Deploy Convex → production |
-| Push to `staging` (convex-backend changes) | Deploy Convex → staging |
 | PR to `main` or `staging` | CI (lint, type-check, test, build) |
+
+---
+
+## Upgrading App Service to S1 (When Quota Available)
+
+The production App Service runs on F1 (Free) until Standard VM quota is approved.
+
+To upgrade:
+
+1. Azure Portal → Subscriptions → **Usage + quotas** → filter East US 2 → search **Standard VMs** → request limit increase (minimum 1)
+2. Once approved, go to App Service → **Scale up** → select **S1 Standard**
 
 ---
 
 ## Secrets Rotation
 
-- **PostgreSQL password**: Update the Azure Flexible Server password, then update `POSTGRES_PASSWORD` and `DATABASE_URL` secrets in both GitHub environments.
-- **VAPID keys**: Rotating keys will invalidate all existing push subscriptions — users must re-subscribe.
-- **Better Auth secret**: Rotating this invalidates all existing sessions.
+- **PostgreSQL password**: Update in Azure Portal, then update `DATABASE_URL` in App Service config and GitHub secrets.
+- **VAPID keys**: Rotating invalidates all push subscriptions — users must re-subscribe.
+- **Better Auth secret**: Rotating invalidates all active sessions.
+- **Convex deploy key**: Rotate in Convex Dashboard → update `CONVEX_SYNC_ADMIN_KEY` in App Service config and GitHub secrets.

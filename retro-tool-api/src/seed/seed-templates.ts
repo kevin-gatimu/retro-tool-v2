@@ -4,7 +4,10 @@
  *
  * Run locally:  pnpm db:seed:templates
  */
-import 'dotenv/config';
+import { config as loadDotenv } from 'dotenv';
+import { join } from 'path';
+loadDotenv({ path: join(__dirname, '../../.env'), override: true });
+loadDotenv({ path: join(__dirname, '../../.env.local'), override: true });
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { randomUUID } from 'crypto';

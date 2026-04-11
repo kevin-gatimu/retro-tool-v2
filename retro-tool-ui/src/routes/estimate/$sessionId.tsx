@@ -1,4 +1,7 @@
-import { useQuery as useTanStackQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useQuery as useTanStackQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useSessionMutations } from './hooks/useSessionMutations'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
@@ -13,7 +16,7 @@ import {
   Plus,
   Spade,
   Timer,
-  Trash2,
+  CircleStop,
   Users,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -633,7 +636,9 @@ function EstimateSessionPage() {
   if (isLoading || !session) {
     return (
       <>
-        {usesConvexRealtime ? <EstimateConvexSync sessionId={sessionId} /> : null}
+        {usesConvexRealtime ? (
+          <EstimateConvexSync sessionId={sessionId} />
+        ) : null}
         <div className="space-y-6">
           <div className="h-12 animate-pulse rounded-lg bg-muted" />
           <div className="h-24 animate-pulse rounded-lg bg-muted" />
@@ -654,7 +659,9 @@ function EstimateSessionPage() {
   if (session.status === 'completed') {
     return (
       <>
-        {usesConvexRealtime ? <EstimateConvexSync sessionId={sessionId} /> : null}
+        {usesConvexRealtime ? (
+          <EstimateConvexSync sessionId={sessionId} />
+        ) : null}
         <CompletedSessionReport session={session} />
       </>
     )
@@ -784,7 +791,7 @@ function EstimateSessionPage() {
                     <p className="text-lg font-medium">
                       {session.currentRound.ticketNumber}
                       {session.currentRound.storyName !==
-                        session.currentRound.ticketNumber
+                      session.currentRound.ticketNumber
                         ? ` - ${session.currentRound.storyName}`
                         : ''}
                     </p>
@@ -836,7 +843,7 @@ function EstimateSessionPage() {
                         ? 'border-primary bg-primary/10 text-primary shadow-lg scale-105 animate-in zoom-in-95 duration-200'
                         : 'border-border hover:border-primary/50',
                       session.status === 'revealed' &&
-                      'opacity-50 cursor-not-allowed hover:scale-100',
+                        'opacity-50 cursor-not-allowed hover:scale-100',
                     )}
                   >
                     {points}
@@ -913,7 +920,9 @@ function EstimateSessionPage() {
                       )}
                     >
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={participant.user.image ?? undefined} />
+                        <AvatarImage
+                          src={participant.user.image ?? undefined}
+                        />
                         <AvatarFallback>
                           {participant.user.name.charAt(0)}
                         </AvatarFallback>
@@ -924,7 +933,8 @@ function EstimateSessionPage() {
                       </span>
                       {participant.user.jobRole && (
                         <Badge
-                          className={`text-xs ${{
+                          className={`text-xs ${
+                            {
                               Dev: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
                               QA: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
                               QE: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
@@ -937,7 +947,7 @@ function EstimateSessionPage() {
                               Oversight:
                                 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
                             }[participant.user.jobRole]
-                            }`}
+                          }`}
                         >
                           {participant.user.jobRole}
                         </Badge>
@@ -1062,7 +1072,7 @@ function EstimateSessionPage() {
                         variant="destructive"
                         disabled={endSessionMutation.isPending}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
+                        <CircleStop className="mr-2 h-4 w-4" />
                         End Session
                       </Button>
                     </AlertDialogTrigger>
@@ -1070,8 +1080,9 @@ function EstimateSessionPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>End this session?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will complete the estimation session and move it to
-                          history. All votes will be preserved for the report.
+                          This will complete the estimation session and move it
+                          to history. All votes will be preserved for the
+                          report.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

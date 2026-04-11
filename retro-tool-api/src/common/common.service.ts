@@ -1,7 +1,7 @@
 import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import * as userSchema from '../auth/schema';
 import * as orgSchema from '../organizations/schema';
 import * as teamSchema from '../teams/schema';
@@ -183,23 +183,27 @@ export class CommonService {
    * EXIST CHECKS
    */
 
-  // Check if any system admin exists (used for bootstrapping first admin)
-  async checkAdminExists(): Promise<{ exists: boolean }> {
+  // Check if any admin exists (for bootstrapping) and if any user exists at all (for the sign-up banner).
+  async checkAdminExists(): Promise<{ exists: boolean; hasAnyUser: boolean }> {
+    const [anyUser] = await this.database
+      .select({ id: userSchema.user.id })
+      .from(userSchema.user)
+      .limit(1);
+
+    if (!anyUser) return { exists: false, hasAnyUser: false };
+
     const [admin] = await this.database
-      .select()
+      .select({ id: userSchema.user.id })
       .from(userSchema.user)
-      .where(eq(userSchema.user.role, USER_ROLES.SystemAdmin))
+      .where(
+        or(
+          eq(userSchema.user.role, USER_ROLES.SystemAdmin),
+          eq(userSchema.user.role, USER_ROLES.SuperAdmin),
+        ),
+      )
       .limit(1);
 
-    if (admin) return { exists: true };
-
-    const [superAdmin] = await this.database
-      .select()
-      .from(userSchema.user)
-      .where(eq(userSchema.user.role, USER_ROLES.SuperAdmin))
-      .limit(1);
-
-    return { exists: !!superAdmin };
+    return { exists: !!admin, hasAnyUser: true };
   }
 
   // ============================================================================

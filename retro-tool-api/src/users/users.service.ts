@@ -916,9 +916,10 @@ export class UsersService {
     const [updated] = await this.database
       .update(userSchema.user)
       .set({
-        role: USER_ROLES.SystemAdmin,
+        role: USER_ROLES.SuperAdmin,
         status: USER_STATUSES.Approved,
         approvedAt: new Date(),
+        emailVerified: true,
         updatedAt: new Date(),
       })
       .where(eq(userSchema.user.id, userId))

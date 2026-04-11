@@ -5,70 +5,69 @@ import { anyApi } from 'convex/server'
 import type { Notification } from '@/common/types/notifications'
 
 interface NotificationProjection {
-    notificationId: string
-    userId: string
-    type: string
-    title: string
-    message: string
-    link?: string
-    read: boolean
-    createdAt: string
-    updatedAt: string
+  notificationId: string
+  userId: string
+  type: string
+  title: string
+  message: string
+  link?: string
+  read: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 interface NotificationConvexSyncProps {
-    userId: string
+  userId: string
 }
 
 const userNotificationsQuery = anyApi.liveNotifications.listUserNotifications
 
-export function NotificationConvexSync({ userId }: NotificationConvexSyncProps) {
-    const queryClient = useQueryClient()
-    const lastSnapshotRef = useRef<string | null>(null)
-    const projections = useConvexQuery(userNotificationsQuery, {
-        userId,
-        limit: 50,
-    }) as NotificationProjection[] | undefined
+export function NotificationConvexSync({
+  userId,
+}: NotificationConvexSyncProps) {
+  const queryClient = useQueryClient()
+  const lastSnapshotRef = useRef<string | null>(null)
+  const projections = useConvexQuery(userNotificationsQuery, {
+    userId,
+    limit: 50,
+  }) as NotificationProjection[] | undefined
 
-    useEffect(() => {
-        if (!projections) {
-            return
-        }
+  useEffect(() => {
+    if (!projections) {
+      return
+    }
 
-        const snapshot = JSON.stringify(
-            projections.map((projection) => [
-                projection.notificationId,
-                projection.read,
-                projection.updatedAt,
-            ]),
-        )
+    const snapshot = JSON.stringify(
+      projections.map((projection) => [
+        projection.notificationId,
+        projection.read,
+        projection.updatedAt,
+      ]),
+    )
 
-        if (
-            lastSnapshotRef.current !== null &&
-            lastSnapshotRef.current !== snapshot
-        ) {
-            const nextNotifications: Notification[] = projections.map(
-                (projection) => ({
-                    id: projection.notificationId,
-                    userId: projection.userId,
-                    type: projection.type,
-                    title: projection.title,
-                    message: projection.message,
-                    link: projection.link ?? null,
-                    read: projection.read,
-                    metadata: null,
-                    createdAt: new Date(projection.createdAt),
-                }),
-            )
+    if (lastSnapshotRef.current !== snapshot) {
+      const nextNotifications: Notification[] = projections.map(
+        (projection) => ({
+          id: projection.notificationId,
+          userId: projection.userId,
+          type: projection.type,
+          title: projection.title,
+          message: projection.message,
+          link: projection.link ?? null,
+          read: projection.read,
+          metadata: null,
+          createdAt: new Date(projection.createdAt),
+        }),
+      )
 
-            queryClient.setQueryData<Notification[]>(
-                ['notifications'],
-                nextNotifications,
-            )
-        }
+      queryClient.setQueryData<Notification[]>(
+        ['notifications'],
+        nextNotifications,
+      )
+    }
 
-        lastSnapshotRef.current = snapshot
-    }, [projections, queryClient])
+    lastSnapshotRef.current = snapshot
+  }, [projections, queryClient])
 
-    return null
+  return null
 }

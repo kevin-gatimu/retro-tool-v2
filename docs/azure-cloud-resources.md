@@ -10,13 +10,14 @@ This document describes every Azure resource deployed for Retro Tool, the config
 
 | Resource | Staging | Production |
 |---|---|---|
-| Static Web App | Free | Standard |
-| App Service Plan | Free F1 | Premium V4 P0V4 |
-| Web App (API) | Free F1 | Premium V4 P0V4, zone-redundant |
-| Container Registry | Premium | Premium |
-| PostgreSQL Flexible Server | Shared (B1ms, Burstable) | Shared (B1ms, Burstable) |
+| Static Web App | Free | Free |
+| App Service Plan | Free F1 | Free F1 (upgrade to S1 once Standard VM quota approved) |
+| Web App (API) | Free F1 | Free F1 |
+| PostgreSQL Flexible Server | Shared (General Purpose D2ds_v4) | Shared (General Purpose D2ds_v4) |
 
 > Both environments **share a single PostgreSQL server** deployed in the production resource group.
+
+> No Azure Container Registry. The API is deployed via zip code deploy (not Docker/container).
 
 ---
 
@@ -30,7 +31,7 @@ This document describes every Azure resource deployed for Retro Tool, the config
 | Region | East US 2 |
 | Bandwidth | 100 GB/month included |
 | Custom domains | 2 |
-| Tags | `Production: Production` |
+| Deployment source | Deployment token |
 
 **Cost: £0/month**
 
@@ -50,7 +51,7 @@ This document describes every Azure resource deployed for Retro Tool, the config
 | Custom domains | Not supported |
 | Always On | Disabled |
 | Zone redundancy | Not supported |
-| Tags | `Production: Production` |
+| Deployment method | Zip code deploy |
 
 **Cost: £0/month**
 
@@ -60,63 +61,47 @@ This document describes every Azure resource deployed for Retro Tool, the config
 
 ## Production Environment
 
-### Static Web App — Standard
+### Static Web App — Free
 
 | Property | Value |
 |---|---|
-| SKU | Standard |
+| SKU | Free |
 | Region | East US 2 |
 | Bandwidth | 100 GB/month included |
-| Custom domains | Unlimited |
-| Staging environments | Up to 10 |
-| Tags | `Production: Production` |
+| Custom domains | 2 |
+| Deployment source | Deployment token |
 
-**Cost: ~£7.50/month** (~$9/month)
+**Cost: £0/month**
+
+> Upgrade to Standard (~£7.50/month) when custom domains or more staging environments are needed.
 
 ---
 
-### App Service Plan + Web App — Premium V4 P0V4
+### App Service Plan + Web App — Free F1
 
 | Property | Value |
 |---|---|
-| SKU | P0v4 (Premium V4) |
+| SKU | F1 (Free) — temporary until Standard VM quota approved |
 | OS | Linux |
 | Region | East US 2 |
-| vCPU | 1 vCPU |
-| RAM | 4 GB |
-| Storage | 250 GB |
-| Always On | Enabled |
-| Custom domains | Unlimited |
-| Zone redundancy | Enabled |
-| Auto-scale | Supported |
-| Tags | `Production: Production` |
+| vCPU | Shared |
+| RAM | 1 GB |
+| Storage | 1 GB |
+| CPU limit | 60 minutes/day |
+| Always On | Disabled |
+| Deployment method | Zip code deploy |
 
-**Cost: ~£55–£65/month** (zone redundancy bills minimum 3 instances)
+**Cost: £0/month (temporary)**
 
-> Zone redundancy automatically spans 3 availability zones. You are billed for at least 3 P0v4 instances when enabled (~£18–£22/instance/month).
+> Target SKU is **S1 Standard** (~£14/month) once the Standard VMs quota is approved (Azure Portal → Subscriptions → Usage + quotas → Standard VMs → request increase). Upgrade: App Service → Scale up → S1 Standard.
 
 ---
 
 ## Shared Resources
 
-### Azure Container Registry — Standard
+### PostgreSQL Flexible Server — General Purpose D2ds_v4
 
-Used by both staging and production to store the NestJS API Docker images.
-
-| Property | Value |
-|---|---|
-| SKU | Standard |
-| Region | East US 2 |
-| Storage included | 100 GB |
-| Geo-replication | Not supported |
-
-**Cost: ~£17/month**
-
----
-
-### PostgreSQL Flexible Server — Burstable B1ms
-
-One server shared between staging and production (separate databases or the same database with separate schemas).
+One server shared between staging and production (separate databases).
 
 | Property | Value |
 |---|---|
@@ -130,31 +115,17 @@ One server shared between staging and production (separate databases or the same
 | Backup retention | 7 days |
 | Geo-redundant backup | Disabled |
 | Region | East US 2 |
-| Workload type | Dev/Test |
+| Workload type | Development |
 
-**Cost: ~£13–£15/month**
+**Cost: ~£55–£65/month**
 
-> Burstable B1ms is sufficient for low-to-moderate traffic. For higher production load, consider upgrading to `Standard_D2ds_v4` (General Purpose, 2 vCPU, 8 GB RAM, ~£80/month).
-
----
-
-## One-off Migration Container (ACI)
-
-A temporary Azure Container Instance is spun up during each API deployment to run database migrations. It is deleted immediately after.
-
-| Property | Value |
-|---|---|
-| CPU | 1 vCPU |
-| Memory | 1 GB |
-| Lifetime | < 5 minutes per deployment |
-
-**Cost: < £0.01 per deployment** (negligible)
+> General Purpose tier is required — Burstable (B1ms) uses the Basic VMs quota which is exhausted on new Azure subscriptions.
 
 ---
 
 ## Convex Cloud
 
-Convex functions are deployed to **Convex Cloud** (not Azure). Convex Cloud pricing depends on your plan:
+Convex functions are deployed to **Convex Cloud** (not self-hosted on Azure). One project per environment.
 
 | Plan | Cost | Notes |
 |---|---|---|
@@ -164,6 +135,12 @@ Convex functions are deployed to **Convex Cloud** (not Azure). Convex Cloud pric
 See [convex.dev/pricing](https://www.convex.dev/pricing) for current pricing.
 
 > You need **two Convex Cloud projects** — one for staging, one for production.
+
+---
+
+## DB Migrations
+
+Migrations run directly on the GitHub Actions runner during each API deployment (`node dist/migrate.js`). No separate Azure resource is needed.
 
 ---
 
@@ -181,24 +158,24 @@ See [convex.dev/pricing](https://www.convex.dev/pricing) for current pricing.
 
 | Resource | Monthly Cost |
 |---|---|
-| Static Web App (Standard) | ~£7.50 |
-| App Service P0v4 × 3 zones | ~£55–£65 |
-| **Production subtotal** | **~£63–£73** |
+| Static Web App (Free) | £0 |
+| App Service F1 (temporary) | £0 |
+| App Service S1 (after quota) | ~£14 |
+| **Production subtotal** | **£0 now / ~£14 after upgrade** |
 
 ### Shared
 
 | Resource | Monthly Cost |
 |---|---|
-| Container Registry (Premium) | ~£33 |
-| PostgreSQL Flexible Server (B1ms) | ~£13–£15 |
-| **Shared subtotal** | **~£46–£48** |
+| PostgreSQL Flexible Server (D2ds_v4) | ~£55–£65 |
+| **Shared subtotal** | **~£55–£65** |
 
 ### Grand Total
 
 | | Monthly |
 |---|---|
-| **Minimum (staging + shared)** | **~£46–£48** |
-| **Full (staging + production + shared)** | **~£109–£121** |
+| **Current (F1 + shared)** | **~£55–£65** |
+| **After S1 upgrade** | **~£69–£79** |
 
 ---
 
@@ -206,8 +183,14 @@ See [convex.dev/pricing](https://www.convex.dev/pricing) for current pricing.
 
 | Option | Saving | Trade-off |
 |---|---|---|
-| Downgrade ACR to Standard | ~£16/month | No geo-replication or private link |
-| Disable zone redundancy (production) | ~£35–£45/month | Reduced availability during zone failure |
-| Use reserved instances (1-year) for App Service | ~30% | Upfront commitment |
-| Stop staging App Service when not in use | ~£0 vs free tier (already free) | N/A — staging is already Free F1 |
-| Upgrade PostgreSQL only when needed | — | Scale up compute when traffic demands it |
+| Downgrade PostgreSQL to Burstable B1ms (when quota allows) | ~£40–£50/month | Requires Basic VMs quota; lower compute ceiling |
+| Use reserved instances (1-year) for PostgreSQL | ~30–40% | Upfront commitment |
+| Upgrade App Service to S1 only in production | ~£7/month vs both envs | Staging stays on free tier anyway |
+| Stop staging PostgreSQL database when not in use | Negligible (shared server) | N/A — single shared server |
+
+---
+
+## Upgrading App Service to S1
+
+1. Azure Portal → Subscriptions → **Usage + quotas** → filter East US 2 → search **Standard VMs** → request limit increase (minimum 1)
+2. Once approved: App Service → **Scale up** → **S1 Standard**

@@ -391,14 +391,13 @@ export class UsersController {
   }
 
   /**
-   * Bootstrap first admin
-   * Public as well; the client signs up and then immediately calls this endpoint
-   * once they have a session cookie (signup auto-auths). If they somehow hit it
-   * without a session, the service will still handle it gracefully.
+   * Bootstrap first admin.
+   * Requires an active session — called immediately after sign-up (both email and OAuth).
+   * Returns 400 if an admin already exists (idempotent guard in the service).
    */
   @Post('admin/bootstrap')
-  @AllowAnonymous()
+  @UseGuards(AuthGuard)
   async bootstrapFirstAdmin(@Session() session: SessionUser) {
-    return this.usersService.bootstrapFirstAdmin(session?.user?.id);
+    return this.usersService.bootstrapFirstAdmin(session.user.id);
   }
 }

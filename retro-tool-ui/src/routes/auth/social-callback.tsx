@@ -19,6 +19,16 @@ function SocialCallbackPage() {
       try {
         const user = await api.get<User>(USERS_ENDPOINTS.ME)
 
+        // Attempt bootstrap — succeeds only if no admin exists yet (first user).
+        // On success this user is now super-admin + approved; go straight to dashboard.
+        try {
+          await api.post(USERS_ENDPOINTS.ADMIN_BOOTSTRAP)
+          navigate({ to: '/dashboard' })
+          return
+        } catch {
+          // Admin already exists — fall through to normal status check.
+        }
+
         if (user.status === 'pending') {
           await signOutWithCleanup()
           navigate({ to: '/auth/sign-in', search: { status: 'pending' } })

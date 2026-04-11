@@ -30,7 +30,7 @@ function SignUpPage() {
   const [success, setSuccess] = useState(false)
   const [isFirstUser, setIsFirstUser] = useState(false)
 
-  const adminExists = useAdminCheck()
+  const { hasAnyUser } = useAdminCheck()
 
   const signUpMutation = useSignUp({
     onSuccess: (firstUser) => {
@@ -44,7 +44,7 @@ function SignUpPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    signUpMutation.mutate({ name, email, password, adminExists })
+    signUpMutation.mutate({ name, email, password })
   }
 
   if (success) {
@@ -136,7 +136,7 @@ function SignUpPage() {
           Create an account
         </h2>
         <p className="text-gray-400 text-sm">
-          {adminExists
+          {hasAnyUser
             ? 'Enter your details to request access'
             : "You'll be the first admin!"}
         </p>
@@ -149,7 +149,7 @@ function SignUpPage() {
           </div>
         )}
 
-        {!adminExists && (
+        {!hasAnyUser && (
           <div
             className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-4 text-sm text-emerald-400
 						flex items-start gap-3"
@@ -245,7 +245,7 @@ function SignUpPage() {
           ) : (
             <span className="flex items-center gap-2">
               <ChevronRight className="h-4 w-4" strokeWidth={3} />
-              {adminExists ? 'Request Access' : 'Create Admin Account'}
+              {hasAnyUser ? 'Request Access' : 'Create Admin Account'}
             </span>
           )}
         </Button>

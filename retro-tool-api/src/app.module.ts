@@ -22,10 +22,9 @@ import { HealthController } from './health.controller';
 import { join } from 'path';
 import { config as loadDotenv } from 'dotenv';
 
-loadDotenv({
-  path: join(__dirname, '../.env'),
-  override: true,
-});
+loadDotenv({ path: join(__dirname, '../.env'), override: true });
+// .env.local overrides .env — useful for local cloud testing without modifying .env
+loadDotenv({ path: join(__dirname, '../.env.local'), override: true });
 
 @Module({
   imports: [
@@ -33,7 +32,10 @@ loadDotenv({
       isGlobal: true,
       load: [configuration],
       // Resolve .env relative to the package root for both src and dist runtime.
-      envFilePath: [join(__dirname, '../.env')],
+      envFilePath: [
+        join(__dirname, '../.env.local'),
+        join(__dirname, '../.env'),
+      ],
     }),
     ScheduleModule.forRoot(),
     AuthModule,
