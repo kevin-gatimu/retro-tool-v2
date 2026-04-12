@@ -196,7 +196,7 @@ jobs:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
           MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
         run: |
           for key in AZURE_RESOURCE_GROUP API_WEBAPP_NAME ACR_LOGIN_SERVER API_IMAGE_REPOSITORY IMAGE_TAG FRONTEND_URL CONVEX_SYNC_URL EMAIL_FROM DATABASE_URL BETTER_AUTH_SECRET; do
@@ -263,7 +263,7 @@ jobs:
               BETTER_AUTH_URL='https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
               GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' \
               GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}' \
-              MICROSOFT_CLIENT_ID='${{ secrets.MICROSOFT_CLIENT_ID }}' \
+              MICROSOFT_CLIENT_ID='${{ secrets.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID }}' \
               MICROSOFT_CLIENT_SECRET='${{ secrets.MICROSOFT_CLIENT_SECRET }}' \
               RESEND_API_KEY='${{ secrets.RESEND_API_KEY }}' \
               CONVEX_SYNC_ADMIN_KEY='${{ secrets.CONVEX_SYNC_ADMIN_KEY }}' \
@@ -276,30 +276,13 @@ jobs:
         env:
           ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
         run: |
-          ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
           PRINCIPAL_ID=$(az webapp identity assign \
             --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
             --name ${{ vars.API_WEBAPP_NAME }} \
             --query principalId -o tsv)
 
-          ACR_ID=$(az acr show --name "${ACR_NAME}" --query id -o tsv)
-
-          EXISTING_ACRPULL=$(az role assignment list \
-            --assignee-object-id "${PRINCIPAL_ID}" \
-            --scope "${ACR_ID}" \
-            --role AcrPull \
-            --query '[0].id' -o tsv)
-
-          if [ -z "${EXISTING_ACRPULL}" ]; then
-            az role assignment create \
-              --assignee-object-id "${PRINCIPAL_ID}" \
-              --assignee-principal-type ServicePrincipal \
-              --role AcrPull \
-              --scope "${ACR_ID}" \
-              --only-show-errors
-          else
-            echo "AcrPull role assignment already exists for this Web App identity."
-          fi
+          echo "Web App managed identity principalId: ${PRINCIPAL_ID}"
+          echo "AcrPull role assignment must be pre-provisioned outside this pipeline."
 
           az webapp config set \
             --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
