@@ -24,6 +24,7 @@ const configSchema = z.object({
         clientId: z.string().optional(),
         clientSecret: z.string().optional(),
         tenantId: z.string().optional(),
+        authority: z.string().optional(),
       })
       .optional(),
   }),
@@ -75,6 +76,7 @@ export default (): Config => {
         clientId: process.env.MICROSOFT_CLIENT_ID,
         clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
         tenantId: process.env.MICROSOFT_TENANT_ID,
+        authority: process.env.MICROSOFT_AUTHORITY,
       },
     },
     frontend: {

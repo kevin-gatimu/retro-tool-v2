@@ -34,7 +34,6 @@ export function createAuth(configService: ConfigService<Config>) {
   const googleClientSecret = authConfig?.google?.clientSecret;
   const microsoftClientId = authConfig?.microsoft?.clientId;
   const microsoftClientSecret = authConfig?.microsoft?.clientSecret;
-  const microsoftTenantId = authConfig?.microsoft?.tenantId;
 
   // Create database pool and drizzle instance using ConfigService
   // Check if this is an Azure PostgreSQL connection
@@ -148,7 +147,9 @@ export function createAuth(configService: ConfigService<Config>) {
             microsoft: {
               clientId: microsoftClientId,
               clientSecret: microsoftClientSecret,
-              tenantId: microsoftTenantId || 'common',
+              tenantId: 'common',
+              authority: 'https://login.microsoftonline.com',
+              prompt: 'select_account',
             },
           }
         : {}),

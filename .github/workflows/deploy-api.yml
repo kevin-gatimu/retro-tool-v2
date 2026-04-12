@@ -225,6 +225,10 @@ jobs:
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
         run: |
           for key in AZURE_RESOURCE_GROUP API_WEBAPP_NAME FRONTEND_URL CONVEX_SYNC_URL EMAIL_FROM DATABASE_URL BETTER_AUTH_SECRET; do
             if [ -z "${!key}" ]; then
@@ -232,6 +236,25 @@ jobs:
               exit 1
             fi
           done
+
+          validate_oauth_pair() {
+            local provider="$1"
+            local client_id_key="$2"
+            local client_secret_key="$3"
+
+            if [ -n "${!client_id_key}" ] && [ -z "${!client_secret_key}" ]; then
+              echo "${provider} OAuth is partially configured: ${client_secret_key} is missing."
+              exit 1
+            fi
+
+            if [ -z "${!client_id_key}" ] && [ -n "${!client_secret_key}" ]; then
+              echo "${provider} OAuth is partially configured: ${client_id_key} is missing."
+              exit 1
+            fi
+          }
+
+          validate_oauth_pair "Google" "GOOGLE_CLIENT_ID" "GOOGLE_CLIENT_SECRET"
+          validate_oauth_pair "Microsoft" "MICROSOFT_CLIENT_ID" "MICROSOFT_CLIENT_SECRET"
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
@@ -256,7 +279,7 @@ jobs:
               ENABLE_CRON_JOBS='true' \
               WEEKLY_DIGEST_SEND_HOUR='6' \
               BETTER_AUTH_SESSION_EXPIRES_IN='604800' \
-              MICROSOFT_TENANT_ID='${{ vars.MICROSOFT_TENANT_ID || 'common' }}' \
+              MICROSOFT_TENANT_ID='${{ vars.MICROSOFT_TENANT_ID || secrets.AZURE_TENANT_ID }}' \
               EMAIL_FROM='${{ vars.EMAIL_FROM }}' \
             --output none
 
