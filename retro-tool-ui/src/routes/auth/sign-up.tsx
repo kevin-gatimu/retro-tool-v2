@@ -66,7 +66,7 @@ function SignUpPage() {
             </h2>
             <p className="text-gray-400 mb-8">
               You're the first user, so you've been automatically made an
-              administrator. You can now approve other users.
+              administrator. Sign in to access your dashboard.
             </p>
             <Button
               asChild
@@ -74,9 +74,9 @@ function SignUpPage() {
 								transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5
 								hover:shadow-[0_15px_30px_-10px_rgba(16,185,129,0.4)]"
             >
-              <Link to="/dashboard" className="flex items-center gap-2">
+              <Link to="/auth/sign-in" className="flex items-center gap-2">
                 <ChevronRight className="h-4 w-4" strokeWidth={3} />
-                Go to Dashboard
+                Sign In
               </Link>
             </Button>
           </>

@@ -1,15 +1,13 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { authClient } from '@/lib/auth-client'
 import { api } from '@/lib/api'
 import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
-import { CURRENT_USER_QUERY_KEY } from '@/hooks/useCurrentUser'
 
 export function useSignUp({
   onSuccess,
 }: {
   onSuccess: (isFirstUser: boolean) => void
 }) {
-  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({
       name,
@@ -29,10 +27,6 @@ export function useSignUp({
       let isFirstUser = false
       try {
         await api.post(USERS_ENDPOINTS.ADMIN_BOOTSTRAP)
-        // Invalidate stale user cache so role/status is fresh before navigating.
-        await queryClient.invalidateQueries({
-          queryKey: CURRENT_USER_QUERY_KEY,
-        })
         isFirstUser = true
       } catch {
         // Admin already exists — normal pending sign-up.
