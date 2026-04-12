@@ -62,109 +62,65 @@ jobs:
             echo "environment=production" >> "$GITHUB_OUTPUT"
           fi
 
-  # ──────────────────── Build & package ───────────────────────────────
+  # ──────────────────── Build & push image ────────────────────────────
   build:
     needs: [validate, set-env]
     runs-on: ubuntu-latest
+    environment: ${{ needs.set-env.outputs.environment }}
     outputs:
-      artifact-name: ${{ steps.pkg.outputs.artifact-name }}
+      image-tag: ${{ steps.meta.outputs.image-tag }}
+      image-name: ${{ steps.meta.outputs.image-name }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.0.0-rc.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build API
-        run: pnpm --filter retro-tool-api build
-
-      - name: Verify build entrypoint
+      - name: Validate container build config
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
         run: |
-          test -f retro-tool-api/dist/main.js || {
-            echo "Expected retro-tool-api/dist/main.js after build, but it is missing.";
-            exit 1;
-          }
+          for key in ACR_LOGIN_SERVER API_IMAGE_REPOSITORY; do
+            if [ -z "${!key}" ]; then
+              echo "Required image build config is missing: ${key}"
+              exit 1
+            fi
+          done
 
-      - name: Package for deployment
-        id: pkg
-        run: |
-          ARTIFACT="retro-tool-api-${{ needs.set-env.outputs.environment }}-${GITHUB_SHA::8}.zip"
-          DEPLOY_DIR=".deploy-api-package"
-          rm -rf "${DEPLOY_DIR}"
-          mkdir -p "${DEPLOY_DIR}"
-
-          # Build a portable package tree for App Service.
-          cp retro-tool-api/package.json "${DEPLOY_DIR}/package.json"
-          cp -R retro-tool-api/dist "${DEPLOY_DIR}/dist"
-
-          # Avoid pnpm symlinked node_modules in deploy artifacts; use npm runtime tree.
-          (
-            cd "${DEPLOY_DIR}"
-            npm install --omit=dev --ignore-scripts --no-audit --no-fund
-          )
-
-          # Verify a known Nest runtime dependency resolves in the packaged tree.
-          node -e "require('./${DEPLOY_DIR}/node_modules/@nestjs/common'); require('./${DEPLOY_DIR}/node_modules/uid'); require('./${DEPLOY_DIR}/node_modules/load-esm'); require('./${DEPLOY_DIR}/node_modules/iterare'); console.log('packaged runtime deps OK')"
-
-          # Smoke boot the packaged app with dummy values to catch missing module/runtime issues early.
-          SMOKE_PORT=18080
-          (
-            cd "${DEPLOY_DIR}"
-            PORT="${SMOKE_PORT}" \
-            NODE_ENV=production \
-            DATABASE_URL="postgresql://smoke:smoke@127.0.0.1:5432/smoke" \
-            BETTER_AUTH_SECRET="smoke-secret" \
-            BETTER_AUTH_URL="http://127.0.0.1:${SMOKE_PORT}" \
-            FRONTEND_URL="http://localhost:5173" \
-            ALLOWED_ORIGINS="http://localhost:5173" \
-            LOCAL_SERVER_URL="http://127.0.0.1:${SMOKE_PORT}" \
-            DEPLOYED_SERVER_URL="http://127.0.0.1:${SMOKE_PORT}" \
-            EMAIL_FROM="smoke@example.com" \
-            node dist/main > ../smoke-start.log 2>&1 &
-            APP_PID=$!
-
-            for i in $(seq 1 20); do
-              if curl -fsS "http://127.0.0.1:${SMOKE_PORT}/health" >/dev/null; then
-                echo "Packaged app smoke boot passed."
-                kill "${APP_PID}" || true
-                wait "${APP_PID}" 2>/dev/null || true
-                exit 0
-              fi
-
-              if ! kill -0 "${APP_PID}" 2>/dev/null; then
-                echo "Packaged app exited during smoke boot."
-                cat ../smoke-start.log
-                exit 1
-              fi
-
-              sleep 1
-            done
-
-            echo "Packaged app did not become healthy in time."
-            cat ../smoke-start.log
-            kill "${APP_PID}" || true
-            wait "${APP_PID}" 2>/dev/null || true
-            exit 1
-          )
-
-          cd "${DEPLOY_DIR}"
-          zip -r "../${ARTIFACT}" dist/ node_modules/ package.json
-          echo "artifact-name=${ARTIFACT}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
         with:
-          name: api-package
-          path: ${{ steps.pkg.outputs.artifact-name }}
-          retention-days: 1
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+        run: |
+          ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
+          az acr login --name "${ACR_NAME}"
+
+      - name: Build and push API image
+        id: meta
+        env:
+          TARGET_ENV: ${{ needs.set-env.outputs.environment }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
+        run: |
+          IMAGE_TAG="${TARGET_ENV}-${GITHUB_SHA::8}"
+          IMAGE_NAME="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${IMAGE_TAG}"
+          IMAGE_LATEST="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${TARGET_ENV}-latest"
+
+          docker build \
+            --file retro-tool-api/Dockerfile \
+            --tag "${IMAGE_NAME}" \
+            --tag "${IMAGE_LATEST}" \
+            .
+
+          docker push "${IMAGE_NAME}"
+          docker push "${IMAGE_LATEST}"
+
+          echo "image-tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "image-name=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
 
   # ──────────────────── Run DB migrations ─────────────────────────────
   migrate:
@@ -220,6 +176,9 @@ jobs:
         env:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
           API_WEBAPP_NAME: ${{ vars.API_WEBAPP_NAME }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
           FRONTEND_URL: ${{ vars.FRONTEND_URL || vars.SWA_URL }}
           CONVEX_SYNC_URL: ${{ vars.CONVEX_SYNC_URL }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
@@ -230,7 +189,7 @@ jobs:
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
           MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
         run: |
-          for key in AZURE_RESOURCE_GROUP API_WEBAPP_NAME FRONTEND_URL CONVEX_SYNC_URL EMAIL_FROM DATABASE_URL BETTER_AUTH_SECRET; do
+          for key in AZURE_RESOURCE_GROUP API_WEBAPP_NAME ACR_LOGIN_SERVER API_IMAGE_REPOSITORY IMAGE_TAG FRONTEND_URL CONVEX_SYNC_URL EMAIL_FROM DATABASE_URL BETTER_AUTH_SECRET; do
             if [ -z "${!key}" ]; then
               echo "Required deploy config is missing: ${key}"
               exit 1
@@ -303,20 +262,60 @@ jobs:
               VAPID_SUBJECT='${{ secrets.VAPID_SUBJECT }}' \
             --output none
 
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: api-package
-
-      - name: Deploy zip to App Service
+      - name: Configure Web App managed identity for ACR pull
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
         run: |
-          ZIP=$(ls retro-tool-api-*.zip)
-          az webapp deploy \
+          ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
+          PRINCIPAL_ID=$(az webapp identity assign \
             --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
             --name ${{ vars.API_WEBAPP_NAME }} \
-            --src-path "${ZIP}" \
-            --type zip \
-            --async true
+            --query principalId -o tsv)
+
+          ACR_ID=$(az acr show --name "${ACR_NAME}" --query id -o tsv)
+
+          EXISTING_ACRPULL=$(az role assignment list \
+            --assignee-object-id "${PRINCIPAL_ID}" \
+            --scope "${ACR_ID}" \
+            --role AcrPull \
+            --query '[0].id' -o tsv)
+
+          if [ -z "${EXISTING_ACRPULL}" ]; then
+            az role assignment create \
+              --assignee-object-id "${PRINCIPAL_ID}" \
+              --assignee-principal-type ServicePrincipal \
+              --role AcrPull \
+              --scope "${ACR_ID}" \
+              --only-show-errors
+          else
+            echo "AcrPull role assignment already exists for this Web App identity."
+          fi
+
+          az webapp config set \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --name ${{ vars.API_WEBAPP_NAME }} \
+            --generic-configurations '{"acrUseManagedIdentityCreds": true}' \
+            --only-show-errors
+
+      - name: Deploy container to App Service
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        run: |
+          IMAGE_NAME="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${IMAGE_TAG}"
+
+          az webapp config container set \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --name ${{ vars.API_WEBAPP_NAME }} \
+            --docker-custom-image-name "${IMAGE_NAME}" \
+            --docker-registry-server-url "https://${ACR_LOGIN_SERVER}" \
+            --output none
+
+          az webapp restart \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --name ${{ vars.API_WEBAPP_NAME }} \
+            --output none
 
       - name: Health check
         run: |
