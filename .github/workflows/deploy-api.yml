@@ -241,7 +241,7 @@ jobs:
               NODE_ENV=production \
               PORT=8080 \
               FRONTEND_URL='${{ vars.FRONTEND_URL || vars.SWA_URL }}' \
-              ALLOWED_ORIGINS='${{ vars.FRONTEND_URL || vars.SWA_URL }}' \
+              ALLOWED_ORIGINS='${{ vars.FRONTEND_URL || vars.SWA_URL }},https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
               LOCAL_SERVER_URL='https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
               DEPLOYED_SERVER_URL='https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
               CONVEX_SYNC_URL='${{ vars.CONVEX_SYNC_URL }}' \
