@@ -157,7 +157,17 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          node -e "const raw = process.env.DATABASE_URL || ''; if (!raw) { console.error('DATABASE_URL is missing'); process.exit(1); } try { const url = new URL(raw); console.log('Migration target host: ' + url.hostname + ':' + (url.port || '5432')); } catch { console.error('DATABASE_URL is set but not a valid URL'); process.exit(1); }"
+          DB_HOST=$(node -e "const raw = process.env.DATABASE_URL || ''; if (!raw) { console.error('DATABASE_URL is missing'); process.exit(1); } try { const url = new URL(raw); process.stdout.write(url.hostname); } catch { console.error('DATABASE_URL is set but not a valid URL'); process.exit(1); }")
+          DB_PORT=$(node -e "const url = new URL(process.env.DATABASE_URL); process.stdout.write(url.port || '5432')")
+
+          echo "Migration target host: ${DB_HOST}:${DB_PORT}"
+
+          if ! getent hosts "${DB_HOST}" > /dev/null; then
+            echo "Database DNS lookup failed for ${DB_HOST}."
+            echo "Check that DATABASE_URL uses the correct Flexible Server FQDN and that networking allows GitHub-hosted runners."
+            echo "If the server is private access only, migrations must run from a VNet-connected runner/service instead of GitHub-hosted runners."
+            exit 1
+          fi
 
       - name: Run migrations
         working-directory: retro-tool-api
