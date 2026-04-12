@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { Sparkles } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
 import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
 import { signOutWithCleanup } from '@/lib/auth-client'
+import { CURRENT_USER_QUERY_KEY } from '@/hooks/useCurrentUser'
 import type { User } from '@/common/types/users'
 
 export const Route = createFileRoute('/auth/social-callback')({
@@ -13,6 +15,7 @@ export const Route = createFileRoute('/auth/social-callback')({
 
 function SocialCallbackPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     async function checkApproval() {
@@ -23,6 +26,10 @@ function SocialCallbackPage() {
         // On success this user is now super-admin + approved; go straight to dashboard.
         try {
           await api.post(USERS_ENDPOINTS.ADMIN_BOOTSTRAP)
+          // Invalidate stale user cache so role/status is fresh before navigating.
+          await queryClient.invalidateQueries({
+            queryKey: CURRENT_USER_QUERY_KEY,
+          })
           navigate({ to: '/dashboard' })
           return
         } catch {
