@@ -907,7 +907,7 @@ export class UsersService {
   }
 
   async bootstrapFirstAdmin(userId: string) {
-    const exists = await this.commonService.checkAdminExists();
+    const { exists } = await this.commonService.checkAdminExists();
 
     if (exists) {
       throw new BadRequestException('An admin already exists');
