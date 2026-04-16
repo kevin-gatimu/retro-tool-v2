@@ -18,6 +18,8 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as TermsofserviceRouteImport } from './routes/termsofservice'
+import { Route as PrivacystatementRouteImport } from './routes/privacystatement'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RetrosIndexRouteImport } from './routes/retros/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
@@ -93,6 +95,16 @@ const AdminRoute = AdminRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsofserviceRoute = TermsofserviceRouteImport.update({
+  id: '/termsofservice',
+  path: '/termsofservice',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacystatementRoute = PrivacystatementRouteImport.update({
+  id: '/privacystatement',
+  path: '/privacystatement',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -254,6 +266,8 @@ const AdminOrgSetupRoute = AdminOrgSetupRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/termsofservice': typeof TermsofserviceRoute
+  '/privacystatement': typeof PrivacystatementRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
@@ -296,6 +310,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/termsofservice': typeof TermsofserviceRoute
+  '/privacystatement': typeof PrivacystatementRoute
   '/auth': typeof AuthRouteWithChildren
   '/me': typeof MeRoute
   '/reports': typeof ReportsRoute
@@ -336,6 +352,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/termsofservice': typeof TermsofserviceRoute
+  '/privacystatement': typeof PrivacystatementRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
@@ -380,6 +398,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/termsofservice'
+    | '/privacystatement'
     | '/admin'
     | '/auth'
     | '/dashboard'
@@ -422,6 +442,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/termsofservice'
+    | '/privacystatement'
     | '/auth'
     | '/me'
     | '/reports'
@@ -461,6 +483,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/termsofservice'
+    | '/privacystatement'
     | '/admin'
     | '/auth'
     | '/dashboard'
@@ -504,6 +528,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  TermsofserviceRoute: typeof TermsofserviceRoute
+  PrivacystatementRoute: typeof PrivacystatementRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
@@ -586,6 +612,20 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termsofservice': {
+      id: '/termsofservice'
+      path: '/termsofservice'
+      fullPath: '/termsofservice'
+      preLoaderRoute: typeof TermsofserviceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacystatement': {
+      id: '/privacystatement'
+      path: '/privacystatement'
+      fullPath: '/privacystatement'
+      preLoaderRoute: typeof PrivacystatementRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -888,6 +928,8 @@ const ProfileRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  TermsofserviceRoute: TermsofserviceRoute,
+  PrivacystatementRoute: PrivacystatementRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,

@@ -8,6 +8,8 @@ import {
   Users,
   Layers,
   ChevronRight,
+  FileText,
+  Lock,
 } from 'lucide-react'
 import { CardGridSkeleton } from '@/components/skeletons'
 
@@ -15,6 +17,85 @@ export const Route = createFileRoute('/')({
   pendingComponent: CardGridSkeleton,
   component: LandingPage,
 })
+
+function LandingNav() {
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50">
+      <div
+        className="mx-auto"
+        style={{
+          background:
+            'linear-gradient(90deg, transparent 0%, rgba(13,17,23,0.85) 40%, rgba(13,17,23,0.95) 100%)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(16,185,129,0.12)',
+        }}
+      >
+        <div className="container mx-auto px-4">
+          <div className="flex items-center h-16">
+            {/* Left: Logo */}
+            <div className="flex items-center gap-2 shrink-0">
+              <img
+                src="/Retro-Tool-Logo.jpg"
+                alt="Retro-Tool"
+                className="h-8 w-8 rounded-lg object-cover"
+              />
+              <span className="font-mono font-bold text-white text-sm tracking-tight hidden sm:block">
+                Retro-Tool
+              </span>
+            </div>
+
+            {/* Right half: nav links */}
+            <nav className="ml-auto flex items-center gap-1">
+              <a
+                href="https://retro-tool.com"
+                target="_blank"
+                rel="noreferrer"
+                className="group flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-400
+                  hover:text-emerald-400 hover:bg-emerald-500/10 transition-all duration-200 font-mono"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 group-hover:scale-125 transition-transform duration-200" />
+                retro-tool.com
+              </a>
+
+              <div className="w-px h-4 bg-gray-700 mx-1" />
+
+              <Link
+                to="/termsofservice"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-400
+                  hover:text-emerald-400 hover:bg-emerald-500/10 transition-all duration-200 font-mono"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Terms
+              </Link>
+
+              <Link
+                to="/privacystatement"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-400
+                  hover:text-emerald-400 hover:bg-emerald-500/10 transition-all duration-200 font-mono"
+              >
+                <Lock className="h-3.5 w-3.5" />
+                Privacy
+              </Link>
+
+              <div className="w-px h-4 bg-gray-700 mx-1" />
+
+              <Link to="/auth/sign-in">
+                <button
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium
+                    text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/70
+                    hover:bg-emerald-500/10 transition-all duration-200 font-mono cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </Link>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </header>
+  )
+}
 
 function LandingPage() {
   const templates = [
@@ -89,9 +170,11 @@ function LandingPage() {
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(16,185,129,0.05),transparent_50%)]" />
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(34,197,94,0.05),transparent_50%)]" />
 
+      <LandingNav />
+
       <div className="relative">
         {/* Hero */}
-        <div className="container mx-auto px-4 pt-24 pb-20">
+        <div className="container mx-auto px-4 pt-28 pb-20">
           <div className="max-w-4xl mx-auto text-center mb-20">
             {/* Logo */}
             <div className="flex items-center justify-center gap-4 mb-6">
@@ -306,8 +389,22 @@ function LandingPage() {
 
         {/* Footer */}
         <div className="border-t border-gray-800 py-8 mt-20">
-          <div className="container mx-auto px-4 text-center text-sm text-gray-500">
+          <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-500">
             <p>© 2026 Retro-Tool. Open source and built for teams.</p>
+            <div className="flex items-center gap-4 text-xs">
+              <Link
+                to="/termsofservice"
+                className="hover:text-emerald-400 transition-colors duration-200"
+              >
+                Terms of Service
+              </Link>
+              <Link
+                to="/privacystatement"
+                className="hover:text-emerald-400 transition-colors duration-200"
+              >
+                Privacy Statement
+              </Link>
+            </div>
           </div>
         </div>
       </div>
