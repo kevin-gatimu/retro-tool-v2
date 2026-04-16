@@ -33,7 +33,7 @@ interface MyRouterContext {
 }
 
 // Routes that should not show the sidebar (auth pages and public landing pages)
-const publicRoutes = ['/']
+const publicRoutes = ['/', '/termsofservice', '/privacystatement']
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   head: () => ({

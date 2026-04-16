@@ -9,17 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsofserviceRouteImport } from './routes/termsofservice'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TeamRouteImport } from './routes/team'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PrivacystatementRouteImport } from './routes/privacystatement'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
-import { Route as TermsofserviceRouteImport } from './routes/termsofservice'
-import { Route as PrivacystatementRouteImport } from './routes/privacystatement'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RetrosIndexRouteImport } from './routes/retros/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
@@ -52,6 +52,11 @@ import { Route as AdminTemplatesRouteImport } from './routes/admin/templates'
 import { Route as AdminOrganizationsRouteImport } from './routes/admin/organizations'
 import { Route as AdminOrgSetupRouteImport } from './routes/admin/org-setup'
 
+const TermsofserviceRoute = TermsofserviceRouteImport.update({
+  id: '/termsofservice',
+  path: '/termsofservice',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -70,6 +75,11 @@ const ReportsRoute = ReportsRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacystatementRoute = PrivacystatementRouteImport.update({
+  id: '/privacystatement',
+  path: '/privacystatement',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MeRoute = MeRouteImport.update({
@@ -95,16 +105,6 @@ const AdminRoute = AdminRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TermsofserviceRoute = TermsofserviceRouteImport.update({
-  id: '/termsofservice',
-  path: '/termsofservice',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacystatementRoute = PrivacystatementRouteImport.update({
-  id: '/privacystatement',
-  path: '/privacystatement',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -266,16 +266,16 @@ const AdminOrgSetupRoute = AdminOrgSetupRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/termsofservice': typeof TermsofserviceRoute
-  '/privacystatement': typeof PrivacystatementRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
   '/me': typeof MeRoute
+  '/privacystatement': typeof PrivacystatementRoute
   '/profile': typeof ProfileRouteWithChildren
   '/reports': typeof ReportsRoute
   '/team': typeof TeamRoute
   '/templates': typeof TemplatesRoute
+  '/termsofservice': typeof TermsofserviceRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
   '/admin/organizations': typeof AdminOrganizationsRoute
   '/admin/templates': typeof AdminTemplatesRoute
@@ -310,13 +310,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/termsofservice': typeof TermsofserviceRoute
-  '/privacystatement': typeof PrivacystatementRoute
   '/auth': typeof AuthRouteWithChildren
   '/me': typeof MeRoute
+  '/privacystatement': typeof PrivacystatementRoute
   '/reports': typeof ReportsRoute
   '/team': typeof TeamRoute
   '/templates': typeof TemplatesRoute
+  '/termsofservice': typeof TermsofserviceRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
   '/admin/organizations': typeof AdminOrganizationsRoute
   '/admin/templates': typeof AdminTemplatesRoute
@@ -352,16 +352,16 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/termsofservice': typeof TermsofserviceRoute
-  '/privacystatement': typeof PrivacystatementRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
   '/me': typeof MeRoute
+  '/privacystatement': typeof PrivacystatementRoute
   '/profile': typeof ProfileRouteWithChildren
   '/reports': typeof ReportsRoute
   '/team': typeof TeamRoute
   '/templates': typeof TemplatesRoute
+  '/termsofservice': typeof TermsofserviceRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
   '/admin/organizations': typeof AdminOrganizationsRoute
   '/admin/templates': typeof AdminTemplatesRoute
@@ -398,16 +398,16 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
-    | '/termsofservice'
-    | '/privacystatement'
     | '/admin'
     | '/auth'
     | '/dashboard'
     | '/me'
+    | '/privacystatement'
     | '/profile'
     | '/reports'
     | '/team'
     | '/templates'
+    | '/termsofservice'
     | '/admin/org-setup'
     | '/admin/organizations'
     | '/admin/templates'
@@ -442,13 +442,13 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
-    | '/termsofservice'
-    | '/privacystatement'
     | '/auth'
     | '/me'
+    | '/privacystatement'
     | '/reports'
     | '/team'
     | '/templates'
+    | '/termsofservice'
     | '/admin/org-setup'
     | '/admin/organizations'
     | '/admin/templates'
@@ -483,16 +483,16 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
-    | '/termsofservice'
-    | '/privacystatement'
     | '/admin'
     | '/auth'
     | '/dashboard'
     | '/me'
+    | '/privacystatement'
     | '/profile'
     | '/reports'
     | '/team'
     | '/templates'
+    | '/termsofservice'
     | '/admin/org-setup'
     | '/admin/organizations'
     | '/admin/templates'
@@ -528,16 +528,16 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
-  TermsofserviceRoute: typeof TermsofserviceRoute
-  PrivacystatementRoute: typeof PrivacystatementRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
   MeRoute: typeof MeRoute
+  PrivacystatementRoute: typeof PrivacystatementRoute
   ProfileRoute: typeof ProfileRouteWithChildren
   ReportsRoute: typeof ReportsRoute
   TeamRoute: typeof TeamRoute
   TemplatesRoute: typeof TemplatesRoute
+  TermsofserviceRoute: typeof TermsofserviceRoute
   EstimateSessionIdRoute: typeof EstimateSessionIdRoute
   EstimateNewRoute: typeof EstimateNewRoute
   OrganizationsOrgIdRoute: typeof OrganizationsOrgIdRoute
@@ -551,6 +551,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/termsofservice': {
+      id: '/termsofservice'
+      path: '/termsofservice'
+      fullPath: '/termsofservice'
+      preLoaderRoute: typeof TermsofserviceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/templates': {
       id: '/templates'
       path: '/templates'
@@ -577,6 +584,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacystatement': {
+      id: '/privacystatement'
+      path: '/privacystatement'
+      fullPath: '/privacystatement'
+      preLoaderRoute: typeof PrivacystatementRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/me': {
@@ -612,20 +626,6 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/termsofservice': {
-      id: '/termsofservice'
-      path: '/termsofservice'
-      fullPath: '/termsofservice'
-      preLoaderRoute: typeof TermsofserviceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacystatement': {
-      id: '/privacystatement'
-      path: '/privacystatement'
-      fullPath: '/privacystatement'
-      preLoaderRoute: typeof PrivacystatementRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -928,16 +928,16 @@ const ProfileRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
-  TermsofserviceRoute: TermsofserviceRoute,
-  PrivacystatementRoute: PrivacystatementRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
   MeRoute: MeRoute,
+  PrivacystatementRoute: PrivacystatementRoute,
   ProfileRoute: ProfileRouteWithChildren,
   ReportsRoute: ReportsRoute,
   TeamRoute: TeamRoute,
   TemplatesRoute: TemplatesRoute,
+  TermsofserviceRoute: TermsofserviceRoute,
   EstimateSessionIdRoute: EstimateSessionIdRoute,
   EstimateNewRoute: EstimateNewRoute,
   OrganizationsOrgIdRoute: OrganizationsOrgIdRoute,
