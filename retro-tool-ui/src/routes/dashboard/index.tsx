@@ -235,7 +235,7 @@ function DashboardIndexPage() {
             {[
               {
                 to: '/retros/new' as const,
-                icon: History,
+                icon: HistoryIcon,
                 label: 'Start a Retrospective',
               },
               {
@@ -245,7 +245,7 @@ function DashboardIndexPage() {
               },
               {
                 to: '/retros' as const,
-                icon: History,
+                icon: HistoryIcon,
                 label: 'View All Retros',
               },
               {
