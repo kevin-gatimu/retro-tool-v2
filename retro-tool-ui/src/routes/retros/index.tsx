@@ -3,7 +3,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
   ChevronLeft,
   ChevronRight,
-  History,
+  History as HistoryIcon,
   MoreHorizontal,
   Plus,
   RefreshCw,
@@ -156,6 +156,8 @@ function RetrosPage() {
     queryClient.invalidateQueries({ queryKey: ['retros', page, limit] })
 
   useEffect(() => {
+    if (usesConvexRealtime) return
+
     const socket = getRetroSocket()
 
     const onRetroListChanged = () => {
@@ -171,7 +173,7 @@ function RetrosPage() {
     return () => {
       socket.off('retro-list-changed', onRetroListChanged)
     }
-  }, [queryClient])
+  }, [queryClient, usesConvexRealtime])
 
   return (
     <div className="space-y-6">
@@ -194,7 +196,7 @@ function RetrosPage() {
       {total === 0 && !isLoading ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <History className="h-12 w-12 text-muted-foreground mb-4" />
+            <HistoryIcon className="h-12 w-12 text-muted-foreground mb-4" />
             <CardTitle className="mb-2">No retrospectives yet</CardTitle>
             <CardDescription className="text-center mb-4">
               Start your first retrospective to gather feedback from your team.

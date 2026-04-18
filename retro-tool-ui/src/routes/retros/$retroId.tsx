@@ -15,25 +15,35 @@ import {
   ArrowLeft,
   CheckCircle,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
+  Circle,
   Clock,
   Eye,
   EyeOff,
   GitMerge,
-  History,
   MessageSquare,
   MoreVertical,
   Play,
   Plus,
   RotateCcw,
-  Send,
   ThumbsUp,
   Trash2,
   Users,
   Vote,
 } from 'lucide-react'
-import React, { useEffect, useRef, useState, memo, useCallback } from 'react'
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  memo,
+  useCallback,
+  useMemo,
+} from 'react'
+import {
+  useQuery as useConvexQuery,
+  useMutation as useConvexMutation,
+} from 'convex/react'
+import type { FunctionReference } from 'convex/server'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useRetroMutations } from './hooks/useRetroMutations'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
@@ -50,20 +60,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -84,7 +85,28 @@ import { RetroReport } from '@/components/retro-report'
 import { MusicPlayer } from '@/components/music-player'
 import { usesConvexForRetros } from '@/lib/realtime-config'
 import { RetroConvexSync } from './components/retro-convex-sync'
+import { RetroDiscussionView } from './components/retro-discussion-view'
 import type { CarriedForwardItem } from './types'
+
+const startTypingMutationRef =
+  'liveRetros:startTyping' as unknown as FunctionReference<'mutation'>
+const stopTypingMutationRef =
+  'liveRetros:stopTyping' as unknown as FunctionReference<'mutation'>
+const getTypingUsersQueryRef =
+  'liveRetros:getTypingUsers' as unknown as FunctionReference<'query'>
+const setReadyStatusMutationRef =
+  'liveRetros:setReadyStatus' as unknown as FunctionReference<'mutation'>
+const clearAllReadyMutationRef =
+  'liveRetros:clearAllReady' as unknown as FunctionReference<'mutation'>
+const getReadyStatusQueryRef =
+  'liveRetros:getReadyStatus' as unknown as FunctionReference<'query'>
+
+function getInitials(name?: string | null): string {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
 
 function RetroAccessError({ error }: { error: Error }) {
   const navigate = useNavigate()
@@ -112,6 +134,95 @@ function RetroDetailPage() {
   const queryClient = useQueryClient()
   const usesConvexRealtime = usesConvexForRetros()
 
+  const { data: currentUser } = useCurrentUser()
+
+  // ── Convex typing indicator ──────────────────────────────────────────────────
+  const startTypingConvex = useConvexMutation(startTypingMutationRef)
+  const stopTypingConvex = useConvexMutation(stopTypingMutationRef)
+  const rawTypingUsers = useConvexQuery(
+    getTypingUsersQueryRef,
+    usesConvexRealtime ? { retroId } : 'skip',
+  )
+  const typingUsers = (rawTypingUsers ?? []).filter(
+    (u: { userId: string }) => u.userId !== currentUser?.id,
+  )
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isTypingRef = useRef(false)
+
+  const handleTypingStart = useCallback(() => {
+    if (!usesConvexRealtime || !currentUser) return
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    // Only fire mutation on idle → typing transition
+    if (!isTypingRef.current) {
+      isTypingRef.current = true
+      startTypingConvex({
+        retroId,
+        userId: currentUser.id,
+        displayName: currentUser.name,
+      })
+    }
+    typingTimeoutRef.current = setTimeout(() => {
+      isTypingRef.current = false
+      typingTimeoutRef.current = null
+      stopTypingConvex({ retroId, userId: currentUser.id })
+    }, 3000)
+  }, [
+    usesConvexRealtime,
+    currentUser,
+    retroId,
+    startTypingConvex,
+    stopTypingConvex,
+  ])
+
+  const handleTypingStop = useCallback(() => {
+    if (!usesConvexRealtime || !currentUser) return
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = null
+    }
+    if (isTypingRef.current) {
+      isTypingRef.current = false
+      stopTypingConvex({ retroId, userId: currentUser.id })
+    }
+  }, [usesConvexRealtime, currentUser, retroId, stopTypingConvex])
+
+  // ── Convex ready status ──────────────────────────────────────────────────────
+  const setReadyStatusConvex = useConvexMutation(setReadyStatusMutationRef)
+  const clearAllReadyConvex = useConvexMutation(clearAllReadyMutationRef)
+  const rawReadyStatuses = useConvexQuery(
+    getReadyStatusQueryRef,
+    usesConvexRealtime ? { retroId } : 'skip',
+  )
+  const readyStatuses = rawReadyStatuses ?? []
+  const myReady = Boolean(
+    (readyStatuses as Array<{ userId: string; isReady: boolean }>).find(
+      (r) => r.userId === currentUser?.id,
+    )?.isReady,
+  )
+  const readyCount = (readyStatuses as Array<{ isReady: boolean }>).filter(
+    (r) => r.isReady,
+  ).length
+
+  const [readyAnimating, setReadyAnimating] = useState(false)
+  const [minAcceptedBoardUpdatedAt, setMinAcceptedBoardUpdatedAt] = useState(0)
+
+  const markConvexBoardSnapshotFloor = useCallback(() => {
+    if (!usesConvexRealtime) return
+    setMinAcceptedBoardUpdatedAt(Date.now())
+  }, [usesConvexRealtime])
+
+  const toggleReady = useCallback(() => {
+    if (!usesConvexRealtime || !currentUser) return
+    const next = !myReady
+    if (next) setReadyAnimating(true)
+    setReadyStatusConvex({
+      retroId,
+      userId: currentUser.id,
+      displayName: currentUser.name,
+      isReady: next,
+    })
+  }, [usesConvexRealtime, currentUser, myReady, retroId, setReadyStatusConvex])
+
   const invalidateRetroDetail = useCallback(() => {
     if (usesConvexRealtime) {
       return
@@ -128,11 +239,12 @@ function RetroDetailPage() {
     })
   }, [queryClient, retroId, usesConvexRealtime])
 
-  // Join retro on mount
+  // Join retro on mount — ref prevents double-fire under React StrictMode
+  const joinedRef = useRef(false)
   useEffect(() => {
-    api.post(RETROS_ENDPOINTS.JOIN(retroId)).catch(() => {
-      // Silently ignore join errors (already joined, or no access)
-    })
+    if (joinedRef.current) return
+    joinedRef.current = true
+    api.post(RETROS_ENDPOINTS.JOIN(retroId)).catch(() => {})
   }, [retroId])
 
   const {
@@ -145,6 +257,26 @@ function RetroDetailPage() {
     staleTime: 5_000,
     refetchInterval: usesConvexRealtime ? false : 3_000,
   })
+
+  // Clear typing + ready status when the active phase ends
+  const prevRetroStatusRef = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevRetroStatusRef.current
+    if (prev === 'active' && retro?.status !== 'active' && usesConvexRealtime) {
+      if (currentUser) {
+        stopTypingConvex({ retroId, userId: currentUser.id })
+      }
+      clearAllReadyConvex({ retroId })
+    }
+    prevRetroStatusRef.current = retro?.status ?? null
+  }, [
+    retro?.status,
+    usesConvexRealtime,
+    currentUser,
+    retroId,
+    stopTypingConvex,
+    clearAllReadyConvex,
+  ])
 
   useEffect(() => {
     if (usesConvexRealtime) {
@@ -181,10 +313,10 @@ function RetroDetailPage() {
       queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
         prev
           ? {
-            ...prev,
-            currentDiscussionCardId: cardId,
-            currentDiscussionActionItemId: null,
-          }
+              ...prev,
+              currentDiscussionCardId: cardId,
+              currentDiscussionActionItemId: null,
+            }
           : prev,
       )
     }
@@ -198,10 +330,10 @@ function RetroDetailPage() {
       queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
         prev
           ? {
-            ...prev,
-            currentDiscussionActionItemId: actionItemId,
-            currentDiscussionCardId: null,
-          }
+              ...prev,
+              currentDiscussionActionItemId: actionItemId,
+              currentDiscussionCardId: null,
+            }
           : prev,
       )
     }
@@ -277,14 +409,9 @@ function RetroDetailPage() {
   const [localPendingCards, setLocalPendingCards] = useState<
     Record<string, Array<{ id: string; content: string }>>
   >({})
-  const [expandedCard, setExpandedCard] = useState<string | null>(null)
-  const [newComment, setNewComment] = useState('')
   const [newCarriedItemComments, setNewCarriedItemComments] = useState<
     Partial<Record<string, string>>
   >({})
-  const [expandedCarriedItemId, setExpandedCarriedItemId] = useState<
-    string | null
-  >(null)
   const [selectedCardIds, setSelectedCardIds] = useState<
     Record<string, boolean>
   >({})
@@ -448,14 +575,96 @@ function RetroDetailPage() {
       if (retro?.status !== 'grouping') {
         throw new Error('Cards can only be merged during the grouping phase')
       }
-      return api.post(RETROS_ENDPOINTS.MERGE_CARDS(retroId), {
-        cardIds,
-        columnId,
-      })
+      return api.post<{ success: boolean; id: string }>(
+        RETROS_ENDPOINTS.MERGE_CARDS(retroId),
+        {
+          cardIds,
+          columnId,
+        },
+      )
     },
-    onSuccess: () => {
+    onMutate: async ({ cardIds }) => {
+      markConvexBoardSnapshotFloor()
+      await queryClient.cancelQueries({ queryKey: ['retro', retroId] })
+      const previous = queryClient.getQueryData<RetroDetail>(['retro', retroId])
+
+      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) => {
+        if (!prev) return prev
+        const mergingCards = cardIds
+          .map((id) => prev.cards.find((c) => c.id === id))
+          .filter((c): c is RetroDetail['cards'][number] => c !== undefined)
+        if (mergingCards.length < 2) return prev
+
+        // In drag-and-drop cardIds = [dragged, target]; target absorbs dragged.
+        // For checkbox merge the last selected card acts as the target.
+        const targetCard = mergingCards[mergingCards.length - 1]
+        const sourceIds = new Set(mergingCards.slice(0, -1).map((c) => c.id))
+
+        const allSourceContents = mergingCards.flatMap((c) =>
+          c.sourceContents && c.sourceContents.length > 0
+            ? c.sourceContents
+            : [c.content],
+        )
+
+        const allAuthorNames = mergingCards
+          .flatMap((c) =>
+            c.mergedFromNames && c.mergedFromNames.length > 0
+              ? c.mergedFromNames
+              : c.author?.name
+                ? [c.author.name]
+                : [],
+          )
+          .filter(Boolean)
+
+        const mergedCard: RetroDetail['cards'][number] = {
+          ...targetCard,
+          sourceContents: allSourceContents,
+          mergedFromNames: allAuthorNames,
+          mergedCount: mergingCards.reduce(
+            (sum, c) =>
+              sum + (c.mergedCount && c.mergedCount > 0 ? c.mergedCount : 1),
+            0,
+          ),
+          canUnmerge: true,
+          voteCount: mergingCards.reduce(
+            (sum, c) => sum + (c.voteCount ?? 0),
+            0,
+          ),
+          hasVoted: mergingCards.some((c) => c.hasVoted),
+          comments: mergingCards.flatMap((c) => c.comments),
+        }
+
+        return {
+          ...prev,
+          cards: prev.cards
+            .filter((c) => !sourceIds.has(c.id))
+            .map((c) => (c.id === targetCard.id ? mergedCard : c)),
+        }
+      })
+
+      return { previous }
+    },
+    onSuccess: (data, variables) => {
+      // The server deletes all merged cards and creates a brand-new UUID.
+      // Immediately replace the optimistic target card's stale ID with the real
+      // server ID so rapid back-to-back merges always reference a valid card.
+      const optimisticTargetId = variables.cardIds[variables.cardIds.length - 1]
+      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          cards: prev.cards.map((c) =>
+            c.id === optimisticTargetId ? { ...c, id: data.id } : c,
+          ),
+        }
+      })
       setSelectedCardIds({})
       invalidateRetroDetail()
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['retro', retroId], context.previous)
+      }
     },
   })
 
@@ -466,9 +675,68 @@ function RetroDetailPage() {
       }
       return api.post(RETROS_ENDPOINTS.UNMERGE_CARD(retroId, cardId))
     },
+    onMutate: async (cardId: string) => {
+      markConvexBoardSnapshotFloor()
+      await queryClient.cancelQueries({ queryKey: ['retro', retroId] })
+      const previous = queryClient.getQueryData<RetroDetail>(['retro', retroId])
+
+      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) => {
+        if (!prev) return prev
+        const mergedCard = prev.cards.find((c) => c.id === cardId)
+        if (!mergedCard) return prev
+
+        const sourceContents =
+          mergedCard.sourceContents && mergedCard.sourceContents.length > 0
+            ? mergedCard.sourceContents
+            : [mergedCard.content]
+
+        const placeholders: RetroDetail['cards'] = sourceContents.map(
+          (content, i) => ({
+            id: `__unmerge_${cardId}_${i}`,
+            columnId: mergedCard.columnId,
+            content,
+            sourceContents: [],
+            mergedFromNames: [],
+            mergedCount: 0,
+            canUnmerge: false,
+            isDiscussed: false,
+            isCarriedForward: false,
+            discussedAt: null,
+            voteCount: 0,
+            hasVoted: false,
+            isOwn: mergedCard.isOwn,
+            // Use the stored author name from mergedFromNames so the card
+            // doesn't flash as anonymous while waiting for the server response.
+            author: mergedCard.mergedFromNames?.[i]
+              ? {
+                  id: '',
+                  name: mergedCard.mergedFromNames[i],
+                  image: null,
+                  jobRole: null,
+                }
+              : mergedCard.author,
+            comments: [],
+          }),
+        )
+
+        return {
+          ...prev,
+          cards: prev.cards.flatMap((c) =>
+            c.id === cardId ? placeholders : [c],
+          ),
+        }
+      })
+
+      return { previous }
+    },
     onSuccess: () => {
       setSelectedCardIds({})
       invalidateRetroDetail()
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['retro', retroId], context.previous)
+      }
     },
   })
 
@@ -485,10 +753,10 @@ function RetroDetailPage() {
           cards: prev.cards.map((card) =>
             card.id === cardId
               ? {
-                ...card,
-                hasVoted: true,
-                voteCount: (card.voteCount ?? 0) + 1,
-              }
+                  ...card,
+                  hasVoted: true,
+                  voteCount: (card.voteCount ?? 0) + 1,
+                }
               : card,
           ),
         }
@@ -516,10 +784,10 @@ function RetroDetailPage() {
           cards: prev.cards.map((card) =>
             card.id === cardId
               ? {
-                ...card,
-                hasVoted: false,
-                voteCount: Math.max(0, (card.voteCount ?? 0) - 1),
-              }
+                  ...card,
+                  hasVoted: false,
+                  voteCount: Math.max(0, (card.voteCount ?? 0) - 1),
+                }
               : card,
           ),
         }
@@ -537,33 +805,182 @@ function RetroDetailPage() {
   const discussCardMutation = useMutation({
     mutationFn: (cardId: string) =>
       api.post(RETROS_ENDPOINTS.DISCUSS_CARD(retroId, cardId)),
+    onMutate: async (cardId: string) => {
+      markConvexBoardSnapshotFloor()
+      await queryClient.cancelQueries({ queryKey: ['retro', retroId] })
+      const previous = queryClient.getQueryData<RetroDetail>(['retro', retroId])
+
+      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
+        prev
+          ? {
+              ...prev,
+              currentDiscussionCardId: cardId,
+              currentDiscussionActionItemId: null,
+            }
+          : prev,
+      )
+
+      return { previous }
+    },
     onSuccess: () => {
       invalidateRetroDetail()
+    },
+    onError: (e: Error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['retro', retroId], context.previous)
+      }
+      toast.error(e.message || 'Failed to set discussion point')
     },
   })
 
   const markDiscussedMutation = useMutation({
     mutationFn: (cardId: string) =>
       api.post(RETROS_ENDPOINTS.MARK_DISCUSSED(retroId, cardId)),
+    onMutate: async (cardId: string) => {
+      markConvexBoardSnapshotFloor()
+      await queryClient.cancelQueries({ queryKey: ['retro', retroId] })
+      const previous = queryClient.getQueryData<RetroDetail>(['retro', retroId])
+      const nowIso = new Date().toISOString()
+
+      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
+        prev
+          ? {
+              ...prev,
+              currentDiscussionCardId: null,
+              cards: prev.cards.map((card) =>
+                card.id === cardId
+                  ? { ...card, isDiscussed: true, discussedAt: nowIso }
+                  : card,
+              ),
+            }
+          : prev,
+      )
+
+      return { previous }
+    },
     onSuccess: () => {
       invalidateRetroDetail()
+    },
+    onError: (e: Error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['retro', retroId], context.previous)
+      }
+      toast.error(e.message || 'Failed to mark card as discussed')
     },
   })
 
   const createCommentMutation = useMutation({
     mutationFn: ({ cardId, content }: { cardId: string; content: string }) =>
-      api.post(RETROS_ENDPOINTS.CARD_COMMENTS(cardId), { content }),
-    onSuccess: () => {
-      setNewComment('')
+      api.post<{ id: string; retroId: string }>(
+        RETROS_ENDPOINTS.CARD_COMMENTS(cardId),
+        {
+          content,
+        },
+      ),
+    onMutate: async ({ cardId, content }) => {
+      markConvexBoardSnapshotFloor()
+      await queryClient.cancelQueries({ queryKey: ['retro', retroId] })
+      const previous = queryClient.getQueryData<RetroDetail>(['retro', retroId])
+      const trimmed = content.trim()
+      if (!trimmed) {
+        return { previous, tempId: '', cardId }
+      }
+
+      const tempId = `__optimistic_comment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const optimisticComment: RetroDetail['cards'][number]['comments'][number] =
+        {
+          id: tempId,
+          content: trimmed,
+          isOwn: true,
+          createdAt: new Date().toISOString(),
+          author: currentUser
+            ? {
+                id: currentUser.id,
+                name: currentUser.name,
+                image: currentUser.image ?? null,
+              }
+            : null,
+        }
+
+      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
+        prev
+          ? {
+              ...prev,
+              cards: prev.cards.map((card) =>
+                card.id === cardId
+                  ? { ...card, comments: [...card.comments, optimisticComment] }
+                  : card,
+              ),
+            }
+          : prev,
+      )
+
+      return { previous, tempId, cardId }
+    },
+    onSuccess: (result, _vars, context) => {
+      if (context.tempId) {
+        queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
+          prev
+            ? {
+                ...prev,
+                cards: prev.cards.map((card) =>
+                  card.id === context.cardId
+                    ? {
+                        ...card,
+                        comments: card.comments.map((comment) =>
+                          comment.id === context.tempId
+                            ? { ...comment, id: result.id }
+                            : comment,
+                        ),
+                      }
+                    : card,
+                ),
+              }
+            : prev,
+        )
+      }
       invalidateRetroDetail()
+    },
+    onError: (e: Error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['retro', retroId], context.previous)
+      }
+      toast.error(e.message || 'Failed to add comment')
     },
   })
 
   const deleteCommentMutation = useMutation({
     mutationFn: (commentId: string) =>
       api.delete(RETROS_ENDPOINTS.COMMENT_BY_ID(commentId)),
+    onMutate: async (commentId: string) => {
+      markConvexBoardSnapshotFloor()
+      await queryClient.cancelQueries({ queryKey: ['retro', retroId] })
+      const previous = queryClient.getQueryData<RetroDetail>(['retro', retroId])
+
+      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
+        prev
+          ? {
+              ...prev,
+              cards: prev.cards.map((card) => ({
+                ...card,
+                comments: card.comments.filter(
+                  (comment) => comment.id !== commentId,
+                ),
+              })),
+            }
+          : prev,
+      )
+
+      return { previous }
+    },
     onSuccess: () => {
       invalidateRetroDetail()
+    },
+    onError: (e: Error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['retro', retroId], context.previous)
+      }
+      toast.error(e.message || 'Failed to delete comment')
     },
   })
 
@@ -578,7 +995,6 @@ function RetroDetailPage() {
   })
 
   // Carried-forward items from the previous retro (shown in discussion phase)
-  const [carriedForwardOpen, setCarriedForwardOpen] = useState(true)
   const [pendingCarriedDiscussItemId, setPendingCarriedDiscussItemId] =
     useState<string | null>(null)
   const [pendingCarriedDoneItemId, setPendingCarriedDoneItemId] = useState<
@@ -595,7 +1011,7 @@ function RetroDetailPage() {
     staleTime: usesConvexRealtime ? 60_000 : 0,
     refetchInterval:
       !usesConvexRealtime &&
-        (retro?.status === 'discussing' || retro?.status === 'completed')
+      (retro?.status === 'discussing' || retro?.status === 'completed')
         ? 3000
         : false,
     refetchIntervalInBackground: !usesConvexRealtime,
@@ -619,15 +1035,6 @@ function RetroDetailPage() {
     onError: (e: Error) => toast.error(e.message || 'Failed to add comment'),
   })
 
-  const deleteCarriedItemCommentMutation = useMutation({
-    mutationFn: (commentId: string) =>
-      api.delete(ACTION_ITEMS_ENDPOINTS.COMMENT_BY_ID(commentId)),
-    onSuccess: () => {
-      invalidatePreviousCarried()
-    },
-    onError: (e: Error) => toast.error(e.message || 'Failed to delete comment'),
-  })
-
   const markCarriedItemDoneMutation = useMutation({
     mutationFn: (itemId: string) =>
       api.patch(ACTION_ITEMS_ENDPOINTS.BY_ID(itemId), {
@@ -648,12 +1055,12 @@ function RetroDetailPage() {
       queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
         prev
           ? {
-            ...prev,
-            currentDiscussionActionItemId:
-              prev.currentDiscussionActionItemId === itemId
-                ? null
-                : prev.currentDiscussionActionItemId,
-          }
+              ...prev,
+              currentDiscussionActionItemId:
+                prev.currentDiscussionActionItemId === itemId
+                  ? null
+                  : prev.currentDiscussionActionItemId,
+            }
           : prev,
       )
       invalidatePreviousCarried()
@@ -675,10 +1082,10 @@ function RetroDetailPage() {
       queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
         prev
           ? {
-            ...prev,
-            currentDiscussionActionItemId: itemId,
-            currentDiscussionCardId: null,
-          }
+              ...prev,
+              currentDiscussionActionItemId: itemId,
+              currentDiscussionCardId: null,
+            }
           : prev,
       )
       invalidateRetroDetail()
@@ -780,6 +1187,49 @@ function RetroDetailPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  // Preserve card positions during grouping so the merged card doesn't jump
+  // when the Convex snapshot arrives with a brand-new server-side card ID.
+  const stableCardOrderRef = useRef<string[]>([])
+  const isGroupingPhase = retro?.status === 'grouping'
+
+  const stableRetroCards = useMemo(() => {
+    const allCards = retro?.cards ?? []
+    if (!isGroupingPhase) {
+      stableCardOrderRef.current = []
+      return allCards
+    }
+
+    const prevOrder = stableCardOrderRef.current
+    if (prevOrder.length === 0) {
+      stableCardOrderRef.current = allCards.map((c) => c.id)
+      return allCards
+    }
+
+    const incomingMap = new Map(allCards.map((c) => [c.id, c]))
+    const prevSet = new Set(prevOrder)
+    const newCards = allCards.filter((c) => !prevSet.has(c.id))
+
+    const result: RetroDetail['cards'] = []
+    let newCardsInserted = false
+
+    for (const id of prevOrder) {
+      if (incomingMap.has(id)) {
+        result.push(incomingMap.get(id)!)
+      } else if (!newCardsInserted && newCards.length > 0) {
+        // Card was removed (merged); slot in the replacement card(s) here
+        for (const card of newCards) result.push(card)
+        newCardsInserted = true
+      }
+    }
+
+    if (!newCardsInserted) {
+      for (const card of newCards) result.push(card)
+    }
+
+    stableCardOrderRef.current = result.map((c) => c.id)
+    return result
+  }, [retro?.cards, isGroupingPhase])
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft':
@@ -844,12 +1294,13 @@ function RetroDetailPage() {
   const canControl = Boolean(retro.isCreator || retro.isTeamLead)
   const retroStatus = retro.status
   const currentDiscussionCardId = retro.currentDiscussionCardId ?? null
-  const currentDiscussionActionItemId =
-    retro.currentDiscussionActionItemId ?? null
   const retroName = retro.name || 'Untitled Retrospective'
+  const participants = Array.from(
+    new Map(retro.participants.map((p) => [p.userId, p])).values(),
+  )
   const teamDisplayName = retro.team.name
   const templateDisplayName = retro.template.name
-  const participantCount = retro.participants.length
+  const participantCount = participants.length
   const templateColumns =
     retro.template.columns.length > 0
       ? retro.template.columns
@@ -867,9 +1318,9 @@ function RetroDetailPage() {
   }, [])
 
   const getColumnCards = (columnId: string) => {
-    const cards = retroCards.filter((c) => c.columnId === columnId)
-    if (retroStatus === 'voting') return cards
-    return cards.sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0))
+    const cards = stableRetroCards.filter((c) => c.columnId === columnId)
+    if (retroStatus === 'grouping' || retroStatus === 'voting') return cards
+    return [...cards].sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0))
   }
 
   const handleVoteClick = useCallback(
@@ -893,7 +1344,12 @@ function RetroDetailPage() {
 
   return (
     <TooltipProvider>
-      {usesConvexRealtime ? <RetroConvexSync retroId={retroId} /> : null}
+      {usesConvexRealtime ? (
+        <RetroConvexSync
+          retroId={retroId}
+          minAcceptedUpdatedAt={minAcceptedBoardUpdatedAt}
+        />
+      ) : null}
       <div className="flex flex-col space-y-3 sm:space-y-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-linear-to-r from-background via-muted/30 to-background rounded-xl p-3 sm:p-4 border border-border/50">
@@ -975,17 +1431,35 @@ function RetroDetailPage() {
               </Tooltip>
 
               <Tooltip>
-                <TooltipTrigger>
-                  <Badge
-                    variant="outline"
-                    className="gap-1.5 py-1 px-2 sm:px-2.5 bg-background/50 text-[10px] sm:text-xs"
-                  >
-                    <Users className="h-3 w-3" />
-                    {participantCount}
-                  </Badge>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center -space-x-2 cursor-default">
+                    {participants.slice(0, 5).map((p) => (
+                      <Avatar
+                        key={p.userId}
+                        className="h-7 w-7 border-2 border-background ring-1 ring-border"
+                      >
+                        <AvatarImage src={p.user?.image ?? undefined} />
+                        <AvatarFallback className="text-[10px] font-semibold bg-muted">
+                          {getInitials(p.user?.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                    {participants.length > 5 && (
+                      <div className="h-7 w-7 rounded-full bg-muted border-2 border-background ring-1 ring-border flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
+                        +{participants.length - 5}
+                      </div>
+                    )}
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {participantCount} participant(s)
+                  <p className="font-medium mb-1">
+                    {participantCount} participant(s)
+                  </p>
+                  <ul className="text-xs space-y-0.5">
+                    {participants.map((p) => (
+                      <li key={p.userId}>{p.user?.name ?? 'Unknown'}</li>
+                    ))}
+                  </ul>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -1064,15 +1538,26 @@ function RetroDetailPage() {
                   </Button>
                 )}
                 {retroStatus === 'active' && (
-                  <Button
-                    onClick={() => moveToGroupingMutation.mutate()}
-                    disabled={moveToGroupingMutation.isPending}
-                    className="shadow-sm h-8 sm:h-9 text-xs sm:text-sm"
-                    size="sm"
-                  >
-                    <GitMerge className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                    <span className="hidden sm:inline">Move to </span>Grouping
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {usesConvexRealtime && (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 text-[11px] h-7 px-2"
+                      >
+                        <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        {readyCount}/{participantCount} ready
+                      </Badge>
+                    )}
+                    <Button
+                      onClick={() => moveToGroupingMutation.mutate()}
+                      disabled={moveToGroupingMutation.isPending}
+                      className="shadow-sm h-8 sm:h-9 text-xs sm:text-sm"
+                      size="sm"
+                    >
+                      <GitMerge className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Move to </span>Grouping
+                    </Button>
+                  </div>
                 )}
                 {retroStatus === 'grouping' && (
                   <Button
@@ -1161,14 +1646,22 @@ function RetroDetailPage() {
 
         {/* Phase alerts */}
         {retroStatus === 'voting' && (
-          <Alert className="border-primary/20 bg-primary/5">
+          <Alert className="border-primary/20 bg-primary/5 py-2.5">
             <Vote className="h-4 w-4 text-primary" />
-            <AlertTitle className="text-primary">Voting Phase</AlertTitle>
-            <AlertDescription>
-              You have used{' '}
-              <span className="font-semibold">{userVoteCount}</span> of{' '}
-              <span className="font-semibold">{maxVotesPerUser}</span> votes.
-              Click the 👍 button on cards to vote for them.
+            <AlertDescription className="flex items-center gap-1.5 flex-wrap text-sm">
+              <span className="font-semibold text-primary">Voting Phase</span>
+              <span className="text-muted-foreground">·</span>
+              <span>
+                You have used{' '}
+                <span className="font-bold text-primary">{userVoteCount}</span>{' '}
+                of{' '}
+                <span className="font-bold text-primary">
+                  {maxVotesPerUser}
+                </span>{' '}
+                votes
+              </span>
+              <span className="text-muted-foreground">·</span>
+              <span>Click 👍 on cards to vote</span>
             </AlertDescription>
           </Alert>
         )}
@@ -1228,11 +1721,11 @@ function RetroDetailPage() {
               {/* Participants list */}
               <div className="rounded-xl border bg-card p-4 space-y-3">
                 <p className="text-sm font-medium text-muted-foreground">
-                  Participants ({retro.participants.length})
+                  Participants ({participants.length})
                 </p>
-                {retro.participants.length > 0 ? (
+                {participants.length > 0 ? (
                   <div className="flex flex-wrap justify-center gap-2">
-                    {retro.participants.map((p) => (
+                    {participants.map((p) => (
                       <div
                         key={p.id}
                         className="flex items-center gap-2 bg-muted/50 rounded-full px-3 py-1.5"
@@ -1269,211 +1762,267 @@ function RetroDetailPage() {
           </div>
         )}
 
-        {/* Column Grid */}
-        {retroStatus !== 'waiting' && (
-          <DndContext
-            sensors={dndSensors}
-            onDragStart={isGrouping && canControl ? handleDragStart : undefined}
-            onDragEnd={isGrouping && canControl ? handleDragEnd : undefined}
-          >
-            <div
-              className={cn(
-                'grid gap-3 sm:gap-4 pb-2',
-                'grid-cols-1',
-                templateColumns.length >= 2 && 'sm:grid-cols-2',
-                templateColumns.length >= 3 && 'lg:grid-cols-3',
-                templateColumns.length >= 4 && 'xl:grid-cols-4',
+        {/* Active phase action bar: typing indicator + ready button */}
+        {retroStatus === 'active' && (
+          <div className="flex items-center justify-between gap-3 px-1">
+            {/* Typing indicator */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground min-h-5">
+              {usesConvexRealtime && typingUsers.length > 0 && (
+                <>
+                  <div className="flex gap-1">
+                    <span className="h-3 w-3 rounded-sm animate-ambulance-left inline-block" />
+                    <span className="h-3 w-3 rounded-sm animate-ambulance-right inline-block" />
+                  </div>
+                  <span>
+                    {typingUsers.length === 1
+                      ? `${(typingUsers[0] as { displayName: string }).displayName} is typing…`
+                      : `${typingUsers.length} people are typing…`}
+                  </span>
+                </>
               )}
+            </div>
+
+            {/* Ready button */}
+            {usesConvexRealtime && (
+              <Button
+                variant={myReady ? 'default' : 'outline'}
+                size="sm"
+                className={cn(
+                  'gap-1.5 h-7 text-xs transition-all',
+                  myReady
+                    ? 'bg-green-600 hover:bg-green-700 text-white border-green-600'
+                    : '',
+                  readyAnimating ? 'animate-ready-pulse' : '',
+                )}
+                onAnimationEnd={() => setReadyAnimating(false)}
+                onClick={toggleReady}
+              >
+                {myReady ? (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                ) : (
+                  <Circle className="h-3.5 w-3.5" />
+                )}
+                {myReady ? 'Ready!' : 'Ready?'}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Column Grid */}
+        {retroStatus !== 'waiting' &&
+          retroStatus !== 'discussing' &&
+          retroStatus !== 'completed' && (
+            <DndContext
+              sensors={dndSensors}
+              onDragStart={
+                isGrouping && canControl ? handleDragStart : undefined
+              }
+              onDragEnd={isGrouping && canControl ? handleDragEnd : undefined}
             >
-              {templateColumns.map((column, index) => {
-                const cards = getColumnCards(column.id)
-                const selectedCardsInColumn = cards.filter(
-                  (card) => selectedCardIds[card.id],
-                )
-                const pendingCards = localPendingCards[column.id] ?? []
-                const totalCards = cards.length + pendingCards.length
-                const canShowPendingCards =
-                  retroStatus === 'active' ||
-                  retroStatus === 'voting' ||
-                  retroStatus === 'discussing'
+              <div
+                className={cn(
+                  'grid gap-3 sm:gap-4 pb-2',
+                  'grid-cols-1',
+                  templateColumns.length >= 2 && 'sm:grid-cols-2',
+                  templateColumns.length >= 3 && 'lg:grid-cols-3',
+                  templateColumns.length >= 4 && 'xl:grid-cols-4',
+                )}
+              >
+                {templateColumns.map((column, index) => {
+                  const cards = getColumnCards(column.id)
+                  const selectedCardsInColumn = cards.filter(
+                    (card) => selectedCardIds[card.id],
+                  )
+                  const pendingCards = localPendingCards[column.id] ?? []
+                  const totalCards = cards.length + pendingCards.length
+                  const canShowPendingCards =
+                    retroStatus === 'active' || retroStatus === 'voting'
 
-                const gradients = [
-                  'from-rose-500/10 via-pink-500/5 to-transparent',
-                  'from-violet-500/10 via-purple-500/5 to-transparent',
-                  'from-amber-500/10 via-orange-500/5 to-transparent',
-                  'from-emerald-500/10 via-green-500/5 to-transparent',
-                  'from-sky-500/10 via-blue-500/5 to-transparent',
-                  'from-fuchsia-500/10 via-pink-500/5 to-transparent',
-                ]
-                const borderColors = [
-                  'border-rose-500/20',
-                  'border-violet-500/20',
-                  'border-amber-500/20',
-                  'border-emerald-500/20',
-                  'border-sky-500/20',
-                  'border-fuchsia-500/20',
-                ]
-                const gradient = gradients[index % gradients.length]
-                const borderColor = borderColors[index % borderColors.length]
+                  const gradients = [
+                    'from-rose-500/10 via-pink-500/5 to-transparent',
+                    'from-violet-500/10 via-purple-500/5 to-transparent',
+                    'from-amber-500/10 via-orange-500/5 to-transparent',
+                    'from-emerald-500/10 via-green-500/5 to-transparent',
+                    'from-sky-500/10 via-blue-500/5 to-transparent',
+                    'from-fuchsia-500/10 via-pink-500/5 to-transparent',
+                  ]
+                  const borderColors = [
+                    'border-rose-500/20',
+                    'border-violet-500/20',
+                    'border-amber-500/20',
+                    'border-emerald-500/20',
+                    'border-sky-500/20',
+                    'border-fuchsia-500/20',
+                  ]
+                  const gradient = gradients[index % gradients.length]
+                  const borderColor = borderColors[index % borderColors.length]
 
-                return (
-                  <div
-                    key={column.id}
-                    className={cn(
-                      'flex min-w-0 flex-col rounded-xl border-2 bg-linear-to-b shadow-sm overflow-hidden',
-                      borderColor,
-                      gradient,
-                    )}
-                  >
-                    {/* Column Header */}
-                    <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 sm:py-4">
-                      <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-background/80 text-xl sm:text-2xl shadow-sm backdrop-blur-sm shrink-0">
-                        {column.emoji}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 sm:gap-2">
-                          <h3 className="font-semibold text-sm sm:text-base truncate">
-                            {column.name}
-                          </h3>
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] sm:text-xs shrink-0 bg-background/60 backdrop-blur-sm"
-                          >
-                            {totalCards}
-                          </Badge>
+                  return (
+                    <div
+                      key={column.id}
+                      className={cn(
+                        'flex min-w-0 flex-col rounded-xl border-2 bg-linear-to-b shadow-sm overflow-hidden',
+                        borderColor,
+                        gradient,
+                      )}
+                    >
+                      {/* Column Header */}
+                      <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 sm:py-4">
+                        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl bg-background/80 text-xl sm:text-2xl shadow-sm backdrop-blur-sm shrink-0">
+                          {column.emoji}
                         </div>
-                        {isGrouping && canControl && cards.length > 1 && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="h-7 text-xs font-semibold bg-amber-400 text-amber-950 hover:bg-amber-300 border border-amber-300 shadow-sm"
-                            onClick={() =>
-                              mergeCardsMutation.mutate({
-                                cardIds: selectedCardsInColumn.map(
-                                  (card) => card.id,
-                                ),
-                                columnId: column.id,
-                              })
-                            }
-                            disabled={
-                              selectedCardsInColumn.length < 2 ||
-                              mergeCardsMutation.isPending
-                            }
-                          >
-                            <GitMerge className="mr-1 h-3 w-3" />
-                            Merge ({selectedCardsInColumn.length})
-                          </Button>
-                        )}
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 line-clamp-1 hidden sm:block">
-                          {column.prompt}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Cards List */}
-                    <div className="px-2 sm:px-3">
-                      <div className="space-y-2 sm:space-y-3 pb-3">
-                        {cards.length === 0 && pendingCards.length === 0 && (
-                          <div className="flex flex-col items-center justify-center py-6 sm:py-8 text-center">
-                            <div className="text-3xl sm:text-4xl mb-2 opacity-50">
-                              {column.emoji}
-                            </div>
-                            <p className="text-xs sm:text-sm text-muted-foreground">
-                              {retroStatus === 'active'
-                                ? 'No cards yet. Add your thoughts!'
-                                : retroStatus === 'voting'
-                                  ? 'No cards are available to vote on yet.'
-                                  : 'No cards are available in this column yet.'}
-                            </p>
-                          </div>
-                        )}
-                        {cards.map((card) => {
-                          const isCurrentDiscussion =
-                            currentDiscussionCardId === card.id
-                          const isDiscussed = card.isDiscussed
-                          return (
-                            <DraggableCard
-                              key={card.id}
-                              id={card.id}
-                              columnId={card.columnId}
-                              enabled={isGrouping && canControl}
-                              className={cn(
-                                'group relative transition-all duration-200 bg-background rounded-lg overflow-hidden',
-                                'before:absolute before:inset-0 before:bg-linear-to-r before:from-primary/5 before:to-transparent before:opacity-0 before:transition-opacity hover:before:opacity-100',
-                                'shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]',
-                                isGrouping &&
-                                selectedCardIds[card.id] &&
-                                'ring-2 ring-primary/60',
-                                isGrouping && canControl && 'cursor-pointer',
-                                card.hasVoted &&
-                                'ring-2 ring-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.2)]',
-                                isCurrentDiscussion &&
-                                'ring-2 ring-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.3)]',
-                                isDiscussed && 'opacity-60',
-                              )}
-                              onClick={
-                                isGrouping && canControl
-                                  ? (e) => {
-                                    // Don't fire if the user clicked a button, input, or link
-                                    if (
-                                      (e.target as HTMLElement).closest(
-                                        'button, input, a',
-                                      )
-                                    )
-                                      return
-                                    toggleCardSelection(card.id)
-                                  }
-                                  : undefined
-                              }
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <h3 className="font-semibold text-sm sm:text-base truncate">
+                              {column.name}
+                            </h3>
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] sm:text-xs shrink-0 bg-background/60 backdrop-blur-sm"
                             >
-                              {isGrouping && canControl && (
-                                <label className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded bg-background/90 px-1.5 py-0.5 text-[10px]">
-                                  <input
-                                    type="checkbox"
-                                    checked={Boolean(selectedCardIds[card.id])}
-                                    onChange={() =>
-                                      toggleCardSelection(card.id)
-                                    }
-                                    className="h-3 w-3"
-                                  />
-                                  Select
-                                </label>
-                              )}
-                              <div className="relative px-3 py-2.5">
-                                {card.sourceContents &&
-                                  card.sourceContents.length > 1 ? (
-                                  <ul className="text-sm leading-relaxed list-disc list-inside space-y-1">
-                                    {card.sourceContents.map((content, idx) => (
-                                      <li
-                                        key={idx}
-                                        className="whitespace-pre-wrap"
-                                      >
-                                        {content}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                ) : (
-                                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                                    {card.content}
-                                  </p>
-                                )}
+                              {totalCards}
+                            </Badge>
+                          </div>
+                          {isGrouping &&
+                            canControl &&
+                            selectedCardsInColumn.length >= 1 && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="h-7 text-xs font-semibold bg-amber-400 text-amber-950 hover:bg-amber-300 border border-amber-300 shadow-sm"
+                                onClick={() =>
+                                  mergeCardsMutation.mutate({
+                                    cardIds: selectedCardsInColumn.map(
+                                      (card) => card.id,
+                                    ),
+                                    columnId: column.id,
+                                  })
+                                }
+                                disabled={
+                                  selectedCardsInColumn.length < 2 ||
+                                  mergeCardsMutation.isPending
+                                }
+                              >
+                                <GitMerge className="mr-1 h-3 w-3" />
+                                Merge ({selectedCardsInColumn.length})
+                              </Button>
+                            )}
+                          <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 line-clamp-1 hidden sm:block">
+                            {isGrouping
+                              ? 'Drag cards onto each other to merge, or check to select'
+                              : column.prompt}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Cards List */}
+                      <div className="px-2 sm:px-3">
+                        <div className="space-y-2 sm:space-y-3 pb-3">
+                          {cards.length === 0 && pendingCards.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-6 sm:py-8 text-center">
+                              <div className="text-3xl sm:text-4xl mb-2 opacity-50">
+                                {column.emoji}
                               </div>
-                              <div className="relative flex items-center justify-between px-3 py-1.5 bg-linear-to-r from-muted/40 to-muted/20">
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  {card.canUnmerge ? (
-                                    <div className="flex items-center gap-2">
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary cursor-default select-none">
-                                            <GitMerge className="h-3 w-3" />
-                                            {card.mergedCount ??
-                                              card.mergedFromNames?.length ??
-                                              2}{' '}
-                                            cards merged
-                                          </span>
-                                        </TooltipTrigger>
-                                        {(card.mergedFromNames?.length ?? 0) >
-                                          0 && (
+                              <p className="text-xs sm:text-sm text-muted-foreground">
+                                {retroStatus === 'active'
+                                  ? 'No cards yet. Add your thoughts!'
+                                  : retroStatus === 'voting'
+                                    ? 'No cards are available to vote on yet.'
+                                    : 'No cards are available in this column yet.'}
+                              </p>
+                            </div>
+                          )}
+                          {cards.map((card) => {
+                            const isCurrentDiscussion =
+                              currentDiscussionCardId === card.id
+                            const isDiscussed = card.isDiscussed
+                            return (
+                              <DraggableCard
+                                key={card.id}
+                                id={card.id}
+                                columnId={card.columnId}
+                                enabled={isGrouping && canControl}
+                                className={cn(
+                                  'group relative transition-all duration-200 bg-background rounded-lg overflow-hidden',
+                                  'before:absolute before:inset-0 before:bg-linear-to-r before:from-primary/5 before:to-transparent before:opacity-0 before:transition-opacity hover:before:opacity-100',
+                                  'shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]',
+                                  isGrouping &&
+                                    selectedCardIds[card.id] &&
+                                    'ring-2 ring-primary/60',
+                                  isGrouping && canControl && 'cursor-pointer',
+                                  card.hasVoted &&
+                                    'ring-2 ring-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.2)]',
+                                  isCurrentDiscussion &&
+                                    'ring-2 ring-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.3)]',
+                                  isDiscussed && 'opacity-60',
+                                )}
+                                onClick={
+                                  isGrouping && canControl
+                                    ? (e) => {
+                                        // Don't fire if the user clicked a button, input, or link
+                                        if (
+                                          (e.target as HTMLElement).closest(
+                                            'button, input, a',
+                                          )
+                                        )
+                                          return
+                                        toggleCardSelection(card.id)
+                                      }
+                                    : undefined
+                                }
+                              >
+                                {isGrouping && canControl && (
+                                  <label className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded bg-background/90 px-1.5 py-0.5 text-[10px]">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(
+                                        selectedCardIds[card.id],
+                                      )}
+                                      onChange={() =>
+                                        toggleCardSelection(card.id)
+                                      }
+                                      className="h-3 w-3"
+                                    />
+                                    Select
+                                  </label>
+                                )}
+                                <div className="relative px-3 py-2.5">
+                                  {card.sourceContents &&
+                                  card.sourceContents.length > 1 ? (
+                                    <ul className="text-sm leading-relaxed list-disc list-inside space-y-1">
+                                      {card.sourceContents.map(
+                                        (content, idx) => (
+                                          <li
+                                            key={idx}
+                                            className="whitespace-pre-wrap"
+                                          >
+                                            {content}
+                                          </li>
+                                        ),
+                                      )}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                      {card.content}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="relative flex items-center justify-between px-3 py-1.5 bg-linear-to-r from-muted/40 to-muted/20">
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    {card.canUnmerge ? (
+                                      <div className="flex items-center gap-2">
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary cursor-default select-none">
+                                              <GitMerge className="h-3 w-3" />
+                                              {card.mergedCount ??
+                                                card.mergedFromNames?.length ??
+                                                2}{' '}
+                                              cards merged
+                                            </span>
+                                          </TooltipTrigger>
+                                          {(card.mergedFromNames?.length ?? 0) >
+                                            0 && (
                                             <TooltipContent side="top">
                                               <p className="text-xs font-medium mb-0.5">
                                                 Merged from:
@@ -1487,711 +2036,278 @@ function RetroDetailPage() {
                                               </ul>
                                             </TooltipContent>
                                           )}
-                                      </Tooltip>
-                                      {isGrouping && canControl && (
-                                        <Button
-                                          variant="default"
-                                          size="sm"
-                                          className="h-6 gap-1 px-2 text-[10px] font-semibold bg-rose-500 text-white hover:bg-rose-400 border border-rose-400 shadow-sm"
-                                          onClick={() =>
-                                            unmergeCardMutation.mutate(card.id)
-                                          }
-                                          disabled={
-                                            unmergeCardMutation.isPending
-                                          }
-                                        >
-                                          <RotateCcw className="h-3 w-3" />
-                                          Unmerge
-                                        </Button>
-                                      )}
-                                    </div>
-                                  ) : card.author ? (
-                                    <>
-                                      <Avatar className="h-4 w-4 ring-1 ring-border">
-                                        <AvatarImage
-                                          src={card.author.image ?? undefined}
-                                        />
-                                        <AvatarFallback className="text-[8px]">
-                                          {card.author.name?.charAt(0) ?? '?'}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <span className="font-medium text-[11px]">
-                                        {card.author.name}
-                                      </span>
-                                      {card.author.jobRole && (
-                                        <Badge
-                                          className={`text-[10px] h-5 ${{
-                                            Dev: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-                                            QA: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-                                            QE: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
-                                            'QA/QE':
-                                              'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-                                            DevOps:
-                                              'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-                                            'BI-Dev':
-                                              'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
-                                            Oversight:
-                                              'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                                          }[card.author.jobRole]
-                                            }`}
-                                        >
-                                          {card.author.jobRole}
-                                        </Badge>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <span className="italic text-muted-foreground/70 text-[11px]">
-                                      Anonymous
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div className="flex items-center gap-0.5">
-                                  {/* Vote button (only in voting phase) */}
-                                  {retroStatus === 'voting' && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant={
-                                            card.hasVoted ? 'default' : 'ghost'
-                                          }
-                                          size="sm"
-                                          className={cn(
-                                            'h-6 gap-1 px-2 text-xs transition-all',
-                                            card.hasVoted && 'shadow-sm',
-                                          )}
-                                          onClick={() =>
-                                            handleVoteClick(
-                                              card.id,
-                                              Boolean(card.hasVoted),
-                                            )
-                                          }
-                                          disabled={
-                                            voteMutation.isPending ||
-                                            removeVoteMutation.isPending
-                                          }
-                                        >
-                                          <ThumbsUp className="h-3 w-3" />
-                                          {(card.voteCount ?? 0) > 0 && (
-                                            <span className="font-semibold">
-                                              {card.voteCount}
-                                            </span>
-                                          )}
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        {card.hasVoted
-                                          ? 'Remove vote'
-                                          : 'Vote for this'}
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-
-                                  {/* Vote count (in discussion/completed) */}
-                                  {(retroStatus === 'discussing' ||
-                                    retroStatus === 'completed') &&
-                                    (card.voteCount ?? 0) > 0 && (
-                                      <Badge
-                                        variant="secondary"
-                                        className="gap-1 h-5 text-[10px] bg-primary/10 text-primary border-0"
-                                      >
-                                        <ThumbsUp className="h-2.5 w-2.5" />
-                                        {card.voteCount}
-                                      </Badge>
-                                    )}
-
-                                  {/* Comments button (in discussion phase) */}
-                                  {(retroStatus === 'discussing' ||
-                                    retroStatus === 'completed') && (
-                                      <Dialog
-                                        open={expandedCard === card.id}
-                                        onOpenChange={(open) =>
-                                          setExpandedCard(open ? card.id : null)
-                                        }
-                                      >
-                                        <DialogTrigger asChild>
+                                        </Tooltip>
+                                        {isGrouping && canControl && (
                                           <Button
-                                            variant="ghost"
+                                            variant="default"
                                             size="sm"
-                                            className="h-6 gap-1 px-2 text-xs"
+                                            className="h-6 gap-1 px-2 text-[10px] font-semibold bg-rose-500 text-white hover:bg-rose-400 border border-rose-400 shadow-sm"
+                                            onClick={() =>
+                                              unmergeCardMutation.mutate(
+                                                card.id,
+                                              )
+                                            }
+                                            disabled={
+                                              unmergeCardMutation.isPending
+                                            }
                                           >
-                                            <MessageSquare className="h-3 w-3" />
-                                            {card.comments.length > 0 && (
+                                            <RotateCcw className="h-3 w-3" />
+                                            Unmerge
+                                          </Button>
+                                        )}
+                                      </div>
+                                    ) : card.author ? (
+                                      <>
+                                        <Avatar className="h-4 w-4 ring-1 ring-border">
+                                          <AvatarImage
+                                            src={card.author.image ?? undefined}
+                                          />
+                                          <AvatarFallback className="text-[8px]">
+                                            {card.author.name?.charAt(0) ?? '?'}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <span className="font-medium text-[11px]">
+                                          {card.author.name}
+                                        </span>
+                                        {card.author.jobRole && (
+                                          <Badge
+                                            className={`text-[10px] h-5 ${
+                                              {
+                                                Dev: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+                                                QA: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                                                QE: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+                                                'QA/QE':
+                                                  'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+                                                DevOps:
+                                                  'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+                                                'BI-Dev':
+                                                  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+                                                Oversight:
+                                                  'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+                                              }[card.author.jobRole]
+                                            }`}
+                                          >
+                                            {card.author.jobRole}
+                                          </Badge>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span className="italic text-muted-foreground/70 text-[11px]">
+                                        Anonymous
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-0.5">
+                                    {/* Vote button (only in voting phase) */}
+                                    {retroStatus === 'voting' && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant={
+                                              card.hasVoted
+                                                ? 'default'
+                                                : 'ghost'
+                                            }
+                                            size="sm"
+                                            className={cn(
+                                              'h-6 gap-1 px-2 text-xs transition-all',
+                                              card.hasVoted && 'shadow-sm',
+                                            )}
+                                            onClick={() =>
+                                              handleVoteClick(
+                                                card.id,
+                                                Boolean(card.hasVoted),
+                                              )
+                                            }
+                                            disabled={
+                                              voteMutation.isPending ||
+                                              removeVoteMutation.isPending
+                                            }
+                                          >
+                                            <ThumbsUp className="h-3 w-3" />
+                                            {(card.voteCount ?? 0) > 0 && (
                                               <span className="font-semibold">
-                                                {card.comments.length}
+                                                {card.voteCount}
                                               </span>
                                             )}
                                           </Button>
-                                        </DialogTrigger>
-                                        <DialogContent className="max-w-lg">
-                                          <DialogHeader>
-                                            <DialogTitle className="flex items-center gap-2">
-                                              <span className="text-xl">
-                                                {column.emoji}
-                                              </span>
-                                              Discussion
-                                            </DialogTitle>
-                                            <DialogDescription>
-                                              {card.content}
-                                            </DialogDescription>
-                                          </DialogHeader>
-
-                                          <div className="max-h-75 space-y-3 overflow-y-auto py-4">
-                                            {card.comments.length === 0 && (
-                                              <p className="text-center text-sm text-muted-foreground">
-                                                No comments yet. Be the first to
-                                                add one!
-                                              </p>
-                                            )}
-                                            {card.comments.map((comment) => (
-                                              <div
-                                                key={comment.id}
-                                                className="flex items-start gap-3 rounded-lg bg-muted p-3"
-                                              >
-                                                <Avatar className="h-6 w-6">
-                                                  <AvatarImage
-                                                    src={
-                                                      comment.author?.image ??
-                                                      undefined
-                                                    }
-                                                  />
-                                                  <AvatarFallback>
-                                                    {comment.author?.name?.charAt(
-                                                      0,
-                                                    ) ?? '?'}
-                                                  </AvatarFallback>
-                                                </Avatar>
-                                                <div className="flex-1">
-                                                  <p className="text-xs font-medium">
-                                                    {comment.author?.name ??
-                                                      'Unknown'}
-                                                  </p>
-                                                  <p className="text-sm">
-                                                    {comment.content}
-                                                  </p>
-                                                </div>
-                                                {comment.isOwn && (
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6"
-                                                    onClick={() =>
-                                                      deleteCommentMutation.mutate(
-                                                        comment.id,
-                                                      )
-                                                    }
-                                                  >
-                                                    <Trash2 className="h-3 w-3" />
-                                                  </Button>
-                                                )}
-                                              </div>
-                                            ))}
-                                          </div>
-
-                                          {retroStatus === 'discussing' && (
-                                            <div className="flex gap-2">
-                                              <Input
-                                                placeholder="Add a comment..."
-                                                value={newComment}
-                                                onChange={(e) =>
-                                                  setNewComment(e.target.value)
-                                                }
-                                                onKeyDown={(e) => {
-                                                  if (
-                                                    e.key === 'Enter' &&
-                                                    newComment.trim()
-                                                  ) {
-                                                    createCommentMutation.mutate({
-                                                      cardId: card.id,
-                                                      content: newComment.trim(),
-                                                    })
-                                                  }
-                                                }}
-                                              />
-                                              <Button
-                                                size="icon"
-                                                disabled={
-                                                  !newComment.trim() ||
-                                                  createCommentMutation.isPending
-                                                }
-                                                onClick={() => {
-                                                  if (newComment.trim()) {
-                                                    createCommentMutation.mutate({
-                                                      cardId: card.id,
-                                                      content: newComment.trim(),
-                                                    })
-                                                  }
-                                                }}
-                                              >
-                                                <Send className="h-4 w-4" />
-                                              </Button>
-                                            </div>
-                                          )}
-                                        </DialogContent>
-                                      </Dialog>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {card.hasVoted
+                                            ? 'Remove vote'
+                                            : 'Vote for this'}
+                                        </TooltipContent>
+                                      </Tooltip>
                                     )}
 
-                                  {/* Discuss controls (discussion phase, moderator only) */}
-                                  {retroStatus === 'discussing' &&
-                                    canControl &&
-                                    !isDiscussed && (
-                                      <>
-                                        {isCurrentDiscussion ? (
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <Button
-                                                variant="default"
-                                                size="sm"
-                                                className="h-6 gap-1 px-2 text-[10px] font-semibold bg-green-500 hover:bg-green-400 text-white border-0"
-                                                onClick={() =>
-                                                  markDiscussedMutation.mutate(
-                                                    card.id,
-                                                  )
-                                                }
-                                                disabled={
-                                                  markDiscussedMutation.isPending
-                                                }
-                                              >
-                                                <CheckCircle2 className="h-3 w-3" />
-                                                Done
-                                              </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              Mark as discussed
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        ) : (
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 gap-1 px-2 text-[10px]"
-                                                onClick={() =>
-                                                  discussCardMutation.mutate(
-                                                    card.id,
-                                                  )
-                                                }
-                                                disabled={
-                                                  discussCardMutation.isPending
-                                                }
-                                              >
-                                                <Play className="h-3 w-3" />
-                                                Discuss
-                                              </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              Set as current discussion topic
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        )}
-                                      </>
+                                    {/* Discussed badge */}
+                                    {isDiscussed && (
+                                      <Badge className="h-5 gap-1 text-[10px] bg-green-500/10 text-green-600 border-green-300 dark:border-green-800">
+                                        <CheckCircle2 className="h-2.5 w-2.5" />
+                                        Discussed
+                                      </Badge>
                                     )}
 
-                                  {/* Discussed badge */}
-                                  {isDiscussed && (
-                                    <Badge className="h-5 gap-1 text-[10px] bg-green-500/10 text-green-600 border-green-300 dark:border-green-800">
-                                      <CheckCircle2 className="h-2.5 w-2.5" />
-                                      Discussed
-                                    </Badge>
-                                  )}
-
-                                  {/* Delete button (only for own cards in active phase) */}
-                                  {retroStatus === 'active' && card.isOwn && (
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-6 w-6 p-0"
-                                        >
-                                          <MoreVertical className="h-3 w-3" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem
-                                          className="text-destructive"
-                                          onClick={() =>
-                                            deleteCardMutation.mutate(card.id)
-                                          }
-                                        >
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  )}
+                                    {/* Delete button (only for own cards in active phase) */}
+                                    {retroStatus === 'active' && card.isOwn && (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            <MoreVertical className="h-3 w-3" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem
+                                            className="text-destructive"
+                                            onClick={() =>
+                                              deleteCardMutation.mutate(card.id)
+                                            }
+                                          >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    )}
+                                  </div>
+                                </div>
+                              </DraggableCard>
+                            )
+                          })}
+                          {canShowPendingCards &&
+                            pendingCards.map((card) => (
+                              <div
+                                key={card.id}
+                                className="rounded-lg border border-dashed border-border/50 bg-background shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+                              >
+                                <div className="px-3 py-2.5">
+                                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                    {card.content}
+                                  </p>
                                 </div>
                               </div>
-                            </DraggableCard>
-                          )
-                        })}
-                        {canShowPendingCards &&
-                          pendingCards.map((card) => (
-                            <div
-                              key={card.id}
-                              className="rounded-lg border border-dashed border-border/50 bg-background shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-                            >
-                              <div className="px-3 py-2.5">
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                                  {card.content}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        {/* Scroll anchor */}
-                        <div
-                          ref={(el) => {
-                            scrollRefs.current[column.id] = el
-                          }}
-                          className="h-px"
-                        />
+                            ))}
+                          {/* Scroll anchor */}
+                          <div
+                            ref={(el) => {
+                              scrollRefs.current[column.id] = el
+                            }}
+                            className="h-px"
+                          />
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Add Card Input (only in active phase) */}
-                    {retroStatus === 'active' && (
-                      <div className="border-t border-border/50 p-2 sm:p-4 bg-background/50 backdrop-blur-sm rounded-b-xl">
-                        <Textarea
-                          placeholder={`Share your "${column.name.toLowerCase()}"...`}
-                          value={newCardContent[column.id] ?? ''}
-                          onChange={(e) =>
-                            setNewCardContent((prev) => ({
-                              ...prev,
-                              [column.id]: e.target.value,
-                            }))
-                          }
-                          className="min-h-15 sm:min-h-20 resize-none border-border/50 bg-background/80 focus-visible:ring-primary/50 transition-all text-sm"
-                          onKeyDown={(e) => {
-                            const content = (
-                              newCardContent[column.id] ?? ''
-                            ).trim()
-                            if (e.key === 'Enter' && !e.shiftKey && content) {
-                              e.preventDefault()
-                              createCardMutation.mutate({
-                                columnId: column.id,
-                                content,
-                              })
-                            }
-                          }}
-                        />
-                        <div className="flex items-center justify-between mt-2 sm:mt-3">
-                          <p className="text-[9px] sm:text-[10px] text-muted-foreground hidden sm:block">
-                            Press Enter to submit
-                          </p>
-                          <Button
-                            size="sm"
-                            disabled={
-                              !(newCardContent[column.id] ?? '').trim() ||
-                              createCardMutation.isPending
-                            }
-                            onClick={() => {
+                      {/* Add Card Input (only in active phase) */}
+                      {retroStatus === 'active' && (
+                        <div className="border-t border-border/50 p-2 sm:p-4 bg-background/50 backdrop-blur-sm rounded-b-xl">
+                          <Textarea
+                            placeholder={`Share your "${column.name.toLowerCase()}"...`}
+                            value={newCardContent[column.id] ?? ''}
+                            onChange={(e) => {
+                              setNewCardContent((prev) => ({
+                                ...prev,
+                                [column.id]: e.target.value,
+                              }))
+                              handleTypingStart()
+                            }}
+                            onBlur={handleTypingStop}
+                            className="min-h-15 sm:min-h-20 resize-none border-border/50 bg-background/80 focus-visible:ring-primary/50 transition-all text-sm"
+                            onKeyDown={(e) => {
                               const content = (
                                 newCardContent[column.id] ?? ''
                               ).trim()
-                              if (content) {
+                              if (e.key === 'Enter' && !e.shiftKey && content) {
+                                e.preventDefault()
+                                handleTypingStop()
                                 createCardMutation.mutate({
                                   columnId: column.id,
                                   content,
                                 })
                               }
                             }}
-                            className="shadow-sm h-7 sm:h-8 text-xs sm:text-sm w-full sm:w-auto"
-                          >
-                            <Plus className="mr-1 sm:mr-1.5 h-3 w-3 sm:h-4 sm:w-4" />
-                            Add
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            <DragOverlay>
-              {draggingCardId && (
-                <div className="rounded-lg bg-background border-2 border-primary shadow-xl px-3 py-2.5 opacity-90 text-sm font-medium text-muted-foreground rotate-2">
-                  {retroCards
-                    .find((c) => c.id === draggingCardId)
-                    ?.content.slice(0, 60) ?? 'Card'}
-                </div>
-              )}
-            </DragOverlay>
-          </DndContext>
-        )}
-
-        {/* Carried-forward items from previous retro — shown in discussion/completed */}
-        {(retroStatus === 'discussing' || retroStatus === 'completed') && (
-          <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-900/10">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-4 py-3 text-left"
-              onClick={() => setCarriedForwardOpen((o) => !o)}
-            >
-              <div className="flex items-center gap-2">
-                <History className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                  Carried from Previous Retro ({previousCarriedItems.length})
-                </span>
-              </div>
-              {carriedForwardOpen ? (
-                <ChevronUp className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              )}
-            </button>
-
-            {carriedForwardOpen && (
-              <div className="divide-y divide-amber-200/60 dark:divide-amber-800/40 border-t border-amber-200/60 dark:border-amber-800/40">
-                {previousCarriedItems.length === 0 && (
-                  <div className="px-4 py-4 text-sm text-muted-foreground">
-                    No carried-forward items from the previous retro.
-                  </div>
-                )}
-                {previousCarriedItems.map((item) => {
-                  const itemComments = item.comments ?? []
-                  const itemLikesCount = item.likesCount ?? 0
-                  const hasMultipleContents =
-                    (item.sourceContents?.length ?? 0) > 1
-                  const isBeingDiscussed =
-                    currentDiscussionActionItemId === item.id ||
-                    pendingCarriedDiscussItemId === item.id
-                  const isStartingThisItem =
-                    markCarriedItemDiscussingMutation.isPending &&
-                    pendingCarriedDiscussItemId === item.id
-                  const isSavingThisItem =
-                    markCarriedItemDoneMutation.isPending &&
-                    pendingCarriedDoneItemId === item.id
-
-                  return (
-                    <div
-                      key={item.id}
-                      className={`space-y-2 px-4 py-3 transition-colors ${isBeingDiscussed
-                        ? 'bg-primary/5 ring-1 ring-primary/30 rounded-lg'
-                        : ''
-                        }`}
-                    >
-                      {hasMultipleContents ? (
-                        <ul className="list-disc list-inside space-y-1">
-                          {item.sourceContents!.map((content, idx) => (
-                            <li
-                              key={idx}
-                              className="text-sm text-foreground leading-relaxed"
-                            >
-                              {content}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm text-foreground leading-relaxed">
-                          {item.title}
-                        </p>
-                      )}
-
-                      {item.description && (
-                        <p className="text-xs text-muted-foreground">
-                          {item.description}
-                        </p>
-                      )}
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        {itemLikesCount > 0 && (
-                          <span className="inline-flex items-center gap-1 h-7 px-2 text-xs text-muted-foreground">
-                            <ThumbsUp className="h-3 w-3" />
-                            {itemLikesCount}
-                          </span>
-                        )}
-
-                        <Dialog
-                          open={expandedCarriedItemId === item.id}
-                          onOpenChange={(open) =>
-                            setExpandedCarriedItemId(open ? item.id : null)
-                          }
-                        >
-                          <DialogTrigger asChild>
+                          />
+                          <div className="flex items-center justify-between mt-2 sm:mt-3">
+                            <p className="text-[9px] sm:text-[10px] text-muted-foreground hidden sm:block">
+                              Press Enter to submit
+                            </p>
                             <Button
-                              variant="outline"
                               size="sm"
-                              className="h-7 gap-1 px-2 text-xs"
-                            >
-                              <MessageSquare className="h-3 w-3" />
-                              {itemComments.length}
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-lg">
-                            <DialogHeader>
-                              <DialogTitle>Comments</DialogTitle>
-                              <DialogDescription>
-                                {item.title}
-                              </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="max-h-75 space-y-3 overflow-y-auto py-4">
-                              {itemComments.length === 0 && (
-                                <p className="text-center text-sm text-muted-foreground">
-                                  No comments yet.
-                                </p>
-                              )}
-                              {itemComments.map((comment) => (
-                                <div
-                                  key={comment.id}
-                                  className="flex items-start gap-3 rounded-lg bg-muted p-3"
-                                >
-                                  <Avatar className="h-6 w-6">
-                                    <AvatarImage
-                                      src={comment.author?.image ?? undefined}
-                                    />
-                                    <AvatarFallback>
-                                      {comment.author?.name?.charAt(0) ?? '?'}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div className="flex-1">
-                                    <p className="text-xs font-medium">
-                                      {comment.author?.name ?? 'Unknown'}
-                                    </p>
-                                    <p className="text-sm">{comment.content}</p>
-                                  </div>
-                                  {comment.isOwn && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6"
-                                      onClick={() =>
-                                        deleteCarriedItemCommentMutation.mutate(
-                                          comment.id,
-                                        )
-                                      }
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-
-                            <div className="flex gap-2">
-                              <Input
-                                placeholder="Add a comment..."
-                                value={newCarriedItemComments[item.id] ?? ''}
-                                onChange={(e) =>
-                                  setNewCarriedItemComments((prev) => ({
-                                    ...prev,
-                                    [item.id]: e.target.value,
-                                  }))
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key !== 'Enter') return
-                                  e.preventDefault()
-                                  const content =
-                                    newCarriedItemComments[item.id]?.trim() ??
-                                    ''
-                                  if (content) {
-                                    createCarriedItemCommentMutation.mutate({
-                                      actionItemId: item.id,
-                                      content,
-                                    })
-                                  }
-                                }}
-                              />
-                              <Button
-                                type="button"
-                                size="icon"
-                                disabled={
-                                  !(
-                                    newCarriedItemComments[item.id] ?? ''
-                                  ).trim() ||
-                                  createCarriedItemCommentMutation.isPending
-                                }
-                                onClick={() => {
-                                  const content =
-                                    newCarriedItemComments[item.id]?.trim() ??
-                                    ''
-                                  if (content) {
-                                    createCarriedItemCommentMutation.mutate({
-                                      actionItemId: item.id,
-                                      content,
-                                    })
-                                  }
-                                }}
-                              >
-                                <Send className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-
-                        {/* Only moderator can carry forward or discuss during discussing phase */}
-                        {canControl && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 gap-1 px-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/40"
-                              onClick={() =>
-                                carryItemForwardMutation.mutate({
-                                  id: item.id,
-                                  title: item.title,
-                                })
-                              }
                               disabled={
-                                carryItemForwardMutation.isPending ||
-                                markCarriedItemDoneMutation.isPending
+                                !(newCardContent[column.id] ?? '').trim() ||
+                                createCardMutation.isPending
                               }
+                              onClick={() => {
+                                const content = (
+                                  newCardContent[column.id] ?? ''
+                                ).trim()
+                                if (content) {
+                                  handleTypingStop()
+                                  createCardMutation.mutate({
+                                    columnId: column.id,
+                                    content,
+                                  })
+                                }
+                              }}
+                              className="shadow-sm h-7 sm:h-8 text-xs sm:text-sm w-full sm:w-auto"
                             >
-                              <RotateCcw className="h-3 w-3" />
-                              Carry Forward
+                              <Plus className="mr-1 sm:mr-1.5 h-3 w-3 sm:h-4 sm:w-4" />
+                              Add
                             </Button>
-
-                            {isBeingDiscussed ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 gap-1 px-2 text-xs border-green-300 text-green-700 hover:bg-green-100 dark:border-green-700 dark:text-green-300 dark:hover:bg-green-900/40"
-                                onClick={() =>
-                                  markCarriedItemDoneMutation.mutate(item.id)
-                                }
-                                disabled={
-                                  isSavingThisItem ||
-                                  carryItemForwardMutation.isPending ||
-                                  isStartingThisItem
-                                }
-                              >
-                                <CheckCircle2 className="h-3 w-3" />
-                                {isSavingThisItem ? 'Saving...' : 'Done'}
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 gap-1 px-2 text-xs border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/40"
-                                onClick={() =>
-                                  markCarriedItemDiscussingMutation.mutate(
-                                    item.id,
-                                  )
-                                }
-                                disabled={
-                                  carryItemForwardMutation.isPending ||
-                                  isSavingThisItem ||
-                                  isStartingThisItem
-                                }
-                              >
-                                <MessageSquare className="h-3 w-3" />
-                                {isStartingThisItem ? 'Starting...' : 'Discuss'}
-                              </Button>
-                            )}
-                          </>
-                        )}
-                      </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
               </div>
-            )}
-          </div>
+              <DragOverlay>
+                {draggingCardId && (
+                  <div className="rounded-lg bg-background border-2 border-primary shadow-xl px-3 py-2.5 opacity-90 text-sm font-medium text-muted-foreground rotate-2">
+                    {retroCards
+                      .find((c) => c.id === draggingCardId)
+                      ?.content.slice(0, 60) ?? 'Card'}
+                  </div>
+                )}
+              </DragOverlay>
+            </DndContext>
+          )}
+
+        {/* Discussion phase — full split-view replaces the card grid */}
+        {retroStatus === 'discussing' && (
+          <RetroDiscussionView
+            retro={retro}
+            previousCarriedItems={previousCarriedItems}
+            canControl={canControl}
+            retroId={retroId}
+            discussCardMutation={discussCardMutation}
+            markDiscussedMutation={markDiscussedMutation}
+            createCommentMutation={createCommentMutation}
+            deleteCommentMutation={deleteCommentMutation}
+            markCarriedItemDiscussingMutation={
+              markCarriedItemDiscussingMutation
+            }
+            markCarriedItemDoneMutation={markCarriedItemDoneMutation}
+            carryItemForwardMutation={carryItemForwardMutation}
+            createCarriedItemCommentMutation={createCarriedItemCommentMutation}
+            pendingCarriedDiscussItemId={pendingCarriedDiscussItemId}
+            pendingCarriedDoneItemId={pendingCarriedDoneItemId}
+            newCarriedItemComments={newCarriedItemComments}
+            onNewCarriedItemCommentsChange={setNewCarriedItemComments}
+          />
         )}
 
         {/* Retro Report — shown after retro is completed */}
-        {retroStatus === 'completed' && <RetroReport retro={retro} />}
+        {retroStatus === 'completed' && (
+          <RetroReport
+            retro={retro}
+            previousCarriedItems={previousCarriedItems}
+          />
+        )}
       </div>
 
       {/* Floating music player — visible during active phases */}

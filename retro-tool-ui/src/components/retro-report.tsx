@@ -6,6 +6,7 @@ import {
   ChevronUp,
   Clock,
   Forward,
+  History as HistoryIcon,
   Mail,
   MessageSquare,
   ThumbsUp,
@@ -14,19 +15,20 @@ import {
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { api } from '@/lib/api'
 import { RETROS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { RetroDetail } from '@/common/types/retros'
 import { cn } from '@/lib/utils'
 import { useSendRetroReport } from '@/routes/retros/hooks/useSendRetroReport'
+import type { CarriedForwardItem } from '@/routes/retros/types'
 
 interface RetroReportProps {
   retro: RetroDetail
+  previousCarriedItems: CarriedForwardItem[]
 }
 
-export function RetroReport({ retro }: RetroReportProps) {
+export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
   const queryClient = useQueryClient()
   const [expanded, setExpanded] = useState(true)
   const [selectedCarryForward, setSelectedCarryForward] = useState<
@@ -47,6 +49,9 @@ export function RetroReport({ retro }: RetroReportProps) {
 
   const totalVotes = allCards.reduce((sum, c) => sum + (c.voteCount ?? 0), 0)
   const totalComments = allCards.reduce((sum, c) => sum + c.comments.length, 0)
+  const participantsCount = new Set(
+    retro.participants.map((participant) => participant.userId),
+  ).size
 
   const mostVoted: RetroDetail['cards'][number] | null =
     allCards.length > 0
@@ -133,7 +138,7 @@ export function RetroReport({ retro }: RetroReportProps) {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard
               label="Participants"
-              value={retro.participants.length}
+              value={participantsCount}
               icon={<Users className="h-4 w-4" />}
             />
             <StatCard
@@ -319,6 +324,53 @@ export function RetroReport({ retro }: RetroReportProps) {
             </section>
           )}
 
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <HistoryIcon className="h-4 w-4 text-amber-500" />
+              <h3 className="font-semibold text-sm">
+                Carried From Previous Retro ({previousCarriedItems.length})
+              </h3>
+            </div>
+            {previousCarriedItems.length === 0 ? (
+              <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground bg-muted/20">
+                No carried-forward items from the previous retro.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {previousCarriedItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-lg border border-amber-200/70 bg-amber-50/40 dark:border-amber-800/50 dark:bg-amber-900/10 px-3 py-2.5"
+                  >
+                    {(item.sourceContents?.length ?? 0) > 1 ? (
+                      <ul className="text-sm leading-snug list-disc list-inside space-y-0.5">
+                        {item.sourceContents!.map((content, idx) => (
+                          <li key={idx}>{content}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm leading-snug">{item.title}</p>
+                    )}
+                    <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
+                      {(item.likesCount ?? 0) > 0 && (
+                        <span className="flex items-center gap-1">
+                          <ThumbsUp className="h-3 w-3" />
+                          {item.likesCount}
+                        </span>
+                      )}
+                      {(item.comments?.length ?? 0) > 0 && (
+                        <span className="flex items-center gap-1">
+                          <MessageSquare className="h-3 w-3" />
+                          {item.comments?.length ?? 0}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
           {undiscussedCards.length === 0 && discussedCards.length > 0 && (
             <div className="rounded-lg border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30 px-4 py-3 text-center">
               <CheckCircle2 className="h-6 w-6 text-green-500 mx-auto mb-1" />
@@ -343,15 +395,13 @@ function StatCard({
   icon: React.ReactNode
 }) {
   return (
-    <Card className="shadow-none">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-          {icon}
-          <span className="text-xs">{label}</span>
-        </div>
-        <p className="text-2xl font-bold">{value}</p>
-      </CardContent>
-    </Card>
+    <div className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2 shadow-none">
+      <div className="text-muted-foreground">{icon}</div>
+      <div>
+        <p className="text-base font-bold leading-none">{value}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+      </div>
+    </div>
   )
 }
 
@@ -412,6 +462,39 @@ function ReportCard({
             </span>
           )}
         </div>
+
+        {card.comments.length > 0 && (
+          <div className="mt-2.5 rounded-lg border border-border/60 bg-muted/10 overflow-hidden">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/60 bg-muted/30">
+              <MessageSquare className="h-3 w-3 text-muted-foreground" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Discussion Notes
+              </span>
+              <span className="ml-auto text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 leading-none">
+                {card.comments.length}
+              </span>
+            </div>
+            <div className="divide-y divide-border/40">
+              {card.comments.map((comment) => (
+                <div key={comment.id} className="flex gap-2.5 px-3 py-2">
+                  <div className="shrink-0 h-5 w-5 rounded-full bg-primary/15 flex items-center justify-center mt-0.5">
+                    <span className="text-[9px] font-bold text-primary">
+                      {(comment.author?.name ?? 'U').charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-semibold text-foreground leading-none mb-1">
+                      {comment.author?.name ?? 'Unknown'}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {comment.content}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

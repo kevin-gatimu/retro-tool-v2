@@ -9,7 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  History,
+  History as HistoryIcon,
   Plus,
   RefreshCw,
   Search,
@@ -80,7 +80,7 @@ function EstimateIndexPage() {
             Active Sessions
           </TabsTrigger>
           <TabsTrigger value="history">
-            <History className="mr-1.5 h-3.5 w-3.5" />
+            <HistoryIcon className="mr-1.5 h-3.5 w-3.5" />
             History
           </TabsTrigger>
         </TabsList>
@@ -141,7 +141,9 @@ function ActiveSessionsTab() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">{session.name}</CardTitle>
                 <Badge
-                  variant={session.status === 'voting' ? 'default' : 'secondary'}
+                  variant={
+                    session.status === 'voting' ? 'default' : 'secondary'
+                  }
                 >
                   {session.status === 'waiting'
                     ? 'Waiting'
@@ -157,7 +159,8 @@ function ActiveSessionsTab() {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Users className="h-4 w-4" />
                   <span>
-                    {session.participants.filter((p) => p.isOnline).length} online
+                    {session.participants.filter((p) => p.isOnline).length}{' '}
+                    online
                   </span>
                 </div>
                 <Button asChild size="sm">
@@ -250,7 +253,7 @@ function HistoryTab() {
         {searchControl}
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <History className="h-12 w-12 text-muted-foreground mb-4" />
+            <HistoryIcon className="h-12 w-12 text-muted-foreground mb-4" />
             <CardTitle className="mb-2">No completed sessions</CardTitle>
             <CardDescription className="text-center max-w-sm">
               Completed estimation sessions will appear here.

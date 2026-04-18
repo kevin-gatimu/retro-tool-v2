@@ -85,4 +85,25 @@ export default defineSchema({
   })
     .index('by_scope', ['scopeType', 'scopeId'])
     .index('by_scope_user', ['scopeType', 'scopeId', 'userId']),
+
+  // Ephemeral typing indicators — cleared when user stops typing or leaves.
+  liveTyping: defineTable({
+    retroId: v.string(),
+    userId: v.string(),
+    displayName: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_retro', ['retroId'])
+    .index('by_retro_user', ['retroId', 'userId']),
+
+  // Per-user ready status during the active (Adding Cards) phase.
+  liveReadyStatus: defineTable({
+    retroId: v.string(),
+    userId: v.string(),
+    displayName: v.string(),
+    isReady: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index('by_retro', ['retroId'])
+    .index('by_retro_user', ['retroId', 'userId']),
 })

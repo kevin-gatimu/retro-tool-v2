@@ -40,6 +40,9 @@ export const upsertRetroProjection = mutation({
     }
 
     if (existingProjection) {
+      if (args.updatedAt < existingProjection.updatedAt) {
+        return { retroId: args.retroId, operation: 'noop' as const }
+      }
       await ctx.db.patch(existingProjection._id, nextProjection)
       return { retroId: args.retroId, operation: 'updated' as const }
     }
@@ -139,6 +142,9 @@ export const upsertRetroBoard = mutation({
     ).find((board) => board.userId === args.userId)
 
     if (existing) {
+      if (args.updatedAt < existing.updatedAt) {
+        return { retroId: args.retroId, operation: 'noop' as const }
+      }
       await ctx.db.patch(existing._id, {
         snapshot: args.snapshot,
         updatedAt: args.updatedAt,
@@ -177,6 +183,131 @@ export const getRetroBoard = query({
       retroId: board.retroId,
       snapshot: board.snapshot,
       updatedAt: board.updatedAt,
+    }
+  },
+})
+
+// ── Typing indicators (Adding Cards phase) ────────────────────────────────────
+
+export const startTyping = mutation({
+  args: {
+    retroId: v.string(),
+    userId: v.string(),
+    displayName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = (
+      await ctx.db
+        .query('liveTyping')
+        .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
+        .collect()
+    ).find((r) => r.userId === args.userId)
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        updatedAt: Date.now(),
+        displayName: args.displayName,
+      })
+    } else {
+      await ctx.db.insert('liveTyping', {
+        retroId: args.retroId,
+        userId: args.userId,
+        displayName: args.displayName,
+        updatedAt: Date.now(),
+      })
+    }
+  },
+})
+
+export const stopTyping = mutation({
+  args: {
+    retroId: v.string(),
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = (
+      await ctx.db
+        .query('liveTyping')
+        .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
+        .collect()
+    ).find((r) => r.userId === args.userId)
+
+    if (existing) {
+      await ctx.db.delete(existing._id)
+    }
+  },
+})
+
+export const getTypingUsers = query({
+  args: {
+    retroId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query('liveTyping')
+      .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
+      .collect()
+  },
+})
+
+// ── Ready status (Adding Cards phase) ────────────────────────────────────────
+
+export const setReadyStatus = mutation({
+  args: {
+    retroId: v.string(),
+    userId: v.string(),
+    displayName: v.string(),
+    isReady: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const existing = (
+      await ctx.db
+        .query('liveReadyStatus')
+        .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
+        .collect()
+    ).find((r) => r.userId === args.userId)
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        isReady: args.isReady,
+        displayName: args.displayName,
+        updatedAt: Date.now(),
+      })
+    } else {
+      await ctx.db.insert('liveReadyStatus', {
+        retroId: args.retroId,
+        userId: args.userId,
+        displayName: args.displayName,
+        isReady: args.isReady,
+        updatedAt: Date.now(),
+      })
+    }
+  },
+})
+
+export const getReadyStatus = query({
+  args: {
+    retroId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query('liveReadyStatus')
+      .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
+      .collect()
+  },
+})
+
+export const clearAllReady = mutation({
+  args: {
+    retroId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const statuses = await ctx.db
+      .query('liveReadyStatus')
+      .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
+      .collect()
+    for (const status of statuses) {
+      await ctx.db.delete(status._id)
     }
   },
 })

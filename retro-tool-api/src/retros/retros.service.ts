@@ -771,13 +771,20 @@ export class RetrosService {
       .where(eq(retroSchema.templateColumn.templateId, retro.templateId))
       .orderBy(retroSchema.templateColumn.order);
 
-    const participants = await this.database
+    const rawParticipants = await this.database
       .select({
         id: retroSchema.retroParticipant.id,
         userId: retroSchema.retroParticipant.userId,
       })
       .from(retroSchema.retroParticipant)
       .where(eq(retroSchema.retroParticipant.retroId, retroId));
+
+    const seenUserIds = new Set<string>();
+    const participants = rawParticipants.filter((p) => {
+      if (seenUserIds.has(p.userId)) return false;
+      seenUserIds.add(p.userId);
+      return true;
+    });
 
     const teamMembers = await this.database
       .select({
@@ -1500,6 +1507,36 @@ export class RetrosService {
       .where(eq(retroSchema.card.retroId, retroId))
       .groupBy(retroSchema.card.id);
 
+    const cardIds = cards.map((card) => card.id);
+    const cardComments =
+      cardIds.length > 0
+        ? await this.database
+            .select({
+              cardId: retroSchema.cardComment.cardId,
+              content: retroSchema.cardComment.content,
+              authorName: authSchema.user.name,
+            })
+            .from(retroSchema.cardComment)
+            .leftJoin(
+              authSchema.user,
+              eq(authSchema.user.id, retroSchema.cardComment.authorId),
+            )
+            .where(inArray(retroSchema.cardComment.cardId, cardIds))
+        : [];
+
+    const commentsByCard = new Map<
+      string,
+      Array<{ content: string; authorName: string | null }>
+    >();
+    for (const comment of cardComments) {
+      const existing = commentsByCard.get(comment.cardId) ?? [];
+      existing.push({
+        content: comment.content,
+        authorName: comment.authorName ?? null,
+      });
+      commentsByCard.set(comment.cardId, existing);
+    }
+
     // Fetch action items
     const actionItemsResult = await this.database
       .select({
@@ -1524,8 +1561,11 @@ export class RetrosService {
       const discussedCards = columnCards.filter((c) => c.isDiscussed);
       const topCards = columnCards
         .sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0))
-        .slice(0, 3)
-        .map((c) => ({ content: c.content, votes: c.voteCount ?? 0 }));
+        .map((c) => ({
+          content: c.content,
+          votes: c.voteCount ?? 0,
+          comments: commentsByCard.get(c.id) ?? [],
+        }));
 
       return {
         name: col.name,
@@ -1835,24 +1875,15 @@ export class RetrosService {
       );
     }
 
-    const [existing] = await this.database
-      .select()
-      .from(retroSchema.retroParticipant)
-      .where(
-        and(
-          eq(retroSchema.retroParticipant.retroId, retroId),
-          eq(retroSchema.retroParticipant.userId, userId),
-        ),
-      )
-      .limit(1);
-
-    if (!existing) {
-      await this.database.insert(retroSchema.retroParticipant).values({
-        id: generateId(),
-        retroId,
-        userId,
+    await this.database
+      .insert(retroSchema.retroParticipant)
+      .values({ id: generateId(), retroId, userId })
+      .onConflictDoNothing({
+        target: [
+          retroSchema.retroParticipant.retroId,
+          retroSchema.retroParticipant.userId,
+        ],
       });
-    }
 
     return { success: true };
   }

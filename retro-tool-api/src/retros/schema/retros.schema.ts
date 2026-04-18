@@ -5,6 +5,7 @@ import {
   boolean,
   varchar,
   integer,
+  unique,
 } from 'drizzle-orm/pg-core';
 import { user } from '../../auth/schema';
 import { team } from '../../teams/schema';
@@ -89,18 +90,27 @@ export const retrospective = pgTable('retrospective', {
   }),
 });
 
-export const retroParticipant = pgTable('retro_participant', {
-  id: varchar('id', { length: 255 }).primaryKey(),
-  retroId: varchar('retro_id', { length: 255 })
-    .notNull()
-    .references(() => retrospective.id, { onDelete: 'cascade' }),
-  userId: varchar('user_id', { length: 255 })
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  joinedAt: timestamp('joined_at')
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const retroParticipant = pgTable(
+  'retro_participant',
+  {
+    id: varchar('id', { length: 255 }).primaryKey(),
+    retroId: varchar('retro_id', { length: 255 })
+      .notNull()
+      .references(() => retrospective.id, { onDelete: 'cascade' }),
+    userId: varchar('user_id', { length: 255 })
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    joinedAt: timestamp('joined_at')
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    unique('retro_participant_retro_user_unique').on(
+      table.retroId,
+      table.userId,
+    ),
+  ],
+);
 
 // ============================================================================
 // Type definitions

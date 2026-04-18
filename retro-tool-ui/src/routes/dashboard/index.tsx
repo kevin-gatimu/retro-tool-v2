@@ -3,7 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   ArrowRight,
   BarChart3,
-  History,
+  History as HistoryIcon,
   LayoutDashboard,
   Plus,
   Spade,
@@ -77,7 +77,7 @@ function DashboardIndexPage() {
     {
       title: 'Total Retros',
       value: stats?.totalRetros ?? 0,
-      icon: History,
+      icon: HistoryIcon,
       color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20',
     },
     {
@@ -145,7 +145,7 @@ function DashboardIndexPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
+                <HistoryIcon className="h-5 w-5" />
                 Recent Retrospectives
               </CardTitle>
               <CardDescription>Your latest retros</CardDescription>
@@ -174,7 +174,7 @@ function DashboardIndexPage() {
               </div>
             ) : latestRetros.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <History className="h-10 w-10 text-muted-foreground mb-3" />
+                <HistoryIcon className="h-10 w-10 text-muted-foreground mb-3" />
                 <p className="text-sm text-muted-foreground">
                   No retrospectives yet.
                 </p>

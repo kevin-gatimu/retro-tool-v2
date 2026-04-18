@@ -307,7 +307,11 @@ export class EmailService {
       emoji: string;
       discussedCount: number;
       undiscussedCount: number;
-      topCards: Array<{ content: string; votes: number }>;
+      topCards: Array<{
+        content: string;
+        votes: number;
+        comments: Array<{ content: string; authorName: string | null }>;
+      }>;
     }>;
     actionItems: Array<{ title: string; assigneeName?: string }>;
   }): string {
@@ -329,6 +333,28 @@ export class EmailService {
         <p style="margin:0 0 8px;font-size:12px;color:#6b7280">Discussed: <strong>${col.discussedCount}</strong> | Undiscussed: <strong>${col.undiscussedCount}</strong></p>
         <div style="margin-top:8px">
           ${col.topCards.map((card) => `<p style="margin:4px 0;font-size:13px;color:#52525b">• ${this.esc(card.content)} <span style="color:#9ca3af">(${card.votes} ${card.votes === 1 ? 'vote' : 'votes'})</span></p>`).join('')}
+          ${col.topCards
+            .map((card) => {
+              if (card.comments.length === 0) {
+                return '';
+              }
+
+              const commentsHtml = card.comments
+                .map(
+                  (comment) =>
+                    `<li style="margin:2px 0;color:#6b7280">${this.esc(comment.authorName ?? 'Unknown')}: ${this.esc(comment.content)}</li>`,
+                )
+                .join('');
+
+              return `
+                <div style="margin:6px 0 10px 14px;padding-left:8px;border-left:2px solid #e5e7eb">
+                  <p style="margin:0 0 4px;font-size:12px;color:#6b7280"><strong>Discussion notes</strong></p>
+                  <ul style="margin:0;padding-left:16px;font-size:12px;line-height:1.4">
+                    ${commentsHtml}
+                  </ul>
+                </div>`;
+            })
+            .join('')}
         </div>
       </div>`,
       )

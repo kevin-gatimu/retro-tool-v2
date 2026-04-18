@@ -6,7 +6,7 @@ import {
   Ban,
   Building2,
   Crown,
-  History,
+  History as HistoryIcon,
   LayoutDashboard,
   RefreshCw,
   SquareStack,
@@ -97,7 +97,7 @@ export function ActionIcon({ action }: { action: string }) {
     user_deleted: <Trash2 className="h-4 w-4 text-red-500" />,
     password_reset_triggered: <RefreshCw className="h-4 w-4 text-blue-500" />,
   }
-  return icons[action] || <History className="h-4 w-4" />
+  return icons[action] || <HistoryIcon className="h-4 w-4" />
 }
 
 /**

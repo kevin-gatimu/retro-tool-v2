@@ -10,7 +10,7 @@ import {
   ChevronRight,
   Clock,
   Crown,
-  History,
+  History as HistoryIcon,
   Loader2,
   RefreshCw,
   Search,
@@ -411,7 +411,7 @@ function AdminUsersPage() {
               Users
             </TabsTrigger>
             <TabsTrigger value="activity">
-              <History className="mr-2 h-4 w-4" />
+              <HistoryIcon className="mr-2 h-4 w-4" />
               Activity Log
             </TabsTrigger>
           </TabsList>
@@ -1014,7 +1014,7 @@ function AdminUsersPage() {
 
               <div>
                 <h4 className="mb-2 flex items-center gap-2 font-medium">
-                  <History className="h-4 w-4" />
+                  <HistoryIcon className="h-4 w-4" />
                   Admin Action History
                 </h4>
                 {userDetails.actionHistory.length > 0 ? (
