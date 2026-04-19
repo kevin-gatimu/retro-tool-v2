@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { EstimateSessionsListSkeleton } from '@/components/skeletons'
+import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
 import { useEstimateMutations } from './hooks/useEstimateMutations'
@@ -30,6 +30,41 @@ const estimateNewTeamsQueryOptions = {
   queryKey: ['teams'] as const,
   queryFn: () => api.get<{ teams: Team[] }>(TEAMS_ENDPOINTS.LIST),
   staleTime: 30_000,
+}
+
+function EstimateSessionsListSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 rounded-md" />
+            <Skeleton className="h-9 w-48" />
+          </div>
+          <Skeleton className="h-5 w-64" />
+        </div>
+        <Skeleton className="h-10 w-36" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="border rounded-lg p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="h-4 w-1/2" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <Skeleton className="h-8 w-24 rounded-md" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export const Route = createFileRoute('/estimate/new')({

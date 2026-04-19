@@ -16,12 +16,10 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { DetailPageSkeleton } from '@/components/skeletons'
 import { authClient } from '@/lib/auth-client'
 import { useAdminCheck, useSignUp } from './hooks'
 
 export const Route = createFileRoute('/auth/sign-up')({
-  pendingComponent: DetailPageSkeleton,
   component: SignUpPage,
 })
 

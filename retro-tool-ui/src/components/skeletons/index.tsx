@@ -596,22 +596,31 @@ export function SettingsSkeleton() {
 export function AdminDashboardSkeleton() {
   return (
     <div className="space-y-6">
+      {/* Admin nav bar */}
+      <div className="flex items-center gap-1 border-b pb-2 mb-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-8 w-24 rounded-md" />
+        ))}
+      </div>
+
       {/* Header */}
       <div className="space-y-2">
         <Skeleton className="h-8 w-32" />
         <Skeleton className="h-4 w-96" />
       </div>
 
-      {/* Stats Grid - 6 cards in 3 columns */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Stats Grid - 6 compact cards, 2-col mobile, 3-col md+ */}
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="border rounded-lg p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-8 w-8 rounded-lg" />
+          <div key={i} className="border rounded-lg px-3 py-2.5">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-6 w-6 rounded-md" />
+              </div>
+              <Skeleton className="h-7 w-12" />
+              <Skeleton className="h-3 w-28" />
             </div>
-            <Skeleton className="h-8 w-16" />
-            <Skeleton className="h-3 w-32" />
           </div>
         ))}
       </div>
@@ -625,6 +634,7 @@ export function AdminDashboardSkeleton() {
           </div>
           <Skeleton className="h-4 w-48" />
           <div className="space-y-3">
+            <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
@@ -1109,6 +1119,53 @@ export function TableSkeleton({
           ))}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ============================================================================
+// LEGAL PAGE SKELETONS
+// ============================================================================
+
+export function LegalPageSkeleton() {
+  return (
+    <div className="min-h-screen" style={{ background: '#0d1117' }}>
+      {/* Sticky header */}
+      <div className="h-14 border-b border-white/5 px-6 flex items-center justify-between">
+        <Skeleton className="h-5 w-24 bg-white/10" />
+        <Skeleton className="h-7 w-28 bg-white/10" />
+        <div className="flex gap-4">
+          <Skeleton className="h-4 w-16 bg-white/10" />
+          <Skeleton className="h-4 w-20 bg-white/10" />
+        </div>
+      </div>
+      {/* Title block */}
+      <div className="px-6 py-12 space-y-4 max-w-4xl mx-auto">
+        <Skeleton className="h-6 w-24 rounded-full bg-white/10" />
+        <Skeleton className="h-10 w-80 bg-white/10" />
+        <Skeleton className="h-4 w-48 bg-white/10" />
+        <Skeleton className="h-5 w-96 bg-white/10" />
+      </div>
+      {/* Two-column layout */}
+      <div className="px-6 pb-16 max-w-4xl mx-auto grid gap-8 lg:grid-cols-[220px_1fr]">
+        {/* Sidebar ToC */}
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-full rounded-lg bg-white/5" />
+          ))}
+        </div>
+        {/* Main content */}
+        <div className="space-y-10">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="space-y-4">
+              <Skeleton className="h-7 w-56 bg-white/10" />
+              <Skeleton className="h-4 w-full bg-white/10" />
+              <Skeleton className="h-4 w-full bg-white/10" />
+              <Skeleton className="h-4 w-3/4 bg-white/10" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

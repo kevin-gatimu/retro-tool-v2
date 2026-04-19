@@ -16,6 +16,8 @@ import {
   Shield,
 } from 'lucide-react'
 
+import { LegalPageSkeleton } from '@/components/skeletons'
+
 // ─── Nanite cursor ───────────────────────────────────────────────────────────
 const TRAIL_LEN = 14
 interface Nanite {
@@ -183,6 +185,7 @@ function NaniteCursor() {
 }
 
 export const Route = createFileRoute('/privacystatement')({
+  pendingComponent: LegalPageSkeleton,
   component: PrivacyStatementPage,
 })
 

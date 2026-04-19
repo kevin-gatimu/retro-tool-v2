@@ -16,6 +16,8 @@ import {
 
 import type { LucideIcon } from 'lucide-react'
 
+import { LegalPageSkeleton } from '@/components/skeletons'
+
 // ─── Nanite cursor ───────────────────────────────────────────────────────────
 const TRAIL_LEN = 14
 interface Nanite {
@@ -183,6 +185,7 @@ function NaniteCursor() {
 }
 
 export const Route = createFileRoute('/termsofservice')({
+  pendingComponent: LegalPageSkeleton,
   component: TermsOfServicePage,
 })
 

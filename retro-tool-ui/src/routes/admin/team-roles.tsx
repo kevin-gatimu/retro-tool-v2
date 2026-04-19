@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { AdminUsersSkeleton } from '@/components/skeletons'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -55,8 +55,36 @@ interface TeamRole {
   updatedAt: string
 }
 
+function AdminTeamRolesSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Skeleton className="h-10 w-36" />
+      </div>
+      <div className="border rounded-lg divide-y">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between p-4">
+            <div className="space-y-1">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-8" />
+              <Skeleton className="h-8 w-8" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export const Route = createFileRoute('/admin/team-roles')({
-  pendingComponent: AdminUsersSkeleton,
+  pendingComponent: AdminTeamRolesSkeleton,
   component: AdminTeamRolesPage,
 })
 
@@ -130,7 +158,7 @@ function AdminTeamRolesPage() {
     })
   }
 
-  if (isLoading) return <AdminUsersSkeleton />
+  if (isLoading) return <AdminTeamRolesSkeleton />
 
   return (
     <div className="container mx-auto py-6 space-y-6">

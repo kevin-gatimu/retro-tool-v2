@@ -20,13 +20,11 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { DetailPageSkeleton } from '@/components/skeletons'
 import { authClient } from '@/lib/auth-client'
 import { useSignIn } from './hooks'
 import type { SignInSearch } from './types'
 
 export const Route = createFileRoute('/auth/sign-in')({
-  pendingComponent: DetailPageSkeleton,
   validateSearch: (search: Record<string, unknown>): SignInSearch => ({
     status: search.status as SignInSearch['status'],
     redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
