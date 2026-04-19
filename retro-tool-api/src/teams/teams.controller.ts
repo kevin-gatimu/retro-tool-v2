@@ -300,14 +300,14 @@ export class TeamsController {
   async updateMemberJobRole(
     @Param('teamId', ParseUUIDPipe) teamId: string,
     @Param('memberId', ParseUUIDPipe) memberId: string,
-    @Body('role') jobRole: string,
+    @Body('roleId') teamRoleId: string | null,
     @Session() session: SessionUser,
   ) {
     return this.teamsService.updateTeamMemberJobRole(
       session.user.id,
       teamId,
       memberId,
-      jobRole,
+      teamRoleId ?? null,
     );
   }
 

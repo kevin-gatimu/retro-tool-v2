@@ -9,7 +9,6 @@ import {
   RETRO_STATUSES,
   RETRO_VOTE_TYPES,
   TEAM_JOIN_REQUEST_STATUSES,
-  TEAM_MEMBER_ROLES,
   TEAM_MEMBER_TAGS,
   USER_ROLES,
   USER_STATUSES,
@@ -49,16 +48,6 @@ export const orgMemberRoleEnum = pgEnum('org_member_role', [
 ]);
 
 // Team
-export const teamMemberRoleEnum = pgEnum('team_member_role', [
-  TEAM_MEMBER_ROLES.Dev,
-  TEAM_MEMBER_ROLES.QA,
-  TEAM_MEMBER_ROLES.QE,
-  TEAM_MEMBER_ROLES.QA_QE,
-  TEAM_MEMBER_ROLES.DevOps,
-  TEAM_MEMBER_ROLES.BI_Dev,
-  TEAM_MEMBER_ROLES.Oversight,
-]);
-
 export const teamMemberTagEnum = pgEnum('team_member_tag', [
   TEAM_MEMBER_TAGS.Lead,
   TEAM_MEMBER_TAGS.Member,

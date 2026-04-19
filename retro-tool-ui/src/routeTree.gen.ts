@@ -49,6 +49,7 @@ import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-passw
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminTemplatesRouteImport } from './routes/admin/templates'
+import { Route as AdminTeamRolesRouteImport } from './routes/admin/team-roles'
 import { Route as AdminOrganizationsRouteImport } from './routes/admin/organizations'
 import { Route as AdminOrgSetupRouteImport } from './routes/admin/org-setup'
 
@@ -252,6 +253,11 @@ const AdminTemplatesRoute = AdminTemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTeamRolesRoute = AdminTeamRolesRouteImport.update({
+  id: '/team-roles',
+  path: '/team-roles',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminOrganizationsRoute = AdminOrganizationsRouteImport.update({
   id: '/organizations',
   path: '/organizations',
@@ -278,6 +284,7 @@ export interface FileRoutesByFullPath {
   '/termsofservice': typeof TermsofserviceRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
   '/admin/organizations': typeof AdminOrganizationsRoute
+  '/admin/team-roles': typeof AdminTeamRolesRoute
   '/admin/templates': typeof AdminTemplatesRoute
   '/admin/users': typeof AdminUsersRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
@@ -319,6 +326,7 @@ export interface FileRoutesByTo {
   '/termsofservice': typeof TermsofserviceRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
   '/admin/organizations': typeof AdminOrganizationsRoute
+  '/admin/team-roles': typeof AdminTeamRolesRoute
   '/admin/templates': typeof AdminTemplatesRoute
   '/admin/users': typeof AdminUsersRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
@@ -364,6 +372,7 @@ export interface FileRoutesById {
   '/termsofservice': typeof TermsofserviceRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
   '/admin/organizations': typeof AdminOrganizationsRoute
+  '/admin/team-roles': typeof AdminTeamRolesRoute
   '/admin/templates': typeof AdminTemplatesRoute
   '/admin/users': typeof AdminUsersRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
@@ -410,6 +419,7 @@ export interface FileRouteTypes {
     | '/termsofservice'
     | '/admin/org-setup'
     | '/admin/organizations'
+    | '/admin/team-roles'
     | '/admin/templates'
     | '/admin/users'
     | '/auth/forgot-password'
@@ -451,6 +461,7 @@ export interface FileRouteTypes {
     | '/termsofservice'
     | '/admin/org-setup'
     | '/admin/organizations'
+    | '/admin/team-roles'
     | '/admin/templates'
     | '/admin/users'
     | '/auth/forgot-password'
@@ -495,6 +506,7 @@ export interface FileRouteTypes {
     | '/termsofservice'
     | '/admin/org-setup'
     | '/admin/organizations'
+    | '/admin/team-roles'
     | '/admin/templates'
     | '/admin/users'
     | '/auth/forgot-password'
@@ -831,6 +843,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTemplatesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/team-roles': {
+      id: '/admin/team-roles'
+      path: '/team-roles'
+      fullPath: '/admin/team-roles'
+      preLoaderRoute: typeof AdminTeamRolesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/organizations': {
       id: '/admin/organizations'
       path: '/organizations'
@@ -851,6 +870,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminOrgSetupRoute: typeof AdminOrgSetupRoute
   AdminOrganizationsRoute: typeof AdminOrganizationsRoute
+  AdminTeamRolesRoute: typeof AdminTeamRolesRoute
   AdminTemplatesRoute: typeof AdminTemplatesRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -859,6 +879,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminOrgSetupRoute: AdminOrgSetupRoute,
   AdminOrganizationsRoute: AdminOrganizationsRoute,
+  AdminTeamRolesRoute: AdminTeamRolesRoute,
   AdminTemplatesRoute: AdminTemplatesRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,

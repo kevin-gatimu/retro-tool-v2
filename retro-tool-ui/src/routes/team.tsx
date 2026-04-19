@@ -188,7 +188,10 @@ function TeamPage() {
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Users className="h-4 w-4" />
-                        <span>{team.memberCount} members</span>
+                        <span>
+                          {team.memberCount ?? 0}{' '}
+                          {team.memberCount === 1 ? 'member' : 'members'}
+                        </span>
                       </div>
                       <ChevronRightIcon className="h-4 w-4" />
                     </div>

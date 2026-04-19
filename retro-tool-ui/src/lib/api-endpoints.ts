@@ -210,3 +210,19 @@ export const TEMPLATES_ENDPOINTS = {
   SEED: '/api/retros/templates/seed',
   BY_ID: RETROS_ENDPOINTS.TEMPLATE_BY_ID,
 } as const
+
+// ---------------------------------------------------------------------------
+// Team Roles
+// ---------------------------------------------------------------------------
+export const TEAM_ROLES_ENDPOINTS = {
+  LIST: '/api/team-roles',
+  SEED: '/api/team-roles/seed',
+  BY_ID: (id: string) => `/api/team-roles/${id}`,
+  ORG_LIST: (orgId: string) => `/api/organizations/${orgId}/team-roles`,
+  ORG_ADMIN_LIST: (orgId: string) =>
+    `/api/organizations/${orgId}/team-roles/admin`,
+  ORG_BY_ID: (orgId: string, id: string) =>
+    `/api/organizations/${orgId}/team-roles/${id}`,
+  ORG_ACTIVATION: (orgId: string, id: string) =>
+    `/api/organizations/${orgId}/team-roles/${id}/activation`,
+} as const

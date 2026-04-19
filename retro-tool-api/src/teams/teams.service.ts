@@ -21,7 +21,6 @@ import {
   ORG_MEMBER_ROLES,
   TEAM_JOIN_REQUEST_STATUSES,
   TEAM_MEMBER_TAGS,
-  TTeamMemberRole,
   EMAIL_LOG_TYPES,
   USER_STATUSES,
 } from 'src/common/enums';
@@ -192,12 +191,29 @@ export class TeamsService {
     const memberTeamIds = new Set(memberships.map((m) => m.teamId));
     const pendingByTeam = new Map(pendingRequests.map((r) => [r.teamId, r.id]));
 
+    const memberCounts =
+      teamIds.length > 0
+        ? await this.database
+            .select({
+              teamId: teamSchema.teamMember.teamId,
+              memberCount: count(),
+            })
+            .from(teamSchema.teamMember)
+            .where(inArray(teamSchema.teamMember.teamId, teamIds))
+            .groupBy(teamSchema.teamMember.teamId)
+        : [];
+
+    const memberCountByTeamId = new Map(
+      memberCounts.map((r) => [r.teamId, r.memberCount]),
+    );
+
     const result = {
       teams: teams.map((t) => ({
         ...t,
         isMember: memberTeamIds.has(t.id),
         hasPendingRequest: pendingByTeam.has(t.id),
         myPendingRequestId: pendingByTeam.get(t.id) ?? null,
+        memberCount: memberCountByTeamId.get(t.id) ?? 0,
       })),
       total: totalCount.count,
       page,
@@ -251,10 +267,29 @@ export class TeamsService {
       )
       .where(whereClause);
 
+    const teamIds = teams.map((t) => t.team.id);
+
+    const memberCounts =
+      teamIds.length > 0
+        ? await this.database
+            .select({
+              teamId: teamSchema.teamMember.teamId,
+              memberCount: count(),
+            })
+            .from(teamSchema.teamMember)
+            .where(inArray(teamSchema.teamMember.teamId, teamIds))
+            .groupBy(teamSchema.teamMember.teamId)
+        : [];
+
+    const memberCountByTeamId = new Map(
+      memberCounts.map((r) => [r.teamId, r.memberCount]),
+    );
+
     return {
       teams: teams.map(({ team, memberTag, organizationName }) => ({
         ...team,
-        memberTag: memberTag ?? TEAM_MEMBER_TAGS.Member,
+        myRole: memberTag ?? TEAM_MEMBER_TAGS.Member,
+        memberCount: memberCountByTeamId.get(team.id) ?? 0,
         organization: { name: organizationName ?? 'Organization' },
       })),
       total: totalCount.count,
@@ -358,7 +393,8 @@ export class TeamsService {
             id: teamSchema.teamMember.id,
             teamId: teamSchema.teamMember.teamId,
             userId: teamSchema.teamMember.userId,
-            role: teamSchema.teamMember.role,
+            roleId: teamSchema.teamMember.roleId,
+            roleName: teamSchema.teamRole.name,
             tag: teamSchema.teamMember.tag,
             createdAt: teamSchema.teamMember.createdAt,
             userName: userSchema.user.name,
@@ -372,6 +408,10 @@ export class TeamsService {
           .innerJoin(
             userSchema.user,
             eq(userSchema.user.id, teamSchema.teamMember.userId),
+          )
+          .leftJoin(
+            teamSchema.teamRole,
+            eq(teamSchema.teamRole.id, teamSchema.teamMember.roleId),
           )
           .leftJoin(
             orgSchema.organizationMember,
@@ -393,7 +433,8 @@ export class TeamsService {
       id: m.id,
       teamId: m.teamId,
       userId: m.userId,
-      role: m.role ?? null,
+      roleId: m.roleId ?? null,
+      roleName: m.roleName ?? null,
       tag: m.tag,
       joinedAt: m.createdAt,
       orgRole: m.orgRole ?? null,
@@ -563,7 +604,8 @@ export class TeamsService {
       .select({
         userId: teamSchema.teamMember.userId,
         teamId: teamSchema.teamMember.teamId,
-        role: teamSchema.teamMember.role,
+        roleId: teamSchema.teamMember.roleId,
+        roleName: teamSchema.teamRole.name,
         tag: teamSchema.teamMember.tag,
         createdAt: teamSchema.teamMember.createdAt,
         orgRole: orgSchema.organizationMember.role,
@@ -573,6 +615,10 @@ export class TeamsService {
       .innerJoin(
         userSchema.user,
         eq(userSchema.user.id, teamSchema.teamMember.userId),
+      )
+      .leftJoin(
+        teamSchema.teamRole,
+        eq(teamSchema.teamRole.id, teamSchema.teamMember.roleId),
       )
       .leftJoin(
         orgSchema.organizationMember,
@@ -598,7 +644,8 @@ export class TeamsService {
       members: members.map((m) => ({
         userId: m.userId,
         teamId: m.teamId,
-        role: m.role ?? null,
+        roleId: m.roleId ?? null,
+        roleName: m.roleName ?? null,
         tag: m.tag,
         joinedAt: m.createdAt,
         orgRole: m.orgRole ?? null,
@@ -679,7 +726,7 @@ export class TeamsService {
         id: generateId(),
         teamId: teamId,
         userId: data.userId,
-        role: data.role,
+        roleId: data.roleId ?? null,
         tag: data.tag,
       })
       .returning();
@@ -818,7 +865,7 @@ export class TeamsService {
     const [updatedMember] = await this.database
       .update(teamSchema.teamMember)
       .set({
-        role: data.role,
+        roleId: data.roleId,
         tag: data.tag,
       })
       .where(eq(teamSchema.teamMember.id, member.id))
@@ -834,7 +881,7 @@ export class TeamsService {
     userId: string,
     teamId: string,
     memberId: string,
-    jobRole: string,
+    teamRoleId: string | null,
   ) {
     const canManage = await this.commonService.canManageTeam(userId, teamId);
     if (!canManage) {
@@ -858,7 +905,7 @@ export class TeamsService {
 
     const [updated] = await this.database
       .update(teamSchema.teamMember)
-      .set({ role: jobRole as TTeamMemberRole })
+      .set({ roleId: teamRoleId })
       .where(eq(teamSchema.teamMember.id, member.id))
       .returning();
 

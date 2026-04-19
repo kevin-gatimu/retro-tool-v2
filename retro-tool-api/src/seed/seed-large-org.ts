@@ -23,7 +23,6 @@ import { eq } from 'drizzle-orm';
 import { user, account } from '../auth/schema';
 import { organization, organizationMember } from '../organizations/schema';
 import { team, teamMember } from '../teams/schema';
-import { TEAM_MEMBER_ROLES } from '../common/enums';
 
 // Hash generated from: hashPassword("password") — reused for all seed users.
 const TEST_PASSWORD_HASH =
@@ -36,8 +35,6 @@ const TEAMS_PER_ORG = 50;
 const MEMBERS_PER_TEAM = 300;
 const TEAM_LEADS_PER_TEAM = 4;
 const ORG_ADMINS_PER_ORG = 3;
-// Round-robin job roles for all team members
-const ROLE_VALUES = Object.values(TEAM_MEMBER_ROLES);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -187,7 +184,6 @@ async function main() {
       for (let memberIdx = 0; memberIdx < MEMBERS_PER_TEAM; memberIdx++) {
         const userId = uid();
         const isLead = memberIdx < TEAM_LEADS_PER_TEAM;
-        const jobRole = ROLE_VALUES[memberIdx % ROLE_VALUES.length];
 
         teamUsers.push({
           id: userId,
@@ -224,7 +220,6 @@ async function main() {
           userId,
           teamId,
           tag: isLead ? ('team-lead' as const) : ('member' as const),
-          role: jobRole,
           createdAt: new Date(),
         });
       }

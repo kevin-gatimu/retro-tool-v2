@@ -30,6 +30,7 @@ import {
 import type {
   JoinRequestRow,
   TeamMemberRow,
+  OrgTeamRole,
 } from '@/components/tables/member-columns'
 import { TeamDetailSkeleton } from '@/components/skeletons'
 import { UserAvatar } from '@/components/UserAvatar'
@@ -76,9 +77,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import {
   ORGANIZATIONS_ENDPOINTS,
+  TEAM_ROLES_ENDPOINTS,
   TEAMS_ENDPOINTS,
   USERS_ENDPOINTS,
 } from '@/lib/api-endpoints'
+
 import type { TeamDetail, TeamMember } from '@/common/types/teams'
 import type { Organization } from '@/common/types/organizations'
 import type { User } from '@/common/types/users'
@@ -192,6 +195,16 @@ function TeamDetailPage() {
     enabled: canSeeMembers,
     placeholderData: (prev) => prev,
   })
+
+  const orgRolesQuery = useQuery({
+    queryKey: ['org-team-roles', team.organizationId],
+    queryFn: () =>
+      api.get<OrgTeamRole[]>(
+        TEAM_ROLES_ENDPOINTS.ORG_LIST(team.organizationId),
+      ),
+    enabled: !!team.organizationId,
+  })
+  const orgRoles = Array.isArray(orgRolesQuery.data) ? orgRolesQuery.data : []
 
   const pagedMembers = teamMembersQuery.data?.members ?? []
   const totalMembersCount =
@@ -338,8 +351,14 @@ function TeamDetailPage() {
   })
 
   const updateJobRoleMutation = useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: string | null }) =>
-      api.patch(TEAMS_ENDPOINTS.MEMBER_JOB_ROLE(teamId, userId), { role }),
+    mutationFn: ({
+      userId,
+      roleId,
+    }: {
+      userId: string
+      roleId: string | null
+    }) =>
+      api.patch(TEAMS_ENDPOINTS.MEMBER_JOB_ROLE(teamId, userId), { roleId }),
     onSuccess: async () => {
       toast.success('Member job role updated')
       await invalidateTeam()
@@ -779,11 +798,12 @@ function TeamDetailPage() {
               <DataTable
                 columns={getTeamMemberColumns({
                   canManage: !!canManage,
+                  orgRoles,
                   onUpdateHierarchy: (userId, tag) =>
                     updateHierarchyMutation.mutate({ userId, tag }),
                   onRemove: (userId) => setRemoveMemberId(userId),
-                  onUpdateJobRole: (userId, role) =>
-                    updateJobRoleMutation.mutate({ userId, role }),
+                  onUpdateJobRole: (userId, roleId) =>
+                    updateJobRoleMutation.mutate({ userId, roleId }),
                 })}
                 data={pagedMembers}
                 searchColumn="user"

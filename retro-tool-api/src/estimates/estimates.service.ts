@@ -354,7 +354,7 @@ export class EstimatesService {
         userName: authSchema.user.name,
         userImage: authSchema.user.image,
         userId2: authSchema.user.id,
-        jobRole: teamSchema.teamMember.role,
+        jobRole: teamSchema.teamRole.name,
       })
       .from(estimatesSchema.storyEstimateParticipant)
       .innerJoin(
@@ -370,6 +370,10 @@ export class EstimatesService {
           ),
           eq(teamSchema.teamMember.teamId, row.session.teamId),
         ),
+      )
+      .leftJoin(
+        teamSchema.teamRole,
+        eq(teamSchema.teamRole.id, teamSchema.teamMember.roleId),
       )
       .where(eq(estimatesSchema.storyEstimateParticipant.sessionId, sessionId));
 

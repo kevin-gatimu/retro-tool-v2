@@ -1,15 +1,10 @@
 import { z } from 'zod';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  TEAM_MEMBER_ROLES,
-  TEAM_MEMBER_TAGS,
-  TTeamMemberRole,
-  TTeamMemberTag,
-} from '../../common/enums';
+import { TEAM_MEMBER_TAGS, TTeamMemberTag } from '../../common/enums';
 
 export const addTeamMemberSchema = z.object({
   userId: z.string().min(1),
-  role: z.enum(TEAM_MEMBER_ROLES).optional(),
+  roleId: z.string().nullable().optional(),
   tag: z.enum(TEAM_MEMBER_TAGS).default(TEAM_MEMBER_TAGS.Member),
 });
 
@@ -19,11 +14,8 @@ export class AddTeamMemberDtoClass {
   @ApiProperty({ description: 'User ID to add' })
   userId: string;
 
-  @ApiPropertyOptional({
-    description: 'Member role',
-    enum: TEAM_MEMBER_ROLES,
-  })
-  role?: TTeamMemberRole;
+  @ApiPropertyOptional({ description: 'Team role ID (from team_role table)' })
+  roleId?: string | null;
 
   @ApiPropertyOptional({
     description: 'Team rank (team-lead or member)',

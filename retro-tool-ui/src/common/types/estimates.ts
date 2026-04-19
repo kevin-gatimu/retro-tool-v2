@@ -1,4 +1,3 @@
-import type { TTeamMemberRole } from '@/common/enums/team.enums'
 import type { TEstimateSessionStatus } from '@/common/enums/estimate.enums'
 
 export interface EstimateRoundInput {
@@ -81,7 +80,7 @@ export interface EstimateSession {
       id: string
       name: string
       image: string | null
-      jobRole: TTeamMemberRole | null
+      jobRole: string | null
     }
   }[]
   votes: {

@@ -9,6 +9,7 @@ import {
   History as HistoryIcon,
   LayoutDashboard,
   RefreshCw,
+  ShieldCheck,
   SquareStack,
   Trash2,
   UserCheck,
@@ -33,6 +34,7 @@ const adminLinks = [
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/organizations', label: 'Organizations', icon: Building2 },
   { to: '/admin/templates', label: 'Templates', icon: SquareStack },
+  { to: '/admin/team-roles', label: 'Team Roles', icon: ShieldCheck },
   { to: '/admin/org-setup', label: 'Org Setup', icon: Wand2 },
 ] as const
 

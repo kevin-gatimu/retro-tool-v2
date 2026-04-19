@@ -84,18 +84,15 @@ const retroNavItems: NavItem[] = [
     allowedRoles: ALL_ROLES,
   },
   {
-    title: 'Templates',
-    url: '/templates',
-    icon: FileText,
-    allowedRoles: ALL_ROLES,
-  },
-]
-
-const storyEstimateNavItems: NavItem[] = [
-  {
     title: 'Story Estimate',
     url: '/estimate',
     icon: Spade,
+    allowedRoles: ALL_ROLES,
+  },
+  {
+    title: 'Templates',
+    url: '/templates',
+    icon: FileText,
     allowedRoles: ALL_ROLES,
   },
 ]
@@ -223,9 +220,6 @@ export function AppSidebar() {
   const visibleRetroNavItems = retroNavItems.filter((item) =>
     item.allowedRoles.includes(currentUserRole),
   )
-  const visibleStoryEstimateNavItems = storyEstimateNavItems.filter((item) =>
-    item.allowedRoles.includes(currentUserRole),
-  )
   const visibleReportsNavItems = reportsNavItems.filter((item) =>
     item.allowedRoles.includes(currentUserRole),
   )
@@ -284,16 +278,6 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {visibleRetroNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              {visibleStoryEstimateNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <Link to={item.url}>

@@ -630,7 +630,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.frontend,
       userId: UID.superAdmin,
       tag: 'member' as const,
-      role: 'DevOps',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -638,7 +638,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.backend,
       userId: UID.superAdmin,
       tag: 'member' as const,
-      role: 'DevOps',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -646,7 +646,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.mobile,
       userId: UID.superAdmin,
       tag: 'member' as const,
-      role: 'DevOps',
+      roleId: null,
       createdAt: now,
     },
     // Frontend team
@@ -655,7 +655,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.frontend,
       userId: UID.member2,
       tag: 'team-lead' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -663,7 +663,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.frontend,
       userId: UID.member3,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -671,7 +671,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.frontend,
       userId: UID.feActive1,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -679,7 +679,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.frontend,
       userId: UID.feActive2,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -687,7 +687,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.frontend,
       userId: UID.feSusp1,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -695,7 +695,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.frontend,
       userId: UID.feSusp2,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     // Backend team
@@ -704,7 +704,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.backend,
       userId: UID.member5,
       tag: 'team-lead' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -712,7 +712,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.backend,
       userId: UID.member1,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -720,7 +720,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.backend,
       userId: UID.beActive1,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -728,7 +728,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.backend,
       userId: UID.beActive2,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -736,7 +736,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.backend,
       userId: UID.beSusp1,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -744,7 +744,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.backend,
       userId: UID.beSusp2,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     // Mobile team
@@ -753,7 +753,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.mobile,
       userId: UID.member4,
       tag: 'team-lead' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -761,7 +761,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.mobile,
       userId: UID.member2,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -769,7 +769,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.mobile,
       userId: UID.mbActive1,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -777,7 +777,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.mobile,
       userId: UID.mbActive2,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -785,7 +785,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.mobile,
       userId: UID.mbSusp1,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
     {
@@ -793,7 +793,7 @@ async function seedOrganizationsAndTeams(db: ReturnType<typeof drizzle>) {
       teamId: TID.mobile,
       userId: UID.mbSusp2,
       tag: 'member' as const,
-      role: 'Dev',
+      roleId: null,
       createdAt: now,
     },
   ]);

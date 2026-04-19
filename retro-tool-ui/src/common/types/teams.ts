@@ -1,6 +1,5 @@
 import type {
   TTeamJoinRequestStatus,
-  TTeamMemberRole,
   TTeamMemberTag,
 } from '@/common/enums/team.enums'
 import type { TOrgMemberRole } from '@/common/enums/organization.enums'
@@ -36,7 +35,8 @@ export interface TeamMember {
   id: string
   teamId: string
   userId: string
-  role: TTeamMemberRole | null
+  roleId: string | null
+  roleName: string | null
   tag: TTeamMemberTag
   orgRole: TOrgMemberRole | null
   joinedAt: Date | string

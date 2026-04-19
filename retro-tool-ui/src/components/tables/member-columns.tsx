@@ -17,7 +17,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { SortableHeader } from '@/components/ui/data-table'
-import { TEAM_MEMBER_ROLES } from '@/common/enums/team.enums'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +29,26 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { isSystemAdmin } from '@/lib/rbac'
 import type { TUserRole } from '@/common/enums/user.enums'
+
+export interface OrgTeamRole {
+  id: string
+  name: string
+  isBuiltIn: boolean
+  sortOrder: number
+}
+
+const ROLE_PALETTE = [
+  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+  'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+  'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
+  'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+]
 
 // ============================================================================
 // Organization Member Type
@@ -192,7 +211,8 @@ export function getOrgMemberColumns(options: {
 
 export type TeamMemberRow = {
   userId: string
-  role: string | null
+  roleId: string | null
+  roleName: string | null
   tag: 'team-lead' | 'member'
   orgRole: 'org-owner' | 'org-admin' | 'member' | null
   user: {
@@ -206,9 +226,10 @@ export type TeamMemberRow = {
 
 export function getTeamMemberColumns(options: {
   canManage: boolean
+  orgRoles: OrgTeamRole[]
   onUpdateHierarchy: (userId: string, tag: 'team-lead' | 'member') => void
   onRemove: (userId: string) => void
-  onUpdateJobRole: (userId: string, role: string | null) => void
+  onUpdateJobRole: (userId: string, roleId: string | null) => void
 }): ColumnDef<TeamMemberRow>[] {
   const columns: ColumnDef<TeamMemberRow>[] = [
     {
@@ -242,35 +263,23 @@ export function getTeamMemberColumns(options: {
       },
     },
     {
-      accessorKey: 'role',
+      accessorKey: 'roleName',
       header: ({ column }) => (
         <SortableHeader column={column}>Team Role</SortableHeader>
       ),
       cell: ({ row }) => {
-        const role = row.original.role
-        if (!role) {
+        const { roleId, roleName } = row.original
+        if (!roleId || !roleName) {
           return <span className="text-muted-foreground text-sm">—</span>
         }
-        const colorMap: Record<string, string> = {
-          Dev: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-          QA: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-          QE: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
-          'QA/QE':
-            'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-          DevOps:
-            'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-          'BI-Dev':
-            'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
-          Oversight:
-            'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-        }
-        return (
-          <Badge
-            className={`text-xs ${colorMap[role] ?? 'bg-secondary text-secondary-foreground'}`}
-          >
-            {role}
-          </Badge>
-        )
+        const roleIdx = Array.isArray(options.orgRoles)
+          ? options.orgRoles.findIndex((r) => r.id === roleId)
+          : -1
+        const colorClass =
+          roleIdx >= 0
+            ? ROLE_PALETTE[roleIdx % ROLE_PALETTE.length]
+            : 'bg-secondary text-secondary-foreground'
+        return <Badge className={`text-xs ${colorClass}`}>{roleName}</Badge>
       },
     },
     {
@@ -383,23 +392,23 @@ export function getTeamMemberColumns(options: {
                   Set Team Role
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
-                  {Object.values(TEAM_MEMBER_ROLES).map((roleOption) => (
+                  {options.orgRoles.map((orgRole) => (
                     <DropdownMenuItem
-                      key={roleOption}
+                      key={orgRole.id}
                       onClick={() =>
-                        options.onUpdateJobRole(member.userId, roleOption)
+                        options.onUpdateJobRole(member.userId, orgRole.id)
                       }
                       className={
-                        member.role === roleOption ? 'font-semibold' : ''
+                        member.roleId === orgRole.id ? 'font-semibold' : ''
                       }
                     >
-                      {roleOption}
-                      {member.role === roleOption && (
+                      {orgRole.name}
+                      {member.roleId === orgRole.id && (
                         <Check className="ml-auto h-3 w-3" />
                       )}
                     </DropdownMenuItem>
                   ))}
-                  {member.role && (
+                  {member.roleId && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem

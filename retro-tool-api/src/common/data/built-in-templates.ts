@@ -257,4 +257,160 @@ export const BUILT_IN_TEMPLATES: BuiltInTemplate[] = [
       },
     ],
   },
+
+  // ── Extended ───────────────────────────────────────────────────────────────
+
+  {
+    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    name: 'Rose / Bud / Thorn',
+    description:
+      'A nature-inspired format that balances reflection on positives, opportunities, and pain points — great for teams wanting a gentle, creative retrospective.',
+    columns: [
+      {
+        name: 'Roses',
+        emoji: '🌹',
+        prompt: 'What went well and deserves recognition?',
+        order: 0,
+      },
+      {
+        name: 'Buds',
+        emoji: '🌱',
+        prompt: 'What opportunities or improvements are you excited about?',
+        order: 1,
+      },
+      {
+        name: 'Thorns',
+        emoji: '🌵',
+        prompt: 'What pain points or problems need addressing?',
+        order: 2,
+      },
+    ],
+  },
+
+  {
+    id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
+    name: 'Plus / Delta',
+    description:
+      'A simple two-column format borrowed from agile coaching. Focus on what to preserve and what to change — no blame, just improvement.',
+    columns: [
+      {
+        name: 'Plus',
+        emoji: '➕',
+        prompt: 'What did we do well that we should continue?',
+        order: 0,
+      },
+      {
+        name: 'Delta',
+        emoji: '🔺',
+        prompt: 'What should we change or improve next sprint?',
+        order: 1,
+      },
+    ],
+  },
+
+  {
+    id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
+    name: 'FLAP',
+    description:
+      'A four-quadrant format that looks back and forward: Future considerations, Lessons learned, Accomplishments, and Problem areas.',
+    columns: [
+      {
+        name: 'Future Considerations',
+        emoji: '🔭',
+        prompt: 'What upcoming risks or events should we plan for?',
+        order: 0,
+      },
+      {
+        name: 'Lessons Learned',
+        emoji: '📖',
+        prompt: 'What did we learn this sprint that we should carry forward?',
+        order: 1,
+      },
+      {
+        name: 'Accomplishments',
+        emoji: '🏆',
+        prompt: 'What are we proud of achieving this sprint?',
+        order: 2,
+      },
+      {
+        name: 'Problem Areas',
+        emoji: '🚧',
+        prompt: 'What problems slowed us down or caused friction?',
+        order: 3,
+      },
+    ],
+  },
+
+  {
+    id: 'd4e5f6a7-b8c9-0123-defa-234567890123',
+    name: 'Speed Car',
+    description:
+      'A metaphor-driven format: the engine powers the team, the parachute slows it, the cliff represents risk, and the bridge is the goal ahead.',
+    columns: [
+      {
+        name: 'Engine',
+        emoji: '🚀',
+        prompt: 'What is driving us forward and giving us momentum?',
+        order: 0,
+      },
+      {
+        name: 'Parachute',
+        emoji: '🪂',
+        prompt: 'What is slowing us down or reducing our velocity?',
+        order: 1,
+      },
+      {
+        name: 'Cliff',
+        emoji: '⚠️',
+        prompt: 'What risks or blockers could derail us if left unaddressed?',
+        order: 2,
+      },
+      {
+        name: 'Bridge',
+        emoji: '🌉',
+        prompt: 'What is our destination or north-star goal?',
+        order: 3,
+      },
+    ],
+  },
+
+  {
+    id: 'e5f6a7b8-c9d0-1234-efab-345678901234',
+    name: 'Starfish',
+    description:
+      'A five-armed format that gives nuanced directional feedback — not just stop/start, but also more, less, and keep — for rich team discussions.',
+    columns: [
+      {
+        name: 'Keep Doing',
+        emoji: '⭐',
+        prompt: 'What practices should we preserve exactly as they are?',
+        order: 0,
+      },
+      {
+        name: 'Stop Doing',
+        emoji: '🛑',
+        prompt: 'What should we stop entirely because it adds no value?',
+        order: 1,
+      },
+      {
+        name: 'Start Doing',
+        emoji: '🚀',
+        prompt: 'What new practice should we introduce next sprint?',
+        order: 2,
+      },
+      {
+        name: 'More Of',
+        emoji: '📈',
+        prompt: 'What is working but deserves even more attention or effort?',
+        order: 3,
+      },
+      {
+        name: 'Less Of',
+        emoji: '📉',
+        prompt:
+          'What is partially useful but is taking up too much time or energy?',
+        order: 4,
+      },
+    ],
+  },
 ];

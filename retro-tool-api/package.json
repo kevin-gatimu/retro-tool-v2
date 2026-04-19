@@ -30,6 +30,7 @@
     "db:seed": "ts-node --transpile-only src/seed/seed-templates.ts && ts-node --transpile-only src/seed/seed-users.ts",
     "db:seed:users": "ts-node --transpile-only src/seed/seed-users.ts",
     "db:seed:templates": "ts-node --transpile-only src/seed/seed-templates.ts",
+    "db:seed:roles": "ts-node --transpile-only src/seed/seed-team-roles.ts",
     "db:seed:large-org": "ts-node --transpile-only src/seed/seed-large-org.ts",
     "db:seed:prod": "node dist/seed/seed-templates",
     "prepare": "husky"

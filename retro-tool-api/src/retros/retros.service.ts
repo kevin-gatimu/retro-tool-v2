@@ -560,17 +560,23 @@ export class RetrosService {
   }
 
   async seedBuiltInTemplates(): Promise<TemplateSeedResult> {
-    const [existing] = await this.database
-      .select()
-      .from(retroSchema.template)
-      .where(eq(retroSchema.template.isBuiltIn, true))
-      .limit(1);
+    const existing = await this.database
+      .select({ id: retroSchema.template.id, name: retroSchema.template.name })
+      .from(retroSchema.template);
 
-    if (existing) {
-      return { message: 'Templates already seeded' };
-    }
+    const existingIds = new Set(existing.map((t) => t.id));
+    const existingNames = new Set(existing.map((t) => t.name.toLowerCase()));
+
+    let added = 0;
 
     for (const tmpl of BUILT_IN_TEMPLATES) {
+      if (
+        existingIds.has(tmpl.id) ||
+        existingNames.has(tmpl.name.toLowerCase())
+      ) {
+        continue;
+      }
+
       await this.database.insert(retroSchema.template).values({
         id: tmpl.id,
         name: tmpl.name,
@@ -585,11 +591,18 @@ export class RetrosService {
           ...col,
         });
       }
+
+      added++;
     }
 
     await this.invalidateTemplateCaches();
 
-    return { message: 'Templates seeded successfully' };
+    return {
+      message:
+        added > 0
+          ? `Seeded ${added} template(s) successfully`
+          : 'All templates already exist',
+    };
   }
 
   // ============================================================================
@@ -789,10 +802,14 @@ export class RetrosService {
     const teamMembers = await this.database
       .select({
         userId: teamSchema.teamMember.userId,
-        role: teamSchema.teamMember.role,
+        roleName: teamSchema.teamRole.name,
         tag: teamSchema.teamMember.tag,
       })
       .from(teamSchema.teamMember)
+      .leftJoin(
+        teamSchema.teamRole,
+        eq(teamSchema.teamRole.id, teamSchema.teamMember.roleId),
+      )
       .where(eq(teamSchema.teamMember.teamId, retro.teamId));
 
     const cards = await this.database
@@ -919,7 +936,7 @@ export class RetrosService {
       orgMembership?.role === ORG_MEMBER_ROLES.Admin;
 
     const teamMemberRoleMap = new Map(
-      teamMembers.map((member) => [member.userId, member.role ?? null]),
+      teamMembers.map((member) => [member.userId, member.roleName ?? null]),
     );
 
     const usersMap = new Map(users.map((user) => [user.id, user]));

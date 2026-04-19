@@ -1,4 +1,3 @@
-import type { TTeamMemberRole } from '@/common/enums/team.enums'
 import type { TRetroStatus, TRetroVoteType } from '@/common/enums/retro.enums'
 
 export interface Retro {
@@ -71,7 +70,7 @@ export interface RetroDetail extends Retro {
       id: string
       name: string | null
       image: string | null
-      jobRole: TTeamMemberRole | null
+      jobRole: string | null
     } | null
     comments: Array<{
       id: string

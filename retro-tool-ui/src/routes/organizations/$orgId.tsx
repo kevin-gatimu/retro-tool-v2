@@ -5,6 +5,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query'
 import { useOrgDetailMutations } from './hooks/useOrganizationMutations'
+import { useOrgTeamRoleMutations } from './hooks/useOrgTeamRoleMutations'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
   ArrowLeft,
@@ -12,10 +13,12 @@ import {
   Clock,
   Edit,
   FileText,
+  Loader2,
   LogOut,
   MoreHorizontal,
   Plus,
   Settings,
+  ShieldCheck,
   Trash2,
   UserPlus,
   Users,
@@ -70,12 +73,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { OrgDetailSkeleton } from '@/components/skeletons'
 import { api } from '@/lib/api'
 import {
   ORGANIZATIONS_ENDPOINTS,
+  TEAM_ROLES_ENDPOINTS,
   TEAMS_ENDPOINTS,
   TEMPLATES_ENDPOINTS,
 } from '@/lib/api-endpoints'
@@ -162,6 +167,18 @@ function OrganizationDetailPage() {
     null,
   )
 
+  // Team roles tab state
+  const [roleCreateOpen, setRoleCreateOpen] = useState(false)
+  const [roleEditTarget, setRoleEditTarget] = useState<{
+    id: string
+    name: string
+    sortOrder: number
+    isBuiltIn: boolean
+  } | null>(null)
+  const [roleFormName, setRoleFormName] = useState('')
+  const [roleFormSortOrder, setRoleFormSortOrder] = useState(0)
+  const [roleDeleteId, setRoleDeleteId] = useState<string | null>(null)
+
   const viewerIsSystemAdmin = currentUser?.role
     ? isSystemAdmin(currentUser.role)
     : false
@@ -181,6 +198,40 @@ function OrganizationDetailPage() {
     createTeamMutation,
     deleteTeamMutation,
   } = useOrgDetailMutations(orgId)
+
+  const {
+    createCustomRoleMutation,
+    updateCustomRoleMutation,
+    deleteCustomRoleMutation,
+    toggleActivationMutation,
+  } = useOrgTeamRoleMutations(orgId)
+
+  interface OrgTeamRoleAdminResponse {
+    builtIn: Array<{
+      id: string
+      name: string
+      isBuiltIn: boolean
+      isActive: boolean
+      sortOrder: number
+      orgIsActive: boolean
+    }>
+    custom: Array<{
+      id: string
+      name: string
+      isBuiltIn: boolean
+      isActive: boolean
+      sortOrder: number
+    }>
+  }
+
+  const { data: orgRolesData } = useQuery<OrgTeamRoleAdminResponse>({
+    queryKey: ['org-team-roles', orgId],
+    queryFn: () =>
+      api.get<OrgTeamRoleAdminResponse>(
+        TEAM_ROLES_ENDPOINTS.ORG_ADMIN_LIST(orgId),
+      ),
+    enabled: isAdmin,
+  })
 
   const requestToJoinTeamMutation = useMutation({
     mutationFn: (teamId: string) =>
@@ -458,6 +509,7 @@ function OrganizationDetailPage() {
         <TabsList>
           <TabsTrigger value="teams">Teams</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
+          {isAdmin && <TabsTrigger value="team-roles">Team Roles</TabsTrigger>}
           {isAdmin && <TabsTrigger value="templates">Templates</TabsTrigger>}
         </TabsList>
 
@@ -653,7 +705,10 @@ function OrganizationDetailPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Users className="h-4 w-4" />
-                        <span>{team.memberCount} members</span>
+                        <span>
+                          {team.memberCount ?? 0}{' '}
+                          {team.memberCount === 1 ? 'member' : 'members'}
+                        </span>
                       </div>
                       {team.isMember ? (
                         <Badge variant="secondary">Joined</Badge>
@@ -836,6 +891,115 @@ function OrganizationDetailPage() {
           )}
         </TabsContent>
 
+        {/* Team Roles Tab */}
+        {isAdmin && (
+          <TabsContent value="team-roles" className="mt-6 space-y-6">
+            {/* Built-in roles section */}
+            <div>
+              <h2 className="text-xl font-semibold mb-1">Built-in Roles</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Toggle which global roles are available in this organisation.
+              </p>
+              <div className="divide-y border rounded-lg">
+                {(orgRolesData?.builtIn ?? []).map((role) => (
+                  <div
+                    key={role.id}
+                    className="flex items-center justify-between px-4 py-3"
+                  >
+                    <span className="font-medium">{role.name}</span>
+                    <div className="flex items-center gap-2">
+                      {!role.orgIsActive && (
+                        <span className="text-xs text-muted-foreground">
+                          Deactivated
+                        </span>
+                      )}
+                      <Switch
+                        checked={role.orgIsActive}
+                        onCheckedChange={(checked) =>
+                          toggleActivationMutation.mutate({
+                            id: role.id,
+                            isActive: checked,
+                          })
+                        }
+                        disabled={toggleActivationMutation.isPending}
+                      />
+                    </div>
+                  </div>
+                ))}
+                {(orgRolesData?.builtIn ?? []).length === 0 && (
+                  <p className="px-4 py-6 text-sm text-muted-foreground text-center">
+                    No built-in roles configured.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Custom roles section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-semibold">Custom Roles</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Roles specific to this organisation.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setRoleFormName('')
+                    setRoleFormSortOrder((orgRolesData?.custom.length ?? 0) + 1)
+                    setRoleCreateOpen(true)
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Custom Role
+                </Button>
+              </div>
+              <div className="divide-y border rounded-lg">
+                {(orgRolesData?.custom ?? []).map((role) => (
+                  <div
+                    key={role.id}
+                    className="flex items-center justify-between px-4 py-3"
+                  >
+                    <span className="font-medium">{role.name}</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setRoleFormName(role.name)
+                          setRoleFormSortOrder(role.sortOrder)
+                          setRoleEditTarget({
+                            id: role.id,
+                            name: role.name,
+                            sortOrder: role.sortOrder,
+                            isBuiltIn: false,
+                          })
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setRoleDeleteId(role.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {(orgRolesData?.custom ?? []).length === 0 && (
+                  <p className="px-4 py-6 text-sm text-muted-foreground text-center">
+                    No custom roles yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+        )}
+
         {/* Templates Tab */}
         {isAdmin && (
           <TabsContent value="templates" className="mt-6 space-y-4">
@@ -901,6 +1065,156 @@ function OrganizationDetailPage() {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Org Custom Role — Create Dialog */}
+      <Dialog open={roleCreateOpen} onOpenChange={setRoleCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Custom Role</DialogTitle>
+            <DialogDescription>
+              This role will only be available within this organisation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input
+                value={roleFormName}
+                onChange={(e) => setRoleFormName(e.target.value)}
+                placeholder="e.g. Release Manager"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sort Order</Label>
+              <Input
+                type="number"
+                value={roleFormSortOrder}
+                onChange={(e) => setRoleFormSortOrder(Number(e.target.value))}
+                min={0}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoleCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                !roleFormName.trim() || createCustomRoleMutation.isPending
+              }
+              onClick={() => {
+                createCustomRoleMutation.mutate(
+                  { name: roleFormName.trim(), sortOrder: roleFormSortOrder },
+                  { onSuccess: () => setRoleCreateOpen(false) },
+                )
+              }}
+            >
+              {createCustomRoleMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Org Custom Role — Edit Dialog */}
+      <Dialog
+        open={roleEditTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) setRoleEditTarget(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Custom Role</DialogTitle>
+            <DialogDescription>
+              Update this organisation role.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input
+                value={roleFormName}
+                onChange={(e) => setRoleFormName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sort Order</Label>
+              <Input
+                type="number"
+                value={roleFormSortOrder}
+                onChange={(e) => setRoleFormSortOrder(Number(e.target.value))}
+                min={0}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoleEditTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                !roleFormName.trim() || updateCustomRoleMutation.isPending
+              }
+              onClick={() => {
+                if (!roleEditTarget) return
+                updateCustomRoleMutation.mutate(
+                  {
+                    id: roleEditTarget.id,
+                    payload: {
+                      name: roleFormName.trim(),
+                      sortOrder: roleFormSortOrder,
+                    },
+                  },
+                  { onSuccess: () => setRoleEditTarget(null) },
+                )
+              }}
+            >
+              {updateCustomRoleMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Org Custom Role — Delete Confirmation */}
+      <AlertDialog
+        open={roleDeleteId !== null}
+        onOpenChange={(o) => {
+          if (!o) setRoleDeleteId(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Role?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This role will be permanently removed. Deletion will be blocked if
+              any team members are currently assigned this role.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (roleDeleteId)
+                  deleteCustomRoleMutation.mutate(roleDeleteId, {
+                    onSuccess: () => setRoleDeleteId(null),
+                  })
+              }}
+            >
+              {deleteCustomRoleMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Template Delete Confirmation */}
       <AlertDialog
