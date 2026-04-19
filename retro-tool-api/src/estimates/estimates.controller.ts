@@ -253,4 +253,15 @@ export class EstimatesController {
     this.estimatesGateway.emitSessionChanged(id);
     return result;
   }
+
+  @Delete(':id/permanent')
+  @ApiOperation({
+    summary: 'Permanently delete an estimate session from history',
+  })
+  async deleteSession(
+    @Session() session: SessionUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.estimatesService.deleteSession(id, session.user.id);
+  }
 }

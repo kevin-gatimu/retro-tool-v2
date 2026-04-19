@@ -116,6 +116,7 @@ export const ESTIMATES_ENDPOINTS = {
   HISTORY: '/api/estimates/history',
 
   BY_ID: (id: string) => `/api/estimates/${id}`,
+  PERMANENT_DELETE: (id: string) => `/api/estimates/${id}/permanent`,
   JOIN: (id: string) => `/api/estimates/${id}/join`,
   VOTES: (id: string) => `/api/estimates/${id}/votes`,
   REVEAL: (id: string) => `/api/estimates/${id}/reveal`,

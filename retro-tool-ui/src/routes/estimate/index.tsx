@@ -1,5 +1,6 @@
 import {
   keepPreviousData,
+  useMutation,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
@@ -14,12 +15,24 @@ import {
   RefreshCw,
   Search,
   Spade,
+  Trash2,
   Users,
 } from 'lucide-react'
 import { useState } from 'react'
+import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Card,
   CardContent,
@@ -293,7 +306,7 @@ function HistoryTab() {
               </Badge>
             </div>
             {items.map((s) => (
-              <SessionHistoryCard key={s.id} session={s} />
+              <SessionHistoryCard key={s.id} session={s} onDeleted={() => {}} />
             ))}
           </section>
         ))}
@@ -318,7 +331,7 @@ function HistoryTab() {
     <div className="space-y-3">
       {searchControl}
       {sessions.map((s) => (
-        <SessionHistoryCard key={s.id} session={s} />
+        <SessionHistoryCard key={s.id} session={s} onDeleted={() => {}} />
       ))}
       <HistoryPaginationBar
         page={page}
@@ -337,13 +350,39 @@ function HistoryTab() {
   )
 }
 
-function SessionHistoryCard({ session }: { session: HistorySession }) {
+function SessionHistoryCard({
+  session,
+  onDeleted,
+}: {
+  session: HistorySession
+  onDeleted: (id: string) => void
+}) {
+  const queryClient = useQueryClient()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const deleteMutation = useMutation({
+    mutationFn: () =>
+      api.delete(ESTIMATES_ENDPOINTS.PERMANENT_DELETE(session.id)),
+    onSuccess: () => {
+      toast.success('Session deleted')
+      queryClient.invalidateQueries({ queryKey: ['estimate-history'] })
+      onDeleted(session.id)
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Failed to delete session')
+    },
+  })
+
   return (
-    <Card className="hover:border-primary/50 transition-colors">
-      <Link to="/estimate/$sessionId" params={{ sessionId: session.id }}>
+    <>
+      <Card className="hover:border-primary/50 transition-colors">
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
+            <Link
+              to="/estimate/$sessionId"
+              params={{ sessionId: session.id }}
+              className="min-w-0 flex-1"
+            >
               <CardTitle className="text-base truncate">
                 {session.name}
               </CardTitle>
@@ -355,28 +394,67 @@ function SessionHistoryCard({ session }: { session: HistorySession }) {
                   </span>
                 )}
               </CardDescription>
+            </Link>
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge variant="secondary">Completed</Badge>
+              {session.canDelete && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Delete session</span>
+                </Button>
+              )}
             </div>
-            <Badge variant="secondary" className="shrink-0">
-              Completed
-            </Badge>
           </div>
         </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Users className="h-3 w-3" />
-              {session.participantCount} participants
-            </span>
-            <span>{session.roundCount} rounds</span>
-            <span>{session.totalVotes} votes</span>
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {new Date(session.updatedAt).toLocaleDateString()}
-            </span>
-          </div>
-        </CardContent>
-      </Link>
-    </Card>
+        <Link to="/estimate/$sessionId" params={{ sessionId: session.id }}>
+          <CardContent className="pt-0">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {session.participantCount} participants
+              </span>
+              <span>{session.roundCount} rounds</span>
+              <span>{session.totalVotes} votes</span>
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {new Date(session.updatedAt).toLocaleDateString()}
+              </span>
+            </div>
+          </CardContent>
+        </Link>
+      </Card>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Estimate Session</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{session.name}&rdquo;? This
+              action cannot be undone. All rounds, stories, and votes will be
+              permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 

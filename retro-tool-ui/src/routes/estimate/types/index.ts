@@ -16,6 +16,7 @@ export type HistorySession = {
   totalVotes: number
   updatedAt: string
   createdAt: string
+  canDelete: boolean
 }
 
 export type HistoryResponse = {

@@ -34,6 +34,8 @@ import {
   ESTIMATE_SESSION_STATUSES,
   ESTIMATE_ROUND_STATUSES,
   USER_ROLES,
+  ORG_MEMBER_ROLES,
+  TEAM_MEMBER_TAGS,
   type TEstimateRoundStatus,
 } from '../common/enums';
 import type {
@@ -161,6 +163,82 @@ export class EstimatesService {
       );
     }
     return session;
+  }
+
+  private async assertCanDeleteSession(
+    sessionId: string,
+    userId: string,
+  ): Promise<void> {
+    const [row] = await this.database
+      .select({
+        createdById: estimatesSchema.storyEstimateSession.createdById,
+        teamId: estimatesSchema.storyEstimateSession.teamId,
+        orgId: teamSchema.team.organizationId,
+      })
+      .from(estimatesSchema.storyEstimateSession)
+      .leftJoin(
+        teamSchema.team,
+        eq(estimatesSchema.storyEstimateSession.teamId, teamSchema.team.id),
+      )
+      .where(eq(estimatesSchema.storyEstimateSession.id, sessionId))
+      .limit(1);
+
+    if (!row) throw new NotFoundException('Session not found');
+
+    // Session creator can always delete
+    if (row.createdById === userId) return;
+
+    const [fullUser] = await this.database
+      .select({ role: authSchema.user.role })
+      .from(authSchema.user)
+      .where(eq(authSchema.user.id, userId))
+      .limit(1);
+
+    const role = fullUser?.role;
+
+    // Super admin / system admin — unrestricted
+    if (role === USER_ROLES.SuperAdmin || role === USER_ROLES.SystemAdmin) {
+      return;
+    }
+
+    // Org owner / admin — check org membership
+    if (row.orgId) {
+      const [orgMembership] = await this.database
+        .select({ role: orgSchema.organizationMember.role })
+        .from(orgSchema.organizationMember)
+        .where(
+          and(
+            eq(orgSchema.organizationMember.organizationId, row.orgId),
+            eq(orgSchema.organizationMember.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (
+        orgMembership?.role === ORG_MEMBER_ROLES.Owner ||
+        orgMembership?.role === ORG_MEMBER_ROLES.Admin
+      ) {
+        return;
+      }
+    }
+
+    // Team lead — check team membership
+    const [teamMembership] = await this.database
+      .select({ tag: teamSchema.teamMember.tag })
+      .from(teamSchema.teamMember)
+      .where(
+        and(
+          eq(teamSchema.teamMember.teamId, row.teamId),
+          eq(teamSchema.teamMember.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (teamMembership?.tag === TEAM_MEMBER_TAGS.Lead) return;
+
+    throw new ForbiddenException(
+      'You do not have permission to delete this session',
+    );
   }
 
   private async getCurrentRoundRecord(
@@ -917,6 +995,16 @@ export class EstimatesService {
     await this.invalidateEstimateCaches(sessionId, { invalidateLists: true });
   }
 
+  async deleteSession(sessionId: string, userId: string): Promise<void> {
+    await this.assertCanDeleteSession(sessionId, userId);
+
+    await this.database
+      .delete(estimatesSchema.storyEstimateSession)
+      .where(eq(estimatesSchema.storyEstimateSession.id, sessionId));
+
+    await this.invalidateEstimateCaches(sessionId, { invalidateLists: true });
+  }
+
   async getHistory(
     userId: string,
     page = 1,
@@ -938,6 +1026,7 @@ export class EstimatesService {
       totalVotes: number;
       updatedAt: Date;
       createdAt: Date;
+      canDelete: boolean;
     }[];
     total: number;
     page: number;
@@ -956,16 +1045,49 @@ export class EstimatesService {
       fullUser?.role === USER_ROLES.SystemAdmin;
 
     // Build team scope
+    let allUserTeamMemberships: { teamId: string; tag: string }[] = [];
     let allowedTeamIds: string[] | null = null;
     if (!isAdmin) {
-      const memberships = await this.database
-        .select({ teamId: teamSchema.teamMember.teamId })
+      allUserTeamMemberships = await this.database
+        .select({
+          teamId: teamSchema.teamMember.teamId,
+          tag: teamSchema.teamMember.tag,
+        })
         .from(teamSchema.teamMember)
         .where(eq(teamSchema.teamMember.userId, userId));
-      allowedTeamIds = memberships.map((m) => m.teamId);
+      allowedTeamIds = allUserTeamMemberships.map((m) => m.teamId);
       if (allowedTeamIds.length === 0) {
         return { sessions: [], total: 0, page, limit };
       }
+    }
+
+    // Pre-fetch org admin/owner memberships for canDelete checks
+    let adminOrgIds = new Set<string>();
+    let leadTeamIds = new Set<string>();
+    if (!isAdmin) {
+      const orgMemberships = await this.database
+        .select({
+          organizationId: orgSchema.organizationMember.organizationId,
+          role: orgSchema.organizationMember.role,
+        })
+        .from(orgSchema.organizationMember)
+        .where(eq(orgSchema.organizationMember.userId, userId));
+
+      adminOrgIds = new Set(
+        orgMemberships
+          .filter(
+            (m) =>
+              m.role === ORG_MEMBER_ROLES.Owner ||
+              m.role === ORG_MEMBER_ROLES.Admin,
+          )
+          .map((m) => m.organizationId),
+      );
+
+      leadTeamIds = new Set(
+        allUserTeamMemberships
+          .filter((m) => m.tag === TEAM_MEMBER_TAGS.Lead)
+          .map((m) => m.teamId),
+      );
     }
 
     const conditions: SQL[] = [
@@ -1060,6 +1182,11 @@ export class EstimatesService {
 
         const roundCount = rc?.total ?? 0;
 
+        const canDelete =
+          isAdmin ||
+          (row.orgId !== null && adminOrgIds.has(row.orgId)) ||
+          leadTeamIds.has(row.teamId);
+
         return {
           ...row,
           participantCount: pc?.total ?? 0,
@@ -1067,6 +1194,7 @@ export class EstimatesService {
           storiesEstimated:
             roundCount > 0 ? roundCount : row.currentStory ? 1 : 0,
           totalVotes: vc?.total ?? 0,
+          canDelete,
         };
       }),
     );
