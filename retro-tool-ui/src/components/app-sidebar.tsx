@@ -121,7 +121,7 @@ const userNavItems: NavItem[] = [
   },
   {
     title: 'Teams',
-    url: '/team',
+    url: '/teams',
     icon: Users,
     allowedRoles: ALL_ROLES,
   },

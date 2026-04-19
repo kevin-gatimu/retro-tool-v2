@@ -102,7 +102,7 @@ function UserTeamsSkeleton() {
   )
 }
 
-export const Route = createFileRoute('/team')({
+export const Route = createFileRoute('/teams/')({
   loader: ({ context: { queryClient } }) =>
     queryClient.ensureQueryData({
       queryKey: buildTeamsQueryKey(1, DEFAULT_PAGE_SIZE, ''),
@@ -235,64 +235,66 @@ function TeamPage() {
             ))}
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Rows per page</span>
-              <Select
-                value={String(pageSize)}
-                onValueChange={(val) => {
-                  setPageSize(Number(val))
-                  setPage(1)
-                }}
-              >
-                <SelectTrigger className="h-8 w-16">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAGE_SIZE_OPTIONS.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span>
-                Page {page} of {totalPages} &middot; {total} teams
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1"
-                onClick={handleRefresh}
-                disabled={isFetching}
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`}
-                />
-                Refresh
-              </Button>
+          {total > 6 && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Rows per page</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(val) => {
+                    setPageSize(Number(val))
+                    setPage(1)
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-16">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAGE_SIZE_OPTIONS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span>
+                  Page {page} of {totalPages} &middot; {total} teams
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1"
+                  onClick={handleRefresh}
+                  disabled={isFetching}
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`}
+                  />
+                  Refresh
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => p - 1)}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Prev
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => p - 1)}
-                disabled={page === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Prev
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page >= totalPages}
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          )}
         </>
       )}
     </div>

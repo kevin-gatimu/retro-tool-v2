@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsofserviceRouteImport } from './routes/termsofservice'
 import { Route as TemplatesRouteImport } from './routes/templates'
-import { Route as TeamRouteImport } from './routes/team'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacystatementRouteImport } from './routes/privacystatement'
@@ -21,6 +20,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TeamsIndexRouteImport } from './routes/teams/index'
 import { Route as RetrosIndexRouteImport } from './routes/retros/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
 import { Route as OrganizationsIndexRouteImport } from './routes/organizations/index'
@@ -61,11 +61,6 @@ const TermsofserviceRoute = TermsofserviceRouteImport.update({
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TeamRoute = TeamRouteImport.update({
-  id: '/team',
-  path: '/team',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -111,6 +106,11 @@ const AboutRoute = AboutRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsIndexRoute = TeamsIndexRouteImport.update({
+  id: '/teams/',
+  path: '/teams/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RetrosIndexRoute = RetrosIndexRouteImport.update({
@@ -279,7 +279,6 @@ export interface FileRoutesByFullPath {
   '/privacystatement': typeof PrivacystatementRoute
   '/profile': typeof ProfileRouteWithChildren
   '/reports': typeof ReportsRoute
-  '/team': typeof TeamRoute
   '/templates': typeof TemplatesRoute
   '/termsofservice': typeof TermsofserviceRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
@@ -313,6 +312,7 @@ export interface FileRoutesByFullPath {
   '/organizations/': typeof OrganizationsIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/retros/': typeof RetrosIndexRoute
+  '/teams/': typeof TeamsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -321,7 +321,6 @@ export interface FileRoutesByTo {
   '/me': typeof MeRoute
   '/privacystatement': typeof PrivacystatementRoute
   '/reports': typeof ReportsRoute
-  '/team': typeof TeamRoute
   '/templates': typeof TemplatesRoute
   '/termsofservice': typeof TermsofserviceRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
@@ -355,6 +354,7 @@ export interface FileRoutesByTo {
   '/organizations': typeof OrganizationsIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/retros': typeof RetrosIndexRoute
+  '/teams': typeof TeamsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -367,7 +367,6 @@ export interface FileRoutesById {
   '/privacystatement': typeof PrivacystatementRoute
   '/profile': typeof ProfileRouteWithChildren
   '/reports': typeof ReportsRoute
-  '/team': typeof TeamRoute
   '/templates': typeof TemplatesRoute
   '/termsofservice': typeof TermsofserviceRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
@@ -401,6 +400,7 @@ export interface FileRoutesById {
   '/organizations/': typeof OrganizationsIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/retros/': typeof RetrosIndexRoute
+  '/teams/': typeof TeamsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -414,7 +414,6 @@ export interface FileRouteTypes {
     | '/privacystatement'
     | '/profile'
     | '/reports'
-    | '/team'
     | '/templates'
     | '/termsofservice'
     | '/admin/org-setup'
@@ -448,6 +447,7 @@ export interface FileRouteTypes {
     | '/organizations/'
     | '/profile/'
     | '/retros/'
+    | '/teams/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -456,7 +456,6 @@ export interface FileRouteTypes {
     | '/me'
     | '/privacystatement'
     | '/reports'
-    | '/team'
     | '/templates'
     | '/termsofservice'
     | '/admin/org-setup'
@@ -490,6 +489,7 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/profile'
     | '/retros'
+    | '/teams'
   id:
     | '__root__'
     | '/'
@@ -501,7 +501,6 @@ export interface FileRouteTypes {
     | '/privacystatement'
     | '/profile'
     | '/reports'
-    | '/team'
     | '/templates'
     | '/termsofservice'
     | '/admin/org-setup'
@@ -535,6 +534,7 @@ export interface FileRouteTypes {
     | '/organizations/'
     | '/profile/'
     | '/retros/'
+    | '/teams/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -547,7 +547,6 @@ export interface RootRouteChildren {
   PrivacystatementRoute: typeof PrivacystatementRoute
   ProfileRoute: typeof ProfileRouteWithChildren
   ReportsRoute: typeof ReportsRoute
-  TeamRoute: typeof TeamRoute
   TemplatesRoute: typeof TemplatesRoute
   TermsofserviceRoute: typeof TermsofserviceRoute
   EstimateSessionIdRoute: typeof EstimateSessionIdRoute
@@ -559,6 +558,7 @@ export interface RootRouteChildren {
   EstimateIndexRoute: typeof EstimateIndexRoute
   OrganizationsIndexRoute: typeof OrganizationsIndexRoute
   RetrosIndexRoute: typeof RetrosIndexRoute
+  TeamsIndexRoute: typeof TeamsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -575,13 +575,6 @@ declare module '@tanstack/react-router' {
       path: '/templates'
       fullPath: '/templates'
       preLoaderRoute: typeof TemplatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/team': {
-      id: '/team'
-      path: '/team'
-      fullPath: '/team'
-      preLoaderRoute: typeof TeamRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -645,6 +638,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/': {
+      id: '/teams/'
+      path: '/teams'
+      fullPath: '/teams/'
+      preLoaderRoute: typeof TeamsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/retros/': {
@@ -956,7 +956,6 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacystatementRoute: PrivacystatementRoute,
   ProfileRoute: ProfileRouteWithChildren,
   ReportsRoute: ReportsRoute,
-  TeamRoute: TeamRoute,
   TemplatesRoute: TemplatesRoute,
   TermsofserviceRoute: TermsofserviceRoute,
   EstimateSessionIdRoute: EstimateSessionIdRoute,
@@ -968,6 +967,7 @@ const rootRouteChildren: RootRouteChildren = {
   EstimateIndexRoute: EstimateIndexRoute,
   OrganizationsIndexRoute: OrganizationsIndexRoute,
   RetrosIndexRoute: RetrosIndexRoute,
+  TeamsIndexRoute: TeamsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

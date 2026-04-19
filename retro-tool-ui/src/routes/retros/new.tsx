@@ -500,7 +500,7 @@ function NewRetroPage() {
                     You need to be a member of a team to create a retrospective.
                   </p>
                   <Button asChild>
-                    <Link to="/team">Join or Create a Team</Link>
+                    <Link to="/teams">Join or Create a Team</Link>
                   </Button>
                 </CardContent>
               </Card>
