@@ -353,50 +353,60 @@ function AdminUsersPage() {
 
       {/* Stats Cards */}
       {viewerIsSystemAdmin && (
-        <div className="grid gap-4 md:grid-cols-5">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <Clock className="h-4 w-4 text-amber-500" />
+        <div className="grid gap-2 md:grid-cols-5">
+          <Card className="py-3">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-0 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Pending
+              </CardTitle>
+              <Clock className="h-3.5 w-3.5 text-amber-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.pending}</div>
+            <CardContent className="px-4 py-0">
+              <div className="text-xl font-bold">{stats.pending}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
+          <Card className="py-3">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-0 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Active
+              </CardTitle>
+              <CheckCircle className="h-3.5 w-3.5 text-green-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.approved}</div>
+            <CardContent className="px-4 py-0">
+              <div className="text-xl font-bold">{stats.approved}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Suspended</CardTitle>
-              <Ban className="h-4 w-4 text-orange-500" />
+          <Card className="py-3">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-0 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Suspended
+              </CardTitle>
+              <Ban className="h-3.5 w-3.5 text-orange-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.suspended}</div>
+            <CardContent className="px-4 py-0">
+              <div className="text-xl font-bold">{stats.suspended}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Rejected</CardTitle>
-              <XCircle className="h-4 w-4 text-red-500" />
+          <Card className="py-3">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-0 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Rejected
+              </CardTitle>
+              <XCircle className="h-3.5 w-3.5 text-red-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.rejected}</div>
+            <CardContent className="px-4 py-0">
+              <div className="text-xl font-bold">{stats.rejected}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Admins</CardTitle>
-              <Crown className="h-4 w-4 text-amber-500" />
+          <Card className="py-3">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-0 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Admins
+              </CardTitle>
+              <Crown className="h-3.5 w-3.5 text-amber-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.admins}</div>
+            <CardContent className="px-4 py-0">
+              <div className="text-xl font-bold">{stats.admins}</div>
             </CardContent>
           </Card>
         </div>

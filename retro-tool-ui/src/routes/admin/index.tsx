@@ -152,19 +152,19 @@ function AdminDashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-3">
         {statCards.map((stat) => (
           <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
-              <div className={`rounded-lg p-2 ${stat.color}`}>
-                <stat.icon className="h-4 w-4" />
+            <CardContent className="flex flex-col gap-1.5 px-3 py-2.5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {stat.title}
+                </p>
+                <div className={`rounded-md p-1.5 ${stat.color}`}>
+                  <stat.icon className="h-3.5 w-3.5" />
+                </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stat.value}</div>
+              <p className="text-2xl font-bold leading-none">{stat.value}</p>
               <p className="text-xs text-muted-foreground">
                 {stat.description}
               </p>
