@@ -18,7 +18,6 @@ import {
   MoreHorizontal,
   Plus,
   Settings,
-  ShieldCheck,
   Trash2,
   UserPlus,
   Users,
