@@ -75,8 +75,8 @@ jobs:
 
       - name: Validate container build config
         env:
-          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
-          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || secrets.ACR_LOGIN_SERVER }}
+          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || secrets.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
         run: |
           for key in ACR_LOGIN_SERVER API_IMAGE_REPOSITORY; do
             if [ -z "${!key}" ]; then
@@ -88,13 +88,13 @@ jobs:
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID || vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Log in to Azure Container Registry
         env:
-          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || secrets.ACR_LOGIN_SERVER }}
         run: |
           ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
           az acr login --name "${ACR_NAME}"
@@ -103,8 +103,8 @@ jobs:
         id: meta
         env:
           TARGET_ENV: ${{ needs.set-env.outputs.environment }}
-          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
-          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || secrets.ACR_LOGIN_SERVER }}
+          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || secrets.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
         run: |
           IMAGE_TAG="${TARGET_ENV}-${GITHUB_SHA::8}"
           IMAGE_NAME="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${IMAGE_TAG}"
@@ -155,7 +155,7 @@ jobs:
       - name: Migration preflight
         working-directory: retro-tool-api
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
         run: |
           DB_HOST=$(node -e "const raw = process.env.DATABASE_URL || ''; if (!raw) { console.error('DATABASE_URL is missing'); process.exit(1); } try { const url = new URL(raw); process.stdout.write(url.hostname); } catch { console.error('DATABASE_URL is set but not a valid URL'); process.exit(1); }")
           DB_PORT=$(node -e "const url = new URL(process.env.DATABASE_URL); process.stdout.write(url.port || '5432')")
@@ -172,7 +172,7 @@ jobs:
       - name: Run migrations
         working-directory: retro-tool-api
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
           NODE_ENV: production
         run: pnpm db:migrate
 
@@ -184,24 +184,24 @@ jobs:
     steps:
       - name: Validate required deploy config
         env:
-          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
-          API_WEBAPP_NAME: ${{ vars.API_WEBAPP_NAME }}
-          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
-          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }}
+          API_WEBAPP_NAME: ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || secrets.ACR_LOGIN_SERVER }}
+          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || secrets.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
-          FRONTEND_URL: ${{ vars.FRONTEND_URL || vars.SWA_URL }}
-          CONVEX_SYNC_URL: ${{ vars.CONVEX_SYNC_URL }}
-          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
-          MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
-          CONVEX_SYNC_ADMIN_KEY: ${{ secrets.CONVEX_SYNC_ADMIN_KEY }}
-          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
-          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL || vars.SWA_URL || secrets.FRONTEND_URL || secrets.SWA_URL }}
+          CONVEX_SYNC_URL: ${{ vars.CONVEX_SYNC_URL || secrets.CONVEX_SYNC_URL }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM || secrets.EMAIL_FROM }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || vars.BETTER_AUTH_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID || vars.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
+          MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET || vars.MICROSOFT_CLIENT_SECRET }}
+          CONVEX_SYNC_ADMIN_KEY: ${{ secrets.CONVEX_SYNC_ADMIN_KEY || vars.CONVEX_SYNC_ADMIN_KEY }}
+          VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY || secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY || vars.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ vars.VAPID_SUBJECT || secrets.VAPID_SUBJECT }}
         run: |
           for key in AZURE_RESOURCE_GROUP API_WEBAPP_NAME ACR_LOGIN_SERVER API_IMAGE_REPOSITORY IMAGE_TAG FRONTEND_URL CONVEX_SYNC_URL EMAIL_FROM DATABASE_URL BETTER_AUTH_SECRET; do
             if [ -z "${!key}" ]; then
@@ -213,7 +213,7 @@ jobs:
           # Warn about optional secrets that are commonly misconfigured
           for key in CONVEX_SYNC_ADMIN_KEY VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT; do
             if [ -z "${!key}" ]; then
-              echo "WARNING: ${key} is empty — check it is stored as a Secret (not a Variable) and exists in the '$(echo ${{ needs.set-env.outputs.environment }})' environment"
+              echo "WARNING: ${key} is empty — check it exists in the '${{ needs.set-env.outputs.environment }}' environment as either a Variable or Secret."
             fi
           done
 
@@ -239,91 +239,91 @@ jobs:
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID || vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Configure App Service environment variables
         run: |
           az webapp config appsettings set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.API_WEBAPP_NAME }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }} \
             --settings \
               NODE_ENV=production \
               PORT=8080 \
-              FRONTEND_URL='${{ vars.FRONTEND_URL || vars.SWA_URL }}' \
-              ALLOWED_ORIGINS='${{ vars.FRONTEND_URL || vars.SWA_URL }},https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
-              LOCAL_SERVER_URL='https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
-              DEPLOYED_SERVER_URL='https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
-              CONVEX_SYNC_URL='${{ vars.CONVEX_SYNC_URL }}' \
+              FRONTEND_URL='${{ vars.FRONTEND_URL || vars.SWA_URL || secrets.FRONTEND_URL || secrets.SWA_URL }}' \
+              ALLOWED_ORIGINS='${{ vars.FRONTEND_URL || vars.SWA_URL || secrets.FRONTEND_URL || secrets.SWA_URL }},https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net' \
+              LOCAL_SERVER_URL='https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net' \
+              DEPLOYED_SERVER_URL='https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net' \
+              CONVEX_SYNC_URL='${{ vars.CONVEX_SYNC_URL || secrets.CONVEX_SYNC_URL }}' \
               ENABLE_CRON_JOBS='true' \
               WEEKLY_DIGEST_SEND_HOUR='6' \
               BETTER_AUTH_SESSION_EXPIRES_IN='604800' \
-              MICROSOFT_TENANT_ID='${{ vars.MICROSOFT_TENANT_ID || secrets.AZURE_TENANT_ID }}' \
-              EMAIL_FROM='${{ vars.EMAIL_FROM }}' \
+              MICROSOFT_TENANT_ID='${{ vars.MICROSOFT_TENANT_ID || secrets.MICROSOFT_TENANT_ID || secrets.AZURE_TENANT_ID || vars.AZURE_TENANT_ID }}' \
+              EMAIL_FROM='${{ vars.EMAIL_FROM || secrets.EMAIL_FROM }}' \
             --output none
 
       - name: Configure App Service secrets
         run: |
           az webapp config appsettings set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.API_WEBAPP_NAME }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }} \
             --settings \
-              DATABASE_URL='${{ secrets.DATABASE_URL }}' \
-              BETTER_AUTH_SECRET='${{ secrets.BETTER_AUTH_SECRET }}' \
-              BETTER_AUTH_URL='https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net' \
-              GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' \
-              GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}' \
-              MICROSOFT_CLIENT_ID='${{ secrets.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID }}' \
-              MICROSOFT_CLIENT_SECRET='${{ secrets.MICROSOFT_CLIENT_SECRET }}' \
-              RESEND_API_KEY='${{ secrets.RESEND_API_KEY }}' \
-              CONVEX_SYNC_ADMIN_KEY='${{ secrets.CONVEX_SYNC_ADMIN_KEY }}' \
-              VAPID_PUBLIC_KEY='${{ secrets.VAPID_PUBLIC_KEY }}' \
-              VAPID_PRIVATE_KEY='${{ secrets.VAPID_PRIVATE_KEY }}' \
-              VAPID_SUBJECT='${{ secrets.VAPID_SUBJECT }}' \
+              DATABASE_URL='${{ secrets.DATABASE_URL || vars.DATABASE_URL }}' \
+              BETTER_AUTH_SECRET='${{ secrets.BETTER_AUTH_SECRET || vars.BETTER_AUTH_SECRET }}' \
+              BETTER_AUTH_URL='https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net' \
+              GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID }}' \
+              GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET }}' \
+              MICROSOFT_CLIENT_ID='${{ secrets.MICROSOFT_CLIENT_ID || vars.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}' \
+              MICROSOFT_CLIENT_SECRET='${{ secrets.MICROSOFT_CLIENT_SECRET || vars.MICROSOFT_CLIENT_SECRET }}' \
+              RESEND_API_KEY='${{ secrets.RESEND_API_KEY || vars.RESEND_API_KEY }}' \
+              CONVEX_SYNC_ADMIN_KEY='${{ secrets.CONVEX_SYNC_ADMIN_KEY || vars.CONVEX_SYNC_ADMIN_KEY }}' \
+              VAPID_PUBLIC_KEY='${{ vars.VAPID_PUBLIC_KEY || secrets.VAPID_PUBLIC_KEY }}' \
+              VAPID_PRIVATE_KEY='${{ secrets.VAPID_PRIVATE_KEY || vars.VAPID_PRIVATE_KEY }}' \
+              VAPID_SUBJECT='${{ vars.VAPID_SUBJECT || secrets.VAPID_SUBJECT }}' \
             --output none
 
       - name: Configure Web App managed identity for ACR pull
         env:
-          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || secrets.ACR_LOGIN_SERVER }}
         run: |
           PRINCIPAL_ID=$(az webapp identity assign \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.API_WEBAPP_NAME }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }} \
             --query principalId -o tsv)
 
           echo "Web App managed identity principalId: ${PRINCIPAL_ID}"
           echo "AcrPull role assignment must be pre-provisioned outside this pipeline."
 
           az webapp config set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.API_WEBAPP_NAME }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }} \
             --generic-configurations '{"acrUseManagedIdentityCreds": true}' \
             --only-show-errors
 
       - name: Deploy container to App Service
         env:
-          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
-          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || secrets.ACR_LOGIN_SERVER }}
+          API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || secrets.API_IMAGE_REPOSITORY || 'retro-tool-api' }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
         run: |
           IMAGE_NAME="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${IMAGE_TAG}"
 
           az webapp config container set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.API_WEBAPP_NAME }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }} \
             --docker-custom-image-name "${IMAGE_NAME}" \
             --docker-registry-server-url "https://${ACR_LOGIN_SERVER}" \
             --output none
 
           az webapp restart \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.API_WEBAPP_NAME }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }} \
             --output none
 
       - name: Health check
         run: |
-          URL="https://${{ vars.API_WEBAPP_NAME }}.azurewebsites.net/health"
+          URL="https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net/health"
           echo "Waiting for API to be healthy at ${URL}..."
           for i in $(seq 1 60); do
             STATUS=$(curl -s -o /dev/null -w '%{http_code}' "${URL}" || echo "000")
@@ -341,8 +341,8 @@ jobs:
         if: ${{ failure() && !cancelled() }}
         continue-on-error: true
         run: |
-          APP_NAME="${{ vars.API_WEBAPP_NAME }}"
-          RG_NAME="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP_NAME="${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}"
+          RG_NAME="${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }}"
           LOG_ROOT="https://${APP_NAME}.scm.azurewebsites.net/api/logs/docker"
 
           echo "Deployment failed. Fetching Kudu runtime logs from ${LOG_ROOT}..."
