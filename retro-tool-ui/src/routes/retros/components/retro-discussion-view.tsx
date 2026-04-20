@@ -186,7 +186,7 @@ export function RetroDiscussionView({
                     isActive
                       ? 'bg-primary/10 border-primary'
                       : 'border-transparent hover:bg-muted/40',
-                    isDiscussed && !isActive ? 'opacity-40' : '',
+                    isDiscussed && !isActive ? 'opacity-60' : '',
                     canControl && !isActive
                       ? 'cursor-pointer'
                       : 'cursor-default',

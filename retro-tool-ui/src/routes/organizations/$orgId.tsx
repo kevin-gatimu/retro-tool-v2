@@ -6,10 +6,10 @@ import {
 } from '@tanstack/react-query'
 import { useOrgDetailMutations } from './hooks/useOrganizationMutations'
 import { useOrgTeamRoleMutations } from './hooks/useOrgTeamRoleMutations'
+import { OrgLogo } from '@/components/OrgLogo'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
   ArrowLeft,
-  Building2,
   Clock,
   Edit,
   FileText,
@@ -491,17 +491,12 @@ function OrganizationDetailPage() {
         </Link>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
-            {organization.logo ? (
-              <img
-                src={organization.logo}
-                alt={organization.name}
-                className="h-16 w-16 rounded-xl object-cover"
-              />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
-                <Building2 className="h-8 w-8 text-primary" />
-              </div>
-            )}
+            <OrgLogo
+              logo={organization.logo}
+              name={organization.name}
+              height={32}
+              tight
+            />
             <div>
               <h1 className="text-3xl font-bold tracking-tight">
                 {organization.name}

@@ -391,23 +391,25 @@ export function getTeamMemberColumns(options: {
                   <Tag className="mr-2 h-4 w-4" />
                   Set Team Role
                 </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  {options.orgRoles.map((orgRole) => (
-                    <DropdownMenuItem
-                      key={orgRole.id}
-                      onClick={() =>
-                        options.onUpdateJobRole(member.userId, orgRole.id)
-                      }
-                      className={
-                        member.roleId === orgRole.id ? 'font-semibold' : ''
-                      }
-                    >
-                      {orgRole.name}
-                      {member.roleId === orgRole.id && (
-                        <Check className="ml-auto h-3 w-3" />
-                      )}
-                    </DropdownMenuItem>
-                  ))}
+                <DropdownMenuSubContent className="max-h-60 overflow-y-auto">
+                  {[...options.orgRoles]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((orgRole) => (
+                      <DropdownMenuItem
+                        key={orgRole.id}
+                        onClick={() =>
+                          options.onUpdateJobRole(member.userId, orgRole.id)
+                        }
+                        className={
+                          member.roleId === orgRole.id ? 'font-semibold' : ''
+                        }
+                      >
+                        {orgRole.name}
+                        {member.roleId === orgRole.id && (
+                          <Check className="ml-auto h-3 w-3" />
+                        )}
+                      </DropdownMenuItem>
+                    ))}
                   {member.roleId && (
                     <>
                       <DropdownMenuSeparator />

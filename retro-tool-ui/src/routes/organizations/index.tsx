@@ -48,6 +48,7 @@ import { api } from '@/lib/api'
 import { ORGANIZATIONS_ENDPOINTS } from '@/lib/api-endpoints'
 import { isSystemAdmin } from '@/lib/rbac'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { OrgLogo } from '@/components/OrgLogo'
 import { useOrganizationMutations } from './hooks/useOrganizationMutations'
 import type { PaginatedOrgsResponse } from './types'
 
@@ -275,17 +276,7 @@ function OrganizationsPage() {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        {org.logo ? (
-                          <img
-                            src={org.logo}
-                            alt={org.name}
-                            className="h-10 w-10 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                            <Building2 className="h-5 w-5 text-primary" />
-                          </div>
-                        )}
+                        <OrgLogo logo={org.logo} name={org.name} height={20} />
                         <div>
                           <CardTitle className="text-lg group-hover:underline">
                             {org.name}
