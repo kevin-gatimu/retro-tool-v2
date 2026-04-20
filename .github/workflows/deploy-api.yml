@@ -198,11 +198,22 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
           MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
+          CONVEX_SYNC_ADMIN_KEY: ${{ secrets.CONVEX_SYNC_ADMIN_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
         run: |
           for key in AZURE_RESOURCE_GROUP API_WEBAPP_NAME ACR_LOGIN_SERVER API_IMAGE_REPOSITORY IMAGE_TAG FRONTEND_URL CONVEX_SYNC_URL EMAIL_FROM DATABASE_URL BETTER_AUTH_SECRET; do
             if [ -z "${!key}" ]; then
               echo "Required deploy config is missing: ${key}"
               exit 1
+            fi
+          done
+
+          # Warn about optional secrets that are commonly misconfigured
+          for key in CONVEX_SYNC_ADMIN_KEY VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT; do
+            if [ -z "${!key}" ]; then
+              echo "WARNING: ${key} is empty — check it is stored as a Secret (not a Variable) and exists in the '$(echo ${{ needs.set-env.outputs.environment }})' environment"
             fi
           done
 

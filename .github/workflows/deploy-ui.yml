@@ -94,7 +94,6 @@ jobs:
             VITE_APP_TITLE \
             VITE_APP_ENV \
             VITE_API_URL \
-            VITE_CONVEX_URL \
             VITE_ESTIMATES_REALTIME_BACKEND \
             VITE_RETROS_REALTIME_BACKEND \
             VITE_NOTIFICATIONS_REALTIME_BACKEND; do
@@ -103,6 +102,16 @@ jobs:
               exit 1
             fi
           done
+
+          USES_CONVEX=false
+          for backend in "${VITE_ESTIMATES_REALTIME_BACKEND}" "${VITE_RETROS_REALTIME_BACKEND}" "${VITE_NOTIFICATIONS_REALTIME_BACKEND}"; do
+            [ "${backend}" = "convex" ] && USES_CONVEX=true && break
+          done
+
+          if [ "${USES_CONVEX}" = "true" ] && [ -z "${VITE_CONVEX_URL}" ]; then
+            echo "VITE_CONVEX_URL is required when any realtime backend is set to 'convex'"
+            exit 1
+          fi
 
           case "${VITE_APP_ENV}" in
             local|development|staging|production) ;;
@@ -136,7 +145,11 @@ jobs:
               ;;
           esac
 
-          node -e "new URL(process.env.VITE_API_URL); new URL(process.env.VITE_CONVEX_URL); console.log('UI env URLs look valid')"
+          node -e "
+            new URL(process.env.VITE_API_URL);
+            if (process.env.VITE_CONVEX_URL) new URL(process.env.VITE_CONVEX_URL);
+            console.log('UI env URLs look valid');
+          "
 
       - name: Build UI
         env:

@@ -40,8 +40,13 @@ export function createAuth(configService: ConfigService<Config>) {
   const isAzurePostgres =
     databaseUrl?.includes('.postgres.database.azure.com') || false;
 
+  // Normalize DATABASE_URL for node-postgres to avoid sslmode deprecation
+  // warnings from pg-connection-string while keeping SSL handling explicit.
+  const normalizedDatabaseUrl = databaseUrl ? new URL(databaseUrl) : null;
+  normalizedDatabaseUrl?.searchParams.delete('sslmode');
+
   const pool = new Pool({
-    connectionString: databaseUrl,
+    connectionString: normalizedDatabaseUrl?.toString() ?? databaseUrl,
     ssl: isAzurePostgres ? { rejectUnauthorized: false } : false,
   });
 
@@ -124,6 +129,17 @@ export function createAuth(configService: ConfigService<Config>) {
       database: {
         // Generate UUID-format IDs for all entities (users, sessions, accounts, etc.)
         generateId: () => crypto.randomUUID(),
+      },
+      ipAddress: {
+        // Azure App Service sits behind a reverse proxy, so client IP is provided
+        // via forwarded headers instead of the direct socket address.
+        ipAddressHeaders: [
+          'x-forwarded-for',
+          'x-client-ip',
+          'x-real-ip',
+          'cf-connecting-ip',
+        ],
+        trustedProxyHeaders: true,
       },
       // Use default cookie configuration
       defaultCookieAttributes: {

@@ -114,6 +114,43 @@ export function TemplatesListSkeleton() {
   )
 }
 
+export function AdminTemplatesSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Admin Nav placeholder */}
+      <div className="flex items-center gap-1 border-b pb-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-8 w-24 rounded-md" />
+        ))}
+      </div>
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-5 w-72" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-9 w-36" />
+        </div>
+      </div>
+      {/* Table card */}
+      <div className="border rounded-lg p-6 space-y-4">
+        <div className="flex gap-3">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-8 w-40" />
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-8 w-full" />
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ============================================================================
 // DETAIL PAGE SKELETONS
 // ============================================================================
