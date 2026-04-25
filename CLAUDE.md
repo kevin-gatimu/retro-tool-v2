@@ -38,6 +38,29 @@ pnpm --filter convex-backend  dev             # Convex watcher
 pnpm --filter convex-backend  deploy          # Deploy to Convex Cloud
 ```
 
+---
+
+## After every code change — mandatory checks
+
+Run these after **every** code generation or edit to catch issues before commit. The pre-commit hooks run lint-staged (ESLint + Prettier) and will block commits if these fail.
+
+```bash
+# Type-check both apps
+pnpm --filter retro-tool-api type-check
+pnpm --filter retro-tool-ui  type-check
+
+# Lint + auto-fix both apps (mirrors what lint-staged runs on commit)
+pnpm --filter retro-tool-api lint
+pnpm --filter retro-tool-ui  lint
+```
+
+### Common lint errors to avoid
+
+| Error | Fix |
+| --- | --- |
+| `@typescript-eslint/consistent-type-imports` | Never use inline `import()` types in generics. Import the type at the top of the file with `import type { Foo }` and reference `Foo` directly. |
+| `react-hooks/exhaustive-deps` (unknown rule) | This rule is **not** in the project ESLint config — never add `// eslint-disable-next-line react-hooks/exhaustive-deps` comments. Remove them if found. |
+
 ### Database commands (API package)
 
 ```bash
