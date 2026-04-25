@@ -42,6 +42,32 @@ async function seedEstimateTemplates() {
         .update(estimateTemplate)
         .set({ name: tmpl.name, description: tmpl.description })
         .where(eq(estimateTemplate.id, tmpl.id));
+
+      const existingValues = await db
+        .select({ value: estimateTemplateValue.value })
+        .from(estimateTemplateValue)
+        .where(eq(estimateTemplateValue.templateId, tmpl.id));
+      const existingValueSet = new Set(existingValues.map((v) => v.value));
+      const missingValues = tmpl.values.filter(
+        (v) => !existingValueSet.has(v.value),
+      );
+      if (missingValues.length > 0) {
+        await db.insert(estimateTemplateValue).values(
+          missingValues.map((v) => ({
+            id: randomUUID(),
+            templateId: tmpl.id,
+            label: v.label,
+            value: v.value,
+            order: v.order,
+            color: v.color ?? null,
+            description: v.description ?? null,
+          })),
+        );
+        console.log(
+          `  Updated "${tmpl.name}": added ${missingValues.length} new value(s)`,
+        );
+      }
+
       skipped++;
       continue;
     }

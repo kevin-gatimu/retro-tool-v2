@@ -1397,7 +1397,7 @@ function EstimateSessionPage() {
           </Dialog>
         </div>
 
-        <MusicPlayer />
+        {session.isCreator && <MusicPlayer />}
       </TooltipProvider>
     </>
   )

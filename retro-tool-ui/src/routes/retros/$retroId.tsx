@@ -2310,8 +2310,8 @@ function RetroDetailPage() {
         )}
       </div>
 
-      {/* Floating music player — visible during active phases */}
-      {retroStatus !== 'draft' && <MusicPlayer />}
+      {/* Floating music player — facilitators only, during active phases */}
+      {retroStatus !== 'draft' && canControl && <MusicPlayer />}
     </TooltipProvider>
   )
 }

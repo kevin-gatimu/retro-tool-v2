@@ -307,7 +307,19 @@ export const BUILT_IN_ESTIMATE_TEMPLATES: BuiltInEstimateTemplate[] = [
         order: 6,
         description: 'Three days — consider splitting',
       },
-      { label: '?', value: '?', order: 7, description: 'Duration unknown' },
+      {
+        label: '36h',
+        value: '36',
+        order: 7,
+        description: 'Four and a half days — likely needs decomposition',
+      },
+      {
+        label: '48h',
+        value: '48',
+        order: 8,
+        description: 'Full working week — split before estimating',
+      },
+      { label: '?', value: '?', order: 9, description: 'Duration unknown' },
     ],
   },
   {
