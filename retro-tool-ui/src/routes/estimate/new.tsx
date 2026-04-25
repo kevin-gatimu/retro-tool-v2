@@ -342,19 +342,7 @@ function NewEstimateSessionPage() {
             {createSessionMutation.isPending ? 'Creating...' : 'Create Session'}
           </Button>
         ) : (
-          <div className="flex items-center gap-2">
-            {step === 'template' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedTemplateId(null)
-                  nextStep()
-                }}
-              >
-                Skip template
-              </Button>
-            )}
+          <div className="flex items-center">
             <Button onClick={nextStep} disabled={!canProceed()}>
               Next
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -373,8 +361,8 @@ function NewEstimateSessionPage() {
                 Choose an Estimate Template
               </h2>
               <p className="text-muted-foreground">
-                Select a voting scale for this session — or skip to use the
-                default story estimate values
+                Select a voting scale for this session — or use the default
+                story estimate values
               </p>
             </div>
 
