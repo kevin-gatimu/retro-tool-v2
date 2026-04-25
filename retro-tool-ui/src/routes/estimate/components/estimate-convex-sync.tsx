@@ -38,7 +38,13 @@ export function EstimateConvexSync({ sessionId }: EstimateConvexSyncProps) {
       return
     }
 
-    if (lastUpdatedAtRef.current === board.updatedAt) {
+    // Reject stale snapshots: a concurrent syncSessionProjection call that
+    // started before a more-recent one can finish later and carry an older
+    // updatedAt. Applying it would overwrite the fresher data already in cache.
+    if (
+      lastUpdatedAtRef.current !== null &&
+      board.updatedAt <= lastUpdatedAtRef.current
+    ) {
       return
     }
 

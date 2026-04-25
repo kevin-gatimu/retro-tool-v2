@@ -206,6 +206,15 @@ export const DIGESTS_ENDPOINTS = {
 } as const
 
 // ---------------------------------------------------------------------------
+// Estimate Templates
+// ---------------------------------------------------------------------------
+export const ESTIMATE_TEMPLATES_ENDPOINTS = {
+  LIST: '/api/estimates/templates',
+  SEED: '/api/estimates/templates/seed',
+  BY_ID: (id: string) => `/api/estimates/templates/${id}`,
+} as const
+
+// ---------------------------------------------------------------------------
 // Templates (alias — served via retros endpoint)
 // ---------------------------------------------------------------------------
 export const TEMPLATES_ENDPOINTS = {

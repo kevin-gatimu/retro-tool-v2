@@ -5,10 +5,27 @@ export type SessionSummary = StoryEstimateSession & {
   participants: { userId: string; isOnline: boolean }[];
 };
 
+export type EstimateTemplateValueView = {
+  id: string;
+  label: string;
+  value: string;
+  order: number;
+  color: string | null;
+  description: string | null;
+};
+
+export type SessionTemplate = {
+  id: string;
+  name: string;
+  color: string | null;
+  values: EstimateTemplateValueView[];
+};
+
 export type SessionDetail = StoryEstimateSession & {
   isCreator: boolean;
   currentUserId: string;
   userVote: string | null;
+  template: SessionTemplate | null;
   team: { id: string; name: string };
   createdBy: { id: string; name: string; image: string | null };
   participants: {

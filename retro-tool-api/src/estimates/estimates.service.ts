@@ -394,6 +394,42 @@ export class EstimatesService {
 
     if (!membership) throw new ForbiddenException('Access denied');
 
+    // Fetch template if session has one
+    let sessionTemplate: import('./types/index').SessionTemplate | null = null;
+    if (row.session.templateId) {
+      const [tmpl] = await this.database
+        .select({
+          id: estimatesSchema.estimateTemplate.id,
+          name: estimatesSchema.estimateTemplate.name,
+          color: estimatesSchema.estimateTemplate.color,
+        })
+        .from(estimatesSchema.estimateTemplate)
+        .where(eq(estimatesSchema.estimateTemplate.id, row.session.templateId))
+        .limit(1);
+
+      if (tmpl) {
+        const templateValues = await this.database
+          .select()
+          .from(estimatesSchema.estimateTemplateValue)
+          .where(eq(estimatesSchema.estimateTemplateValue.templateId, tmpl.id))
+          .orderBy(asc(estimatesSchema.estimateTemplateValue.order));
+
+        sessionTemplate = {
+          id: tmpl.id,
+          name: tmpl.name,
+          color: tmpl.color ?? null,
+          values: templateValues.map((v) => ({
+            id: v.id,
+            label: v.label,
+            value: v.value,
+            order: v.order,
+            color: v.color ?? null,
+            description: v.description ?? null,
+          })),
+        };
+      }
+    }
+
     // Fetch participants with user info + jobRole from teamMember
     const rawParticipants = await this.database
       .select({
@@ -577,6 +613,7 @@ export class EstimatesService {
       isCreator,
       currentUserId: userId,
       userVote,
+      template: sessionTemplate,
       currentStory: currentRound
         ? this.roundStoryLabel(
             currentRound.storyName,
@@ -637,6 +674,7 @@ export class EstimatesService {
       status: ESTIMATE_SESSION_STATUSES.Waiting,
       sprintLink: data.sprintLink,
       timerDuration: data.timerDuration,
+      templateId: data.templateId ?? null,
       currentStory: null,
       createdAt: now,
       updatedAt: now,
@@ -887,7 +925,7 @@ export class EstimatesService {
     await this.database
       .update(estimatesSchema.storyEstimateSession)
       .set({
-        status: ESTIMATE_SESSION_STATUSES.Waiting,
+        status: ESTIMATE_SESSION_STATUSES.Voting,
         currentRoundId: createdRound.id,
         currentStory: this.roundStoryLabel(
           createdRound.storyName,
@@ -1053,7 +1091,7 @@ export class EstimatesService {
     await this.database
       .update(estimatesSchema.storyEstimateSession)
       .set({
-        status: ESTIMATE_SESSION_STATUSES.Waiting,
+        status: ESTIMATE_SESSION_STATUSES.Voting,
         timerEndsAt: revoteTimerEndsAt,
         updatedAt: new Date(),
       })

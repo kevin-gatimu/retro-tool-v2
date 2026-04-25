@@ -6,6 +6,7 @@ export const CreateEstimateSessionSchema = z.object({
   teamId: z.string().min(1),
   sprintLink: z.string().url().max(2048).optional(),
   timerDuration: z.number().int().positive().max(3600).optional(),
+  templateId: z.string().optional(),
 });
 
 export type CreateEstimateSessionDto = z.infer<

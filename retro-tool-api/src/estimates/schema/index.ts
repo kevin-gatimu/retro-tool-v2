@@ -8,8 +8,43 @@ import {
 } from 'drizzle-orm/pg-core';
 import { user } from '../../auth/schema';
 import { team } from '../../teams/schema';
+import { organization } from '../../organizations/schema';
 import { ESTIMATE_SESSION_STATUSES } from '../../common/enums';
 import { estimateSessionStatusEnum } from '../../common/schema-enums';
+
+// ============================================================================
+// Estimate Template Tables
+// ============================================================================
+
+export const estimateTemplate = pgTable('estimate_template', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  isBuiltIn: boolean('is_built_in').notNull().default(false),
+  organizationId: varchar('organization_id', { length: 255 }).references(
+    () => organization.id,
+    { onDelete: 'cascade' },
+  ),
+  color: varchar('color', { length: 7 }),
+  createdAt: timestamp('created_at')
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: timestamp('updated_at')
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export const estimateTemplateValue = pgTable('estimate_template_value', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  templateId: varchar('template_id', { length: 255 })
+    .notNull()
+    .references(() => estimateTemplate.id, { onDelete: 'cascade' }),
+  label: varchar('label', { length: 20 }).notNull(),
+  value: varchar('value', { length: 20 }).notNull(),
+  order: integer('order').notNull().default(0),
+  color: varchar('color', { length: 7 }),
+  description: text('description'),
+});
 
 // ============================================================================
 // Story Estimate Session Table
@@ -32,6 +67,10 @@ export const storyEstimateSession = pgTable('story_estimate_session', {
   currentStory: text('current_story'),
   timerDuration: integer('timer_duration'), // seconds
   timerEndsAt: timestamp('timer_ends_at'),
+  templateId: varchar('template_id', { length: 255 }).references(
+    () => estimateTemplate.id,
+    { onDelete: 'set null' },
+  ),
   createdAt: timestamp('created_at')
     .notNull()
     .$defaultFn(() => new Date()),
@@ -122,3 +161,9 @@ export type NewStoryEstimateRound = typeof storyEstimateRound.$inferInsert;
 
 export type StoryEstimateVote = typeof storyEstimateVote.$inferSelect;
 export type NewStoryEstimateVote = typeof storyEstimateVote.$inferInsert;
+
+export type EstimateTemplate = typeof estimateTemplate.$inferSelect;
+export type NewEstimateTemplate = typeof estimateTemplate.$inferInsert;
+export type EstimateTemplateValue = typeof estimateTemplateValue.$inferSelect;
+export type NewEstimateTemplateValue =
+  typeof estimateTemplateValue.$inferInsert;

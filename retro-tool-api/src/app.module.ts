@@ -11,6 +11,7 @@ import { RetrosModule } from './retros/retros.module';
 import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { EstimatesModule } from './estimates/estimates.module';
+import { EstimateTemplatesModule } from './estimate-templates/estimate-templates.module';
 import { TeamsModule } from './teams/teams.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { RetroRemindersModule } from './retro-reminders/retro-reminders.module';
@@ -47,6 +48,7 @@ loadDotenv({ path: join(__dirname, '../.env.local'), override: true });
     RetrosModule,
     ReportsModule,
     NotificationsModule,
+    EstimateTemplatesModule,
     EstimatesModule,
     TeamsModule,
     SessionsModule,

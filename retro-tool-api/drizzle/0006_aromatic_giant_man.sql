@@ -1,0 +1,1 @@
+ALTER TABLE "estimate_template" ADD COLUMN "color" varchar(7);

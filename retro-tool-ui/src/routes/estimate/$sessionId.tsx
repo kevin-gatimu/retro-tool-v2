@@ -22,6 +22,11 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+import {
+  TShirtIcon,
+  getShirtScale,
+  isTShirtTemplateName,
+} from '@/components/TShirtIcon'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   AlertDialog,
@@ -72,20 +77,20 @@ import { usesConvexForEstimates } from '@/lib/realtime-config'
 import { EstimateConvexSync } from './components/estimate-convex-sync'
 import { getRoundDurationLabel } from './helpers'
 
-const POINT_VALUES = [
-  '0',
-  '½',
-  '1',
-  '2',
-  '3',
-  '5',
-  '8',
-  '13',
-  '20',
-  '40',
-  '100',
-  '?',
-  '☕',
+const DEFAULT_POINT_VALUES = [
+  { label: '0', value: '0', color: null },
+  { label: '½', value: '0.5', color: null },
+  { label: '1', value: '1', color: null },
+  { label: '2', value: '2', color: null },
+  { label: '3', value: '3', color: null },
+  { label: '5', value: '5', color: null },
+  { label: '8', value: '8', color: null },
+  { label: '13', value: '13', color: null },
+  { label: '20', value: '20', color: null },
+  { label: '40', value: '40', color: null },
+  { label: '100', value: '100', color: null },
+  { label: '?', value: '?', color: null },
+  { label: '☕', value: '☕', color: null },
 ]
 
 export const Route = createFileRoute('/estimate/$sessionId')({
@@ -557,24 +562,45 @@ function EstimateSessionPage() {
     revoteMutation,
   } = useSessionMutations(sessionId)
 
-  // Sync selectedPoints from server — handles "New Round" clearing votes
-  // Only sync when not actively voting to keep local state instant
+  // Effect 1: clear selectedPoints when the round changes or a revote happens.
+  // This is the only place that legitimately resets the selection to null based
+  // on server state (new round = different ID; revote = same ID but round goes
+  // back to 'active' from 'revealed').
+  const roundClearRef = useRef<{
+    id: string | null
+    status: string | undefined
+  }>({
+    id: null,
+    status: undefined,
+  })
   useEffect(() => {
-    if (
-      !castVoteMutation.isPending &&
-      !removeVoteMutation.isPending &&
-      session
-    ) {
-      setSelectedPoints(session.userVote ?? null)
+    if (!session) return
+    const id = session.currentRound?.id ?? null
+    const status = session.currentRound?.status
+    const prev = roundClearRef.current
+    if (prev.status !== undefined) {
+      const roundChanged = prev.id !== id
+      const revoted =
+        prev.id === id && prev.status === 'revealed' && status === 'active'
+      if (roundChanged || revoted) setSelectedPoints(null)
     }
+    roundClearRef.current = { id, status }
+  }, [session?.currentRound?.id, session?.currentRound?.status])
+
+  // Effect 2: sync a server-confirmed vote into local state.
+  // Intentionally does NOT reset to null — stale Convex snapshots can briefly
+  // report userVote=null while the fresh snapshot is still in-flight, which
+  // would flash the selection away. Null resets come from Effect 1 above or
+  // from the explicit setSelectedPoints(null) call inside handleVote (unvote).
+  useEffect(() => {
+    if (castVoteMutation.isPending || removeVoteMutation.isPending || !session)
+      return
+    if (session.userVote != null) setSelectedPoints(session.userVote)
   }, [
     session?.userVote,
-    session,
     castVoteMutation.isPending,
     removeVoteMutation.isPending,
   ])
-
-  const hasActiveRoundStory = session?.currentRound !== null
 
   // Sync agreedPoints input when votes are revealed: prefer saved value, fall back to avg
   useEffect(() => {
@@ -603,7 +629,7 @@ function EstimateSessionPage() {
   }, [session?.status, session?.currentRound?.id])
 
   const handleVote = (points: string) => {
-    if (!hasActiveRoundStory) {
+    if (!session?.currentRound) {
       toast.warning('Waiting for next story', {
         description:
           'The session host must add a story before voting can begin.',
@@ -737,6 +763,42 @@ function EstimateSessionPage() {
   }
 
   const stats = getVoteStats()
+
+  const voteOptions = session.template
+    ? session.template.values.map((v) => ({
+        label: v.label,
+        value: v.value,
+        color: v.color,
+      }))
+    : DEFAULT_POINT_VALUES
+
+  const isTShirtTemplate = !!(
+    session.template && isTShirtTemplateName(session.template.name)
+  )
+
+  const tShirtThemeColor =
+    session.template?.values.find((v) => v.color)?.color ??
+    session.template?.color ??
+    '#f43f5e'
+
+  const displayVote = (points: string): string => {
+    if (!session.template) return points
+    return (
+      session.template.values.find((v) => v.value === points)?.label ?? points
+    )
+  }
+
+  const closestLabel = (avg: string | null): string | null => {
+    if (!avg || !session.template) return null
+    const avgNum = parseFloat(avg)
+    if (isNaN(avgNum)) return null
+    const numeric = session.template.values
+      .map((v) => ({ label: v.label, n: parseFloat(v.value) }))
+      .filter((v) => !isNaN(v.n))
+      .sort((a, b) => Math.abs(a.n - avgNum) - Math.abs(b.n - avgNum))
+    return numeric[0]?.label ?? null
+  }
+
   const savedAgreedPoints =
     session.status === 'revealed'
       ? (session.rounds.find((r) => r.id === session.currentRound?.id)
@@ -835,14 +897,16 @@ function EstimateSessionPage() {
 
           {/* Story being estimated */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Round Story</CardTitle>
+            <CardHeader className="py-0 px-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Current Story
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
+            <CardContent className="px-4 pb-0 pt-0">
+              <div className="space-y-0.5">
                 {session.currentRound ? (
                   <>
-                    <p className="text-lg font-medium">
+                    <p className="text-base font-medium">
                       {session.currentRound.ticketNumber}
                       {session.currentRound.storyName !==
                       session.currentRound.ticketNumber
@@ -876,32 +940,63 @@ function EstimateSessionPage() {
             </CardContent>
           </Card>
 
-          {/* Point Cards */}
-          <div>
-            <h3 className="text-sm font-medium mb-3">Select your estimate</h3>
-            {hasActiveRoundStory ? (
-              <div className="flex flex-wrap gap-2 sm:gap-3">
-                {POINT_VALUES.map((points) => (
+          {/* Point Cards — only shown once a round is active */}
+          {session.currentRound && (
+            <div>
+              <h3 className="text-sm font-medium mb-3">
+                Select your estimate
+                {session.template && (
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    · {session.template.name}
+                  </span>
+                )}
+              </h3>
+              <div className="flex flex-wrap items-end gap-3 sm:gap-4">
+                {voteOptions.map((option) => (
                   <button
-                    key={points}
+                    key={option.value}
                     type="button"
-                    onClick={() => handleVote(points)}
+                    onClick={() => handleVote(option.value)}
                     disabled={session.status === 'revealed'}
+                    style={
+                      !isTShirtTemplate &&
+                      option.color &&
+                      selectedPoints !== option.value
+                        ? {
+                            borderColor: `${option.color}40`,
+                            color: option.color,
+                          }
+                        : undefined
+                    }
                     className={cn(
-                      'relative w-12 h-16 sm:w-14 sm:h-20 rounded-lg border-2 font-bold text-lg sm:text-xl',
-                      'transition-all duration-150 ease-out',
+                      'relative rounded-lg transition-all duration-150 ease-out',
                       'hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-                      'bg-card flex items-center justify-center',
-                      'active:scale-95',
-                      selectedPoints === points
-                        ? 'border-primary bg-primary/10 text-primary shadow-lg scale-105 animate-in zoom-in-95 duration-200'
-                        : 'border-border hover:border-primary/50',
+                      'flex items-center justify-center active:scale-95',
+                      isTShirtTemplate
+                        ? 'w-20 h-20 sm:w-24 sm:h-24 border-0 bg-transparent p-0'
+                        : 'w-12 h-16 sm:w-14 sm:h-20 border-2 font-bold text-lg sm:text-xl bg-card',
+                      !isTShirtTemplate &&
+                        (selectedPoints === option.value
+                          ? 'border-primary bg-primary/10 text-primary shadow-lg scale-105 animate-in zoom-in-95 duration-200'
+                          : 'border-border hover:border-primary/50'),
+                      isTShirtTemplate &&
+                        selectedPoints === option.value &&
+                        'scale-110 shadow-lg drop-shadow-md animate-in zoom-in-95 duration-200',
                       session.status === 'revealed' &&
                         'opacity-50 cursor-not-allowed hover:scale-100',
                     )}
                   >
-                    {points}
-                    {selectedPoints === points && (
+                    {isTShirtTemplate ? (
+                      <TShirtIcon
+                        label={option.label}
+                        themeColor={option.color ?? tShirtThemeColor}
+                        selected={selectedPoints === option.value}
+                        scale={getShirtScale(option.label)}
+                      />
+                    ) : (
+                      option.label
+                    )}
+                    {selectedPoints === option.value && (
                       <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center animate-in zoom-in-50 duration-200">
                         <Check className="h-2.5 w-2.5 text-primary-foreground" />
                       </div>
@@ -909,16 +1004,8 @@ function EstimateSessionPage() {
                   </button>
                 ))}
               </div>
-            ) : (
-              <Card className="border-dashed">
-                <CardContent className="py-4 text-sm text-muted-foreground">
-                  {session.isCreator
-                    ? "Use 'Start Round' in the controls below to unlock the estimate board."
-                    : 'Waiting for the host to start the next round...'}
-                </CardContent>
-              </Card>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Participants & Votes */}
           <Card>
@@ -928,12 +1015,30 @@ function EstimateSessionPage() {
                   <Users className="h-4 w-4" />
                   Participants ({votedCount}/{onlineParticipants.length} voted)
                 </CardTitle>
-                <div className="flex flex-wrap items-center gap-3 text-sm">
-                  {stats && (
+                {/* Reserve a fixed-height row so the card never shifts when
+                    stats appear. Items are always rendered but invisible until
+                    they have a value — this keeps the layout stable. */}
+                <div className="flex min-h-[1.75rem] flex-wrap items-center gap-3 text-sm">
+                  {savedAgreedPoints ? (
+                    <span className="inline-flex items-center gap-1 rounded-md border-2 border-primary bg-primary/10 px-2 py-0.5 font-bold text-primary">
+                      <Check className="h-3 w-3" />
+                      Agreed: {savedAgreedPoints}
+                    </span>
+                  ) : (
+                    <span className="invisible inline-flex items-center gap-1 rounded-md border-2 px-2 py-0.5 font-bold">
+                      Agreed: —
+                    </span>
+                  )}
+                  {stats ? (
                     <>
                       <span className="text-muted-foreground">
                         Avg:{' '}
                         <strong className="text-foreground">{stats.avg}</strong>
+                        {closestLabel(stats.avg) && (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            (~{closestLabel(stats.avg)})
+                          </span>
+                        )}
                       </span>
                       <span className="text-muted-foreground">
                         Range:{' '}
@@ -942,11 +1047,9 @@ function EstimateSessionPage() {
                         </strong>
                       </span>
                     </>
-                  )}
-                  {savedAgreedPoints && (
-                    <span className="inline-flex items-center gap-1 rounded-md border-2 border-primary bg-primary/10 px-2 py-0.5 font-bold text-primary">
-                      <Check className="h-3 w-3" />
-                      Agreed: {savedAgreedPoints}
+                  ) : (
+                    <span className="invisible text-muted-foreground">
+                      Avg: — Range: —
                     </span>
                   )}
                 </div>
@@ -1027,7 +1130,7 @@ function EstimateSessionPage() {
                         {hasVoted ? (
                           isRevealed ? (
                             <span className="animate-in zoom-in-50 duration-150">
-                              {vote.points}
+                              {displayVote(vote.points)}
                             </span>
                           ) : (
                             <Check className="h-4 w-4 text-primary animate-in zoom-in-50 duration-150" />
@@ -1054,114 +1157,143 @@ function EstimateSessionPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap items-center gap-2">
-                  {session.status === 'revealed' && (
-                    <>
-                      <label
-                        htmlFor="agreed-points-input"
-                        className="text-sm font-medium text-muted-foreground whitespace-nowrap"
-                      >
-                        Agreed Points
-                      </label>
-                      <div className="relative">
-                        <Input
-                          id="agreed-points-input"
-                          className="w-28 border-primary/60 bg-primary/5 text-center font-semibold focus-visible:ring-primary focus-visible:border-primary"
-                          placeholder={stats?.avg ?? '—'}
-                          value={agreedPoints}
-                          onChange={(e) =>
-                            handleAgreedPointsChange(e.target.value)
-                          }
-                          onBlur={handleAgreedPointsBlur}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              handleAgreedPointsBlur()
-                            }
-                          }}
-                        />
-                        {setConsensusMutation.isPending && (
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                            <div className="h-3 w-3 animate-spin rounded-full border border-primary border-t-transparent" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="h-6 w-px bg-border" />
-                    </>
-                  )}
-
-                  {session.status !== 'revealed' ? (
-                    <Button
-                      onClick={() => revealVotesMutation.mutate()}
-                      disabled={
-                        revealVotesMutation.isPending ||
-                        votedCount === 0 ||
-                        !session.currentRound
-                      }
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      Reveal Votes
-                    </Button>
-                  ) : (
-                    <>
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                  {/* Left — round & session actions */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {session.status !== 'revealed' ? (
                       <Button
-                        variant="outline"
-                        onClick={() => revoteMutation.mutate()}
-                        disabled={revoteMutation.isPending}
+                        onClick={() => revealVotesMutation.mutate()}
+                        disabled={
+                          revealVotesMutation.isPending ||
+                          votedCount === 0 ||
+                          !session.currentRound
+                        }
                       >
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Revote
+                        <Eye className="mr-2 h-4 w-4" />
+                        Reveal Votes
                       </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={() => revoteMutation.mutate()}
+                          disabled={revoteMutation.isPending}
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Revote
+                        </Button>
+                        <Button
+                          onClick={() => setIsRoundModalOpen(true)}
+                          disabled={startRoundMutation.isPending}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          New Round
+                        </Button>
+                      </>
+                    )}
+
+                    {!session.currentRound && (
                       <Button
                         onClick={() => setIsRoundModalOpen(true)}
                         disabled={startRoundMutation.isPending}
                       >
                         <Plus className="mr-2 h-4 w-4" />
-                        New Round
+                        Start Round
                       </Button>
+                    )}
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          disabled={endSessionMutation.isPending}
+                        >
+                          <CircleStop className="mr-2 h-4 w-4" />
+                          End Session
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>End this session?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will complete the estimation session and move
+                            it to history. All votes will be preserved for the
+                            report.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => endSessionMutation.mutate()}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            End Session
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+
+                  {/* Right — agreed points (only when votes are revealed) */}
+                  {session.status === 'revealed' && (
+                    <>
+                      <div className="hidden sm:block w-px self-stretch bg-border" />
+                      <div className="flex flex-col gap-2 sm:ml-auto">
+                        <label
+                          htmlFor="agreed-points-input"
+                          className="text-sm font-medium text-muted-foreground whitespace-nowrap"
+                        >
+                          Agreed Points
+                        </label>
+                        {session.template && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {session.template.values
+                              .filter((v) => v.value !== '?')
+                              .map((v) => (
+                                <Button
+                                  key={v.id}
+                                  variant={
+                                    agreedPoints === v.value
+                                      ? 'default'
+                                      : 'outline'
+                                  }
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() =>
+                                    handleAgreedPointsChange(v.value)
+                                  }
+                                >
+                                  {v.label}
+                                </Button>
+                              ))}
+                          </div>
+                        )}
+                        <div className="relative">
+                          <Input
+                            id="agreed-points-input"
+                            className="w-28 border-primary/60 bg-primary/5 text-center font-semibold focus-visible:ring-primary focus-visible:border-primary"
+                            placeholder={stats?.avg ?? '—'}
+                            value={agreedPoints}
+                            onChange={(e) =>
+                              handleAgreedPointsChange(e.target.value)
+                            }
+                            onBlur={handleAgreedPointsBlur}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                handleAgreedPointsBlur()
+                              }
+                            }}
+                          />
+                          {setConsensusMutation.isPending && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                              <div className="h-3 w-3 animate-spin rounded-full border border-primary border-t-transparent" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </>
                   )}
-
-                  {!session.currentRound && (
-                    <Button
-                      onClick={() => setIsRoundModalOpen(true)}
-                      disabled={startRoundMutation.isPending}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Start Round
-                    </Button>
-                  )}
-
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        disabled={endSessionMutation.isPending}
-                      >
-                        <CircleStop className="mr-2 h-4 w-4" />
-                        End Session
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>End this session?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will complete the estimation session and move it
-                          to history. All votes will be preserved for the
-                          report.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => endSessionMutation.mutate()}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          End Session
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>

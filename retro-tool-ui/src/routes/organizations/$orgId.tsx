@@ -13,6 +13,7 @@ import {
   Clock,
   Edit,
   FileText,
+  Layers,
   Loader2,
   LogOut,
   MoreHorizontal,
@@ -21,6 +22,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -78,12 +80,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import {
+  ESTIMATE_TEMPLATES_ENDPOINTS,
   ORGANIZATIONS_ENDPOINTS,
   TEAM_ROLES_ENDPOINTS,
   TEAMS_ENDPOINTS,
   TEMPLATES_ENDPOINTS,
 } from '@/lib/api-endpoints'
 import type { CreateTemplateInput, Template } from '@/common/types/templates'
+import type {
+  EstimateTemplate,
+  PaginatedEstimateTemplatesResponse,
+  CreateEstimateTemplateInput,
+} from '@/common/types/estimates'
 import { isSystemAdmin } from '@/lib/rbac'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import type { OrganizationDetail } from '@/common/types/organizations'
@@ -236,6 +244,7 @@ function OrganizationDetailPage() {
   const isOwner = organization.myRole === 'org-owner'
   const isAdmin =
     viewerIsSystemAdmin || organization.myRole === 'org-admin' || isOwner
+  const isTeamLeadInOrg = teams.some((t) => t.myRole === 'team-lead')
   const canDeleteOrganization = viewerIsSystemAdmin || isOwner
   const canLeaveOrganization = !viewerIsSystemAdmin && !isOwner
 
@@ -556,7 +565,9 @@ function OrganizationDetailPage() {
           <TabsTrigger value="teams">Teams</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
           {isAdmin && <TabsTrigger value="team-roles">Team Roles</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="templates">Templates</TabsTrigger>}
+          {(isAdmin || isTeamLeadInOrg) && (
+            <TabsTrigger value="templates">Templates</TabsTrigger>
+          )}
         </TabsList>
 
         {/* Teams Tab */}
@@ -1047,67 +1058,93 @@ function OrganizationDetailPage() {
         )}
 
         {/* Templates Tab */}
-        {isAdmin && (
-          <TabsContent value="templates" className="mt-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Org Templates</h2>
-                <p className="text-sm text-muted-foreground">
-                  Manage retro templates for this organisation.
-                </p>
-              </div>
-              <Button onClick={openCreateTemplateDialog} size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                New Template
-              </Button>
-            </div>
+        {(isAdmin || isTeamLeadInOrg) && (
+          <TabsContent value="templates" className="mt-6">
+            <Tabs defaultValue="retro">
+              <TabsList>
+                <TabsTrigger value="retro">
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  Retro Templates
+                </TabsTrigger>
+                <TabsTrigger value="estimate">
+                  <Layers className="h-4 w-4 mr-1.5" />
+                  Story Estimates
+                </TabsTrigger>
+              </TabsList>
 
-            {orgTemplates.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
-                  <p className="font-medium">No templates yet</p>
-                  <p className="text-sm text-muted-foreground">
-                    Create your first org-specific template.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {orgTemplates.map((template) => (
-                  <Card key={template.id}>
-                    <CardHeader>
-                      <CardTitle className="line-clamp-1">
-                        {template.name}
-                      </CardTitle>
-                      {template.description && (
-                        <CardDescription className="line-clamp-2">
-                          {template.description}
-                        </CardDescription>
-                      )}
-                    </CardHeader>
-                    <CardContent className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openEditTemplateDialog(template)}
-                      >
-                        <Edit className="mr-1 h-4 w-4" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setTemplateToDelete(template)}
-                      >
-                        <Trash2 className="mr-1 h-4 w-4" />
-                        Delete
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+              {/* Retro Templates sub-tab */}
+              {isAdmin && (
+                <TabsContent value="retro" className="mt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-semibold">Retro Templates</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Manage retro templates for this organisation.
+                      </p>
+                    </div>
+                    <Button onClick={openCreateTemplateDialog} size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
+                      New Template
+                    </Button>
+                  </div>
+
+                  {orgTemplates.length === 0 ? (
+                    <Card className="border-dashed">
+                      <CardContent className="flex flex-col items-center justify-center py-12">
+                        <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
+                        <p className="font-medium">No templates yet</p>
+                        <p className="text-sm text-muted-foreground">
+                          Create your first org-specific template.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {orgTemplates.map((template) => (
+                        <Card key={template.id}>
+                          <CardHeader>
+                            <CardTitle className="line-clamp-1">
+                              {template.name}
+                            </CardTitle>
+                            {template.description && (
+                              <CardDescription className="line-clamp-2">
+                                {template.description}
+                              </CardDescription>
+                            )}
+                          </CardHeader>
+                          <CardContent className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditTemplateDialog(template)}
+                            >
+                              <Edit className="mr-1 h-4 w-4" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => setTemplateToDelete(template)}
+                            >
+                              <Trash2 className="mr-1 h-4 w-4" />
+                              Delete
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              )}
+
+              {/* Story Estimate Templates sub-tab */}
+              <TabsContent value="estimate" className="mt-4">
+                <OrgEstimateTemplatesSection
+                  orgId={orgId}
+                  canManage={isAdmin || isTeamLeadInOrg}
+                />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         )}
       </Tabs>
@@ -1594,5 +1631,423 @@ function OrganizationDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  )
+}
+
+// ============================================================================
+// Org Estimate Templates Section
+// ============================================================================
+
+type EstimateValueDraft = {
+  label: string
+  value: string
+  color: string
+  description: string
+}
+
+function OrgEstimateTemplatesSection({
+  orgId,
+  canManage,
+}: {
+  orgId: string
+  canManage: boolean
+}) {
+  const queryClient = useQueryClient()
+
+  const queryKey = ['org-estimate-templates', orgId] as const
+
+  const templatesQuery = useQuery({
+    queryKey,
+    queryFn: () =>
+      api
+        .get<PaginatedEstimateTemplatesResponse>(
+          `${ESTIMATE_TEMPLATES_ENDPOINTS.LIST}?type=organization&page=1&limit=100`,
+        )
+        .then((r) => r.templates.filter((t) => t.organizationId === orgId)),
+    staleTime: 60_000,
+  })
+  const templates = templatesQuery.data ?? []
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey })
+
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editTemplate, setEditTemplate] = useState<EstimateTemplate | null>(
+    null,
+  )
+  const [deleteTarget, setDeleteTarget] = useState<EstimateTemplate | null>(
+    null,
+  )
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.delete(ESTIMATE_TEMPLATES_ENDPOINTS.BY_ID(id)),
+    onSuccess: () => {
+      toast.success('Template deleted')
+      setDeleteTarget(null)
+      invalidate()
+    },
+    onError: (e: Error) =>
+      toast.error(e.message || 'Failed to delete template'),
+  })
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Story Estimate Templates</h2>
+          <p className="text-sm text-muted-foreground">
+            Custom voting scales for estimation sessions in this organisation.
+          </p>
+        </div>
+        {canManage && (
+          <Button onClick={() => setCreateOpen(true)} size="sm">
+            <Plus className="mr-2 h-4 w-4" />
+            New Template
+          </Button>
+        )}
+      </div>
+
+      {templates.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Layers className="mb-4 h-12 w-12 text-muted-foreground" />
+            <p className="font-medium">No estimate templates yet</p>
+            <p className="text-sm text-muted-foreground">
+              Create a custom voting scale for your team.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {templates.map((t) => {
+            const themeColor = t.color ?? '#6366f1'
+            return (
+              <Card key={t.id}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm truncate">{t.name}</CardTitle>
+                  {t.description && (
+                    <CardDescription className="text-xs mt-0.5 line-clamp-2">
+                      {t.description}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {t.values.slice(0, 10).map((v) => (
+                      <span
+                        key={v.id}
+                        className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted"
+                        style={{ color: themeColor }}
+                      >
+                        {v.label}
+                      </span>
+                    ))}
+                    {t.values.length > 10 && (
+                      <span className="text-xs text-muted-foreground">
+                        +{t.values.length - 10}
+                      </span>
+                    )}
+                  </div>
+                  {canManage && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditTemplate(t)}
+                      >
+                        <Edit className="mr-1 h-4 w-4" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setDeleteTarget(t)}
+                      >
+                        <Trash2 className="mr-1 h-4 w-4" />
+                        Delete
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      <OrgEstimateTemplateDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        orgId={orgId}
+        onSuccess={() => {
+          setCreateOpen(false)
+          invalidate()
+        }}
+      />
+
+      {editTemplate && (
+        <OrgEstimateTemplateDialog
+          open={!!editTemplate}
+          onClose={() => setEditTemplate(null)}
+          orgId={orgId}
+          template={editTemplate}
+          onSuccess={() => {
+            setEditTemplate(null)
+            invalidate()
+          }}
+        />
+      )}
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete estimate template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sessions using this template will lose the template association,
+              but all vote and round data will be preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() =>
+                deleteTarget && deleteMutation.mutate(deleteTarget.id)
+              }
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
+
+function OrgEstimateTemplateDialog({
+  open,
+  onClose,
+  orgId,
+  template,
+  onSuccess,
+}: {
+  open: boolean
+  onClose: () => void
+  orgId: string
+  template?: EstimateTemplate
+  onSuccess: () => void
+}) {
+  const isEdit = !!template
+
+  const [name, setName] = useState(template?.name ?? '')
+  const [desc, setDesc] = useState(template?.description ?? '')
+  const [color, setColor] = useState(template?.color ?? '#6366f1')
+  const [values, setValues] = useState<EstimateValueDraft[]>(
+    template
+      ? template.values
+          .slice()
+          .sort((a, b) => a.order - b.order)
+          .map((v) => ({
+            label: v.label,
+            value: v.value,
+            color: v.color ?? '',
+            description: v.description ?? '',
+          }))
+      : [{ label: '', value: '', color: '', description: '' }],
+  )
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const payload = {
+        name: name.trim(),
+        description: desc.trim() || (isEdit ? null : undefined),
+        color: color || (isEdit ? null : undefined),
+        values: values
+          .filter((v) => v.label.trim() && v.value.trim())
+          .map((v, i) => ({
+            label: v.label.trim(),
+            value: v.value.trim(),
+            order: i,
+            color: v.color || (isEdit ? null : undefined),
+            description: v.description.trim() || (isEdit ? null : undefined),
+          })),
+      }
+      if (template) {
+        return api.patch(
+          ESTIMATE_TEMPLATES_ENDPOINTS.BY_ID(template.id),
+          payload,
+        )
+      }
+      return api.post(ESTIMATE_TEMPLATES_ENDPOINTS.LIST, {
+        ...(payload as CreateEstimateTemplateInput),
+        organizationId: orgId,
+      })
+    },
+    onSuccess: () => {
+      toast.success(isEdit ? 'Template updated' : 'Template created')
+      onSuccess()
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to save template'),
+  })
+
+  const validValues = values.filter((v) => v.label.trim() && v.value.trim())
+  const canSubmit = name.trim().length > 0 && validValues.length > 0
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose()
+      }}
+    >
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {isEdit ? 'Edit Estimate Template' : 'New Estimate Template'}
+          </DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? 'Update the template values and settings.'
+              : 'Define a custom voting scale for estimation sessions.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label>Name *</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Sprint Estimation"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Textarea
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              className="min-h-16 resize-none"
+              placeholder="When to use this template"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Theme Color</Label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-9 w-12 cursor-pointer rounded border border-input p-0.5"
+              />
+              <span className="text-xs text-muted-foreground font-mono">
+                {color}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Values *</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={values.length >= 30}
+                onClick={() =>
+                  setValues((v) => [
+                    ...v,
+                    { label: '', value: '', color: '', description: '' },
+                  ])
+                }
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Label = displayed. Value = stored in votes (use numbers for
+              stats).
+            </p>
+            {values.map((v, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-2 rounded-lg border p-3"
+              >
+                <div className="flex-1 grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Label</Label>
+                    <Input
+                      placeholder="XS"
+                      value={v.label}
+                      maxLength={20}
+                      onChange={(e) =>
+                        setValues((vals) =>
+                          vals.map((vv, j) =>
+                            j === i ? { ...vv, label: e.target.value } : vv,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Value</Label>
+                    <Input
+                      placeholder="1"
+                      value={v.value}
+                      maxLength={20}
+                      onChange={(e) =>
+                        setValues((vals) =>
+                          vals.map((vv, j) =>
+                            j === i ? { ...vv, value: e.target.value } : vv,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+                {values.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 mt-5 text-muted-foreground hover:text-destructive"
+                    onClick={() =>
+                      setValues((vals) => vals.filter((_, j) => j !== i))
+                    }
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending || !canSubmit}
+          >
+            {mutation.isPending
+              ? isEdit
+                ? 'Saving...'
+                : 'Creating...'
+              : isEdit
+                ? 'Save Changes'
+                : 'Create Template'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

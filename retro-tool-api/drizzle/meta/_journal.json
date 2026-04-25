@@ -36,6 +36,20 @@
       "when": 1777130844784,
       "tag": "0004_faithful_hellcat",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777139239527,
+      "tag": "0005_eager_typhoid_mary",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777140575870,
+      "tag": "0006_aromatic_giant_man",
+      "breakpoints": true
     }
   ]
 }

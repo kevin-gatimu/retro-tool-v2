@@ -1,5 +1,66 @@
 import type { TEstimateSessionStatus } from '@/common/enums/estimate.enums'
 
+// ============================================================================
+// Estimate Template Types
+// ============================================================================
+
+export interface EstimateTemplateValue {
+  id: string
+  templateId: string
+  label: string
+  value: string
+  order: number
+  color: string | null
+  description: string | null
+}
+
+export interface EstimateTemplate {
+  id: string
+  name: string
+  description: string | null
+  isBuiltIn: boolean
+  organizationId: string | null
+  organizationName: string | null
+  color: string | null
+  values: EstimateTemplateValue[]
+  createdAt: string | Date
+  updatedAt: string | Date
+}
+
+export interface PaginatedEstimateTemplatesResponse {
+  templates: EstimateTemplate[]
+  total: number
+  page: number
+  limit: number
+}
+
+export interface CreateEstimateTemplateInput {
+  name: string
+  description?: string
+  organizationId?: string
+  color?: string
+  values: {
+    label: string
+    value: string
+    order?: number
+    color?: string
+    description?: string
+  }[]
+}
+
+export interface UpdateEstimateTemplateInput {
+  name?: string
+  description?: string | null
+  color?: string | null
+  values?: {
+    label: string
+    value: string
+    order?: number
+    color?: string | null
+    description?: string | null
+  }[]
+}
+
 export interface EstimateRoundInput {
   ticketNumber: string
   storyName?: string
@@ -39,6 +100,20 @@ export interface EstimateRound {
   }[]
 }
 
+export interface SessionTemplateInfo {
+  id: string
+  name: string
+  color: string | null
+  values: {
+    id: string
+    label: string
+    value: string
+    order: number
+    color: string | null
+    description: string | null
+  }[]
+}
+
 export interface EstimateSession {
   id: string
   name: string
@@ -47,6 +122,8 @@ export interface EstimateSession {
   createdById: string
   isCreator: boolean
   userVote?: string | null
+  template: SessionTemplateInfo | null
+  templateId: string | null
   status: TEstimateSessionStatus
   sprintLink: string | null
   currentStory: string | null
@@ -104,6 +181,7 @@ export interface CreateSessionInput {
   teamId: string
   sprintLink?: string
   timerDuration?: number
+  templateId?: string
 }
 
 export interface UpdateSessionInput {
