@@ -42,10 +42,39 @@ export function useSessionMutations(sessionId: string) {
       return httpPromise
     },
     onMutate: (points: string) => {
-      // Optimistic update - show vote immediately to you
+      // Broad optimistic update: reflect the vote in both userVote and the votes
+      // array so the Participants panel reacts immediately and survives a stale
+      // Convex snapshot that only clears userVote but not the derived votes list.
       queryClient.setQueryData<EstimateSession>(
         ['estimate-session', sessionId],
-        (prev) => (prev ? { ...prev, userVote: points } : prev),
+        (prev) => {
+          if (!prev) return prev
+          const participant = prev.participants.find(
+            (p) => p.userId === prev.currentUserId,
+          )
+          const optimisticVote = {
+            id: 'optimistic-vote',
+            voterId: prev.currentUserId,
+            userId: prev.currentUserId,
+            points,
+            value: points,
+            user: {
+              id: prev.currentUserId,
+              name: participant?.user.name ?? '',
+              jobRole: participant?.user.jobRole ?? null,
+            },
+          }
+          const existingIdx = prev.votes.findIndex(
+            (v) => v.voterId === prev.currentUserId,
+          )
+          const newVotes =
+            existingIdx >= 0
+              ? prev.votes.map((v, i) =>
+                  i === existingIdx ? optimisticVote : v,
+                )
+              : [...prev.votes, optimisticVote]
+          return { ...prev, userVote: points, votes: newVotes }
+        },
       )
     },
     onSuccess: () => {
@@ -62,10 +91,16 @@ export function useSessionMutations(sessionId: string) {
   const removeVoteMutation = useMutation({
     mutationFn: () => api.delete(ESTIMATES_ENDPOINTS.VOTES(sessionId)),
     onMutate: () => {
-      // Optimistic update - remove vote immediately
       queryClient.setQueryData<EstimateSession>(
         ['estimate-session', sessionId],
-        (prev) => (prev ? { ...prev, userVote: null } : prev),
+        (prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            userVote: null,
+            votes: prev.votes.filter((v) => v.voterId !== prev.currentUserId),
+          }
+        },
       )
     },
     onSuccess: () => {

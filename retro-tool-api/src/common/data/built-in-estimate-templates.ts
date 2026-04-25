@@ -19,7 +19,7 @@ export const BUILT_IN_ESTIMATE_TEMPLATES: BuiltInEstimateTemplate[] = [
     id: 'f1b0acc1-0000-4000-a000-000000000001',
     name: 'Fibonacci',
     description:
-      'Classic planning poker scale based on Fibonacci numbers. Gaps between values grow with complexity — making it harder to agree on large estimates, which encourages breaking down stories. The gold standard for agile estimation.',
+      'Classic story estimate scale based on Fibonacci numbers. Gaps between values grow with complexity — making it harder to agree on large estimates, which encourages breaking down stories. The gold standard for agile estimation.',
     values: [
       {
         label: '½',
@@ -501,9 +501,9 @@ export const BUILT_IN_ESTIMATE_TEMPLATES: BuiltInEstimateTemplate[] = [
   },
   {
     id: 'f1b0acc1-0000-4000-a000-000000000012',
-    name: 'Classic Planning Poker',
+    name: 'Classic Story Estimate',
     description:
-      'The most widely used planning poker deck. Starts at 0 for trivial no-ops and tops out at 100 for very rough epic sizing. The standard scale found in most physical planning poker card sets.',
+      'The most widely used story estimate scale. Starts at 0 for trivial no-ops and tops out at 100 for very rough epic sizing. The standard scale found in most agile estimation kits.',
     color: '#8b5cf6',
     values: [
       {
@@ -557,7 +557,7 @@ export const BUILT_IN_ESTIMATE_TEMPLATES: BuiltInEstimateTemplate[] = [
     id: 'f1b0acc1-0000-4000-a000-000000000013',
     name: 'Fibonacci with Coffee',
     description:
-      "Extended planning poker with two special cards. '?' means the team needs more information before estimating. '☕' signals the item is too large and the team needs a break or a splitting session. The most expressive Fibonacci deck.",
+      "Extended story estimate scale with two special cards. '?' means the team needs more information before estimating. '☕' signals the item is too large and the team needs a break or a splitting session. The most expressive Fibonacci deck.",
     color: '#d946ef',
     values: [
       {

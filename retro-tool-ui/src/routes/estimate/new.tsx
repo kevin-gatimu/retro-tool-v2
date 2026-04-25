@@ -374,7 +374,7 @@ function NewEstimateSessionPage() {
               </h2>
               <p className="text-muted-foreground">
                 Select a voting scale for this session — or skip to use the
-                default planning poker values
+                default story estimate values
               </p>
             </div>
 
@@ -402,7 +402,7 @@ function NewEstimateSessionPage() {
               </div>
               <div>
                 <p className="text-sm font-medium">
-                  Default planning poker values
+                  Default story estimate values
                 </p>
                 <p className="text-xs text-muted-foreground">
                   0, ½, 1, 2, 3, 5, 8, 13, 20, 40, 100, ?, ☕
@@ -693,7 +693,7 @@ function NewEstimateSessionPage() {
                       </div>
                     ) : (
                       <span className="text-sm text-muted-foreground">
-                        Default planning poker (0, ½, 1, 2, 3, 5, 8, 13…)
+                        Default story estimate (0, ½, 1, 2, 3, 5, 8, 13…)
                       </span>
                     )}
                   </div>

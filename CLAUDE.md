@@ -4,6 +4,14 @@ This is a **pnpm monorepo** containing three applications and one shared package
 
 ---
 
+## Terminology rules
+
+- **Never use "planning poker"** — the correct term throughout this codebase is **"story estimate"** (or "story estimates"). This applies to UI text, comments, docs, template names, and variable/function names.
+
+---
+
+---
+
 ## Quick-start commands
 
 ```bash

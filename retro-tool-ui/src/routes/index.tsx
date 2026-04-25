@@ -143,7 +143,7 @@ const CORE_FEATURES = [
     bg: 'bg-amber-500/10 border-amber-500/20',
     glow: 'hover:shadow-[0_0_30px_rgba(245,158,11,0.15)]',
     border: 'hover:border-amber-500/40',
-    title: 'Planning Poker',
+    title: 'Story Estimates',
     description:
       'Built-in estimation sessions with real-time voting, consensus detection, and result broadcasting to the whole team.',
     badge: 'ESTIMATES',
@@ -1179,7 +1179,7 @@ function LandingPage() {
       <section className="relative py-28 px-6">
         <div className="container mx-auto max-w-6xl">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* Left: mock planning poker UI */}
+            {/* Left: mock story estimate UI */}
             <div className="relative">
               <div className="absolute -inset-4 bg-amber-500/5 blur-3xl rounded-3xl" />
               <div
@@ -1309,14 +1309,14 @@ function LandingPage() {
 
             {/* Right: copy + perks */}
             <div>
-              <SectionLabel>Planning Poker</SectionLabel>
+              <SectionLabel>Story Estimates</SectionLabel>
               <h2 className="text-4xl font-bold mb-5 leading-tight">
                 Estimate stories
                 <br />
                 <span className="text-amber-400">as a team, live.</span>
               </h2>
               <p className="text-gray-400 leading-relaxed mb-8">
-                Built-in planning poker sessions let your team vote on story
+                Built-in story estimate sessions let your team vote on story
                 points in real time. Votes stay hidden until everyone commits —
                 then flip the reveal and discuss outliers instantly.
               </p>

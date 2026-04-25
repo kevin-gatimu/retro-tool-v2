@@ -366,7 +366,7 @@ Clients are joined to room `user:<userId>` on connection.
 
 **Namespace:** `/estimates`
 
-> Previously called "Planning Poker" — renamed to **Story Estimates** (`story_estimate_session`, `story_estimate_participant`, `story_estimate_vote`).
+> Tables: `story_estimate_session`, `story_estimate_participant`, `story_estimate_vote`.
 
 | Event (client → server) | Payload                       | Description                                     |
 | ----------------------- | ----------------------------- | ----------------------------------------------- |
@@ -503,7 +503,7 @@ src/
 │   ├── database.module.ts        # Drizzle provider (DATABASE_CONNECTION token)
 │   └── database-connection.ts
 ├── email/                        # Resend wrapper + email_log table
-├── estimates/                    # Planning poker — REST + Socket.io gateway
+├── estimates/                    # Story estimates — REST + Socket.io gateway
 ├── lib/
 │   ├── email.ts                  # Email template helpers
 │   └── utils.ts                  # generateId(), etc.

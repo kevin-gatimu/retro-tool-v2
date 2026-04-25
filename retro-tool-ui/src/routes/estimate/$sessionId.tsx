@@ -99,6 +99,30 @@ export const Route = createFileRoute('/estimate/$sessionId')({
 
 // ─── Completed Session Report ─────────────────────────────────────────────────
 
+function formatTemplatePoint(
+  value: string | number | null,
+  template: EstimateSession['template'],
+): string {
+  if (value === null) return '—'
+  const strValue = String(value)
+  if (!template) return strValue
+  const found = template.values.find((v) => v.value === strValue)
+  if (!found || found.label === strValue) return strValue
+  return `${found.label} (${strValue})`
+}
+
+function closestTemplateLabel(
+  avg: number,
+  template: EstimateSession['template'],
+): string | null {
+  if (!template) return null
+  const numeric = template.values
+    .map((v) => ({ label: v.label, n: parseFloat(v.value) }))
+    .filter((v) => !isNaN(v.n))
+    .sort((a, b) => Math.abs(a.n - avg) - Math.abs(b.n - avg))
+  return numeric[0]?.label ?? null
+}
+
 function CompletedSessionReport({ session }: { session: EstimateSession }) {
   const PAGE_SIZE = 5
 
@@ -287,14 +311,31 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
                     <div className="rounded-md border bg-muted/30 p-2">
                       <p className="text-xs text-muted-foreground">Average</p>
                       <p className="text-sm font-semibold">
-                        {round.stats.average ?? '—'}
+                        {round.stats.average !== null ? (
+                          <>
+                            {round.stats.average}
+                            {(() => {
+                              const hint = closestTemplateLabel(
+                                round.stats.average,
+                                session.template,
+                              )
+                              return hint ? (
+                                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                  (~{hint})
+                                </span>
+                              ) : null
+                            })()}
+                          </>
+                        ) : (
+                          '—'
+                        )}
                       </p>
                     </div>
                     <div className="rounded-md border bg-muted/30 p-2">
                       <p className="text-xs text-muted-foreground">Range</p>
                       <p className="text-sm font-semibold">
                         {round.stats.min !== null && round.stats.max !== null
-                          ? `${round.stats.min} – ${round.stats.max}`
+                          ? `${formatTemplatePoint(round.stats.min, session.template)} – ${formatTemplatePoint(round.stats.max, session.template)}`
                           : '—'}
                       </p>
                     </div>
@@ -303,10 +344,17 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
                         Agreed Points
                       </p>
                       <p className="text-lg font-extrabold text-primary">
-                        {round.agreedPoints ??
-                          (round.stats.average !== null
-                            ? round.stats.average
-                            : '—')}
+                        {round.agreedPoints !== null
+                          ? formatTemplatePoint(
+                              round.agreedPoints,
+                              session.template,
+                            )
+                          : round.stats.average !== null
+                            ? formatTemplatePoint(
+                                round.stats.average,
+                                session.template,
+                              )
+                            : '—'}
                       </p>
                     </div>
                   </div>
@@ -387,7 +435,10 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
                                       </TableCell>
                                       <TableCell className="text-right">
                                         <span className="inline-flex min-w-10 items-center justify-center rounded-md border-2 border-primary bg-primary/10 px-2 py-1 text-sm font-bold text-primary">
-                                          {vote.points}
+                                          {formatTemplatePoint(
+                                            vote.points,
+                                            session.template,
+                                          )}
                                         </span>
                                       </TableCell>
                                     </TableRow>
@@ -1234,11 +1285,11 @@ function EstimateSessionPage() {
                     </AlertDialog>
                   </div>
 
-                  {/* Right — agreed points (only when votes are revealed) */}
+                  {/* Agreed points (only when votes are revealed) */}
                   {session.status === 'revealed' && (
                     <>
-                      <div className="hidden sm:block w-px self-stretch bg-border" />
-                      <div className="flex flex-col gap-2 sm:ml-auto">
+                      <div className="w-full h-px bg-border sm:w-px sm:h-auto sm:self-stretch" />
+                      <div className="flex flex-col gap-2">
                         <label
                           htmlFor="agreed-points-input"
                           className="text-sm font-medium text-muted-foreground whitespace-nowrap"

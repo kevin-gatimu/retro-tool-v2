@@ -70,7 +70,7 @@ Simplify feedback collection through easy-to-use tools. Foster collaboration and
 Spaces are a way to manage all sessions for your organisation or team in one place.
 
 - Create a Space and invite your team
-- Create Rooms within a Space for Planning Poker and Sprint Retrospective sessions
+- Create Rooms within a Space for Story Estimate and Sprint Retrospective sessions
 - Shared tags, teams, and permissions across all rooms in a Space
 - Easier session management — everything stays in sync
 - Better insights per team gathered across all spaces

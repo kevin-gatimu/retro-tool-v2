@@ -115,7 +115,7 @@ src/
 │   │       └── useRetroMutations.ts
 │   └── estimate/
 │       ├── index.tsx              # Estimate session list
-│       └── $sessionId.tsx         # Planning poker board
+│       └── $sessionId.tsx         # Story estimate board
 │
 └── main.tsx                       # App entry (Router + QueryClient providers)
 ```

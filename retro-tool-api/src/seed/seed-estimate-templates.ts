@@ -38,6 +38,10 @@ async function seedEstimateTemplates() {
       .limit(1);
 
     if (existingById) {
+      await db
+        .update(estimateTemplate)
+        .set({ name: tmpl.name, description: tmpl.description })
+        .where(eq(estimateTemplate.id, tmpl.id));
       skipped++;
       continue;
     }
