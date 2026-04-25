@@ -1,0 +1,1 @@
+ALTER TABLE "story_estimate_round" ADD COLUMN "agreed_points" varchar(20);

@@ -18,12 +18,12 @@ export interface EstimateRound {
   revealedAt: Date | null
   createdAt: Date
   updatedAt: Date
+  agreedPoints: string | null
   stats: {
     votesCount: number
     average: number | null
     min: number | null
     max: number | null
-    consensus: string | null
   }
   votes: {
     id: string
@@ -34,6 +34,7 @@ export interface EstimateRound {
     user: {
       id: string
       name: string
+      jobRole: string | null
     }
   }[]
 }
@@ -57,6 +58,7 @@ export interface EstimateSession {
     storyDescription: string | null
     storyLink: string | null
     status: string
+    createdAt: Date
   } | null
   rounds: EstimateRound[]
   timerDuration: number | null
@@ -92,6 +94,7 @@ export interface EstimateSession {
     user: {
       id: string
       name: string
+      jobRole: string | null
     }
   }[]
 }

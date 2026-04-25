@@ -32,6 +32,9 @@ import {
   UpdateEstimateStoryBody,
   UpdateEstimateStoryDto,
   UpdateEstimateStorySchema,
+  SetConsensusSchema,
+  SetConsensusBody,
+  type SetConsensusDto,
 } from './dtos';
 
 @ApiTags('estimates')
@@ -239,6 +242,38 @@ export class EstimatesController {
       session.user.id,
       duration,
     );
+    this.estimatesGateway.emitSessionChanged(id);
+    return result;
+  }
+
+  @Patch(':id/consensus')
+  @ApiOperation({
+    summary: 'Set the agreed points for the current revealed round',
+  })
+  @UsePipes(new ZodValidationPipe(SetConsensusSchema))
+  async setConsensus(
+    @Session() session: SessionUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SetConsensusBody,
+  ) {
+    const result = await this.estimatesService.setConsensus(
+      id,
+      session.user.id,
+      (body as SetConsensusDto).agreedPoints,
+    );
+    this.estimatesGateway.emitSessionChanged(id);
+    return result;
+  }
+
+  @Post(':id/revote')
+  @ApiOperation({
+    summary: 'Clear votes and reopen the current round for re-voting',
+  })
+  async revote(
+    @Session() session: SessionUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const result = await this.estimatesService.revote(id, session.user.id);
     this.estimatesGateway.emitSessionChanged(id);
     return result;
   }

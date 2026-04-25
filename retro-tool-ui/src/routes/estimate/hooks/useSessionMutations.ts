@@ -92,7 +92,7 @@ export function useSessionMutations(sessionId: string) {
     mutationFn: (payload: EstimateRoundInput) =>
       api.post(ESTIMATES_ENDPOINTS.START_ROUND(sessionId), payload),
     onSuccess: () => {
-      invalidate()
+      refetchSession()
       toast.success('New round started')
     },
     onError: (error: Error) =>
@@ -102,12 +102,29 @@ export function useSessionMutations(sessionId: string) {
   const startTimerMutation = useMutation({
     mutationFn: (seconds: number) =>
       api.post(ESTIMATES_ENDPOINTS.TIMER(sessionId), { duration: seconds }),
+    onMutate: (seconds: number) => {
+      // Optimistic update so the creator sees the countdown start immediately
+      queryClient.setQueryData<EstimateSession>(
+        ['estimate-session', sessionId],
+        (prev) =>
+          prev
+            ? {
+                ...prev,
+                timerDuration: seconds,
+                timerEndsAt: new Date(Date.now() + seconds * 1000),
+              }
+            : prev,
+      )
+    },
     onSuccess: (_, seconds) => {
-      invalidate()
+      // Always refetch to get the accurate server-side timerEndsAt (bypasses Convex lag)
+      refetchSession()
       toast.success(`Timer started — ${seconds / 60} min`)
     },
-    onError: (error: Error) =>
-      toast.error(error.message || 'Failed to start timer'),
+    onError: (error: Error) => {
+      refetchSession()
+      toast.error(error.message || 'Failed to start timer')
+    },
   })
 
   const endSessionMutation = useMutation({
@@ -120,6 +137,27 @@ export function useSessionMutations(sessionId: string) {
       toast.error(error.message || 'Failed to end session'),
   })
 
+  const setConsensusMutation = useMutation({
+    mutationFn: (agreedPoints: string) =>
+      api.patch(ESTIMATES_ENDPOINTS.CONSENSUS(sessionId), { agreedPoints }),
+    onSuccess: () => {
+      refetchSession()
+      toast.success('Consensus saved')
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || 'Failed to save consensus'),
+  })
+
+  const revoteMutation = useMutation({
+    mutationFn: () => api.post(ESTIMATES_ENDPOINTS.REVOTE(sessionId)),
+    onSuccess: () => {
+      refetchSession()
+      toast.success('Revote started')
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || 'Failed to start revote'),
+  })
+
   return {
     castVoteMutation,
     removeVoteMutation,
@@ -127,5 +165,7 @@ export function useSessionMutations(sessionId: string) {
     startRoundMutation,
     startTimerMutation,
     endSessionMutation,
+    setConsensusMutation,
+    revoteMutation,
   }
 }

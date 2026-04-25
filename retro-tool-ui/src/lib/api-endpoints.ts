@@ -124,6 +124,8 @@ export const ESTIMATES_ENDPOINTS = {
   START_ROUND: (id: string) => `/api/estimates/${id}/rounds/start`,
   STORY: (id: string) => `/api/estimates/${id}/story`,
   TIMER: (id: string) => `/api/estimates/${id}/timer`,
+  CONSENSUS: (id: string) => `/api/estimates/${id}/consensus`,
+  REVOTE: (id: string) => `/api/estimates/${id}/revote`,
 } as const
 
 // ---------------------------------------------------------------------------

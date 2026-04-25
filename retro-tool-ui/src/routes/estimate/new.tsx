@@ -83,7 +83,7 @@ function NewEstimateSessionPage() {
   const [name, setName] = useState('')
   const [teamId, setTeamId] = useState('')
   const [sprintLink, setSprintLink] = useState('')
-  const [timerDuration, setTimerDuration] = useState<number | undefined>()
+  const [timerDuration, setTimerDuration] = useState<number | undefined>(120)
   const [touched, setTouched] = useState({
     name: false,
     teamId: false,
@@ -223,18 +223,18 @@ function NewEstimateSessionPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="timer">Default Timer (optional)</Label>
+            <Label htmlFor="timer">Default timer per story estimate</Label>
             <Select
-              value={timerDuration?.toString() ?? ''}
+              value={timerDuration?.toString() ?? 'none'}
               onValueChange={(v) =>
-                setTimerDuration(v ? Number.parseInt(v) : undefined)
+                setTimerDuration(v === 'none' ? undefined : Number.parseInt(v))
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="No timer" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="30">30 seconds</SelectItem>
+                <SelectItem value="none">No timer</SelectItem>
                 <SelectItem value="60">1 minute</SelectItem>
                 <SelectItem value="120">2 minutes</SelectItem>
                 <SelectItem value="180">3 minutes</SelectItem>
@@ -242,7 +242,7 @@ function NewEstimateSessionPage() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Optional default countdown for each voting round
+              Countdown that auto-starts when each story round begins
             </p>
           </div>
 

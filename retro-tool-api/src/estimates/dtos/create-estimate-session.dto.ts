@@ -55,6 +55,17 @@ export class NewEstimateRoundBody {
   storyLink?: string;
 }
 
+export const SetConsensusSchema = z.object({
+  agreedPoints: z.string().min(1).max(20),
+});
+
+export type SetConsensusDto = z.infer<typeof SetConsensusSchema>;
+
+export class SetConsensusBody {
+  @ApiProperty({ example: '5' })
+  agreedPoints: string;
+}
+
 export const UpdateEstimateStorySchema = z.object({
   storyName: z.string().min(1).max(255),
   ticketNumber: z.string().min(1).max(100),

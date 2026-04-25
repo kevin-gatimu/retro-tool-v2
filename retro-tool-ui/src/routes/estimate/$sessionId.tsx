@@ -14,12 +14,13 @@ import {
   Eye,
   Hash,
   Plus,
+  RefreshCw,
   Spade,
   Timer,
   CircleStop,
   Users,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -60,12 +61,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { getEstimateSocket } from '@/lib/socket'
 import { ESTIMATES_ENDPOINTS } from '@/lib/api-endpoints'
@@ -276,35 +272,36 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-md border bg-muted/30 p-2">
                       <p className="text-xs text-muted-foreground">Votes</p>
                       <p className="text-sm font-semibold">
                         {round.stats.votesCount}
                       </p>
                     </div>
-                    <div className="rounded-md border-2 border-primary/50 bg-primary/10 p-2 shadow-sm">
+                    <div className="rounded-md border bg-muted/30 p-2">
                       <p className="text-xs text-muted-foreground">Average</p>
-                      <p className="text-lg font-extrabold text-primary">
+                      <p className="text-sm font-semibold">
                         {round.stats.average ?? '—'}
                       </p>
                     </div>
                     <div className="rounded-md border bg-muted/30 p-2">
-                      <p className="text-xs text-muted-foreground">Minimum</p>
+                      <p className="text-xs text-muted-foreground">Range</p>
                       <p className="text-sm font-semibold">
-                        {round.stats.min ?? '—'}
+                        {round.stats.min !== null && round.stats.max !== null
+                          ? `${round.stats.min} – ${round.stats.max}`
+                          : '—'}
                       </p>
                     </div>
-                    <div className="rounded-md border bg-muted/30 p-2">
-                      <p className="text-xs text-muted-foreground">Maximum</p>
-                      <p className="text-sm font-semibold">
-                        {round.stats.max ?? '—'}
+                    <div className="rounded-md border-2 border-primary/50 bg-primary/10 p-2 shadow-sm">
+                      <p className="text-xs text-muted-foreground">
+                        Agreed Points
                       </p>
-                    </div>
-                    <div className="rounded-md border bg-muted/30 p-2">
-                      <p className="text-xs text-muted-foreground">Consensus</p>
-                      <p className="text-sm font-semibold">
-                        {round.stats.consensus ?? '—'}
+                      <p className="text-lg font-extrabold text-primary">
+                        {round.agreedPoints ??
+                          (round.stats.average !== null
+                            ? round.stats.average
+                            : '—')}
                       </p>
                     </div>
                   </div>
@@ -355,29 +352,27 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
                                     <TableRow key={vote.id}>
                                       <TableCell className="font-medium">
                                         <div className="flex items-center gap-2">
-                                          {participant && (
-                                            <Avatar className="h-6 w-6">
-                                              <AvatarImage
-                                                src={
-                                                  participant.user.image ??
-                                                  undefined
-                                                }
-                                              />
-                                              <AvatarFallback>
-                                                {vote.user.name.charAt(0)}
-                                              </AvatarFallback>
-                                            </Avatar>
-                                          )}
+                                          <Avatar className="h-6 w-6">
+                                            <AvatarImage
+                                              src={
+                                                participant?.user.image ??
+                                                undefined
+                                              }
+                                            />
+                                            <AvatarFallback>
+                                              {vote.user.name.charAt(0)}
+                                            </AvatarFallback>
+                                          </Avatar>
                                           <span>{vote.user.name}</span>
                                         </div>
                                       </TableCell>
                                       <TableCell>
-                                        {participant?.user.jobRole ? (
+                                        {vote.user.jobRole ? (
                                           <Badge
                                             variant="outline"
                                             className="text-xs"
                                           >
-                                            {participant.user.jobRole}
+                                            {vote.user.jobRole}
                                           </Badge>
                                         ) : (
                                           <span className="text-muted-foreground">
@@ -527,10 +522,13 @@ function EstimateSessionPage() {
   const [roundTicket, setRoundTicket] = useState('')
   const [isRoundModalOpen, setIsRoundModalOpen] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
+  const [agreedPoints, setAgreedPoints] = useState('')
+  const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedAgreedPoints = useRef('')
 
   const timerEndsAt = session?.timerEndsAt ?? null
 
-  // Timer logic
+  // Countdown timer
   useEffect(() => {
     if (!timerEndsAt) {
       setTimeRemaining(null)
@@ -554,8 +552,9 @@ function EstimateSessionPage() {
     removeVoteMutation,
     revealVotesMutation,
     startRoundMutation,
-    startTimerMutation,
     endSessionMutation,
+    setConsensusMutation,
+    revoteMutation,
   } = useSessionMutations(sessionId)
 
   // Sync selectedPoints from server — handles "New Round" clearing votes
@@ -576,6 +575,32 @@ function EstimateSessionPage() {
   ])
 
   const hasActiveRoundStory = session?.currentRound !== null
+
+  // Sync agreedPoints input when votes are revealed: prefer saved value, fall back to avg
+  useEffect(() => {
+    if (session?.status === 'revealed') {
+      const currentRoundInRounds = session.rounds.find(
+        (r) => r.id === session.currentRound?.id,
+      )
+      const saved = currentRoundInRounds?.agreedPoints ?? null
+      const numericVotes = session.votes
+        .map((v) => {
+          if (v.points === '½') return 0.5
+          const n = Number.parseFloat(v.points)
+          return Number.isNaN(n) ? null : n
+        })
+        .filter((v): v is number => v !== null)
+      const computedAvg =
+        numericVotes.length > 0
+          ? (
+              numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length
+            ).toFixed(1)
+          : ''
+      const value = saved ?? computedAvg
+      setAgreedPoints(value)
+      lastSavedAgreedPoints.current = saved ?? ''
+    }
+  }, [session?.status, session?.currentRound?.id])
 
   const handleVote = (points: string) => {
     if (!hasActiveRoundStory) {
@@ -605,6 +630,29 @@ function EstimateSessionPage() {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const handleAgreedPointsChange = (value: string) => {
+    setAgreedPoints(value)
+    if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current)
+    const trimmed = value.trim()
+    if (!trimmed || trimmed === lastSavedAgreedPoints.current) return
+    saveDebounceRef.current = setTimeout(() => {
+      lastSavedAgreedPoints.current = trimmed
+      setConsensusMutation.mutate(trimmed)
+    }, 600)
+  }
+
+  const handleAgreedPointsBlur = () => {
+    if (saveDebounceRef.current) {
+      clearTimeout(saveDebounceRef.current)
+      saveDebounceRef.current = null
+    }
+    const trimmed = agreedPoints.trim()
+    if (trimmed && trimmed !== lastSavedAgreedPoints.current) {
+      lastSavedAgreedPoints.current = trimmed
+      setConsensusMutation.mutate(trimmed)
+    }
   }
 
   const handleStartRound = () => {
@@ -689,6 +737,12 @@ function EstimateSessionPage() {
   }
 
   const stats = getVoteStats()
+  const savedAgreedPoints =
+    session.status === 'revealed'
+      ? (session.rounds.find((r) => r.id === session.currentRound?.id)
+          ?.agreedPoints ?? null)
+      : null
+
   // Sort participants: current user first, then others
   const onlineParticipants = session.participants
     .filter((p) => p.isOnline)
@@ -814,8 +868,8 @@ function EstimateSessionPage() {
                 ) : (
                   <span className="text-muted-foreground italic">
                     {session.isCreator
-                      ? 'Start the first round by adding a ticket number.'
-                      : 'Waiting for host to start a round...'}
+                      ? "Click 'Start Round' in the controls below to begin the first round."
+                      : 'Waiting for the host to start the first round...'}
                   </span>
                 )}
               </div>
@@ -859,8 +913,8 @@ function EstimateSessionPage() {
               <Card className="border-dashed">
                 <CardContent className="py-4 text-sm text-muted-foreground">
                   {session.isCreator
-                    ? 'Add and save a story for the next round to unlock the estimate board.'
-                    : 'Waiting for the session host to add the next story before voting starts.'}
+                    ? "Use 'Start Round' in the controls below to unlock the estimate board."
+                    : 'Waiting for the host to start the next round...'}
                 </CardContent>
               </Card>
             )}
@@ -869,25 +923,33 @@ function EstimateSessionPage() {
           {/* Participants & Votes */}
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   Participants ({votedCount}/{onlineParticipants.length} voted)
                 </CardTitle>
-                {stats && (
-                  <div className="flex gap-4 text-sm">
-                    <span className="text-muted-foreground">
-                      Avg:{' '}
-                      <strong className="text-foreground">{stats.avg}</strong>
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  {stats && (
+                    <>
+                      <span className="text-muted-foreground">
+                        Avg:{' '}
+                        <strong className="text-foreground">{stats.avg}</strong>
+                      </span>
+                      <span className="text-muted-foreground">
+                        Range:{' '}
+                        <strong className="text-foreground">
+                          {stats.min} - {stats.max}
+                        </strong>
+                      </span>
+                    </>
+                  )}
+                  {savedAgreedPoints && (
+                    <span className="inline-flex items-center gap-1 rounded-md border-2 border-primary bg-primary/10 px-2 py-0.5 font-bold text-primary">
+                      <Check className="h-3 w-3" />
+                      Agreed: {savedAgreedPoints}
                     </span>
-                    <span className="text-muted-foreground">
-                      Range:{' '}
-                      <strong className="text-foreground">
-                        {stats.min} - {stats.max}
-                      </strong>
-                    </span>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -987,11 +1049,47 @@ function EstimateSessionPage() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Session Controls</CardTitle>
                 <CardDescription>
-                  As the session creator, you can control the voting
+                  As the session creator, you can control the voting. You can
+                  also change the Agreed Points.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {session.status === 'revealed' && (
+                    <>
+                      <label
+                        htmlFor="agreed-points-input"
+                        className="text-sm font-medium text-muted-foreground whitespace-nowrap"
+                      >
+                        Agreed Points
+                      </label>
+                      <div className="relative">
+                        <Input
+                          id="agreed-points-input"
+                          className="w-28 border-primary/60 bg-primary/5 text-center font-semibold focus-visible:ring-primary focus-visible:border-primary"
+                          placeholder={stats?.avg ?? '—'}
+                          value={agreedPoints}
+                          onChange={(e) =>
+                            handleAgreedPointsChange(e.target.value)
+                          }
+                          onBlur={handleAgreedPointsBlur}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              handleAgreedPointsBlur()
+                            }
+                          }}
+                        />
+                        {setConsensusMutation.isPending && (
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <div className="h-3 w-3 animate-spin rounded-full border border-primary border-t-transparent" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="h-6 w-px bg-border" />
+                    </>
+                  )}
+
                   {session.status !== 'revealed' ? (
                     <Button
                       onClick={() => revealVotesMutation.mutate()}
@@ -1005,13 +1103,23 @@ function EstimateSessionPage() {
                       Reveal Votes
                     </Button>
                   ) : (
-                    <Button
-                      onClick={() => setIsRoundModalOpen(true)}
-                      disabled={startRoundMutation.isPending}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      New Round
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => revoteMutation.mutate()}
+                        disabled={revoteMutation.isPending}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Revote
+                      </Button>
+                      <Button
+                        onClick={() => setIsRoundModalOpen(true)}
+                        disabled={startRoundMutation.isPending}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        New Round
+                      </Button>
+                    </>
                   )}
 
                   {!session.currentRound && (
@@ -1022,48 +1130,6 @@ function EstimateSessionPage() {
                       <Plus className="mr-2 h-4 w-4" />
                       Start Round
                     </Button>
-                  )}
-
-                  {session.status !== 'revealed' && (
-                    <>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            onClick={() => startTimerMutation.mutate(60)}
-                            disabled={
-                              startTimerMutation.isPending ||
-                              isTimerActive ||
-                              !hasActiveRoundStory
-                            }
-                          >
-                            <Clock className="mr-2 h-4 w-4" />1 min Timer
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Start a 1 minute countdown
-                        </TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            onClick={() => startTimerMutation.mutate(180)}
-                            disabled={
-                              startTimerMutation.isPending ||
-                              isTimerActive ||
-                              !hasActiveRoundStory
-                            }
-                          >
-                            <Clock className="mr-2 h-4 w-4" />3 min Timer
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Start a 3 minute countdown
-                        </TooltipContent>
-                      </Tooltip>
-                    </>
                   )}
 
                   <AlertDialog>

@@ -55,6 +55,7 @@ export const storyEstimateRound = pgTable('story_estimate_round', {
   storyDescription: text('story_description'),
   storyLink: varchar('story_link', { length: 2048 }),
   status: varchar('status', { length: 50 }).notNull().default('active'),
+  agreedPoints: varchar('agreed_points', { length: 20 }),
   revealedAt: timestamp('revealed_at'),
   createdAt: timestamp('created_at')
     .notNull()

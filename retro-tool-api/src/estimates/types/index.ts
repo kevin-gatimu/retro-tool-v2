@@ -29,7 +29,7 @@ export type SessionDetail = StoryEstimateSession & {
     userId: string;
     points: string;
     value: string;
-    user: { id: string; name: string };
+    user: { id: string; name: string; jobRole: string | null };
   }[];
   currentRound: {
     id: string;
@@ -39,6 +39,7 @@ export type SessionDetail = StoryEstimateSession & {
     storyDescription: string | null;
     storyLink: string | null;
     status: string;
+    createdAt: Date;
   } | null;
   rounds: {
     id: string;
@@ -48,6 +49,7 @@ export type SessionDetail = StoryEstimateSession & {
     storyDescription: string | null;
     storyLink: string | null;
     status: string;
+    agreedPoints: string | null;
     revealedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
@@ -57,14 +59,13 @@ export type SessionDetail = StoryEstimateSession & {
       userId: string;
       points: string;
       value: string;
-      user: { id: string; name: string };
+      user: { id: string; name: string; jobRole: string | null };
     }[];
     stats: {
       votesCount: number;
       average: number | null;
       min: number | null;
       max: number | null;
-      consensus: string | null;
     };
   }[];
 };
@@ -75,5 +76,5 @@ export type EstimateVoteView = {
   userId: string;
   points: string;
   value: string;
-  user: { id: string; name: string };
+  user: { id: string; name: string; jobRole: string | null };
 };

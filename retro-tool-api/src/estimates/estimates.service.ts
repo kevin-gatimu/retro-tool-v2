@@ -86,30 +86,9 @@ export class EstimatesService {
     average: number | null;
     min: number | null;
     max: number | null;
-    consensus: string | null;
   } {
     if (votes.length === 0) {
-      return {
-        votesCount: 0,
-        average: null,
-        min: null,
-        max: null,
-        consensus: null,
-      };
-    }
-
-    const countMap = new Map<string, number>();
-    for (const vote of votes) {
-      countMap.set(vote.points, (countMap.get(vote.points) ?? 0) + 1);
-    }
-
-    let consensus: string | null = null;
-    if (countMap.size > 0) {
-      const maxCount = Math.max(...countMap.values());
-      consensus = [...countMap.entries()]
-        .filter(([, value]) => value === maxCount)
-        .map(([value]) => value)
-        .join(', ');
+      return { votesCount: 0, average: null, min: null, max: null };
     }
 
     const numericVotes = votes
@@ -117,13 +96,7 @@ export class EstimatesService {
       .filter((value): value is number => value !== null);
 
     if (numericVotes.length === 0) {
-      return {
-        votesCount: votes.length,
-        average: null,
-        min: null,
-        max: null,
-        consensus,
-      };
+      return { votesCount: votes.length, average: null, min: null, max: null };
     }
 
     const average =
@@ -135,7 +108,6 @@ export class EstimatesService {
       average: Number(average.toFixed(2)),
       min: sorted[0],
       max: sorted[sorted.length - 1],
-      consensus,
     };
   }
 
@@ -462,7 +434,7 @@ export class EstimatesService {
       .where(eq(estimatesSchema.storyEstimateRound.sessionId, sessionId))
       .orderBy(asc(estimatesSchema.storyEstimateRound.roundNumber));
 
-    // Fetch votes with voter user info
+    // Fetch votes with voter user info + their job role in this session's team
     const rawVotes = await this.database
       .select({
         id: estimatesSchema.storyEstimateVote.id,
@@ -472,11 +444,26 @@ export class EstimatesService {
         votedAt: estimatesSchema.storyEstimateVote.votedAt,
         voterName: authSchema.user.name,
         voterId2: authSchema.user.id,
+        voterJobRole: teamSchema.teamRole.name,
       })
       .from(estimatesSchema.storyEstimateVote)
       .innerJoin(
         authSchema.user,
         eq(estimatesSchema.storyEstimateVote.voterId, authSchema.user.id),
+      )
+      .leftJoin(
+        teamSchema.teamMember,
+        and(
+          eq(
+            teamSchema.teamMember.userId,
+            estimatesSchema.storyEstimateVote.voterId,
+          ),
+          eq(teamSchema.teamMember.teamId, row.session.teamId),
+        ),
+      )
+      .leftJoin(
+        teamSchema.teamRole,
+        eq(teamSchema.teamRole.id, teamSchema.teamMember.roleId),
       )
       .where(eq(estimatesSchema.storyEstimateVote.sessionId, sessionId));
 
@@ -504,6 +491,7 @@ export class EstimatesService {
             ticketNumber: 'LEGACY',
             storyDescription: null,
             storyLink: null,
+            agreedPoints: null,
             status: ESTIMATE_ROUND_STATUSES.Revealed,
             revealedAt: row.session.updatedAt,
             createdAt: row.session.createdAt,
@@ -552,7 +540,11 @@ export class EstimatesService {
           userId: vote.voterId,
           points: visiblePoints,
           value: visiblePoints,
-          user: { id: vote.voterId2, name: vote.voterName },
+          user: {
+            id: vote.voterId2,
+            name: vote.voterName,
+            jobRole: vote.voterJobRole ?? null,
+          },
         };
       });
 
@@ -564,6 +556,7 @@ export class EstimatesService {
         storyDescription: round.storyDescription ?? null,
         storyLink: round.storyLink ?? null,
         status: round.status,
+        agreedPoints: round.agreedPoints ?? null,
         revealedAt: round.revealedAt ?? null,
         createdAt: round.createdAt,
         updatedAt: round.updatedAt,
@@ -607,6 +600,7 @@ export class EstimatesService {
             storyDescription: currentRound.storyDescription ?? null,
             storyLink: currentRound.storyLink ?? null,
             status: currentRound.status,
+            createdAt: currentRound.createdAt,
           }
         : null,
       rounds: roundViews,
@@ -886,6 +880,10 @@ export class EstimatesService {
       storyLink: newRound.storyLink,
     });
 
+    const autoTimerEndsAt = session.timerDuration
+      ? new Date(Date.now() + session.timerDuration * 1000)
+      : null;
+
     await this.database
       .update(estimatesSchema.storyEstimateSession)
       .set({
@@ -895,7 +893,7 @@ export class EstimatesService {
           createdRound.storyName,
           createdRound.ticketNumber,
         ),
-        timerEndsAt: null,
+        timerEndsAt: autoTimerEndsAt,
         updatedAt: new Date(),
       })
       .where(eq(estimatesSchema.storyEstimateSession.id, sessionId));
@@ -993,6 +991,75 @@ export class EstimatesService {
       .where(eq(estimatesSchema.storyEstimateSession.id, sessionId));
 
     await this.invalidateEstimateCaches(sessionId, { invalidateLists: true });
+  }
+
+  async setConsensus(
+    sessionId: string,
+    userId: string,
+    agreedPoints: string,
+  ): Promise<void> {
+    const session = await this.assertSessionCreator(sessionId, userId);
+    if (session.status !== ESTIMATE_SESSION_STATUSES.Revealed) {
+      throw new BadRequestException(
+        'Consensus can only be set after votes are revealed',
+      );
+    }
+    if (!session.currentRoundId) {
+      throw new BadRequestException('No active round found for this session');
+    }
+
+    await this.database
+      .update(estimatesSchema.storyEstimateRound)
+      .set({ agreedPoints, updatedAt: new Date() })
+      .where(eq(estimatesSchema.storyEstimateRound.id, session.currentRoundId));
+
+    await this.invalidateEstimateCaches(sessionId);
+  }
+
+  async revote(sessionId: string, userId: string): Promise<void> {
+    const session = await this.assertSessionCreator(sessionId, userId);
+    if (session.status !== ESTIMATE_SESSION_STATUSES.Revealed) {
+      throw new BadRequestException(
+        'Revote can only be triggered after votes are revealed',
+      );
+    }
+    if (!session.currentRoundId) {
+      throw new BadRequestException('No active round found for this session');
+    }
+
+    await this.database
+      .delete(estimatesSchema.storyEstimateVote)
+      .where(
+        and(
+          eq(estimatesSchema.storyEstimateVote.sessionId, sessionId),
+          eq(estimatesSchema.storyEstimateVote.roundId, session.currentRoundId),
+        ),
+      );
+
+    await this.database
+      .update(estimatesSchema.storyEstimateRound)
+      .set({
+        status: ESTIMATE_ROUND_STATUSES.Active,
+        revealedAt: null,
+        agreedPoints: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(estimatesSchema.storyEstimateRound.id, session.currentRoundId));
+
+    const revoteTimerEndsAt = session.timerDuration
+      ? new Date(Date.now() + session.timerDuration * 1000)
+      : null;
+
+    await this.database
+      .update(estimatesSchema.storyEstimateSession)
+      .set({
+        status: ESTIMATE_SESSION_STATUSES.Waiting,
+        timerEndsAt: revoteTimerEndsAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(estimatesSchema.storyEstimateSession.id, sessionId));
+
+    await this.invalidateEstimateCaches(sessionId);
   }
 
   async deleteSession(sessionId: string, userId: string): Promise<void> {
