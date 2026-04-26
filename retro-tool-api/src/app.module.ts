@@ -18,6 +18,7 @@ import { RetroRemindersModule } from './retro-reminders/retro-reminders.module';
 import { WeeklyDigestsModule } from './weekly-digests/weekly-digests.module';
 import { ActionItemsModule } from './action-items/action-items.module';
 import { TeamRolesModule } from './team-roles/team-roles.module';
+import { ConvexAdminModule } from './convex-admin/convex-admin.module';
 import { LastActiveInterceptor } from './common/interceptors/last-active.interceptor';
 import configuration from './config/configuration';
 import { HealthController } from './health.controller';
@@ -56,6 +57,7 @@ loadDotenv({ path: join(__dirname, '../.env.local'), override: true });
     WeeklyDigestsModule,
     ActionItemsModule,
     TeamRolesModule,
+    ConvexAdminModule,
   ],
   controllers: [HealthController],
   providers: [

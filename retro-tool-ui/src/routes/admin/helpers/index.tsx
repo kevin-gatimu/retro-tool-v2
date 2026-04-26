@@ -16,9 +16,13 @@ import {
   Users,
   Wand2,
   XCircle,
+  Zap,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
+import { isSuperAdmin } from '@/lib/rbac'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 // Import common helpers
 import { slugify, toSlug, createEmptyColumn } from '@/common/helpers'
 
@@ -29,7 +33,7 @@ export { slugify, toSlug, createEmptyColumn }
 // Admin Navigation
 // ─────────────────────────────────────────────────────────────────────────────
 
-const adminLinks = [
+const commonAdminLinks = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/organizations', label: 'Organizations', icon: Building2 },
@@ -38,33 +42,58 @@ const adminLinks = [
   { to: '/admin/org-setup', label: 'Org Setup', icon: Wand2 },
 ] as const
 
+const superAdminLinks = [
+  { to: '/admin/convex', label: 'Convex', icon: Zap },
+] as const
+
+type AdminNavLink = {
+  to: string
+  label: string
+  icon: LucideIcon
+  exact?: true
+}
+
+function NavLink({
+  link,
+  currentPath,
+}: {
+  link: AdminNavLink
+  currentPath: string
+}) {
+  const active = link.exact
+    ? currentPath === link.to
+    : currentPath.startsWith(link.to)
+  const Icon = link.icon
+  return (
+    <Link
+      key={link.to}
+      to={link.to}
+      className={cn(
+        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors',
+        active
+          ? 'bg-primary text-primary-foreground'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {link.label}
+    </Link>
+  )
+}
+
 export function AdminNav() {
   const currentPath = useRouterState({ select: (s) => s.location.pathname })
+  const { data: currentUser } = useCurrentUser()
 
   return (
     <nav className="flex items-center gap-1 overflow-x-auto border-b pb-2 mb-6">
-      {adminLinks.map((link) => {
-        const active =
-          'exact' in link
-            ? currentPath === link.to
-            : currentPath.startsWith(link.to)
-        const Icon = link.icon
-        return (
-          <Link
-            key={link.to}
-            to={link.to}
-            className={cn(
-              'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors',
-              active
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            {link.label}
-          </Link>
-        )
-      })}
+      {commonAdminLinks.map((link) => (
+        <NavLink key={link.to} link={link} currentPath={currentPath} />
+      ))}
+      {isSuperAdmin(currentUser?.role) &&
+        superAdminLinks.map((link) => (
+          <NavLink key={link.to} link={link} currentPath={currentPath} />
+        ))}
     </nav>
   )
 }

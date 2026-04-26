@@ -50,6 +50,13 @@
       "when": 1777140575870,
       "tag": "0006_aromatic_giant_man",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777161555828,
+      "tag": "0007_complete_ezekiel",
+      "breakpoints": true
     }
   ]
 }

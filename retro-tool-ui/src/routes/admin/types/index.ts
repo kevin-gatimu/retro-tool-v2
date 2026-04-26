@@ -157,3 +157,43 @@ export type PaginatedOrgsResponse = {
   limit: number
   totalPages: number
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// convex.tsx types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface OperationalMetrics {
+  topFunctions: Array<{ identifier: string; calls: number }>
+  cacheHitPercentage: number | null
+  latencyPercentiles: { p50: number; p95: number; p99: number } | null
+  scheduledJobLag: number | null
+  functionConcurrency: number | null
+  tableRates: Array<{ tableName: string; reads: number; writes: number }>
+}
+
+export interface UsageMetricEntry {
+  used: number
+  quota: number
+}
+
+export interface UsageMetrics {
+  functionCalls: UsageMetricEntry | null
+  actionCompute: UsageMetricEntry | null
+  databaseStorage: UsageMetricEntry | null
+  databaseBandwidth: UsageMetricEntry | null
+  fileStorage: UsageMetricEntry | null
+  fileBandwidth: UsageMetricEntry | null
+  vectorStorage: UsageMetricEntry | null
+  vectorBandwidth: UsageMetricEntry | null
+  deployments: UsageMetricEntry | null
+  chefTokens: UsageMetricEntry | null
+}
+
+export interface ConvexCronConfigResponse {
+  id: string
+  schedule: string
+  enabled: boolean
+  tablesToClear: string[]
+  updatedAt: string | null
+  updatedByUserId: string | null
+}

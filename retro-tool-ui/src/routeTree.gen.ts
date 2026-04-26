@@ -52,6 +52,7 @@ import { Route as AdminTemplatesRouteImport } from './routes/admin/templates'
 import { Route as AdminTeamRolesRouteImport } from './routes/admin/team-roles'
 import { Route as AdminOrganizationsRouteImport } from './routes/admin/organizations'
 import { Route as AdminOrgSetupRouteImport } from './routes/admin/org-setup'
+import { Route as AdminConvexRouteImport } from './routes/admin/convex'
 
 const TermsofserviceRoute = TermsofserviceRouteImport.update({
   id: '/termsofservice',
@@ -268,6 +269,11 @@ const AdminOrgSetupRoute = AdminOrgSetupRouteImport.update({
   path: '/org-setup',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminConvexRoute = AdminConvexRouteImport.update({
+  id: '/convex',
+  path: '/convex',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -281,6 +287,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof ReportsRoute
   '/templates': typeof TemplatesRoute
   '/termsofservice': typeof TermsofserviceRoute
+  '/admin/convex': typeof AdminConvexRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
   '/admin/organizations': typeof AdminOrganizationsRoute
   '/admin/team-roles': typeof AdminTeamRolesRoute
@@ -323,6 +330,7 @@ export interface FileRoutesByTo {
   '/reports': typeof ReportsRoute
   '/templates': typeof TemplatesRoute
   '/termsofservice': typeof TermsofserviceRoute
+  '/admin/convex': typeof AdminConvexRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
   '/admin/organizations': typeof AdminOrganizationsRoute
   '/admin/team-roles': typeof AdminTeamRolesRoute
@@ -369,6 +377,7 @@ export interface FileRoutesById {
   '/reports': typeof ReportsRoute
   '/templates': typeof TemplatesRoute
   '/termsofservice': typeof TermsofserviceRoute
+  '/admin/convex': typeof AdminConvexRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
   '/admin/organizations': typeof AdminOrganizationsRoute
   '/admin/team-roles': typeof AdminTeamRolesRoute
@@ -416,6 +425,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/templates'
     | '/termsofservice'
+    | '/admin/convex'
     | '/admin/org-setup'
     | '/admin/organizations'
     | '/admin/team-roles'
@@ -458,6 +468,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/templates'
     | '/termsofservice'
+    | '/admin/convex'
     | '/admin/org-setup'
     | '/admin/organizations'
     | '/admin/team-roles'
@@ -503,6 +514,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/templates'
     | '/termsofservice'
+    | '/admin/convex'
     | '/admin/org-setup'
     | '/admin/organizations'
     | '/admin/team-roles'
@@ -864,10 +876,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrgSetupRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/convex': {
+      id: '/admin/convex'
+      path: '/convex'
+      fullPath: '/admin/convex'
+      preLoaderRoute: typeof AdminConvexRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminConvexRoute: typeof AdminConvexRoute
   AdminOrgSetupRoute: typeof AdminOrgSetupRoute
   AdminOrganizationsRoute: typeof AdminOrganizationsRoute
   AdminTeamRolesRoute: typeof AdminTeamRolesRoute
@@ -877,6 +897,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminConvexRoute: AdminConvexRoute,
   AdminOrgSetupRoute: AdminOrgSetupRoute,
   AdminOrganizationsRoute: AdminOrganizationsRoute,
   AdminTeamRolesRoute: AdminTeamRolesRoute,

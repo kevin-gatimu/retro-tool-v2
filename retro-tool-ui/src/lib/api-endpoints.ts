@@ -238,3 +238,13 @@ export const TEAM_ROLES_ENDPOINTS = {
   ORG_ACTIVATION: (orgId: string, id: string) =>
     `/api/organizations/${orgId}/team-roles/${id}/activation`,
 } as const
+
+// ---------------------------------------------------------------------------
+// Convex Admin
+// ---------------------------------------------------------------------------
+export const CONVEX_ADMIN_ENDPOINTS = {
+  METRICS_OPERATIONAL: '/api/convex-admin/metrics/operational',
+  METRICS_USAGE: '/api/convex-admin/metrics/usage',
+  CRON_CONFIG: '/api/convex-admin/cron-config',
+  CLEAR_TABLES: '/api/convex-admin/clear-tables',
+} as const
