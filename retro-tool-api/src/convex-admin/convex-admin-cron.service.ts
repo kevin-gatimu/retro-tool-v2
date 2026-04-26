@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { ConvexAdminService } from './convex-admin.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const JOB_NAME = 'convex-table-clear';
 
@@ -12,6 +13,7 @@ export class ConvexAdminCronService implements OnModuleInit {
   constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly convexAdminService: ConvexAdminService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -57,10 +59,17 @@ export class ConvexAdminCronService implements OnModuleInit {
         this.logger.log(
           `Convex table clear completed. Cleared: ${result.cleared.join(', ')}`,
         );
+        void this.notificationsService.notifySuperAdminsOfTableClear(
+          result.cleared,
+        );
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'unknown error';
         this.logger.error(`Scheduled Convex table clear failed: ${message}`);
+        void this.notificationsService.notifySuperAdminsOfTableClear(
+          [],
+          message,
+        );
       }
     });
 

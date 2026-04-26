@@ -57,6 +57,13 @@
       "when": 1777161555828,
       "tag": "0007_complete_ezekiel",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777222690780,
+      "tag": "0008_right_daimon_hellstrom",
+      "breakpoints": true
     }
   ]
 }

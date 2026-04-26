@@ -345,4 +345,34 @@ export class NotificationsService {
       link: `/organizations/${orgId}`,
     });
   }
+
+  async notifySuperAdminsOfTableClear(
+    clearedTables: string[],
+    failed?: string,
+  ): Promise<void> {
+    const superAdmins = await this.database
+      .select({ id: authSchema.user.id })
+      .from(authSchema.user)
+      .where(eq(authSchema.user.role, USER_ROLES.SuperAdmin));
+
+    const isFailure = !!failed;
+    const title = isFailure
+      ? 'Scheduled Convex cleanup failed'
+      : 'Scheduled Convex cleanup completed';
+    const message = isFailure
+      ? `The scheduled Convex table cleanup failed: ${failed}`
+      : `Cleared tables: ${clearedTables.join(', ')}.`;
+
+    await Promise.all(
+      superAdmins.map((admin) =>
+        this.createAndEmit({
+          userId: admin.id,
+          type: NOTIFICATION_TYPES.ConvexTableClear,
+          title,
+          message,
+          link: '/admin/convex',
+        }),
+      ),
+    );
+  }
 }

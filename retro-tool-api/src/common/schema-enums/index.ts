@@ -101,6 +101,7 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   NOTIFICATION_TYPES.ActionItemAssigned,
   NOTIFICATION_TYPES.ActionItemDueSoon,
   NOTIFICATION_TYPES.EstimateSessionCreated,
+  NOTIFICATION_TYPES.ConvexTableClear,
 ]);
 
 // Estimates

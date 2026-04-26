@@ -11,6 +11,7 @@ export const NOTIFICATION_TYPES = {
   ActionItemAssigned: 'action_item_assigned',
   ActionItemDueSoon: 'action_item_due_soon',
   EstimateSessionCreated: 'estimate_session_created',
+  ConvexTableClear: 'convex_table_clear',
 } as const;
 
 export type TNotificationType =
