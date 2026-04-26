@@ -1077,6 +1077,7 @@ export class RetrosService {
           ? {
               name: usersMap.get(p.userId)!.name,
               image: usersMap.get(p.userId)!.image,
+              jobRole: teamMemberRoleMap.get(p.userId) ?? null,
             }
           : null,
       })),
@@ -1669,13 +1670,8 @@ export class RetrosService {
       )
       .limit(1);
 
-    if (
-      !membership ||
-      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
-    ) {
-      throw new ForbiddenException(
-        'Only the creator or team lead can merge cards',
-      );
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this team');
     }
 
     if (retro.status !== RETRO_STATUSES.Grouping) {
@@ -1809,13 +1805,8 @@ export class RetrosService {
       )
       .limit(1);
 
-    if (
-      !membership ||
-      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
-    ) {
-      throw new ForbiddenException(
-        'Only the creator or team lead can unmerge cards',
-      );
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this team');
     }
 
     if (retro.status !== RETRO_STATUSES.Grouping) {

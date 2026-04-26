@@ -4,7 +4,6 @@ import {
   ChevronRight,
   History as HistoryIcon,
   MessageSquare,
-  Play,
   RotateCcw,
   Send,
   ThumbsUp,
@@ -69,11 +68,9 @@ export function RetroDiscussionView({
   createCarriedItemCommentMutation,
   pendingCarriedDiscussItemId,
   pendingCarriedDoneItemId,
-  newCarriedItemComments,
-  onNewCarriedItemCommentsChange,
 }: RetroDiscussionViewProps) {
   const [newCommentText, setNewCommentText] = useState('')
-  const chatEndRef = useRef<HTMLDivElement>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
   const discussionQueueRef = useRef<string[]>([])
 
   const cardsById = new Map(retro.cards.map((card) => [card.id, card]))
@@ -102,10 +99,18 @@ export function RetroDiscussionView({
   const firstUndiscussedCard =
     sortedCards.find((card) => !card.isDiscussed) ?? sortedCards.at(0) ?? null
 
-  const currentCard =
-    sortedCards.find((c) => c.id === retro.currentDiscussionCardId) ??
-    firstUndiscussedCard ??
-    null
+  // When a carried item is focused, don't auto-fall-back to a card
+  const currentCarriedItem = retro.currentDiscussionActionItemId
+    ? (previousCarriedItems.find(
+        (i) => i.id === retro.currentDiscussionActionItemId,
+      ) ?? null)
+    : null
+
+  const currentCard = currentCarriedItem
+    ? null
+    : (sortedCards.find((c) => c.id === retro.currentDiscussionCardId) ??
+      firstUndiscussedCard ??
+      null)
 
   const currentIdx = sortedCards.findIndex((c) => c.id === currentCard?.id)
   const nextUndiscussedCard =
@@ -123,135 +128,158 @@ export function RetroDiscussionView({
     ? retro.template.columns.find((col) => col.id === currentCard.columnId)
     : null
 
+  // Scroll to bottom when comments change or focused item switches
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [currentCard?.comments.length])
+    const el = chatScrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [
+    currentCard?.comments.length,
+    currentCard?.id,
+    currentCarriedItem?.comments?.length,
+    currentCarriedItem?.id,
+  ])
 
   const handleCardFocus = (cardId: string) => {
-    if (canControl) {
-      discussCardMutation.mutate(cardId)
-    }
+    if (canControl) discussCardMutation.mutate(cardId)
+  }
+
+  const handleCarriedFocus = (itemId: string) => {
+    if (canControl) markCarriedItemDiscussingMutation.mutate(itemId)
   }
 
   const handlePrev = () => {
-    if (canControl && prevUndiscussedCard) {
+    if (canControl && prevUndiscussedCard)
       discussCardMutation.mutate(prevUndiscussedCard.id)
-    }
   }
 
   const handleNext = () => {
-    if (canControl && nextUndiscussedCard) {
+    if (canControl && nextUndiscussedCard)
       discussCardMutation.mutate(nextUndiscussedCard.id)
-    }
   }
 
   const handleSendComment = () => {
-    if (!newCommentText.trim() || !currentCard) return
-    createCommentMutation.mutate({
-      cardId: currentCard.id,
-      content: newCommentText.trim(),
-    })
+    const text = newCommentText.trim()
+    if (!text) return
+
+    if (currentCarriedItem) {
+      createCarriedItemCommentMutation.mutate({
+        actionItemId: currentCarriedItem.id,
+        content: text,
+      })
+    } else if (currentCard) {
+      createCommentMutation.mutate({ cardId: currentCard.id, content: text })
+    }
     setNewCommentText('')
   }
 
+  const isSendingComment =
+    createCommentMutation.isPending ||
+    createCarriedItemCommentMutation.isPending
+
+  // Unified comments list — either from current card or current carried item
+  const activeComments: Array<{
+    id: string
+    content: string
+    isOwn?: boolean
+    author: { id: string; name: string | null; image: string | null } | null
+  }> = currentCarriedItem
+    ? (currentCarriedItem.comments ?? [])
+    : (currentCard?.comments ?? [])
+
   return (
-    <div className="flex gap-4 min-h-145">
+    <div className="flex gap-4 h-[calc(100vh-17rem)]">
       {/* ── Sidebar ──────────────────────────────────────────────── */}
-      <div className="w-64 xl:w-72 shrink-0 flex flex-col gap-3">
-        {/* Discussion points list */}
-        <div className="rounded-xl border bg-card flex flex-col overflow-hidden flex-1">
-          <div className="px-3 py-2.5 border-b bg-muted/30 shrink-0">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Discussion Points ({sortedCards.length})
-            </p>
-          </div>
-
-          <div className="overflow-y-auto flex-1">
-            {sortedCards.length === 0 && (
-              <p className="px-3 py-4 text-xs text-muted-foreground text-center">
-                No cards to discuss.
-              </p>
-            )}
-            {sortedCards.map((card) => {
-              const isActive = card.id === currentCard?.id
-              const isDiscussed = card.isDiscussed
-              return (
-                <button
-                  key={card.id}
-                  type="button"
-                  disabled={!canControl || isActive}
-                  onClick={() => handleCardFocus(card.id)}
-                  className={cn(
-                    'w-full text-left px-3 py-2.5 border-l-2 transition-colors',
-                    isActive
-                      ? 'bg-primary/10 border-primary'
-                      : 'border-transparent hover:bg-muted/40',
-                    isDiscussed && !isActive ? 'opacity-60' : '',
-                    canControl && !isActive
-                      ? 'cursor-pointer'
-                      : 'cursor-default',
-                  )}
-                >
-                  <p
-                    className={cn(
-                      'text-xs leading-snug',
-                      isActive
-                        ? 'font-semibold text-foreground'
-                        : 'text-muted-foreground/70 line-clamp-2',
-                    )}
-                  >
-                    {card.content}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    {(card.voteCount ?? 0) > 0 && (
-                      <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/50">
-                        <ThumbsUp className="h-2.5 w-2.5" />
-                        {card.voteCount}
-                      </span>
-                    )}
-                    {isDiscussed && (
-                      <span className="text-[10px] text-green-600/80 flex items-center gap-0.5">
-                        <CheckCircle2 className="h-2.5 w-2.5" />
-                        Done
-                      </span>
-                    )}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Prev / Next navigation */}
-          {canControl && sortedCards.length > 1 && (
-            <div className="border-t p-2 flex gap-1.5 shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 h-7 text-xs gap-1"
-                onClick={handlePrev}
-                disabled={!prevUndiscussedCard || discussCardMutation.isPending}
-              >
-                <ChevronLeft className="h-3 w-3" />
-                Prev
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 h-7 text-xs gap-1"
-                onClick={handleNext}
-                disabled={!nextUndiscussedCard || discussCardMutation.isPending}
-              >
-                Next
-                <ChevronRight className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
+      <div className="w-64 xl:w-72 shrink-0 flex flex-col min-h-0 rounded-xl border bg-card overflow-hidden">
+        {/* Discussion Points */}
+        <div className="px-3 py-2.5 border-b bg-muted/30 shrink-0">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Discussion Points ({sortedCards.length})
+          </p>
         </div>
 
-        {/* Carried forward items in sidebar */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {sortedCards.length === 0 && (
+            <p className="px-3 py-4 text-xs text-muted-foreground text-center">
+              No cards to discuss.
+            </p>
+          )}
+          {sortedCards.map((card) => {
+            const isActive = card.id === currentCard?.id && !currentCarriedItem
+            const isDiscussed = card.isDiscussed
+            return (
+              <button
+                key={card.id}
+                type="button"
+                disabled={!canControl || isActive}
+                onClick={() => handleCardFocus(card.id)}
+                className={cn(
+                  'w-full text-left px-3 py-2.5 border-l-2 transition-colors',
+                  isActive
+                    ? 'bg-primary/10 border-primary'
+                    : 'border-transparent hover:bg-muted/40',
+                  isDiscussed && !isActive ? 'opacity-60' : '',
+                  canControl && !isActive ? 'cursor-pointer' : 'cursor-default',
+                )}
+              >
+                <p
+                  className={cn(
+                    'text-xs leading-snug',
+                    isActive
+                      ? 'font-semibold text-foreground'
+                      : 'text-muted-foreground/70 line-clamp-2',
+                  )}
+                >
+                  {card.content}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  {(card.voteCount ?? 0) > 0 && (
+                    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/50">
+                      <ThumbsUp className="h-2.5 w-2.5" />
+                      {card.voteCount}
+                    </span>
+                  )}
+                  {isDiscussed && (
+                    <span className="text-[10px] text-green-600/80 flex items-center gap-0.5">
+                      <CheckCircle2 className="h-2.5 w-2.5" />
+                      Done
+                    </span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Prev / Next navigation */}
+        {canControl && sortedCards.length > 1 && (
+          <div className="border-t p-2 flex gap-1.5 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 h-7 text-xs gap-1"
+              onClick={handlePrev}
+              disabled={!prevUndiscussedCard || discussCardMutation.isPending}
+            >
+              <ChevronLeft className="h-3 w-3" />
+              Prev
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 h-7 text-xs gap-1"
+              onClick={handleNext}
+              disabled={!nextUndiscussedCard || discussCardMutation.isPending}
+            >
+              Next
+              <ChevronRight className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+
+        {/* ── Carried Forward partition ─────────────────────────── */}
         {previousCarriedItems.length > 0 && (
-          <div className="rounded-xl border border-amber-200/60 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-900/10 overflow-hidden shrink-0">
-            <div className="px-3 py-2 border-b border-amber-200/60 dark:border-amber-800/50 bg-amber-100/40 dark:bg-amber-900/20">
+          <>
+            <div className="border-t border-amber-200/60 dark:border-amber-800/50 px-3 py-2 bg-amber-100/40 dark:bg-amber-900/20 shrink-0">
               <div className="flex items-center gap-1.5">
                 <HistoryIcon className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                 <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
@@ -259,150 +287,66 @@ export function RetroDiscussionView({
                 </p>
               </div>
             </div>
-            <div className="divide-y divide-amber-200/40 dark:divide-amber-800/30 max-h-48 overflow-y-auto">
+            <div className="max-h-48 overflow-y-auto divide-y divide-border/50 shrink-0">
               {previousCarriedItems.map((item) => {
-                const isBeingDiscussed =
-                  retro.currentDiscussionActionItemId === item.id ||
-                  pendingCarriedDiscussItemId === item.id
-                const isSaving =
-                  markCarriedItemDoneMutation.isPending &&
-                  pendingCarriedDoneItemId === item.id
+                const isActive = item.id === currentCarriedItem?.id
+                const isDone = item.status === 'completed'
                 const isStarting =
                   markCarriedItemDiscussingMutation.isPending &&
                   pendingCarriedDiscussItemId === item.id
-
                 return (
-                  <div
+                  <button
                     key={item.id}
+                    type="button"
+                    disabled={!canControl || isActive || isStarting}
+                    onClick={() => handleCarriedFocus(item.id)}
                     className={cn(
-                      'px-3 py-2',
-                      isBeingDiscussed ? 'bg-primary/5' : '',
+                      'w-full text-left px-3 py-2 border-l-2 transition-colors',
+                      isActive
+                        ? 'bg-amber-500/10 border-amber-500'
+                        : 'border-transparent hover:bg-amber-50/50 dark:hover:bg-amber-900/20',
+                      isDone && !isActive ? 'opacity-50' : '',
+                      canControl && !isActive
+                        ? 'cursor-pointer'
+                        : 'cursor-default',
                     )}
                   >
                     <p
                       className={cn(
-                        'text-xs leading-snug',
-                        isBeingDiscussed
-                          ? 'text-foreground font-medium'
-                          : 'text-muted-foreground/60 line-clamp-2',
+                        'text-xs leading-snug line-clamp-2',
+                        isActive
+                          ? 'font-semibold text-foreground'
+                          : 'text-muted-foreground/70',
                       )}
                     >
                       {item.title}
                     </p>
-                    {canControl && (
-                      <div className="flex gap-1 mt-1.5 flex-wrap">
-                        {isBeingDiscussed ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-5 text-[10px] px-1.5 text-green-600 hover:text-green-700"
-                            onClick={() =>
-                              markCarriedItemDoneMutation.mutate(item.id)
-                            }
-                            disabled={isSaving}
-                          >
-                            <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
-                            {isSaving ? 'Saving…' : 'Done'}
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-5 text-[10px] px-1.5 text-blue-600 hover:text-blue-700"
-                            onClick={() =>
-                              markCarriedItemDiscussingMutation.mutate(item.id)
-                            }
-                            disabled={isStarting}
-                          >
-                            <Play className="h-2.5 w-2.5 mr-0.5" />
-                            {isStarting ? 'Starting…' : 'Focus'}
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-5 text-[10px] px-1.5 text-amber-600 hover:text-amber-700"
-                          onClick={() =>
-                            carryItemForwardMutation.mutate({
-                              id: item.id,
-                              title: item.title,
-                            })
-                          }
-                          disabled={carryItemForwardMutation.isPending}
-                        >
-                          <RotateCcw className="h-2.5 w-2.5 mr-0.5" />
-                          Carry
-                        </Button>
-                      </div>
+                    {isDone && (
+                      <span className="text-[10px] text-green-600/80 flex items-center gap-0.5 mt-0.5">
+                        <CheckCircle2 className="h-2.5 w-2.5" />
+                        Done
+                      </span>
                     )}
-                    {/* Inline comment for focused carried item */}
-                    {isBeingDiscussed && (
-                      <div className="mt-2 flex gap-1.5">
-                        <Input
-                          placeholder="Add note…"
-                          className="h-6 text-xs"
-                          value={newCarriedItemComments[item.id] ?? ''}
-                          onChange={(e) =>
-                            onNewCarriedItemCommentsChange((prev) => ({
-                              ...prev,
-                              [item.id]: e.target.value,
-                            }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key !== 'Enter') return
-                            e.preventDefault()
-                            const content =
-                              newCarriedItemComments[item.id]?.trim() ?? ''
-                            if (content) {
-                              createCarriedItemCommentMutation.mutate({
-                                actionItemId: item.id,
-                                content,
-                              })
-                            }
-                          }}
-                        />
-                        <Button
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          disabled={
-                            !(newCarriedItemComments[item.id] ?? '').trim() ||
-                            createCarriedItemCommentMutation.isPending
-                          }
-                          onClick={() => {
-                            const content =
-                              newCarriedItemComments[item.id]?.trim() ?? ''
-                            if (content) {
-                              createCarriedItemCommentMutation.mutate({
-                                actionItemId: item.id,
-                                content,
-                              })
-                            }
-                          }}
-                        >
-                          <Send className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  </button>
                 )
               })}
             </div>
-          </div>
+          </>
         )}
       </div>
 
       {/* ── Main Content ─────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col gap-3 min-w-0">
-        {!currentCard && (
+      <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
+        {!currentCard && !currentCarriedItem && (
           <div className="flex-1 flex items-center justify-center rounded-xl border bg-card text-muted-foreground text-sm">
             No cards to discuss yet.
           </div>
         )}
 
-        {currentCard && (
+        {/* ── Regular card focused panel ── */}
+        {currentCard && !currentCarriedItem && (
           <>
-            {/* Focused card panel */}
-            <div className="rounded-xl border-2 border-primary/30 bg-card p-5 shadow-sm">
+            <div className="rounded-xl border-2 border-primary/30 bg-card p-5 shadow-sm shrink-0">
               <div className="flex items-center gap-2 mb-3">
                 {currentColumn && (
                   <>
@@ -463,86 +407,201 @@ export function RetroDiscussionView({
               </div>
             </div>
 
-            {/* Chat / Discussion notes */}
-            <div className="flex-1 flex flex-col rounded-xl border bg-card overflow-hidden">
-              <div className="px-4 py-2.5 border-b bg-muted/30 flex items-center gap-2 shrink-0">
-                <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-                <p className="text-sm font-medium">Discussion Notes</p>
-                {currentCard.comments.length > 0 && (
-                  <Badge
-                    variant="secondary"
-                    className="ml-auto text-[10px] h-5"
-                  >
-                    {currentCard.comments.length}
+            {/* Discussion notes for card */}
+            <DiscussionNotesPanel
+              comments={activeComments}
+              newCommentText={newCommentText}
+              onCommentChange={setNewCommentText}
+              onSend={handleSendComment}
+              onDeleteComment={deleteCommentMutation.mutate}
+              isSending={isSendingComment}
+              chatScrollRef={chatScrollRef}
+            />
+          </>
+        )}
+
+        {/* ── Carried Forward focused panel ── */}
+        {currentCarriedItem && (
+          <>
+            <div className="rounded-xl border-2 border-amber-400/40 dark:border-amber-600/40 bg-card p-5 shadow-sm shrink-0">
+              <div className="flex items-center gap-2 mb-3">
+                <HistoryIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-300 uppercase tracking-wide">
+                  Carried Forward
+                </span>
+                {currentCarriedItem.status === 'completed' && (
+                  <Badge className="ml-auto bg-green-500/10 text-green-600 border-green-300 dark:border-green-800 gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Done
                   </Badge>
                 )}
               </div>
 
-              <div className="overflow-y-auto p-3 space-y-3 min-h-45 max-h-95">
-                {currentCard.comments.length === 0 && (
-                  <p className="text-center text-sm text-muted-foreground py-6">
-                    No discussion notes yet. Be the first to add one.
-                  </p>
-                )}
-                {currentCard.comments.map((comment) => (
-                  <div key={comment.id} className="flex items-start gap-2.5">
-                    <Avatar className="h-6 w-6 shrink-0">
-                      <AvatarImage src={comment.author?.image ?? undefined} />
-                      <AvatarFallback className="text-[10px]">
-                        {comment.author?.name?.charAt(0) ?? '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0 rounded-lg bg-muted/50 px-3 py-1.5">
-                      <p className="text-[11px] font-semibold text-muted-foreground mb-0.5">
-                        {comment.author?.name ?? 'Unknown'}
-                      </p>
-                      <p className="text-sm leading-snug">{comment.content}</p>
-                    </div>
-                    {comment.isOwn && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0 opacity-50 hover:opacity-100"
-                        onClick={() => deleteCommentMutation.mutate(comment.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-                <div ref={chatEndRef} />
-              </div>
+              {currentCarriedItem.sourceContents &&
+              currentCarriedItem.sourceContents.length > 1 ? (
+                <ul className="list-disc list-inside space-y-1.5 text-base leading-relaxed">
+                  {currentCarriedItem.sourceContents.map((content, idx) => (
+                    <li key={idx} className="font-medium">
+                      {content}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-base sm:text-lg leading-relaxed font-medium">
+                  {currentCarriedItem.title}
+                </p>
+              )}
 
-              <div className="border-t p-3 flex gap-2 shrink-0">
-                <Input
-                  placeholder="Add a discussion note…"
-                  value={newCommentText}
-                  onChange={(e) => setNewCommentText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (
-                      e.key === 'Enter' &&
-                      !e.shiftKey &&
-                      newCommentText.trim()
-                    ) {
-                      e.preventDefault()
-                      handleSendComment()
+              {currentCarriedItem.description && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  {currentCarriedItem.description}
+                </p>
+              )}
+
+              {canControl && currentCarriedItem.status !== 'completed' && (
+                <div className="flex items-center gap-2 mt-4">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-300 dark:border-amber-700 dark:hover:bg-amber-900/20"
+                    onClick={() =>
+                      carryItemForwardMutation.mutate({
+                        id: currentCarriedItem.id,
+                        title: currentCarriedItem.title,
+                      })
                     }
-                  }}
-                  className="flex-1"
-                />
-                <Button
-                  size="icon"
-                  onClick={handleSendComment}
-                  disabled={
-                    !newCommentText.trim() || createCommentMutation.isPending
-                  }
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+                    disabled={carryItemForwardMutation.isPending}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Carry Forward Again
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white gap-1 ml-auto"
+                    onClick={() =>
+                      markCarriedItemDoneMutation.mutate(currentCarriedItem.id)
+                    }
+                    disabled={
+                      markCarriedItemDoneMutation.isPending &&
+                      pendingCarriedDoneItemId === currentCarriedItem.id
+                    }
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Mark as Done
+                  </Button>
+                </div>
+              )}
             </div>
+
+            {/* Discussion notes for carried item */}
+            <DiscussionNotesPanel
+              comments={activeComments}
+              newCommentText={newCommentText}
+              onCommentChange={setNewCommentText}
+              onSend={handleSendComment}
+              onDeleteComment={deleteCommentMutation.mutate}
+              isSending={isSendingComment}
+              chatScrollRef={chatScrollRef}
+            />
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── Shared Discussion Notes Panel ────────────────────────────────────────────
+function DiscussionNotesPanel({
+  comments,
+  newCommentText,
+  onCommentChange,
+  onSend,
+  onDeleteComment,
+  isSending,
+  chatScrollRef,
+}: {
+  comments: Array<{
+    id: string
+    content: string
+    isOwn?: boolean
+    author: { id: string; name: string | null; image: string | null } | null
+  }>
+  newCommentText: string
+  onCommentChange: (v: string) => void
+  onSend: () => void
+  onDeleteComment: (id: string) => void
+  isSending: boolean
+  chatScrollRef: React.RefObject<HTMLDivElement | null>
+}) {
+  return (
+    <div className="flex-1 flex flex-col rounded-xl border bg-card overflow-hidden min-h-0">
+      <div className="px-4 py-2.5 border-b bg-muted/30 flex items-center gap-2 shrink-0">
+        <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+        <p className="text-sm font-medium">Discussion Notes</p>
+        {comments.length > 0 && (
+          <Badge variant="secondary" className="ml-auto text-[10px] h-5">
+            {comments.length}
+          </Badge>
+        )}
+      </div>
+
+      <div
+        ref={chatScrollRef}
+        className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3"
+      >
+        {comments.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-6">
+            No discussion notes yet. Be the first to add one.
+          </p>
+        )}
+        {comments.map((comment) => (
+          <div key={comment.id} className="flex items-start gap-2.5">
+            <Avatar className="h-6 w-6 shrink-0">
+              <AvatarImage src={comment.author?.image ?? undefined} />
+              <AvatarFallback className="text-[10px]">
+                {comment.author?.name?.charAt(0) ?? '?'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0 rounded-lg bg-muted/50 px-3 py-1.5">
+              <p className="text-[11px] font-semibold text-muted-foreground mb-0.5">
+                {comment.author?.name ?? 'Unknown'}
+              </p>
+              <p className="text-sm leading-snug">{comment.content}</p>
+            </div>
+            {comment.isOwn && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0 opacity-50 hover:opacity-100"
+                onClick={() => onDeleteComment(comment.id)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t p-3 flex gap-2 shrink-0">
+        <Input
+          placeholder="Add a discussion note…"
+          value={newCommentText}
+          onChange={(e) => onCommentChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && newCommentText.trim()) {
+              e.preventDefault()
+              onSend()
+            }
+          }}
+          className="flex-1"
+        />
+        <Button
+          size="icon"
+          onClick={onSend}
+          disabled={!newCommentText.trim() || isSending}
+        >
+          <Send className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   )

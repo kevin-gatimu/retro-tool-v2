@@ -48,6 +48,7 @@ export interface RetroDetail extends Retro {
     user?: {
       name: string | null
       image: string | null
+      jobRole: string | null
     } | null
   }>
   currentDiscussionCardId?: string | null
