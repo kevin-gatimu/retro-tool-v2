@@ -5,11 +5,8 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { Config } from '../config/configuration';
-import { EmailService } from '../email/email.service';
 import { eq, and, desc, count, inArray, ilike, type SQL } from 'drizzle-orm';
 import * as teamSchema from './schema';
 import * as orgSchema from '../organizations/schema';
@@ -21,7 +18,6 @@ import {
   ORG_MEMBER_ROLES,
   TEAM_JOIN_REQUEST_STATUSES,
   TEAM_MEMBER_TAGS,
-  EMAIL_LOG_TYPES,
   USER_STATUSES,
 } from 'src/common/enums';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -35,8 +31,6 @@ export class TeamsService {
     >,
     private readonly commonService: CommonService,
     private readonly notificationsService: NotificationsService,
-    private readonly emailService: EmailService,
-    private readonly configService: ConfigService<Config>,
   ) {}
 
   // Create a new team
@@ -1087,44 +1081,6 @@ export class TeamsService {
       )
       .catch(() => undefined);
 
-    // Send email to team leads
-    const adminsWithEmails = await this.database
-      .select({
-        userId: teamSchema.teamMember.userId,
-        email: userSchema.user.email,
-        name: userSchema.user.name,
-      })
-      .from(teamSchema.teamMember)
-      .innerJoin(
-        userSchema.user,
-        eq(userSchema.user.id, teamSchema.teamMember.userId),
-      )
-      .where(
-        and(
-          eq(teamSchema.teamMember.teamId, teamId),
-          eq(teamSchema.teamMember.tag, TEAM_MEMBER_TAGS.Lead),
-        ),
-      );
-
-    const appUrl =
-      this.configService.get('frontend.url', { infer: true }) ?? '';
-    for (const admin of adminsWithEmails.filter((a) => a.userId !== userId)) {
-      void this.emailService
-        .send({
-          to: admin.email,
-          subject: `${requester?.name ?? 'Someone'} wants to join ${team.name}`,
-          html: this.emailService.buildTeamJoinRequestHtml({
-            adminName: admin.name,
-            requesterName: requester?.name ?? 'Someone',
-            teamName: team.name,
-            appUrl,
-          }),
-          userId: admin.userId,
-          type: EMAIL_LOG_TYPES.TeamActivity,
-        })
-        .catch(() => undefined);
-    }
-
     return request;
   }
 
@@ -1270,32 +1226,6 @@ export class TeamsService {
       .notifyUserOfJoinApproval(request.userId, teamId, team.name)
       .catch(() => undefined);
 
-    // Send approval email to requester
-    const [requesterUser] = await this.database
-      .select({ email: userSchema.user.email, name: userSchema.user.name })
-      .from(userSchema.user)
-      .where(eq(userSchema.user.id, request.userId))
-      .limit(1);
-
-    if (requesterUser) {
-      const appUrl =
-        this.configService.get('frontend.url', { infer: true }) ?? '';
-      void this.emailService
-        .send({
-          to: requesterUser.email,
-          subject: `Your request to join ${team.name} has been approved`,
-          html: this.emailService.buildTeamJoinApprovedHtml({
-            userName: requesterUser.name,
-            teamName: team.name,
-            teamId,
-            appUrl,
-          }),
-          userId: request.userId,
-          type: EMAIL_LOG_TYPES.TeamActivity,
-        })
-        .catch(() => undefined);
-    }
-
     return {
       request: { ...request, status: TEAM_JOIN_REQUEST_STATUSES.Approved },
       member,
@@ -1355,28 +1285,6 @@ export class TeamsService {
     void this.notificationsService
       .notifyUserOfJoinRejection(request.userId, team?.name ?? 'the team')
       .catch(() => undefined);
-
-    // Send rejection email to requester
-    const [requesterUser] = await this.database
-      .select({ email: userSchema.user.email, name: userSchema.user.name })
-      .from(userSchema.user)
-      .where(eq(userSchema.user.id, request.userId))
-      .limit(1);
-
-    if (requesterUser) {
-      void this.emailService
-        .send({
-          to: requesterUser.email,
-          subject: `Your request to join ${team?.name ?? 'the team'} was not approved`,
-          html: this.emailService.buildTeamJoinRejectedHtml({
-            userName: requesterUser.name,
-            teamName: team?.name ?? 'the team',
-          }),
-          userId: request.userId,
-          type: EMAIL_LOG_TYPES.TeamActivity,
-        })
-        .catch(() => undefined);
-    }
 
     return updated;
   }

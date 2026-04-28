@@ -38,6 +38,10 @@ export const ORGANIZATIONS_ENDPOINTS = {
     `/api/organizations/${id}/members/${memberId}`,
   MEMBER_ROLE: (id: string, memberId: string) =>
     `/api/organizations/${id}/members/${memberId}/role`,
+  INVITATION_PREVIEW: (token: string) =>
+    `/api/organizations/invitations/${token}`,
+  INVITATION_ACCEPT: (token: string) =>
+    `/api/organizations/invitations/${token}/accept`,
 } as const
 
 // ---------------------------------------------------------------------------

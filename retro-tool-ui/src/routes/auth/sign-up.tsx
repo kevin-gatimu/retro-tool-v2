@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
   ChevronRight,
   Clock,
@@ -207,10 +207,18 @@ function SignUpPage() {
   const [success, setSuccess] = useState(false)
   const [isFirstUser, setIsFirstUser] = useState(false)
 
+  const inviteToken =
+    new URLSearchParams(window.location.search).get('inviteToken') ?? undefined
+  const navigate = useNavigate()
+
   const { hasAnyUser } = useAdminCheck()
 
   const signUpMutation = useSignUp({
     onSuccess: (firstUser) => {
+      if (inviteToken) {
+        navigate({ to: '/auth/accept-invite', search: { token: inviteToken } })
+        return
+      }
       setIsFirstUser(firstUser)
       setSuccess(true)
     },

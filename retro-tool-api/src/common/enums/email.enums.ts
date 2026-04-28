@@ -1,10 +1,8 @@
 export const EMAIL_LOG_TYPES = {
   Verification: 'verification',
-  WeeklyDigest: 'weekly_digest',
-  RetroReminder: 'retro_reminder',
-  TeamActivity: 'team_activity',
   AccountApproved: 'account_approved',
   OrgInvite: 'org_invite',
+  OrgInviteExternal: 'org_invite_external',
   RetroReport: 'retro_report',
 } as const;
 

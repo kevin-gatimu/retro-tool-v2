@@ -282,11 +282,18 @@ export class OrganizationsController {
 
   // Authorization validated in service (system-admin or org admin)
   @Post(':id/invite')
-  @ApiOperation({ summary: 'Invite a user to the organization by email' })
+  @ApiOperation({
+    summary: 'Invite a user to the organization by email',
+    description:
+      'If the email belongs to an existing user they are added immediately. Otherwise a pending invitation email is sent.',
+  })
   @ApiParam({ name: 'id', type: String, description: 'Organization ID' })
-  @ApiResponse({ status: 201, description: 'User added to organization' })
-  @ApiResponse({ status: 404, description: 'No user found with that email' })
-  @ApiResponse({ status: 403, description: 'User is already a member' })
+  @ApiResponse({ status: 201, description: 'User added or invitation sent' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({
+    status: 409,
+    description: 'Already a member or invitation pending',
+  })
   async inviteOrganizationMember(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('email') email: string,

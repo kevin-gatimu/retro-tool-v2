@@ -81,12 +81,6 @@ export const actionItemStatusEnum = pgEnum('action_item_status', [
   'completed',
 ]);
 
-export const retroReminderTypeEnum = pgEnum('retro_reminder_type', [
-  'before_retro',
-  'after_retro',
-  'custom',
-]);
-
 // Notifications
 export const notificationTypeEnum = pgEnum('notification_type', [
   NOTIFICATION_TYPES.UserSignup,
@@ -115,11 +109,9 @@ export const estimateSessionStatusEnum = pgEnum('estimate_session_status', [
 // Email
 export const emailLogTypeEnum = pgEnum('email_log_type', [
   EMAIL_LOG_TYPES.Verification,
-  EMAIL_LOG_TYPES.WeeklyDigest,
-  EMAIL_LOG_TYPES.RetroReminder,
-  EMAIL_LOG_TYPES.TeamActivity,
   EMAIL_LOG_TYPES.AccountApproved,
   EMAIL_LOG_TYPES.OrgInvite,
+  EMAIL_LOG_TYPES.OrgInviteExternal,
   EMAIL_LOG_TYPES.RetroReport,
 ]);
 

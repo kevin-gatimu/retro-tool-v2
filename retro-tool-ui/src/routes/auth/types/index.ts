@@ -11,6 +11,7 @@ import type { TUserStatus } from '@/common/enums/user.enums'
 export type SignInSearch = {
   status?: Extract<TUserStatus, 'pending' | 'rejected'>
   redirect?: string
+  inviteToken?: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

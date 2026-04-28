@@ -14,8 +14,6 @@ import { EstimatesModule } from './estimates/estimates.module';
 import { EstimateTemplatesModule } from './estimate-templates/estimate-templates.module';
 import { TeamsModule } from './teams/teams.module';
 import { SessionsModule } from './sessions/sessions.module';
-import { RetroRemindersModule } from './retro-reminders/retro-reminders.module';
-import { WeeklyDigestsModule } from './weekly-digests/weekly-digests.module';
 import { ActionItemsModule } from './action-items/action-items.module';
 import { TeamRolesModule } from './team-roles/team-roles.module';
 import { ConvexAdminModule } from './convex-admin/convex-admin.module';
@@ -53,8 +51,6 @@ loadDotenv({ path: join(__dirname, '../.env.local'), override: true });
     EstimatesModule,
     TeamsModule,
     SessionsModule,
-    RetroRemindersModule,
-    WeeklyDigestsModule,
     ActionItemsModule,
     TeamRolesModule,
     ConvexAdminModule,

@@ -28,6 +28,8 @@ export const Route = createFileRoute('/auth/sign-in')({
   validateSearch: (search: Record<string, unknown>): SignInSearch => ({
     status: search.status as SignInSearch['status'],
     redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
+    inviteToken:
+      typeof search.inviteToken === 'string' ? search.inviteToken : undefined,
   }),
   component: SignInPage,
 })
@@ -229,7 +231,10 @@ function PageShell({ children }: { children: React.ReactNode }) {
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 function SignInPage() {
-  const { status, redirect } = useSearch({ from: '/auth/sign-in' })
+  const { status, redirect, inviteToken } = useSearch({ from: '/auth/sign-in' })
+  const resolvedRedirect = inviteToken
+    ? `/auth/accept-invite?token=${inviteToken}`
+    : redirect
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -241,7 +246,7 @@ function SignInPage() {
     onPendingApproval: () => setPendingApproval(true),
     onRejected: () => setRejected(true),
     onSuspended: () => setSuspended(true),
-    redirect,
+    redirect: resolvedRedirect,
   })
 
   const error = signInMutation.error?.message ?? ''

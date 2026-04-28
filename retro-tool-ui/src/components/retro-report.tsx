@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   BarChart3,
   CheckCircle2,
@@ -16,9 +16,19 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { api } from '@/lib/api'
-import { RETROS_ENDPOINTS } from '@/lib/api-endpoints'
+import { RETROS_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { RetroDetail } from '@/common/types/retros'
+import type { TeamMember } from '@/common/types/teams'
+import type { PaginatedResponse } from '@/common/types/utilities'
 import { cn } from '@/lib/utils'
 import { useSendRetroReport } from '@/routes/retros/hooks/useSendRetroReport'
 import type { CarriedForwardItem } from '@/routes/retros/types'
@@ -34,7 +44,19 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
   const [selectedCarryForward, setSelectedCarryForward] = useState<
     Record<string, boolean>
   >({})
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(
+    new Set(),
+  )
   const sendRetroReportMutation = useSendRetroReport(retro.id)
+
+  const { data: membersData } = useQuery({
+    queryKey: ['team-members', retro.team.id],
+    queryFn: () =>
+      api.get<PaginatedResponse<TeamMember>>(
+        `${TEAMS_ENDPOINTS.MEMBERS(retro.team.id)}?limit=100`,
+      ),
+    staleTime: 60_000,
+  })
 
   const columns = retro.template.columns
   const allCards = retro.cards
@@ -117,19 +139,86 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           )}
         </button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation()
-            sendRetroReportMutation.mutate({})
-          }}
-          disabled={sendRetroReportMutation.isPending}
-          title="Send report to all team members by email"
-        >
-          <Mail className="h-4 w-4 mr-1.5" />
-          {sendRetroReportMutation.isPending ? 'Sending...' : 'Email Report'}
-        </Button>
+        <div className="flex items-center">
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-r-none border-r-0"
+            onClick={(e) => {
+              e.stopPropagation()
+              const recipients =
+                selectedRecipients.size > 0
+                  ? Array.from(selectedRecipients)
+                  : undefined
+              sendRetroReportMutation.mutate({ recipients })
+            }}
+            disabled={sendRetroReportMutation.isPending}
+            title={
+              selectedRecipients.size > 0
+                ? `Send report to ${selectedRecipients.size} selected recipient${selectedRecipients.size !== 1 ? 's' : ''}`
+                : 'Send report to all team members'
+            }
+          >
+            <Mail className="h-4 w-4 mr-1.5" />
+            {sendRetroReportMutation.isPending
+              ? 'Sending...'
+              : selectedRecipients.size > 0
+                ? `Email (${selectedRecipients.size} selected)`
+                : 'Email Report'}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-l-none px-2"
+                onClick={(e) => e.stopPropagation()}
+                disabled={sendRetroReportMutation.isPending}
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Recipients</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {(membersData?.data ?? []).map((member) => (
+                <DropdownMenuCheckboxItem
+                  key={member.userId}
+                  checked={selectedRecipients.has(member.user.email)}
+                  onCheckedChange={(checked) => {
+                    setSelectedRecipients((prev) => {
+                      const next = new Set(prev)
+                      if (checked) next.add(member.user.email)
+                      else next.delete(member.user.email)
+                      return next
+                    })
+                  }}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {member.user.name ?? member.user.email}
+                </DropdownMenuCheckboxItem>
+              ))}
+              {(membersData?.data ?? []).length === 0 && (
+                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                  No members found
+                </div>
+              )}
+              {selectedRecipients.size > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={false}
+                    onCheckedChange={() => setSelectedRecipients(new Set())}
+                    onSelect={(e) => e.preventDefault()}
+                    className="text-muted-foreground"
+                  >
+                    Clear selection
+                  </DropdownMenuCheckboxItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {expanded && (

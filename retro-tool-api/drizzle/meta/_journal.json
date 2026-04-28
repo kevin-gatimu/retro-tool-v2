@@ -64,6 +64,13 @@
       "when": 1777222690780,
       "tag": "0008_right_daimon_hellstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1745798400000,
+      "tag": "0009_email_cleanup_org_invite",
+      "breakpoints": true
     }
   ]
 }

@@ -124,76 +124,6 @@ export class EmailService {
   // Email Templates
   // ============================================================================
 
-  buildRetroReminderHtml(params: {
-    userName: string;
-    retroName: string;
-    teamName: string;
-    scheduledAt: Date;
-  }): string {
-    const time = params.scheduledAt.toUTCString();
-    return `
-<!DOCTYPE html>
-<html>
-<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-  <h2 style="color:#1e40af">Retrospective Reminder</h2>
-  <p>Hi ${this.esc(params.userName)},</p>
-  <p>Your retrospective <strong>${this.esc(params.retroName)}</strong> for team
-     <strong>${this.esc(params.teamName)}</strong> is starting in about 1 hour.</p>
-  <p><strong>Scheduled:</strong> ${time}</p>
-  <p>Make sure you're ready to reflect on the sprint!</p>
-  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-  <p style="color:#6b7280;font-size:12px">Retro Tool — Team Retrospectives Made Simple</p>
-</body>
-</html>`;
-  }
-
-  buildWeeklyDigestHtml(params: {
-    userName: string;
-    teams: Array<{
-      teamName: string;
-      retroCount: number;
-      totalCards: number;
-      totalVotes: number;
-      participationRate: number;
-    }>;
-  }): string {
-    const rows = params.teams
-      .map(
-        (t) => `
-      <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${this.esc(t.teamName)}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${t.retroCount}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${t.totalCards}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${t.totalVotes}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${Math.round(t.participationRate)}%</td>
-      </tr>`,
-      )
-      .join('');
-
-    return `
-<!DOCTYPE html>
-<html>
-<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-  <h2 style="color:#1e40af">Your Weekly Digest</h2>
-  <p>Hi ${this.esc(params.userName)}, here's a summary of last week's activity across your teams.</p>
-  <table style="width:100%;border-collapse:collapse;margin-top:16px">
-    <thead>
-      <tr style="background:#f3f4f6">
-        <th style="padding:8px 12px;text-align:left">Team</th>
-        <th style="padding:8px 12px;text-align:center">Retros</th>
-        <th style="padding:8px 12px;text-align:center">Cards</th>
-        <th style="padding:8px 12px;text-align:center">Votes</th>
-        <th style="padding:8px 12px;text-align:center">Participation</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-  <p style="color:#6b7280;font-size:12px">Retro Tool — Team Retrospectives Made Simple</p>
-</body>
-</html>`;
-  }
-
   buildAccountApprovedHtml(params: {
     userName: string;
     appUrl: string;
@@ -232,57 +162,22 @@ export class EmailService {
 </html>`;
   }
 
-  buildTeamJoinRequestHtml(params: {
-    adminName: string;
-    requesterName: string;
-    teamName: string;
+  buildOrgExternalInviteHtml(params: {
+    orgName: string;
+    role: string;
     appUrl: string;
+    token: string;
   }): string {
+    const acceptUrl = `${params.appUrl}/auth/accept-invite?token=${params.token}`;
     return `
 <!DOCTYPE html>
 <html>
 <body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-  <h2 style="color:#1e40af">New Team Join Request</h2>
-  <p>Hi ${this.esc(params.adminName)},</p>
-  <p><strong>${this.esc(params.requesterName)}</strong> wants to join <strong>${this.esc(params.teamName)}</strong>. Review and approve or reject their request.</p>
-  <p><a href="${params.appUrl}" style="display:inline-block;padding:10px 20px;background-color:#1e40af;color:white;text-decoration:none;border-radius:4px">Review Request</a></p>
-  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-  <p style="color:#6b7280;font-size:12px">Retro Tool — Team Retrospectives Made Simple</p>
-</body>
-</html>`;
-  }
-
-  buildTeamJoinApprovedHtml(params: {
-    userName: string;
-    teamName: string;
-    teamId: string;
-    appUrl: string;
-  }): string {
-    return `
-<!DOCTYPE html>
-<html>
-<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-  <h2 style="color:#1e40af">Welcome to the Team</h2>
-  <p>Hi ${this.esc(params.userName)},</p>
-  <p>Your request to join <strong>${this.esc(params.teamName)}</strong> has been approved. You can now access the team and participate in retrospectives.</p>
-  <p><a href="${params.appUrl}" style="display:inline-block;padding:10px 20px;background-color:#1e40af;color:white;text-decoration:none;border-radius:4px">View Team</a></p>
-  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-  <p style="color:#6b7280;font-size:12px">Retro Tool — Team Retrospectives Made Simple</p>
-</body>
-</html>`;
-  }
-
-  buildTeamJoinRejectedHtml(params: {
-    userName: string;
-    teamName: string;
-  }): string {
-    return `
-<!DOCTYPE html>
-<html>
-<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-  <h2 style="color:#dc2626">Request Not Approved</h2>
-  <p>Hi ${this.esc(params.userName)},</p>
-  <p>Your request to join <strong>${this.esc(params.teamName)}</strong> was not approved at this time. You can try again later or contact the team administrator for more information.</p>
+  <h2 style="color:#1e40af">You've Been Invited</h2>
+  <p>You've been invited to join <strong>${this.esc(params.orgName)}</strong> as <strong>${this.esc(params.role)}</strong>.</p>
+  <p>Click below to create an account and accept your invitation. This link expires in 7 days.</p>
+  <p><a href="${acceptUrl}" style="display:inline-block;padding:10px 20px;background-color:#1e40af;color:white;text-decoration:none;border-radius:4px">Accept Invitation</a></p>
+  <p style="margin-top:16px;font-size:13px;color:#6b7280">Already have an account? <a href="${acceptUrl}" style="color:#1e40af">Sign in and accept</a>.</p>
   <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
   <p style="color:#6b7280;font-size:12px">Retro Tool — Team Retrospectives Made Simple</p>
 </body>
