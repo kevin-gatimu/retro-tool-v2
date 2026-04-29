@@ -88,6 +88,7 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   NOTIFICATION_TYPES.TeamJoinApproved,
   NOTIFICATION_TYPES.TeamJoinRejected,
   NOTIFICATION_TYPES.OrgInvite,
+  NOTIFICATION_TYPES.TeamInvite,
   NOTIFICATION_TYPES.RetroCreated,
   NOTIFICATION_TYPES.RetroLobbyOpen,
   NOTIFICATION_TYPES.RetroStarted,
@@ -112,6 +113,8 @@ export const emailLogTypeEnum = pgEnum('email_log_type', [
   EMAIL_LOG_TYPES.AccountApproved,
   EMAIL_LOG_TYPES.OrgInvite,
   EMAIL_LOG_TYPES.OrgInviteExternal,
+  EMAIL_LOG_TYPES.TeamInvite,
+  EMAIL_LOG_TYPES.TeamInviteExternal,
   EMAIL_LOG_TYPES.RetroReport,
 ]);
 

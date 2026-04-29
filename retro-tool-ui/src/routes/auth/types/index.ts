@@ -12,6 +12,7 @@ export type SignInSearch = {
   status?: Extract<TUserStatus, 'pending' | 'rejected'>
   redirect?: string
   inviteToken?: string
+  email?: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

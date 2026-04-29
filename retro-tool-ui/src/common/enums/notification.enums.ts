@@ -4,6 +4,7 @@ export const NOTIFICATION_TYPES = {
   TeamJoinApproved: 'team_join_approved',
   TeamJoinRejected: 'team_join_rejected',
   OrgInvite: 'org_invite',
+  TeamInvite: 'team_invite',
   RetroCreated: 'retro_created',
   RetroStarted: 'retro_started',
   RetroCompleted: 'retro_completed',

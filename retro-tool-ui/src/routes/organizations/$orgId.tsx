@@ -16,6 +16,7 @@ import {
   Layers,
   Loader2,
   LogOut,
+  Mail,
   MoreHorizontal,
   Plus,
   Settings,
@@ -85,6 +86,7 @@ import {
   TEAM_ROLES_ENDPOINTS,
   TEAMS_ENDPOINTS,
   TEMPLATES_ENDPOINTS,
+  USERS_ENDPOINTS,
 } from '@/lib/api-endpoints'
 import type { CreateTemplateInput, Template } from '@/common/types/templates'
 import type {
@@ -185,6 +187,7 @@ function OrganizationDetailPage() {
   const [activeTab, setActiveTab] = useState('teams')
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isInviteOpen, setIsInviteOpen] = useState(false)
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
@@ -201,6 +204,15 @@ function OrganizationDetailPage() {
   const [editLogo, setEditLogo] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<
+    'org-owner' | 'org-admin' | 'member'
+  >('member')
+  const [inviteEmailCheck, setInviteEmailCheck] = useState<{
+    registered: boolean
+    name?: string
+  } | null>(null)
+  const [addMemberSearch, setAddMemberSearch] = useState('')
+  const [addMemberUserId, setAddMemberUserId] = useState('')
+  const [addMemberRole, setAddMemberRole] = useState<
     'org-owner' | 'org-admin' | 'member'
   >('member')
   const [teamName, setTeamName] = useState('')
@@ -253,6 +265,7 @@ function OrganizationDetailPage() {
     deleteOrgMutation,
     leaveOrgMutation,
     inviteOrgMemberMutation,
+    addOrgMemberMutation,
     updateRoleMutation,
     removeMemberMutation,
     createTeamMutation,
@@ -291,6 +304,15 @@ function OrganizationDetailPage() {
         TEAM_ROLES_ENDPOINTS.ORG_ADMIN_LIST(orgId),
       ),
     enabled: isAdmin,
+  })
+
+  const userSearchQuery = useQuery({
+    queryKey: ['user-search', addMemberSearch],
+    queryFn: () =>
+      api.get<
+        Array<{ id: string; name: string; email: string; image: string | null }>
+      >(`${USERS_ENDPOINTS.SEARCH}?q=${encodeURIComponent(addMemberSearch)}`),
+    enabled: addMemberSearch.length >= 2,
   })
 
   const requestToJoinTeamMutation = useMutation({
@@ -807,53 +829,217 @@ function OrganizationDetailPage() {
             </h2>
             <div className="flex items-center gap-2">
               {isAdmin && (
-                <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Invite Member
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Invite Member</DialogTitle>
-                      <DialogDescription>
-                        Add a user to this organization by their email.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault()
-                        if (inviteEmail && !inviteOrgMemberMutation.isPending)
-                          inviteOrgMemberMutation.mutate(
-                            { email: inviteEmail, role: inviteRole },
-                            {
-                              onSuccess: () => {
-                                setIsInviteOpen(false)
-                                setInviteEmail('')
-                                setInviteRole('member')
+                <>
+                  {/* Invite by Email */}
+                  <Dialog
+                    open={isInviteOpen}
+                    onOpenChange={(open) => {
+                      setIsInviteOpen(open)
+                      if (!open) {
+                        setInviteEmail('')
+                        setInviteRole('member')
+                        setInviteEmailCheck(null)
+                      }
+                    }}
+                  >
+                    <DialogTrigger asChild>
+                      <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Mail className="mr-2 h-4 w-4" />
+                        Invite
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Invite Member by Email</DialogTitle>
+                        <DialogDescription>
+                          Send an invitation email. Works for both registered
+                          and new users.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          if (inviteEmail && !inviteOrgMemberMutation.isPending)
+                            inviteOrgMemberMutation.mutate(
+                              { email: inviteEmail, role: inviteRole },
+                              {
+                                onSuccess: () => {
+                                  setIsInviteOpen(false)
+                                  setInviteEmail('')
+                                  setInviteRole('member')
+                                  setInviteEmailCheck(null)
+                                },
                               },
-                            },
-                          )
-                      }}
-                    >
+                            )
+                        }}
+                      >
+                        <div className="grid gap-4 py-4">
+                          <div className="grid gap-2">
+                            <Label htmlFor="invite-email">Email</Label>
+                            <Input
+                              id="invite-email"
+                              type="email"
+                              placeholder="user@example.com"
+                              value={inviteEmail}
+                              onChange={(e) => {
+                                setInviteEmail(e.target.value)
+                                setInviteEmailCheck(null)
+                              }}
+                              onBlur={async () => {
+                                if (!inviteEmail) return
+                                try {
+                                  const result = await api.get<{
+                                    registered: boolean
+                                    name?: string
+                                  }>(
+                                    `${ORGANIZATIONS_ENDPOINTS.CHECK_INVITE_EMAIL(orgId)}?email=${encodeURIComponent(inviteEmail)}`,
+                                  )
+                                  setInviteEmailCheck(result)
+                                } catch {
+                                  setInviteEmailCheck(null)
+                                }
+                              }}
+                            />
+                            {inviteEmailCheck !== null && (
+                              <p
+                                className={`text-xs ${inviteEmailCheck.registered ? 'text-emerald-400' : 'text-gray-400'}`}
+                              >
+                                {inviteEmailCheck.registered
+                                  ? `Account found${inviteEmailCheck.name ? ` (${inviteEmailCheck.name})` : ''} — invitation email will be sent`
+                                  : 'No account found — invitation email will be sent to register'}
+                              </p>
+                            )}
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="invite-role">Role</Label>
+                            <Select
+                              value={inviteRole}
+                              onValueChange={(v: string) =>
+                                setInviteRole(
+                                  v as 'org-owner' | 'org-admin' | 'member',
+                                )
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="member">Member</SelectItem>
+                                <SelectItem value="org-admin">
+                                  Admin (Org)
+                                </SelectItem>
+                                {isOwner && (
+                                  <SelectItem value="org-owner">
+                                    Owner (Org)
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsInviteOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={
+                              !inviteEmail || inviteOrgMemberMutation.isPending
+                            }
+                          >
+                            {inviteOrgMemberMutation.isPending
+                              ? 'Sending...'
+                              : 'Send Invite'}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Add Member directly */}
+                  <Dialog
+                    open={isAddMemberOpen}
+                    onOpenChange={(open) => {
+                      setIsAddMemberOpen(open)
+                      if (!open) {
+                        setAddMemberSearch('')
+                        setAddMemberUserId('')
+                        setAddMemberRole('member')
+                      }
+                    }}
+                  >
+                    <DialogTrigger asChild>
+                      <Button>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Add Member
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add Member</DialogTitle>
+                        <DialogDescription>
+                          Directly add an existing user without sending an
+                          email.
+                        </DialogDescription>
+                      </DialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                          <Label htmlFor="email">Email</Label>
+                          <Label>Search user</Label>
                           <Input
-                            id="email"
-                            type="email"
-                            placeholder="user@example.com"
-                            value={inviteEmail}
-                            onChange={(e) => setInviteEmail(e.target.value)}
+                            placeholder="Name or email…"
+                            value={addMemberSearch}
+                            onChange={(e) => {
+                              setAddMemberSearch(e.target.value)
+                              setAddMemberUserId('')
+                            }}
                           />
+                          {userSearchQuery.data &&
+                            userSearchQuery.data.length > 0 &&
+                            !addMemberUserId && (
+                              <div className="border border-[#30363d] rounded-md divide-y divide-[#30363d] max-h-40 overflow-y-auto">
+                                {userSearchQuery.data
+                                  .filter(
+                                    (u) =>
+                                      !orgMembers.some(
+                                        (m) => m.userId === u.id,
+                                      ),
+                                  )
+                                  .map((u) => (
+                                    <button
+                                      key={u.id}
+                                      type="button"
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-[#21262d] flex items-center gap-2"
+                                      onClick={() => {
+                                        setAddMemberUserId(u.id)
+                                        setAddMemberSearch(u.name)
+                                      }}
+                                    >
+                                      <span className="font-medium text-white">
+                                        {u.name}
+                                      </span>
+                                      <span className="text-gray-400">
+                                        {u.email}
+                                      </span>
+                                    </button>
+                                  ))}
+                              </div>
+                            )}
+                          {addMemberUserId && (
+                            <p className="text-xs text-emerald-400">
+                              User selected
+                            </p>
+                          )}
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="role">Role</Label>
+                          <Label>Role</Label>
                           <Select
-                            value={inviteRole}
+                            value={addMemberRole}
                             onValueChange={(v: string) =>
-                              setInviteRole(
+                              setAddMemberRole(
                                 v as 'org-owner' | 'org-admin' | 'member',
                               )
                             }
@@ -877,26 +1063,30 @@ function OrganizationDetailPage() {
                       </div>
                       <DialogFooter>
                         <Button
-                          type="button"
                           variant="outline"
-                          onClick={() => setIsInviteOpen(false)}
+                          onClick={() => setIsAddMemberOpen(false)}
                         >
                           Cancel
                         </Button>
                         <Button
-                          type="submit"
                           disabled={
-                            !inviteEmail || inviteOrgMemberMutation.isPending
+                            !addMemberUserId || addOrgMemberMutation.isPending
+                          }
+                          onClick={() =>
+                            addOrgMemberMutation.mutate(
+                              { userId: addMemberUserId, role: addMemberRole },
+                              { onSuccess: () => setIsAddMemberOpen(false) },
+                            )
                           }
                         >
-                          {inviteOrgMemberMutation.isPending
-                            ? 'Inviting...'
-                            : 'Invite'}
+                          {addOrgMemberMutation.isPending
+                            ? 'Adding...'
+                            : 'Add Member'}
                         </Button>
                       </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                    </DialogContent>
+                  </Dialog>
+                </>
               )}
             </div>
           </div>

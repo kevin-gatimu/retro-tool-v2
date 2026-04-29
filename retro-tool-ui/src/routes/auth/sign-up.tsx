@@ -200,15 +200,17 @@ function SuccessPending() {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 function SignUpPage() {
+  const searchParams = new URLSearchParams(window.location.search)
+  const inviteToken = searchParams.get('inviteToken') ?? undefined
+  const emailFromInvite = searchParams.get('email') ?? undefined
+
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(emailFromInvite ?? '')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [success, setSuccess] = useState(false)
   const [isFirstUser, setIsFirstUser] = useState(false)
 
-  const inviteToken =
-    new URLSearchParams(window.location.search).get('inviteToken') ?? undefined
   const navigate = useNavigate()
 
   const { hasAnyUser } = useAdminCheck()
@@ -323,6 +325,22 @@ function SignUpPage() {
                     </div>
                   )}
 
+                  {inviteToken && emailFromInvite && (
+                    <div className="mb-5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
+                      <p className="text-emerald-300 font-medium mb-1">
+                        You're accepting an invitation
+                      </p>
+                      <p className="text-gray-400 text-xs leading-relaxed">
+                        Your account will be created with{' '}
+                        <span className="text-emerald-400 font-mono">
+                          {emailFromInvite}
+                        </span>
+                        . You must use this email — it's the address the invite
+                        was sent to.
+                      </p>
+                    </div>
+                  )}
+
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-1.5">
                       <Label htmlFor="name" className="text-gray-300 text-sm">
@@ -350,7 +368,8 @@ function SignUpPage() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        className="bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 h-11"
+                        readOnly={!!emailFromInvite}
+                        className={`bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 h-11 ${emailFromInvite ? 'cursor-not-allowed opacity-80' : ''}`}
                       />
                     </div>
 

@@ -24,6 +24,14 @@ export const USERS_ENDPOINTS = {
 } as const
 
 // ---------------------------------------------------------------------------
+// Invitations (unified — works for both org and team tokens)
+// ---------------------------------------------------------------------------
+export const INVITATIONS_ENDPOINTS = {
+  PREVIEW: (token: string) => `/api/invitations/preview/${token}`,
+  ACCEPT: (token: string) => `/api/invitations/${token}/accept`,
+} as const
+
+// ---------------------------------------------------------------------------
 // Organizations
 // ---------------------------------------------------------------------------
 export const ORGANIZATIONS_ENDPOINTS = {
@@ -33,6 +41,9 @@ export const ORGANIZATIONS_ENDPOINTS = {
   BY_ID: (id: string) => `/api/organizations/${id}`,
   LEAVE: (id: string) => `/api/organizations/${id}/leave`,
   INVITE: (id: string) => `/api/organizations/${id}/invite`,
+  ADD_MEMBER: (id: string) => `/api/organizations/${id}/members`,
+  CHECK_INVITE_EMAIL: (id: string) =>
+    `/api/organizations/${id}/check-invite-email`,
   MEMBERS: (id: string) => `/api/organizations/${id}/members`,
   MEMBER_BY_ID: (id: string, memberId: string) =>
     `/api/organizations/${id}/members/${memberId}`,
@@ -68,6 +79,10 @@ export const TEAMS_ENDPOINTS = {
   JOIN_REQUESTS_BULK_APPROVE: (id: string) =>
     `/api/teams/${id}/join-requests/bulk-approve`,
   JOIN_REQUESTS_ALL: '/api/teams/join-requests/all',
+  INVITE: (id: string) => `/api/teams/${id}/invite`,
+  INVITATION_PREVIEW: (token: string) => `/api/teams/invitations/${token}`,
+  INVITATION_ACCEPT: (token: string) =>
+    `/api/teams/invitations/${token}/accept`,
 } as const
 
 // ---------------------------------------------------------------------------

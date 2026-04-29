@@ -3,6 +3,8 @@ export const EMAIL_LOG_TYPES = {
   AccountApproved: 'account_approved',
   OrgInvite: 'org_invite',
   OrgInviteExternal: 'org_invite_external',
+  TeamInvite: 'team_invite',
+  TeamInviteExternal: 'team_invite_external',
   RetroReport: 'retro_report',
 } as const
 

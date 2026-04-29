@@ -116,6 +116,25 @@ export const teamJoinRequest = pgTable('team_join_request', {
     .$defaultFn(() => new Date()),
 });
 
+// Team invitation table
+export const teamInvitation = pgTable('team_invitation', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  token: varchar('token', { length: 255 }).notNull().unique(),
+  email: varchar('email', { length: 255 }).notNull(),
+  teamId: varchar('team_id', { length: 255 })
+    .notNull()
+    .references(() => team.id, { onDelete: 'cascade' }),
+  tag: teamMemberTagEnum('tag').notNull().default(TEAM_MEMBER_TAGS.Member),
+  createdById: varchar('created_by_id', { length: 255 })
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at').notNull(),
+  acceptedAt: timestamp('accepted_at'),
+  createdAt: timestamp('created_at')
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 // Type definitions for team-related entities
 export type TeamRole = typeof teamRole.$inferSelect;
 export type NewTeamRole = typeof teamRole.$inferInsert;
@@ -128,3 +147,6 @@ export type NewTeam = typeof team.$inferInsert;
 
 export type TeamMember = typeof teamMember.$inferSelect;
 export type NewTeamMember = typeof teamMember.$inferInsert;
+
+export type TeamInvitation = typeof teamInvitation.$inferSelect;
+export type NewTeamInvitation = typeof teamInvitation.$inferInsert;

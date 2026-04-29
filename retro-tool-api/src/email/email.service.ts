@@ -142,24 +142,111 @@ export class EmailService {
 </html>`;
   }
 
-  buildOrgInviteHtml(params: {
-    userName: string;
-    orgName: string;
-    role: string;
-    appUrl: string;
+  /**
+   * Builds the standard invitation accept URL.
+   * Token alone is enough — the API resolves org vs team from the token.
+   * `email` is included so sign-in / sign-up can pre-fill the field.
+   */
+  private buildInviteAcceptUrl(
+    appUrl: string,
+    token: string,
+    email: string,
+  ): string {
+    return `${appUrl}/auth/accept-invite?token=${encodeURIComponent(
+      token,
+    )}&email=${encodeURIComponent(email)}`;
+  }
+
+  private renderInviteEmail(params: {
+    heading: string;
+    greeting?: string;
+    leadHtml: string;
+    invitedEmail: string;
+    acceptUrl: string;
+    isExistingUser: boolean;
   }): string {
+    const stepsForExisting = `
+    <ol style="padding-left:20px;margin:8px 0 0 0;color:#1f2937;font-size:14px;line-height:1.6">
+      <li>Click <strong>Accept Invitation</strong> below.</li>
+      <li>If you're not signed in, log in with <strong>${this.esc(params.invitedEmail)}</strong> — the email this invite was sent to.</li>
+      <li>You'll be taken to your new ${params.heading.toLowerCase().includes('team') ? 'team' : 'organisation'} automatically.</li>
+    </ol>`;
+
+    const stepsForNewUser = `
+    <ol style="padding-left:20px;margin:8px 0 0 0;color:#1f2937;font-size:14px;line-height:1.6">
+      <li>Click <strong>Accept Invitation</strong> below.</li>
+      <li>Create your account using <strong>${this.esc(params.invitedEmail)}</strong> — your email will be pre-filled. <em>Use this exact address</em>, otherwise the invite cannot be accepted.</li>
+      <li>Choose a password and finish sign-up.</li>
+      <li>You'll be taken straight to your new ${params.heading.toLowerCase().includes('team') ? 'team' : 'organisation'}.</li>
+    </ol>
+    <p style="margin:12px 0 0 0;font-size:13px;color:#6b7280">
+      Already have a Retro Tool account with <strong>${this.esc(params.invitedEmail)}</strong>?
+      Use the same link — you'll be prompted to sign in instead.
+    </p>`;
+
+    const steps = params.isExistingUser ? stepsForExisting : stepsForNewUser;
+
     return `
 <!DOCTYPE html>
 <html>
-<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-  <h2 style="color:#1e40af">Organisation Invitation</h2>
-  <p>Hi ${this.esc(params.userName)},</p>
-  <p>You've been added to <strong>${this.esc(params.orgName)}</strong> as <strong>${this.esc(params.role)}</strong>. Sign in to start collaborating.</p>
-  <p><a href="${params.appUrl}/organizations" style="display:inline-block;padding:10px 20px;background-color:#1e40af;color:white;text-decoration:none;border-radius:4px">View Organisation</a></p>
-  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-  <p style="color:#6b7280;font-size:12px">Retro Tool — Team Retrospectives Made Simple</p>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:24px">
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:32px">
+    <h2 style="color:#1e40af;margin:0 0 16px 0">${this.esc(params.heading)}</h2>
+    ${params.greeting ? `<p style="margin:0 0 12px 0">${params.greeting}</p>` : ''}
+    <p style="margin:0 0 16px 0;color:#1f2937;font-size:15px;line-height:1.5">${params.leadHtml}</p>
+
+    <div style="background:#f3f4f6;border-left:4px solid #1e40af;padding:14px 16px;border-radius:4px;margin:20px 0">
+      <p style="margin:0;font-size:13px;color:#374151"><strong>Invited email:</strong> ${this.esc(params.invitedEmail)}</p>
+      <p style="margin:6px 0 0 0;font-size:13px;color:#374151"><strong>This link expires in 7 days.</strong></p>
+    </div>
+
+    <p style="margin:0 0 4px 0;font-size:14px;color:#111827"><strong>What to do next:</strong></p>
+    ${steps}
+
+    <p style="margin:24px 0 8px 0;text-align:center">
+      <a href="${params.acceptUrl}" style="display:inline-block;padding:12px 28px;background-color:#1e40af;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:15px">Accept Invitation</a>
+    </p>
+
+    <p style="margin:16px 0 0 0;font-size:12px;color:#6b7280;text-align:center">
+      Trouble with the button? Copy &amp; paste this link into your browser:<br>
+      <span style="word-break:break-all;color:#374151">${params.acceptUrl}</span>
+    </p>
+
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0 16px 0">
+    <p style="color:#6b7280;font-size:12px;margin:0;text-align:center">
+      You received this email because someone invited you to collaborate on Retro Tool.<br>
+      If you weren't expecting this, you can safely ignore it.
+    </p>
+    <p style="color:#9ca3af;font-size:11px;margin:8px 0 0 0;text-align:center">
+      Retro Tool — Team Retrospectives Made Simple
+    </p>
+  </div>
 </body>
 </html>`;
+  }
+
+  buildOrgInviteHtml(params: {
+    userName: string;
+    invitedEmail: string;
+    orgName: string;
+    role: string;
+    appUrl: string;
+    token: string;
+  }): string {
+    return this.renderInviteEmail({
+      heading: 'Organisation Invitation',
+      greeting: `Hi ${this.esc(params.userName)},`,
+      leadHtml: `You've been invited to join <strong>${this.esc(
+        params.orgName,
+      )}</strong> as <strong>${this.esc(params.role)}</strong>.`,
+      invitedEmail: params.invitedEmail,
+      acceptUrl: this.buildInviteAcceptUrl(
+        params.appUrl,
+        params.token,
+        params.invitedEmail,
+      ),
+      isExistingUser: true,
+    });
   }
 
   buildOrgExternalInviteHtml(params: {
@@ -167,21 +254,73 @@ export class EmailService {
     role: string;
     appUrl: string;
     token: string;
+    invitedEmail: string;
   }): string {
-    const acceptUrl = `${params.appUrl}/auth/accept-invite?token=${params.token}`;
-    return `
-<!DOCTYPE html>
-<html>
-<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-  <h2 style="color:#1e40af">You've Been Invited</h2>
-  <p>You've been invited to join <strong>${this.esc(params.orgName)}</strong> as <strong>${this.esc(params.role)}</strong>.</p>
-  <p>Click below to create an account and accept your invitation. This link expires in 7 days.</p>
-  <p><a href="${acceptUrl}" style="display:inline-block;padding:10px 20px;background-color:#1e40af;color:white;text-decoration:none;border-radius:4px">Accept Invitation</a></p>
-  <p style="margin-top:16px;font-size:13px;color:#6b7280">Already have an account? <a href="${acceptUrl}" style="color:#1e40af">Sign in and accept</a>.</p>
-  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-  <p style="color:#6b7280;font-size:12px">Retro Tool — Team Retrospectives Made Simple</p>
-</body>
-</html>`;
+    return this.renderInviteEmail({
+      heading: "You've Been Invited",
+      leadHtml: `You've been invited to join <strong>${this.esc(
+        params.orgName,
+      )}</strong> on Retro Tool as <strong>${this.esc(params.role)}</strong>.`,
+      invitedEmail: params.invitedEmail,
+      acceptUrl: this.buildInviteAcceptUrl(
+        params.appUrl,
+        params.token,
+        params.invitedEmail,
+      ),
+      isExistingUser: false,
+    });
+  }
+
+  buildTeamInviteHtml(params: {
+    userName: string;
+    invitedEmail: string;
+    orgName: string;
+    teamName: string;
+    tag: string;
+    appUrl: string;
+    token: string;
+  }): string {
+    return this.renderInviteEmail({
+      heading: 'Team Invitation',
+      greeting: `Hi ${this.esc(params.userName)},`,
+      leadHtml: `You've been invited to join the team <strong>${this.esc(
+        params.teamName,
+      )}</strong> in <strong>${this.esc(params.orgName)}</strong> as <strong>${this.esc(
+        params.tag,
+      )}</strong>.`,
+      invitedEmail: params.invitedEmail,
+      acceptUrl: this.buildInviteAcceptUrl(
+        params.appUrl,
+        params.token,
+        params.invitedEmail,
+      ),
+      isExistingUser: true,
+    });
+  }
+
+  buildTeamExternalInviteHtml(params: {
+    orgName: string;
+    teamName: string;
+    tag: string;
+    appUrl: string;
+    token: string;
+    invitedEmail: string;
+  }): string {
+    return this.renderInviteEmail({
+      heading: "You've Been Invited to a Team",
+      leadHtml: `You've been invited to join the team <strong>${this.esc(
+        params.teamName,
+      )}</strong> in <strong>${this.esc(
+        params.orgName,
+      )}</strong> on Retro Tool as <strong>${this.esc(params.tag)}</strong>.`,
+      invitedEmail: params.invitedEmail,
+      acceptUrl: this.buildInviteAcceptUrl(
+        params.appUrl,
+        params.token,
+        params.invitedEmail,
+      ),
+      isExistingUser: false,
+    });
   }
 
   buildRetroReportHtml(params: {

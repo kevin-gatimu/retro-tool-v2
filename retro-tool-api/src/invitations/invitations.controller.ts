@@ -1,8 +1,8 @@
 import {
   Controller,
   Get,
-  Post,
   Param,
+  Post,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -15,40 +15,39 @@ import {
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
-import { OrganizationsService } from './organizations.service';
+import { InvitationsService } from './invitations.service';
 import type { SessionUser } from '../common/types';
 
-@ApiTags('organizations')
-@Controller('organizations/invitations')
-export class OrgInvitationsController {
-  constructor(private readonly organizationsService: OrganizationsService) {}
+@ApiTags('invitations')
+@Controller('invitations')
+export class InvitationsController {
+  constructor(private readonly invitationsService: InvitationsService) {}
 
-  @Get(':token')
-  @ApiOperation({ summary: 'Preview an organisation invitation (public)' })
+  @Get('preview/:token')
+  @ApiOperation({
+    summary:
+      'Preview an invitation (works for both org and team tokens; public)',
+  })
   @ApiParam({ name: 'token', type: String })
   @ApiResponse({ status: 200, description: 'Invitation preview' })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
-  async getOrgInvitationPreview(@Param('token') token: string) {
-    return this.organizationsService.getOrgInvitationPreview(token);
+  async getPreview(@Param('token') token: string) {
+    return this.invitationsService.getPreview(token);
   }
 
   @Post(':token/accept')
   @UseGuards(AuthGuard)
   @ApiBearerAuth('session')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Accept an organisation invitation' })
+  @ApiOperation({
+    summary: 'Accept an invitation (works for both org and team tokens)',
+  })
   @ApiParam({ name: 'token', type: String })
   @ApiResponse({ status: 200, description: 'Invitation accepted' })
   @ApiResponse({ status: 403, description: 'Expired or wrong email' })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   @ApiResponse({ status: 409, description: 'Already accepted' })
-  async acceptOrgInvitation(
-    @Param('token') token: string,
-    @Session() session: SessionUser,
-  ) {
-    return this.organizationsService.acceptOrgInvitation(
-      token,
-      session.user.id,
-    );
+  async accept(@Param('token') token: string, @Session() session: SessionUser) {
+    return this.invitationsService.accept(token, session.user.id);
   }
 }

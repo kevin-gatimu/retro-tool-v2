@@ -30,6 +30,7 @@ export const Route = createFileRoute('/auth/sign-in')({
     redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
     inviteToken:
       typeof search.inviteToken === 'string' ? search.inviteToken : undefined,
+    email: typeof search.email === 'string' ? search.email : undefined,
   }),
   component: SignInPage,
 })
@@ -231,11 +232,16 @@ function PageShell({ children }: { children: React.ReactNode }) {
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 function SignInPage() {
-  const { status, redirect, inviteToken } = useSearch({ from: '/auth/sign-in' })
+  const {
+    status,
+    redirect,
+    inviteToken,
+    email: emailFromInvite,
+  } = useSearch({ from: '/auth/sign-in' })
   const resolvedRedirect = inviteToken
-    ? `/auth/accept-invite?token=${inviteToken}`
+    ? `/auth/accept-invite?token=${encodeURIComponent(inviteToken)}`
     : redirect
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(emailFromInvite ?? '')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [pendingApproval, setPendingApproval] = useState(status === 'pending')
@@ -360,10 +366,57 @@ function SignInPage() {
         </p>
       </div>
 
+      {inviteToken && emailFromInvite && (
+        <div className="mb-5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
+          <p className="text-emerald-300 font-medium mb-1">
+            You're accepting an invitation
+          </p>
+          <p className="text-gray-400 text-xs leading-relaxed">
+            Sign in with{' '}
+            <span className="text-emerald-400 font-mono">
+              {emailFromInvite}
+            </span>{' '}
+            — the email this invite was sent to. You'll be redirected back to
+            accept once signed in.
+          </p>
+          <p className="text-gray-500 text-xs leading-relaxed mt-2">
+            New to Retro-Tool?{' '}
+            <Link
+              to="/auth/sign-up"
+              search={{ inviteToken, email: emailFromInvite }}
+              className="text-emerald-400 hover:text-emerald-300 font-medium"
+            >
+              Create an account
+            </Link>{' '}
+            with this email instead.
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-400">
-            {error}
+            <p>{error}</p>
+            {inviteToken && emailFromInvite && (
+              <p className="mt-2 text-xs text-gray-400">
+                Don't have an account yet?{' '}
+                <Link
+                  to="/auth/sign-up"
+                  search={{ inviteToken, email: emailFromInvite }}
+                  className="text-emerald-400 hover:text-emerald-300 font-medium"
+                >
+                  Create one with {emailFromInvite}
+                </Link>{' '}
+                or{' '}
+                <Link
+                  to="/auth/forgot-password"
+                  className="text-emerald-400 hover:text-emerald-300 font-medium"
+                >
+                  reset your password
+                </Link>
+                .
+              </p>
+            )}
           </div>
         )}
 
@@ -478,6 +531,11 @@ function SignInPage() {
           Don't have an account?{' '}
           <Link
             to="/auth/sign-up"
+            search={
+              inviteToken && emailFromInvite
+                ? { inviteToken, email: emailFromInvite }
+                : undefined
+            }
             className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
           >
             Sign up

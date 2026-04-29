@@ -5,11 +5,8 @@ import {
   ConflictException,
   Inject,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { Config } from '../config/configuration';
-import { EmailService } from '../email/email.service';
 import {
   eq,
   and,
@@ -31,10 +28,8 @@ import { AddMemberDto } from './dto/add-member.dto';
 import { CommonService } from '../common/common.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
-  EMAIL_LOG_TYPES,
   ORG_MEMBER_ROLES,
   TOrgAssignableRole,
-  TOrgMemberRole,
   USER_STATUSES,
 } from '../common/enums';
 
@@ -47,8 +42,6 @@ export class OrganizationsService {
     >,
     private readonly commonService: CommonService,
     private readonly notificationsService: NotificationsService,
-    private readonly emailService: EmailService,
-    private readonly configService: ConfigService<Config>,
   ) {}
 
   private async isSystemAdmin(userId: string): Promise<boolean> {
@@ -467,6 +460,14 @@ export class OrganizationsService {
       );
     }
 
+    const [org] = await this.database
+      .select({ name: orgSchema.organization.name })
+      .from(orgSchema.organization)
+      .where(eq(orgSchema.organization.id, orgId))
+      .limit(1);
+
+    if (!org) throw new NotFoundException('Organisation not found');
+
     const [existing] = await this.database
       .select()
       .from(orgSchema.organizationMember)
@@ -479,7 +480,7 @@ export class OrganizationsService {
       .limit(1);
 
     if (existing) {
-      throw new ForbiddenException(
+      throw new ConflictException(
         'User is already a member of this organization',
       );
     }
@@ -493,6 +494,24 @@ export class OrganizationsService {
         role: data.role,
       })
       .returning();
+
+    await this.database
+      .update(userSchema.user)
+      .set({
+        status: USER_STATUSES.Approved,
+        approvedAt: new Date(),
+        approvedById: userId,
+      })
+      .where(
+        and(
+          eq(userSchema.user.id, data.userId),
+          eq(userSchema.user.status, USER_STATUSES.Pending),
+        ),
+      );
+
+    void this.notificationsService
+      .notifyUserOfOrgInvite(data.userId, orgId, org.name)
+      .catch(() => undefined);
 
     return member;
   }
@@ -608,274 +627,5 @@ export class OrganizationsService {
       .where(eq(orgSchema.organizationMember.id, member.id));
 
     return { message: 'Left organization successfully' };
-  }
-
-  async inviteOrganizationMember(
-    userId: string,
-    orgId: string,
-    email: string,
-    role: TOrgMemberRole,
-  ) {
-    const isAdmin = await this.isSystemAdmin(userId);
-    const isOrgAdmin = await this.isOrgAdmin(userId, orgId);
-
-    if (!isAdmin && !isOrgAdmin) {
-      throw new ForbiddenException(
-        'Only system admins and organization admins can invite members',
-      );
-    }
-
-    // Only org owners (or system admins) can assign the org-owner role
-    if (role === ORG_MEMBER_ROLES.Owner) {
-      const isOwner = await this.isOrgOwner(userId, orgId);
-      if (!isAdmin && !isOwner) {
-        throw new ForbiddenException(
-          'Only system admins and the organization owner can invite users as org-owner',
-        );
-      }
-    }
-
-    const [org] = await this.database
-      .select({ name: orgSchema.organization.name })
-      .from(orgSchema.organization)
-      .where(eq(orgSchema.organization.id, orgId))
-      .limit(1);
-
-    if (!org) throw new NotFoundException('Organisation not found');
-
-    const appUrl =
-      this.configService.get('frontend.url', { infer: true }) ?? '';
-
-    const [invitee] = await this.database
-      .select()
-      .from(userSchema.user)
-      .where(eq(userSchema.user.email, email))
-      .limit(1);
-
-    // External invite — user does not have an account yet
-    if (!invitee) {
-      // Check for an existing pending invite for this email + org
-      const [existingInvite] = await this.database
-        .select()
-        .from(orgSchema.orgInvitation)
-        .where(
-          and(
-            eq(orgSchema.orgInvitation.email, email),
-            eq(orgSchema.orgInvitation.organizationId, orgId),
-          ),
-        )
-        .limit(1);
-
-      if (existingInvite && !existingInvite.acceptedAt) {
-        throw new ConflictException(
-          'An invitation has already been sent to this email address',
-        );
-      }
-
-      const token = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-      await this.database.insert(orgSchema.orgInvitation).values({
-        id: generateId(),
-        token,
-        email,
-        organizationId: orgId,
-        role,
-        createdById: userId,
-        expiresAt,
-      });
-
-      void this.emailService
-        .send({
-          to: email,
-          subject: `You've been invited to join ${org.name}`,
-          html: this.emailService.buildOrgExternalInviteHtml({
-            orgName: org.name,
-            role,
-            appUrl,
-            token,
-          }),
-          userId,
-          type: EMAIL_LOG_TYPES.OrgInviteExternal,
-        })
-        .catch(() => undefined);
-
-      return { pending: true };
-    }
-
-    // Existing user invite
-    const [existing] = await this.database
-      .select()
-      .from(orgSchema.organizationMember)
-      .where(
-        and(
-          eq(orgSchema.organizationMember.userId, invitee.id),
-          eq(orgSchema.organizationMember.organizationId, orgId),
-        ),
-      )
-      .limit(1);
-
-    if (existing) {
-      throw new ConflictException(
-        'User is already a member of this organization',
-      );
-    }
-
-    const [member] = await this.database
-      .insert(orgSchema.organizationMember)
-      .values({
-        id: generateId(),
-        organizationId: orgId,
-        userId: invitee.id,
-        role,
-      })
-      .returning();
-
-    // Auto-approve pending accounts when added to an org
-    await this.database
-      .update(userSchema.user)
-      .set({
-        status: USER_STATUSES.Approved,
-        approvedAt: new Date(),
-        approvedById: userId,
-      })
-      .where(
-        and(
-          eq(userSchema.user.id, invitee.id),
-          eq(userSchema.user.status, USER_STATUSES.Pending),
-        ),
-      );
-
-    void this.notificationsService
-      .notifyUserOfOrgInvite(invitee.id, orgId, org.name)
-      .catch(() => undefined);
-
-    void this.emailService
-      .send({
-        to: invitee.email,
-        subject: `You've been invited to join ${org.name}`,
-        html: this.emailService.buildOrgInviteHtml({
-          userName: invitee.name,
-          orgName: org.name,
-          role,
-          appUrl,
-        }),
-        userId: invitee.id,
-        type: EMAIL_LOG_TYPES.OrgInvite,
-      })
-      .catch(() => undefined);
-
-    return member;
-  }
-
-  async getOrgInvitationPreview(token: string) {
-    const [invitation] = await this.database
-      .select({
-        orgName: orgSchema.organization.name,
-        role: orgSchema.orgInvitation.role,
-        expiresAt: orgSchema.orgInvitation.expiresAt,
-        acceptedAt: orgSchema.orgInvitation.acceptedAt,
-      })
-      .from(orgSchema.orgInvitation)
-      .innerJoin(
-        orgSchema.organization,
-        eq(orgSchema.organization.id, orgSchema.orgInvitation.organizationId),
-      )
-      .where(eq(orgSchema.orgInvitation.token, token))
-      .limit(1);
-
-    if (!invitation) throw new NotFoundException('Invitation not found');
-
-    return {
-      orgName: invitation.orgName,
-      role: invitation.role,
-      expired: invitation.expiresAt < new Date(),
-      accepted: !!invitation.acceptedAt,
-    };
-  }
-
-  async acceptOrgInvitation(token: string, userId: string) {
-    const [invitation] = await this.database
-      .select()
-      .from(orgSchema.orgInvitation)
-      .where(eq(orgSchema.orgInvitation.token, token))
-      .limit(1);
-
-    if (!invitation) throw new NotFoundException('Invitation not found');
-    if (invitation.acceptedAt)
-      throw new ConflictException('Invitation has already been accepted');
-    if (invitation.expiresAt < new Date())
-      throw new ForbiddenException('Invitation has expired');
-
-    const [user] = await this.database
-      .select({ email: userSchema.user.email })
-      .from(userSchema.user)
-      .where(eq(userSchema.user.id, userId))
-      .limit(1);
-
-    if (!user || user.email !== invitation.email) {
-      throw new ForbiddenException(
-        'This invitation was sent to a different email address',
-      );
-    }
-
-    const [existing] = await this.database
-      .select()
-      .from(orgSchema.organizationMember)
-      .where(
-        and(
-          eq(orgSchema.organizationMember.userId, userId),
-          eq(
-            orgSchema.organizationMember.organizationId,
-            invitation.organizationId,
-          ),
-        ),
-      )
-      .limit(1);
-
-    if (existing) {
-      // Already a member — just mark accepted and return
-      await this.database
-        .update(orgSchema.orgInvitation)
-        .set({ acceptedAt: new Date() })
-        .where(eq(orgSchema.orgInvitation.token, token));
-      return { organizationId: invitation.organizationId };
-    }
-
-    const [member] = await this.database
-      .insert(orgSchema.organizationMember)
-      .values({
-        id: generateId(),
-        organizationId: invitation.organizationId,
-        userId,
-        role: invitation.role,
-      })
-      .returning();
-
-    // Auto-approve pending accounts
-    await this.database
-      .update(userSchema.user)
-      .set({
-        status: USER_STATUSES.Approved,
-        approvedAt: new Date(),
-        approvedById: invitation.createdById,
-      })
-      .where(
-        and(
-          eq(userSchema.user.id, userId),
-          eq(userSchema.user.status, USER_STATUSES.Pending),
-        ),
-      );
-
-    await this.database
-      .update(orgSchema.orgInvitation)
-      .set({ acceptedAt: new Date() })
-      .where(eq(orgSchema.orgInvitation.token, token));
-
-    void this.notificationsService
-      .notifyUserOfOrgInvite(userId, invitation.organizationId, '')
-      .catch(() => undefined);
-
-    return { organizationId: invitation.organizationId, member };
   }
 }

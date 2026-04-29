@@ -14,6 +14,7 @@ import {
   Clock,
   Loader2,
   LogOut,
+  Mail,
   MoreHorizontal,
   RefreshCw,
   Settings,
@@ -181,6 +182,7 @@ function TeamDetailPage() {
   // Dialog states
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
+  const [isInviteOpen, setIsInviteOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
   const [removeMemberId, setRemoveMemberId] = useState<string | null>(null)
@@ -209,6 +211,12 @@ function TeamDetailPage() {
   const [memberSearch, setMemberSearch] = useState('')
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteTag, setInviteTag] = useState<'team-lead' | 'member'>('member')
+  const [inviteEmailCheck, setInviteEmailCheck] = useState<{
+    registered: boolean
+    name?: string
+  } | null>(null)
 
   // Sync edit form when team loads
   useEffect(() => {
@@ -384,6 +392,25 @@ function TeamDetailPage() {
       await invalidateTeam()
     },
     onError: (error) => toast.error(error.message || 'Failed to add member'),
+  })
+
+  const inviteMemberMutation = useMutation({
+    mutationFn: ({
+      email,
+      tag,
+    }: {
+      email: string
+      tag: 'team-lead' | 'member'
+    }) => api.post(TEAMS_ENDPOINTS.INVITE(teamId), { email, tag }),
+    onSuccess: (_, variables) => {
+      toast.success(`Invitation sent to ${variables.email}`)
+      setIsInviteOpen(false)
+      setInviteEmail('')
+      setInviteTag('member')
+      setInviteEmailCheck(null)
+    },
+    onError: (error) =>
+      toast.error(error.message || 'Failed to send invitation'),
   })
 
   const updateHierarchyMutation = useMutation({
@@ -621,189 +648,309 @@ function TeamDetailPage() {
           </h2>
           <div className="flex items-center gap-2">
             {canManage && (
-              <Dialog
-                open={isAddMemberOpen}
-                onOpenChange={(open) => {
-                  setIsAddMemberOpen(open)
-                  if (!open) {
-                    setMemberSearch('')
-                    setSearchResults([])
-                    setAddMemberUserIds([])
-                  }
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button>
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Add Member
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add Team Member</DialogTitle>
-                    <DialogDescription>
-                      Select one or more users to add to this team. Team Rank
-                      will be applied to all selected users.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="memberSearch">Search User</Label>
-                      <Input
-                        id="memberSearch"
-                        placeholder="Type name or email to search..."
-                        value={memberSearch}
-                        onChange={(e) => setMemberSearch(e.target.value)}
-                      />
-                      {isSearching && (
-                        <p className="text-sm text-muted-foreground">
-                          Searching...
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Quick add from org members */}
-                    {memberSearch.length < 2 && availableMembers.length > 0 && (
-                      <div className="grid gap-2">
-                        <Label>Organization Members</Label>
-                        <div className="max-h-48 overflow-y-auto space-y-1 rounded-md border p-2">
-                          {availableMembers.map((om) => (
-                            <div
-                              key={om.userId}
-                              className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-muted ${
-                                addMemberUserIds.includes(om.userId)
-                                  ? 'bg-muted'
-                                  : ''
-                              }`}
-                              onClick={() =>
-                                toggleAddMemberSelection(om.userId)
+              <>
+                {/* Invite by Email */}
+                <Dialog
+                  open={isInviteOpen}
+                  onOpenChange={(open) => {
+                    setIsInviteOpen(open)
+                    if (!open) {
+                      setInviteEmail('')
+                      setInviteTag('member')
+                      setInviteEmailCheck(null)
+                    }
+                  }}
+                >
+                  <DialogTrigger asChild>
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <Mail className="mr-2 h-4 w-4" />
+                      Invite
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Invite Team Member by Email</DialogTitle>
+                      <DialogDescription>
+                        Send an invitation email. The invitee will also be added
+                        to this team's organisation.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        if (inviteEmail && !inviteMemberMutation.isPending)
+                          inviteMemberMutation.mutate({
+                            email: inviteEmail,
+                            tag: inviteTag,
+                          })
+                      }}
+                    >
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="team-invite-email">Email</Label>
+                          <Input
+                            id="team-invite-email"
+                            type="email"
+                            placeholder="user@example.com"
+                            value={inviteEmail}
+                            onChange={(e) => {
+                              setInviteEmail(e.target.value)
+                              setInviteEmailCheck(null)
+                            }}
+                            onBlur={async () => {
+                              if (!inviteEmail) return
+                              try {
+                                const result = await api.get<{
+                                  registered: boolean
+                                  name?: string
+                                }>(
+                                  `${ORGANIZATIONS_ENDPOINTS.CHECK_INVITE_EMAIL(team.organizationId)}?email=${encodeURIComponent(inviteEmail)}`,
+                                )
+                                setInviteEmailCheck(result)
+                              } catch {
+                                setInviteEmailCheck(null)
                               }
+                            }}
+                          />
+                          {inviteEmailCheck !== null && (
+                            <p
+                              className={`text-xs ${inviteEmailCheck.registered ? 'text-emerald-400' : 'text-gray-400'}`}
                             >
-                              <UserAvatar
-                                image={om.user.image}
-                                name={om.user.name}
-                                userId={om.userId}
-                                size="sm"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
-                                  {om.user.name ?? om.user.email}
-                                </p>
-                                {om.user.name && (
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {om.user.email}
-                                  </p>
-                                )}
-                              </div>
-                              {addMemberUserIds.includes(om.userId) && (
-                                <Check className="h-4 w-4 text-primary" />
-                              )}
-                            </div>
-                          ))}
+                              {inviteEmailCheck.registered
+                                ? `Account found${inviteEmailCheck.name ? ` (${inviteEmailCheck.name})` : ''} — invitation email will be sent`
+                                : 'No account found — invitation email will be sent to register'}
+                            </p>
+                          )}
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Team Rank</Label>
+                          <Select
+                            value={inviteTag}
+                            onValueChange={(v: string) =>
+                              setInviteTag(v as 'team-lead' | 'member')
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="member">Member</SelectItem>
+                              <SelectItem value="team-lead">
+                                Team Lead
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                    )}
+                      <DialogFooter>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsInviteOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={
+                            !inviteEmail || inviteMemberMutation.isPending
+                          }
+                        >
+                          {inviteMemberMutation.isPending
+                            ? 'Sending...'
+                            : 'Send Invite'}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
 
-                    {/* Search results */}
-                    {memberSearch.length >= 2 &&
-                      filteredSearchResults.length > 0 && (
-                        <div className="grid gap-2">
-                          <Label>Search Results</Label>
-                          <div className="max-h-48 overflow-y-auto space-y-1 rounded-md border p-2">
-                            {filteredSearchResults.map((u) => (
-                              <div
-                                key={u.id}
-                                className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-muted ${
-                                  addMemberUserIds.includes(u.id)
-                                    ? 'bg-muted'
-                                    : ''
-                                }`}
-                                onClick={() => toggleAddMemberSelection(u.id)}
-                              >
-                                <UserAvatar
-                                  image={u.image}
-                                  name={u.name}
-                                  userId={u.id}
-                                  size="sm"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">
-                                    {u.name}
-                                  </p>
-                                  {u.name && (
-                                    <p className="text-xs text-muted-foreground truncate">
-                                      {u.email}
+                {/* Add Member directly */}
+                <Dialog
+                  open={isAddMemberOpen}
+                  onOpenChange={(open) => {
+                    setIsAddMemberOpen(open)
+                    if (!open) {
+                      setMemberSearch('')
+                      setSearchResults([])
+                      setAddMemberUserIds([])
+                    }
+                  }}
+                >
+                  <DialogTrigger asChild>
+                    <Button>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Add Member
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Team Member</DialogTitle>
+                      <DialogDescription>
+                        Select one or more users to add to this team. Team Rank
+                        will be applied to all selected users.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="memberSearch">Search User</Label>
+                        <Input
+                          id="memberSearch"
+                          placeholder="Type name or email to search..."
+                          value={memberSearch}
+                          onChange={(e) => setMemberSearch(e.target.value)}
+                        />
+                        {isSearching && (
+                          <p className="text-sm text-muted-foreground">
+                            Searching...
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Quick add from org members */}
+                      {memberSearch.length < 2 &&
+                        availableMembers.length > 0 && (
+                          <div className="grid gap-2">
+                            <Label>Organization Members</Label>
+                            <div className="max-h-48 overflow-y-auto space-y-1 rounded-md border p-2">
+                              {availableMembers.map((om) => (
+                                <div
+                                  key={om.userId}
+                                  className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-muted ${
+                                    addMemberUserIds.includes(om.userId)
+                                      ? 'bg-muted'
+                                      : ''
+                                  }`}
+                                  onClick={() =>
+                                    toggleAddMemberSelection(om.userId)
+                                  }
+                                >
+                                  <UserAvatar
+                                    image={om.user.image}
+                                    name={om.user.name}
+                                    userId={om.userId}
+                                    size="sm"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {om.user.name ?? om.user.email}
                                     </p>
+                                    {om.user.name && (
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {om.user.email}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {addMemberUserIds.includes(om.userId) && (
+                                    <Check className="h-4 w-4 text-primary" />
                                   )}
                                 </div>
-                                {addMemberUserIds.includes(u.id) && (
-                                  <Check className="h-4 w-4 text-primary" />
-                                )}
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                    {memberSearch.length >= 2 &&
-                      !isSearching &&
-                      filteredSearchResults.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          No users found matching "{memberSearch}"
-                        </p>
-                      )}
+                      {/* Search results */}
+                      {memberSearch.length >= 2 &&
+                        filteredSearchResults.length > 0 && (
+                          <div className="grid gap-2">
+                            <Label>Search Results</Label>
+                            <div className="max-h-48 overflow-y-auto space-y-1 rounded-md border p-2">
+                              {filteredSearchResults.map((u) => (
+                                <div
+                                  key={u.id}
+                                  className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-muted ${
+                                    addMemberUserIds.includes(u.id)
+                                      ? 'bg-muted'
+                                      : ''
+                                  }`}
+                                  onClick={() => toggleAddMemberSelection(u.id)}
+                                >
+                                  <UserAvatar
+                                    image={u.image}
+                                    name={u.name}
+                                    userId={u.id}
+                                    size="sm"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {u.name}
+                                    </p>
+                                    {u.name && (
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {u.email}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {addMemberUserIds.includes(u.id) && (
+                                    <Check className="h-4 w-4 text-primary" />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
-                    <div className="grid gap-2">
-                      <Label htmlFor="role">Team Rank</Label>
-                      <Select
-                        value={addMemberRole}
-                        onValueChange={(v: string) =>
-                          setAddMemberRole(v as 'team-lead' | 'member')
+                      {memberSearch.length >= 2 &&
+                        !isSearching &&
+                        filteredSearchResults.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No users found matching "{memberSearch}"
+                          </p>
+                        )}
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="role">Team Rank</Label>
+                        <Select
+                          value={addMemberRole}
+                          onValueChange={(v: string) =>
+                            setAddMemberRole(v as 'team-lead' | 'member')
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="member">Member</SelectItem>
+                            <SelectItem value="team-lead">Team Lead</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        {addMemberUserIds.length} user(s) selected with rank:{' '}
+                        {addMemberRole === 'team-lead' ? 'Team Lead' : 'Member'}
+                      </p>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsAddMemberOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() =>
+                          addMemberMutation.mutate({
+                            userIds: addMemberUserIds,
+                            role: addMemberRole,
+                          })
+                        }
+                        disabled={
+                          addMemberUserIds.length === 0 ||
+                          addMemberMutation.isPending
                         }
                       >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="team-lead">Team Lead</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <p className="text-xs text-muted-foreground">
-                      {addMemberUserIds.length} user(s) selected with rank:{' '}
-                      {addMemberRole === 'team-lead' ? 'Team Lead' : 'Member'}
-                    </p>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsAddMemberOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={() =>
-                        addMemberMutation.mutate({
-                          userIds: addMemberUserIds,
-                          role: addMemberRole,
-                        })
-                      }
-                      disabled={
-                        addMemberUserIds.length === 0 ||
-                        addMemberMutation.isPending
-                      }
-                    >
-                      {addMemberMutation.isPending
-                        ? 'Adding...'
-                        : `Add ${addMemberUserIds.length || ''}${
-                            addMemberUserIds.length ? ' Member(s)' : ''
-                          }`}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                        {addMemberMutation.isPending
+                          ? 'Adding...'
+                          : `Add ${addMemberUserIds.length || ''}${
+                              addMemberUserIds.length ? ' Member(s)' : ''
+                            }`}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </>
             )}
           </div>
         </div>

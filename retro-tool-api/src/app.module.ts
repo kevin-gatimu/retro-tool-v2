@@ -17,6 +17,7 @@ import { SessionsModule } from './sessions/sessions.module';
 import { ActionItemsModule } from './action-items/action-items.module';
 import { TeamRolesModule } from './team-roles/team-roles.module';
 import { ConvexAdminModule } from './convex-admin/convex-admin.module';
+import { InvitationsModule } from './invitations/invitations.module';
 import { LastActiveInterceptor } from './common/interceptors/last-active.interceptor';
 import configuration from './config/configuration';
 import { HealthController } from './health.controller';
@@ -54,6 +55,7 @@ loadDotenv({ path: join(__dirname, '../.env.local'), override: true });
     ActionItemsModule,
     TeamRolesModule,
     ConvexAdminModule,
+    InvitationsModule,
   ],
   controllers: [HealthController],
   providers: [

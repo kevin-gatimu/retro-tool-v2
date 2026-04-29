@@ -131,11 +131,21 @@ export function useOrgDetailMutations(orgId: string) {
     mutationFn: ({ email, role }: { email: string; role?: string }) =>
       api.post(ORGANIZATIONS_ENDPOINTS.INVITE(orgId), { email, role }),
     onSuccess: async (_, variables) => {
-      toast.success(`${variables.email} has been added to the organization`)
+      toast.success(`Invitation sent to ${variables.email}`)
       await invalidate()
     },
     onError: (error) =>
       toast.error(error.message || 'Failed to send invitation'),
+  })
+
+  const addOrgMemberMutation = useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role?: string }) =>
+      api.post(ORGANIZATIONS_ENDPOINTS.ADD_MEMBER(orgId), { userId, role }),
+    onSuccess: async () => {
+      toast.success('Member added to the organization')
+      await invalidate()
+    },
+    onError: (error) => toast.error(error.message || 'Failed to add member'),
   })
 
   const updateRoleMutation = useMutation({
@@ -182,6 +192,7 @@ export function useOrgDetailMutations(orgId: string) {
     deleteOrgMutation,
     leaveOrgMutation,
     inviteOrgMemberMutation,
+    addOrgMemberMutation,
     updateRoleMutation,
     removeMemberMutation,
     createTeamMutation,

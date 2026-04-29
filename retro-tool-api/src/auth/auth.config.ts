@@ -2,10 +2,13 @@ import { ConfigService } from '@nestjs/config';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, bearer, multiSession } from 'better-auth/plugins';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { Config } from '../config/configuration';
 import { createEmailService } from '../lib/email';
+import { orgInvitation } from '../organizations/schema';
+import { teamInvitation } from '../teams/schema';
 import * as schema from './schema';
 
 /**
@@ -96,6 +99,37 @@ export function createAuth(configService: ConfigService<Config>) {
         user: { email: string; name: string };
         token: string;
       }) => {
+        // Suppress the standalone "verify your email" message when an active
+        // (unaccepted, unexpired) invitation already exists for this address —
+        // accepting that invite will mark the email as verified, so the
+        // duplicate verification email would only confuse the recipient.
+        const now = new Date();
+        const [orgInv] = await db
+          .select({ id: orgInvitation.id })
+          .from(orgInvitation)
+          .where(
+            and(
+              eq(orgInvitation.email, user.email),
+              isNull(orgInvitation.acceptedAt),
+              gt(orgInvitation.expiresAt, now),
+            ),
+          )
+          .limit(1);
+        const [teamInv] = orgInv
+          ? [undefined]
+          : await db
+              .select({ id: teamInvitation.id })
+              .from(teamInvitation)
+              .where(
+                and(
+                  eq(teamInvitation.email, user.email),
+                  isNull(teamInvitation.acceptedAt),
+                  gt(teamInvitation.expiresAt, now),
+                ),
+              )
+              .limit(1);
+        if (orgInv || teamInv) return;
+
         const verificationUrl = `${frontendUrl}/auth/verify-email?token=${token}`;
         await emailService.sendVerificationEmail({
           to: user.email,

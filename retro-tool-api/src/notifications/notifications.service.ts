@@ -346,6 +346,20 @@ export class NotificationsService {
     });
   }
 
+  async notifyUserOfTeamInvite(
+    userId: string,
+    teamId: string,
+    teamName: string,
+  ): Promise<void> {
+    await this.createAndEmit({
+      userId,
+      type: NOTIFICATION_TYPES.TeamInvite,
+      title: 'Team invitation',
+      message: `You have been added to the team "${teamName}".`,
+      link: `/teams/${teamId}`,
+    });
+  }
+
   async notifySuperAdminsOfTableClear(
     clearedTables: string[],
     failed?: string,
