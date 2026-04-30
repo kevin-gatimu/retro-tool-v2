@@ -49,10 +49,6 @@ export const ORGANIZATIONS_ENDPOINTS = {
     `/api/organizations/${id}/members/${memberId}`,
   MEMBER_ROLE: (id: string, memberId: string) =>
     `/api/organizations/${id}/members/${memberId}/role`,
-  INVITATION_PREVIEW: (token: string) =>
-    `/api/organizations/invitations/${token}`,
-  INVITATION_ACCEPT: (token: string) =>
-    `/api/organizations/invitations/${token}/accept`,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -80,9 +76,6 @@ export const TEAMS_ENDPOINTS = {
     `/api/teams/${id}/join-requests/bulk-approve`,
   JOIN_REQUESTS_ALL: '/api/teams/join-requests/all',
   INVITE: (id: string) => `/api/teams/${id}/invite`,
-  INVITATION_PREVIEW: (token: string) => `/api/teams/invitations/${token}`,
-  INVITATION_ACCEPT: (token: string) =>
-    `/api/teams/invitations/${token}/accept`,
 } as const
 
 // ---------------------------------------------------------------------------

@@ -85,8 +85,6 @@ On acceptance:
 | Expired (> 3 days) | Page shows "Invitation Expired" with a message to request a new invite. |
 | Invalid / missing token | Page shows "Invalid Link" or "Invitation Not Found". |
 
----
-
 ## Sign-in page — invite mode
 
 When `/auth/sign-in` is opened with `?inviteToken=...&email=...` (the invite-aware redirect from `accept-invite`), the page enters **invite mode**:
@@ -180,3 +178,55 @@ A single token-only API works for both org and team invites. The token alone is 
 | `expires_at` | `timestamp` | 3 days from creation |
 | `accepted_at` | `timestamp` | Null until accepted |
 | `created_at` | `timestamp` | Auto |
+
+---
+
+## Password & account requirements
+
+These rules are enforced in both **sign-up** and **reset-password** pages (UI helper: `getPasswordRequirements` in `retro-tool-ui/src/routes/auth/helpers/index.ts`) and validated server-side by Better Auth (`minPasswordLength: 6` in `retro-tool-api/src/auth/auth.config.ts`).
+
+| Requirement | Pattern |
+|---|---|
+| At least 6 characters | `password.length >= 6` |
+| Contains a number | `/\d/` |
+| Contains a special character (e.g. `@ ! # $`) | `/[^a-zA-Z0-9]/` |
+| Contains uppercase letter | `/[A-Z]/` |
+| Contains lowercase letter | `/[a-z]/` |
+
+Live checklist items render in emerald/grey under the password input. The submit button is disabled until **all** requirements pass.
+
+### Reset-password flow
+
+| Step | Endpoint / Page | Notes |
+|---|---|---|
+| 1. Request | `/auth/forgot-password` → `authClient.requestPasswordReset({ email, redirectTo })` | Hits Better Auth `POST /api/auth/request-password-reset`. Always returns `{ status: true, message }` regardless of whether the email exists (prevents enumeration). |
+| 2. Email | `sendResetPassword` callback in `auth.config.ts` | Builds `${FRONTEND_URL}/auth/reset-password?token={token}`. Token expires in **20 minutes** (`resetPasswordTokenExpiresIn: 60 * 20`). |
+| 3. Reset | `/auth/reset-password?token=...` → `authClient.resetPassword({ newPassword, token })` | Same password checklist enforced; submit disabled until satisfied + passwords match. |
+
+The forgot-password success view surfaces the API's `message` field directly ("If this email exists in our system, check your email for the reset link") so users get the intended security-vague response instead of a hard-coded UI string.
+
+> **Verification not required for invitees** — invited users are auto-verified when they accept (see *Accept-invite page* above). Self-signup users still receive the standard Better Auth verification email and must verify before signing in.
+
+---
+
+## Email branding
+
+All transactional emails (password reset, verification, account approved, org/team invitations, retro reports) share the same Retro-Tool logo header.
+
+The logo URL is built dynamically from `FRONTEND_URL` at boot:
+
+```
+${FRONTEND_URL}/Retro-Tool-Logo.jpg
+```
+
+- In production: `https://retro-tool.com/Retro-Tool-Logo.jpg`
+- Locally: `http://localhost:3000/Retro-Tool-Logo.jpg`
+
+Wired in two places:
+
+| File | Templates |
+|---|---|
+| `retro-tool-api/src/lib/email.ts` | Password reset, email verification (Better Auth callbacks). Logo URL passed as a third arg to `createEmailService(apiKey, fromEmail, frontendUrl)`. |
+| `retro-tool-api/src/email/email.service.ts` | Account approved, all invitation variants, retro report. Logo built once in the constructor from `frontend.url` config and rendered via the private `logoHtml()` helper. |
+
+To rebrand, drop a new `Retro-Tool-Logo.jpg` into the UI's `public/` folder (or update the suffix in both files) — no template-by-template edits required.

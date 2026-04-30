@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  UseGuards,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import {
   ApiTags,
@@ -25,35 +16,6 @@ export class TeamInvitationsController {
   constructor(
     private readonly teamInvitationsService: TeamInvitationsService,
   ) {}
-
-  @Get('invitations/:token')
-  @ApiOperation({ summary: 'Preview a team invitation (public)' })
-  @ApiParam({ name: 'token', type: String })
-  @ApiResponse({ status: 200, description: 'Invitation preview' })
-  @ApiResponse({ status: 404, description: 'Invitation not found' })
-  async getTeamInvitationPreview(@Param('token') token: string) {
-    return this.teamInvitationsService.getTeamInvitationPreview(token);
-  }
-
-  @Post('invitations/:token/accept')
-  @UseGuards(AuthGuard)
-  @ApiBearerAuth('session')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Accept a team invitation' })
-  @ApiParam({ name: 'token', type: String })
-  @ApiResponse({ status: 200, description: 'Invitation accepted' })
-  @ApiResponse({ status: 403, description: 'Expired or wrong email' })
-  @ApiResponse({ status: 404, description: 'Invitation not found' })
-  @ApiResponse({ status: 409, description: 'Already accepted' })
-  async acceptTeamInvitation(
-    @Param('token') token: string,
-    @Session() session: SessionUser,
-  ) {
-    return this.teamInvitationsService.acceptTeamInvitation(
-      token,
-      session.user.id,
-    );
-  }
 
   @Post(':id/invite')
   @UseGuards(AuthGuard)

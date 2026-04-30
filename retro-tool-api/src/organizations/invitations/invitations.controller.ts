@@ -6,8 +6,6 @@ import {
   Body,
   Query,
   UseGuards,
-  HttpCode,
-  HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import {
@@ -24,35 +22,6 @@ import type { SessionUser } from '../../common/types';
 @Controller('organizations')
 export class OrgInvitationsController {
   constructor(private readonly orgInvitationsService: OrgInvitationsService) {}
-
-  @Get('invitations/:token')
-  @ApiOperation({ summary: 'Preview an organization invitation (public)' })
-  @ApiParam({ name: 'token', type: String })
-  @ApiResponse({ status: 200, description: 'Invitation preview' })
-  @ApiResponse({ status: 404, description: 'Invitation not found' })
-  async getOrgInvitationPreview(@Param('token') token: string) {
-    return this.orgInvitationsService.getOrgInvitationPreview(token);
-  }
-
-  @Post('invitations/:token/accept')
-  @UseGuards(AuthGuard)
-  @ApiBearerAuth('session')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Accept an organisation invitation' })
-  @ApiParam({ name: 'token', type: String })
-  @ApiResponse({ status: 200, description: 'Invitation accepted' })
-  @ApiResponse({ status: 403, description: 'Expired or wrong email' })
-  @ApiResponse({ status: 404, description: 'Invitation not found' })
-  @ApiResponse({ status: 409, description: 'Already accepted' })
-  async acceptOrgInvitation(
-    @Param('token') token: string,
-    @Session() session: SessionUser,
-  ) {
-    return this.orgInvitationsService.acceptOrgInvitation(
-      token,
-      session.user.id,
-    );
-  }
 
   @Post(':id/invite')
   @UseGuards(AuthGuard)
