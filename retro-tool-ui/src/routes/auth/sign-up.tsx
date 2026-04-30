@@ -10,13 +10,15 @@ import {
   Zap,
   Users,
   BarChart3,
+  CheckCircle2,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { authClient } from '@/lib/auth-client'
+import { allPasswordRequirementsMet, getPasswordRequirements } from './helpers'
 import { useAdminCheck, useSignUp } from './hooks'
 
 export const Route = createFileRoute('/auth/sign-up')({
@@ -229,8 +231,15 @@ function SignUpPage() {
   const error = signUpMutation.error?.message ?? ''
   const loading = signUpMutation.isPending
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const passwordRequirements = useMemo(
+    () => getPasswordRequirements(password),
+    [password],
+  )
+  const allRequirementsMet = allPasswordRequirementsMet(passwordRequirements)
+
+  const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault()
+    if (!allRequirementsMet) return
     signUpMutation.mutate({ name, email, password })
   }
 
@@ -384,11 +393,11 @@ function SignUpPage() {
                         <Input
                           id="password"
                           type={showPassword ? 'text' : 'password'}
-                          placeholder="At least 8 characters"
+                          placeholder="At least 6 characters"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           required
-                          minLength={8}
+                          minLength={6}
                           className="pr-10 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 h-11"
                         />
                         <button
@@ -404,11 +413,30 @@ function SignUpPage() {
                           )}
                         </button>
                       </div>
+                      {password && (
+                        <div className="mt-2 space-y-1">
+                          {passwordRequirements.map((req, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-2 text-xs"
+                            >
+                              <CheckCircle2
+                                className={`w-3.5 h-3.5 transition-colors ${req.met ? 'text-emerald-400' : 'text-gray-600'}`}
+                              />
+                              <span
+                                className={`transition-colors ${req.met ? 'text-emerald-400' : 'text-gray-500'}`}
+                              >
+                                {req.label}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <Button
                       type="submit"
-                      disabled={loading}
+                      disabled={loading || !allRequirementsMet}
                       className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_15px_30px_-10px_rgba(16,185,129,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0 mt-2"
                     >
                       {loading ? (

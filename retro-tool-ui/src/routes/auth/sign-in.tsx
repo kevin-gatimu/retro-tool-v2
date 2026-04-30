@@ -258,7 +258,7 @@ function SignInPage() {
   const error = signInMutation.error?.message ?? ''
   const loading = signInMutation.isPending
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault()
     setPendingApproval(false)
     setRejected(false)

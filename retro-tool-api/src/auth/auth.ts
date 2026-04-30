@@ -18,6 +18,7 @@ const db = drizzle(pool, { schema });
 const emailService = createEmailService(
   process.env.RESEND_API_KEY,
   process.env.EMAIL_FROM || 'Retro-Tool <onboarding@resend.dev>',
+  process.env.FRONTEND_URL || 'http://localhost:3000',
 );
 
 const trustedOrigins = process.env.ALLOWED_ORIGINS

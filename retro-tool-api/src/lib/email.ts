@@ -21,7 +21,10 @@ export interface EmailService {
 export function createEmailService(
   apiKey: string | undefined,
   fromEmail: string,
+  frontendUrl: string,
 ): EmailService {
+  const logoUrl = `${frontendUrl.replace(/\/$/, '')}/Retro-Tool-Logo.jpg`;
+
   if (!apiKey) {
     return {
       sendPasswordResetEmail({ to, resetUrl }) {
@@ -41,21 +44,45 @@ export function createEmailService(
 
   const resend = new Resend(apiKey);
 
+  // Resend's SDK returns `{ data, error }` instead of throwing — surface the
+  // error so misconfigured senders (unverified domain, invalid recipient, etc.)
+  // don't silently swallow the email.
+  const send = async (params: {
+    to: string;
+    subject: string;
+    html: string;
+  }) => {
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    });
+    if (error) {
+      console.error(
+        `[Email] Resend rejected "${params.subject}" to ${params.to}:`,
+        error,
+      );
+      throw new Error(`Email delivery failed: ${error.message ?? 'unknown'}`);
+    }
+    console.log(
+      `[Email] Sent "${params.subject}" to ${params.to} (id=${data?.id ?? 'n/a'})`,
+    );
+  };
+
   return {
     async sendPasswordResetEmail({ to, name, resetUrl }) {
-      await resend.emails.send({
-        from: fromEmail,
+      await send({
         to,
         subject: 'Reset your password',
-        html: passwordResetHtml({ name, resetUrl }),
+        html: passwordResetHtml({ name, resetUrl, logoUrl }),
       });
     },
     async sendVerificationEmail({ to, name, verificationUrl }) {
-      await resend.emails.send({
-        from: fromEmail,
+      await send({
         to,
         subject: 'Verify your email address',
-        html: emailVerificationHtml({ name, verificationUrl }),
+        html: emailVerificationHtml({ name, verificationUrl, logoUrl }),
       });
     },
   };
@@ -64,9 +91,11 @@ export function createEmailService(
 function passwordResetHtml({
   name,
   resetUrl,
+  logoUrl,
 }: {
   name: string;
   resetUrl: string;
+  logoUrl: string;
 }): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -83,8 +112,9 @@ function passwordResetHtml({
 
           <!-- Header -->
           <tr>
-            <td style="background-color:#18181b;padding:32px 40px;">
-              <p style="margin:0;font-size:20px;font-weight:600;color:#ffffff;letter-spacing:-0.3px;">Retro Tool</p>
+            <td style="background-color:#18181b;padding:24px 40px;text-align:center;">
+              <img src="${logoUrl}" alt="Retro Tool" height="48" style="display:block;margin:0 auto 10px;height:48px;border:0;" />
+              <p style="margin:0;font-size:18px;font-weight:600;color:#ffffff;letter-spacing:-0.3px;">Retro Tool</p>
             </td>
           </tr>
 
@@ -96,7 +126,7 @@ function passwordResetHtml({
                 Hi ${name},
               </p>
               <p style="margin:0 0 32px;font-size:15px;line-height:1.6;color:#52525b;">
-                We received a request to reset the password for your account. Click the button below to choose a new password. This link expires in <strong>1 hour</strong>.
+                We received a request to reset the password for your account. Click the button below to choose a new password. This link expires in <strong>20 minutes</strong>.
               </p>
 
               <!-- CTA Button -->
@@ -141,9 +171,11 @@ function passwordResetHtml({
 function emailVerificationHtml({
   name,
   verificationUrl,
+  logoUrl,
 }: {
   name: string;
   verificationUrl: string;
+  logoUrl: string;
 }): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -160,8 +192,9 @@ function emailVerificationHtml({
 
           <!-- Header -->
           <tr>
-            <td style="background-color:#18181b;padding:32px 40px;">
-              <p style="margin:0;font-size:20px;font-weight:600;color:#ffffff;letter-spacing:-0.3px;">Retro Tool</p>
+            <td style="background-color:#18181b;padding:24px 40px;text-align:center;">
+              <img src="${logoUrl}" alt="Retro Tool" height="48" style="display:block;margin:0 auto 10px;height:48px;border:0;" />
+              <p style="margin:0;font-size:18px;font-weight:600;color:#ffffff;letter-spacing:-0.3px;">Retro Tool</p>
             </td>
           </tr>
 

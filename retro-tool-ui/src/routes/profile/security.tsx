@@ -118,7 +118,7 @@ function SecurityPage() {
 
   const isLoading = changePasswordMutation.isPending
 
-  const handlePasswordChange = (e: React.FormEvent) => {
+  const handlePasswordChange = (e: React.SyntheticEvent) => {
     e.preventDefault()
     setError(null)
 

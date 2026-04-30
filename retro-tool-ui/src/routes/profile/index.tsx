@@ -105,7 +105,7 @@ function ProfilePage() {
 
   const isLoading = updateProfileMutation.isPending
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault()
     setError(null)
     updateProfileMutation.mutate(formData.name)

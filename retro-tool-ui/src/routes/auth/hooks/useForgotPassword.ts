@@ -1,14 +1,24 @@
 import { useMutation } from '@tanstack/react-query'
 import { authClient } from '@/lib/auth-client'
 
-export function useForgotPassword({ onSuccess }: { onSuccess: () => void }) {
+export function useForgotPassword({
+  onSuccess,
+}: {
+  onSuccess: (message: string) => void
+}) {
   return useMutation({
-    mutationFn: (email: string) =>
-      // @ts-expect-error - forgetPassword exists in better-auth but may not be typed depending on config
-      authClient.forgetPassword({
+    mutationFn: async (email: string) => {
+      const { data, error } = await authClient.requestPasswordReset({
         email,
-        redirectTo: '/auth/reset-password',
-      }),
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
+      if (error)
+        throw new Error(error.message ?? 'Failed to request password reset')
+      return (
+        data.message ||
+        'If this email exists in our system, check your email for the reset link'
+      )
+    },
     onSuccess,
   })
 }

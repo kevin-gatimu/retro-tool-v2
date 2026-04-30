@@ -29,6 +29,7 @@ export function createAuth(configService: ConfigService<Config>) {
   const emailService = createEmailService(
     emailConfig?.resendApiKey,
     emailConfig?.fromEmail ?? 'Retro-Tool <onboarding@resend.dev>',
+    frontendUrl ?? 'http://localhost:3000',
   );
 
   // Get auth config object for nested properties
@@ -75,6 +76,9 @@ export function createAuth(configService: ConfigService<Config>) {
     trustedOrigins: allowedOrigins,
     emailAndPassword: {
       enabled: true,
+      minPasswordLength: 6,
+      // Password reset tokens expire 20 minutes after issuance
+      resetPasswordTokenExpiresIn: 60 * 20,
       sendResetPassword: async ({
         user,
         token,
@@ -82,12 +86,20 @@ export function createAuth(configService: ConfigService<Config>) {
         user: { email: string; name: string };
         token: string;
       }) => {
-        const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
-        await emailService.sendPasswordResetEmail({
-          to: user.email,
-          name: user.name,
-          resetUrl,
-        });
+        const resetUrl = `${frontendUrl}/auth/reset-password?token=${token}`;
+        console.log(
+          `[Auth] sendResetPassword fired for ${user.email} -> ${resetUrl}`,
+        );
+        try {
+          await emailService.sendPasswordResetEmail({
+            to: user.email,
+            name: user.name,
+            resetUrl,
+          });
+        } catch (err) {
+          console.error('[Auth] sendResetPassword failed:', err);
+          throw err;
+        }
       },
     },
     emailVerification: {
@@ -115,20 +127,20 @@ export function createAuth(configService: ConfigService<Config>) {
             ),
           )
           .limit(1);
-        const [teamInv] = orgInv
-          ? [undefined]
-          : await db
-              .select({ id: teamInvitation.id })
-              .from(teamInvitation)
-              .where(
-                and(
-                  eq(teamInvitation.email, user.email),
-                  isNull(teamInvitation.acceptedAt),
-                  gt(teamInvitation.expiresAt, now),
-                ),
-              )
-              .limit(1);
-        if (orgInv || teamInv) return;
+        if (orgInv) return;
+
+        const [teamInv] = await db
+          .select({ id: teamInvitation.id })
+          .from(teamInvitation)
+          .where(
+            and(
+              eq(teamInvitation.email, user.email),
+              isNull(teamInvitation.acceptedAt),
+              gt(teamInvitation.expiresAt, now),
+            ),
+          )
+          .limit(1);
+        if (teamInv) return;
 
         const verificationUrl = `${frontendUrl}/auth/verify-email?token=${token}`;
         await emailService.sendVerificationEmail({

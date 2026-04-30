@@ -16,6 +16,7 @@ export class EmailService {
   private resend: Resend | null = null;
   private readonly fromEmail: string;
   private readonly sandboxTo: string | null;
+  private readonly logoUrl: string;
 
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
@@ -27,6 +28,10 @@ export class EmailService {
       'noreply@example.com';
     this.sandboxTo =
       configService.get('email', { infer: true })?.sandboxTo ?? null;
+    const frontendUrl =
+      configService.get('frontend.url', { infer: true }) ??
+      'http://localhost:3000';
+    this.logoUrl = `${frontendUrl.replace(/\/$/, '')}/Retro-Tool-Logo.jpg`;
     if (apiKey) {
       this.resend = new Resend(apiKey);
     } else {
@@ -124,6 +129,10 @@ export class EmailService {
   // Email Templates
   // ============================================================================
 
+  private logoHtml(): string {
+    return `<div style="text-align:center;margin:0 0 24px 0"><img src="${this.logoUrl}" alt="Retro Tool" height="56" style="display:inline-block;height:56px;border:0" /></div>`;
+  }
+
   buildAccountApprovedHtml(params: {
     userName: string;
     appUrl: string;
@@ -132,6 +141,7 @@ export class EmailService {
 <!DOCTYPE html>
 <html>
 <body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+  ${this.logoHtml()}
   <h2 style="color:#1e40af">You're In!</h2>
   <p>Hi ${this.esc(params.userName)},</p>
   <p>Your account has been approved. You can now sign in and start collaborating with your teams.</p>
@@ -191,13 +201,14 @@ export class EmailService {
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:24px">
   <div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:32px">
+    ${this.logoHtml()}
     <h2 style="color:#1e40af;margin:0 0 16px 0">${this.esc(params.heading)}</h2>
     ${params.greeting ? `<p style="margin:0 0 12px 0">${params.greeting}</p>` : ''}
     <p style="margin:0 0 16px 0;color:#1f2937;font-size:15px;line-height:1.5">${params.leadHtml}</p>
 
     <div style="background:#f3f4f6;border-left:4px solid #1e40af;padding:14px 16px;border-radius:4px;margin:20px 0">
       <p style="margin:0;font-size:13px;color:#374151"><strong>Invited email:</strong> ${this.esc(params.invitedEmail)}</p>
-      <p style="margin:6px 0 0 0;font-size:13px;color:#374151"><strong>This link expires in 7 days.</strong></p>
+      <p style="margin:6px 0 0 0;font-size:13px;color:#374151"><strong>This link expires in 3 days.</strong></p>
     </div>
 
     <p style="margin:0 0 4px 0;font-size:14px;color:#111827"><strong>What to do next:</strong></p>
@@ -407,6 +418,7 @@ export class EmailService {
 <!DOCTYPE html>
 <html>
 <body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+  ${this.logoHtml()}
   <h2 style="color:#1e40af">Retrospective Report</h2>
   <p>Hi ${this.esc(params.recipientName)},</p>
   <p>Here's the report from <strong>${this.esc(params.retroName)}</strong> for team <strong>${this.esc(params.teamName)}</strong> completed on ${params.completedAt}.</p>
