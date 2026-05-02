@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import {
   useOrgSetupMutations,
@@ -29,7 +30,44 @@ import {
 import { slugify } from './helpers'
 import type { CreatedOrg, SelectedUser, TeamDraft } from './types'
 
+function OrgSetupSkeleton() {
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      {/* Stepper */}
+      <div className="flex items-center gap-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <Skeleton className="hidden sm:block h-4 w-16" />
+            {i < 4 && <Skeleton className="h-px w-4" />}
+          </div>
+        ))}
+      </div>
+      {/* Form card */}
+      <div className="border rounded-lg p-6 space-y-4">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-4 w-64" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-3 w-72" />
+        </div>
+        <Skeleton className="h-10 w-full" />
+      </div>
+    </div>
+  )
+}
+
 export const Route = createFileRoute('/admin/org-setup')({
+  pendingComponent: OrgSetupSkeleton,
   component: OrgSetupWizard,
 })
 

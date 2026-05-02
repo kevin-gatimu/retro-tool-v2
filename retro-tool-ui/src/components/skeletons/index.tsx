@@ -117,12 +117,6 @@ export function TemplatesListSkeleton() {
 export function AdminTemplatesSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Admin Nav placeholder */}
-      <div className="flex items-center gap-1 border-b pb-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-8 w-24 rounded-md" />
-        ))}
-      </div>
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div className="space-y-2">
@@ -633,13 +627,6 @@ export function SettingsSkeleton() {
 export function AdminDashboardSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Admin nav bar */}
-      <div className="flex items-center gap-1 border-b pb-2 mb-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-8 w-24 rounded-md" />
-        ))}
-      </div>
-
       {/* Header */}
       <div className="space-y-2">
         <Skeleton className="h-8 w-32" />
