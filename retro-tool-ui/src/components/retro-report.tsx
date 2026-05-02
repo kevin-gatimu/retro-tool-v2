@@ -51,6 +51,10 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(
     new Set(),
   )
+  const [discussedOpen, setDiscussedOpen] = useState(false)
+  const [undiscussedOpen, setUndiscussedOpen] = useState(false)
+  const [carriedForwardOpen, setCarriedForwardOpen] = useState(false)
+  const [carriedFromPreviousOpen, setCarriedFromPreviousOpen] = useState(false)
   const sendRetroReportMutation = useSendRetroReport(retro.id, {
     onSuccess: () => setSelectedRecipients(new Set()),
   })
@@ -291,109 +295,137 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
           {/* Discussed Cards */}
           {discussedCards.length > 0 && (
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <h3 className="font-semibold text-sm">
-                  Discussed ({discussedCards.length})
-                </h3>
-              </div>
-              {columns.map((col) => {
-                const cards = getCardsForColumn(col.id, discussedCards)
-                if (cards.length === 0) return null
-                return (
-                  <div key={col.id} className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {col.emoji} {col.name}
-                    </p>
-                    <div className="space-y-1.5 pl-2 border-l-2 border-green-200 dark:border-green-900">
-                      {cards.map((card) => (
-                        <ReportCard
-                          key={card.id}
-                          card={card}
-                          status="discussed"
-                        />
-                      ))}
+              <button
+                type="button"
+                onClick={() => setDiscussedOpen((prev) => !prev)}
+                className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left hover:bg-muted/30"
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <h3 className="font-semibold text-sm">
+                    Discussed ({discussedCards.length})
+                  </h3>
+                </div>
+                {discussedOpen ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+              {discussedOpen &&
+                columns.map((col) => {
+                  const cards = getCardsForColumn(col.id, discussedCards)
+                  if (cards.length === 0) return null
+                  return (
+                    <div key={col.id} className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        {col.emoji} {col.name}
+                      </p>
+                      <div className="space-y-1.5 pl-2 border-l-2 border-green-200 dark:border-green-900">
+                        {cards.map((card) => (
+                          <ReportCard
+                            key={card.id}
+                            card={card}
+                            status="discussed"
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
             </section>
           )}
 
           {/* Undiscussed Cards */}
           {undiscussedCards.length > 0 && (
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-500" />
-                <h3 className="font-semibold text-sm">
-                  Not Discussed ({undiscussedCards.length})
-                </h3>
-              </div>
-
-              {columns.map((col) => {
-                const cards = getCardsForColumn(col.id, undiscussedCards)
-                if (cards.length === 0) return null
-                return (
-                  <div key={col.id} className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {col.emoji} {col.name}
-                    </p>
-                    <div className="space-y-1.5 pl-2 border-l-2 border-amber-200 dark:border-amber-900">
-                      {cards.map((card) => (
-                        <ReportCard
-                          key={card.id}
-                          card={card}
-                          status="undiscussed"
-                          selected={
-                            retro.isCreator
-                              ? !!selectedCarryForward[card.id]
-                              : undefined
-                          }
-                          onSelect={
-                            retro.isCreator
-                              ? (checked) =>
-                                  setSelectedCarryForward((prev) => ({
-                                    ...prev,
-                                    [card.id]: checked,
-                                  }))
-                              : undefined
-                          }
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-
-              {/* Carry Forward Action - only visible to retro creator */}
-              {retro.isCreator && (
-                <div className="rounded-lg border border-dashed bg-muted/30 p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium">
-                        Carry Forward to Next Retro
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Select undiscussed items above to create action items
-                        for the next session.
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      disabled={
-                        selectedCount === 0 || carryForwardMutation.isPending
-                      }
-                      onClick={() => carryForwardMutation.mutate()}
-                      className="shrink-0"
-                    >
-                      {carryForwardMutation.isPending
-                        ? 'Creating...'
-                        : selectedCount > 0
-                          ? `Carry Forward (${selectedCount})`
-                          : 'Carry Forward'}
-                    </Button>
-                  </div>
+              <button
+                type="button"
+                onClick={() => setUndiscussedOpen((prev) => !prev)}
+                className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left hover:bg-muted/30"
+              >
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-amber-500" />
+                  <h3 className="font-semibold text-sm">
+                    Not Discussed ({undiscussedCards.length})
+                  </h3>
                 </div>
+                {undiscussedOpen ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+
+              {undiscussedOpen && (
+                <>
+                  {columns.map((col) => {
+                    const cards = getCardsForColumn(col.id, undiscussedCards)
+                    if (cards.length === 0) return null
+                    return (
+                      <div key={col.id} className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          {col.emoji} {col.name}
+                        </p>
+                        <div className="space-y-1.5 pl-2 border-l-2 border-amber-200 dark:border-amber-900">
+                          {cards.map((card) => (
+                            <ReportCard
+                              key={card.id}
+                              card={card}
+                              status="undiscussed"
+                              selected={
+                                retro.isCreator
+                                  ? !!selectedCarryForward[card.id]
+                                  : undefined
+                              }
+                              onSelect={
+                                retro.isCreator
+                                  ? (checked) =>
+                                      setSelectedCarryForward((prev) => ({
+                                        ...prev,
+                                        [card.id]: checked,
+                                      }))
+                                  : undefined
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* Carry Forward Action - only visible to retro creator */}
+                  {retro.isCreator && (
+                    <div className="rounded-lg border border-dashed bg-muted/30 p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium">
+                            Carry Forward to Next Retro
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Select undiscussed items above to create action
+                            items for the next session.
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          disabled={
+                            selectedCount === 0 ||
+                            carryForwardMutation.isPending
+                          }
+                          onClick={() => carryForwardMutation.mutate()}
+                          className="shrink-0"
+                        >
+                          {carryForwardMutation.isPending
+                            ? 'Creating...'
+                            : selectedCount > 0
+                              ? `Carry Forward (${selectedCount})`
+                              : 'Carry Forward'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </section>
           )}
@@ -401,80 +433,104 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
           {/* Carried Forward Cards */}
           {carriedForwardCards.length > 0 && (
             <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Forward className="h-4 w-4 text-purple-500" />
-                <h3 className="font-semibold text-sm">
-                  Carried Forward ({carriedForwardCards.length})
-                </h3>
-              </div>
-              {columns.map((col) => {
-                const cards = getCardsForColumn(col.id, carriedForwardCards)
-                if (cards.length === 0) return null
-                return (
-                  <div key={col.id} className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      {col.emoji} {col.name}
-                    </p>
-                    <div className="space-y-1.5 pl-2 border-l-2 border-purple-200 dark:border-purple-900">
-                      {cards.map((card) => (
-                        <ReportCard
-                          key={card.id}
-                          card={card}
-                          status="carried-forward"
-                        />
-                      ))}
+              <button
+                type="button"
+                onClick={() => setCarriedForwardOpen((prev) => !prev)}
+                className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left hover:bg-muted/30"
+              >
+                <div className="flex items-center gap-2">
+                  <Forward className="h-4 w-4 text-purple-500" />
+                  <h3 className="font-semibold text-sm">
+                    Carried Forward ({carriedForwardCards.length})
+                  </h3>
+                </div>
+                {carriedForwardOpen ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+              {carriedForwardOpen &&
+                columns.map((col) => {
+                  const cards = getCardsForColumn(col.id, carriedForwardCards)
+                  if (cards.length === 0) return null
+                  return (
+                    <div key={col.id} className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        {col.emoji} {col.name}
+                      </p>
+                      <div className="space-y-1.5 pl-2 border-l-2 border-purple-200 dark:border-purple-900">
+                        {cards.map((card) => (
+                          <ReportCard
+                            key={card.id}
+                            card={card}
+                            status="carried-forward"
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
             </section>
           )}
 
           <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <HistoryIcon className="h-4 w-4 text-amber-500" />
-              <h3 className="font-semibold text-sm">
-                Carried From Previous Retro ({previousCarriedItems.length})
-              </h3>
-            </div>
-            {previousCarriedItems.length === 0 ? (
-              <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground bg-muted/20">
-                No carried-forward items from the previous retro.
+            <button
+              type="button"
+              onClick={() => setCarriedFromPreviousOpen((prev) => !prev)}
+              className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left hover:bg-muted/30"
+            >
+              <div className="flex items-center gap-2">
+                <HistoryIcon className="h-4 w-4 text-amber-500" />
+                <h3 className="font-semibold text-sm">
+                  Carried From Previous Retro ({previousCarriedItems.length})
+                </h3>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {previousCarriedItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-lg border border-amber-200/70 bg-amber-50/40 dark:border-amber-800/50 dark:bg-amber-900/10 px-3 py-2.5"
-                  >
-                    {(item.sourceContents?.length ?? 0) > 1 ? (
-                      <ul className="text-sm leading-snug list-disc list-inside space-y-0.5">
-                        {item.sourceContents!.map((content, idx) => (
-                          <li key={idx}>{content}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm leading-snug">{item.title}</p>
-                    )}
-                    <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
-                      {(item.likesCount ?? 0) > 0 && (
-                        <span className="flex items-center gap-1">
-                          <ThumbsUp className="h-3 w-3" />
-                          {item.likesCount}
-                        </span>
+              {carriedFromPreviousOpen ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+            {carriedFromPreviousOpen &&
+              (previousCarriedItems.length === 0 ? (
+                <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground bg-muted/20">
+                  No carried-forward items from the previous retro.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {previousCarriedItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-lg border border-amber-200/70 bg-amber-50/40 dark:border-amber-800/50 dark:bg-amber-900/10 px-3 py-2.5"
+                    >
+                      {(item.sourceContents?.length ?? 0) > 1 ? (
+                        <ul className="text-sm leading-snug list-disc list-inside space-y-0.5">
+                          {item.sourceContents!.map((content, idx) => (
+                            <li key={idx}>{content}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm leading-snug">{item.title}</p>
                       )}
-                      {(item.comments?.length ?? 0) > 0 && (
-                        <span className="flex items-center gap-1">
-                          <MessageSquare className="h-3 w-3" />
-                          {item.comments?.length ?? 0}
-                        </span>
-                      )}
+                      <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
+                        {(item.likesCount ?? 0) > 0 && (
+                          <span className="flex items-center gap-1">
+                            <ThumbsUp className="h-3 w-3" />
+                            {item.likesCount}
+                          </span>
+                        )}
+                        {(item.comments?.length ?? 0) > 0 && (
+                          <span className="flex items-center gap-1">
+                            <MessageSquare className="h-3 w-3" />
+                            {item.comments?.length ?? 0}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              ))}
           </section>
 
           {undiscussedCards.length === 0 && discussedCards.length > 0 && (
