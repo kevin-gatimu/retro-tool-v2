@@ -155,7 +155,7 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
-    const canManage = await this.estimatesService.canManageSession(
+    const canManage: boolean = await this.estimatesService.canManageSession(
       data.sessionId,
       userId,
     );
