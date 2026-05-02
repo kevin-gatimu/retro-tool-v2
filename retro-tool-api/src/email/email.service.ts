@@ -356,6 +356,7 @@ export class EmailService {
         content: string;
         votes: number;
         comments: Array<{ content: string; authorName: string | null }>;
+        sourceContents?: string[];
       }>;
     }>;
     actionItems: Array<{ title: string; assigneeName?: string }>;
@@ -377,7 +378,29 @@ export class EmailService {
         <h4 style="margin:0 0 12px;color:#1e40af">${col.emoji} ${this.esc(col.name)}</h4>
         <p style="margin:0 0 8px;font-size:12px;color:#6b7280">Discussed: <strong>${col.discussedCount}</strong> | Undiscussed: <strong>${col.undiscussedCount}</strong></p>
         <div style="margin-top:8px">
-          ${col.topCards.map((card) => `<p style="margin:4px 0;font-size:13px;color:#52525b">• ${this.esc(card.content)} <span style="color:#9ca3af">(${card.votes} ${card.votes === 1 ? 'vote' : 'votes'})</span></p>`).join('')}
+          ${col.topCards
+            .map((card) => {
+              const voteLabel = `${card.votes} ${card.votes === 1 ? 'vote' : 'votes'}`;
+              if (card.sourceContents && card.sourceContents.length > 1) {
+                const sourcesHtml = card.sourceContents
+                  .map(
+                    (content) =>
+                      `<li style="margin:2px 0">${this.esc(content)}</li>`,
+                  )
+                  .join('');
+
+                return `
+                  <div style="margin:6px 0 8px 0">
+                    <p style="margin:0 0 4px;font-size:13px;color:#52525b">• Merged items <span style="color:#9ca3af">(${voteLabel})</span></p>
+                    <ul style="margin:0;padding-left:18px;font-size:13px;color:#52525b;line-height:1.4">
+                      ${sourcesHtml}
+                    </ul>
+                  </div>`;
+              }
+
+              return `<p style="margin:4px 0;font-size:13px;color:#52525b">• ${this.esc(card.content)} <span style="color:#9ca3af">(${voteLabel})</span></p>`;
+            })
+            .join('')}
           ${col.topCards
             .map((card) => {
               if (card.comments.length === 0) {

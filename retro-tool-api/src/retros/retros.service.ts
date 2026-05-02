@@ -1577,12 +1577,29 @@ export class RetrosService {
     const columnSummaries = columns.map((col) => {
       const columnCards = cards.filter((c) => c.columnId === col.id);
       const discussedCards = columnCards.filter((c) => c.isDiscussed);
+      const cleanCardContent = (content: string) =>
+        removeMergeMetadata(content)
+          .replace(MERGED_FROM_LINE_REGEX, '')
+          .replace(/\s+$/, '');
+      const extractSourceContents = (content: string) => {
+        const mergeMetadata = parseMergeMetadata(content);
+        const sourceContents = (mergeMetadata?.sourceCards ?? [])
+          .map((sourceCard) =>
+            sourceCard.content
+              .replace(MERGED_FROM_LINE_REGEX, '')
+              .replace(/\s+$/, ''),
+          )
+          .filter(Boolean);
+
+        return sourceContents.length > 1 ? sourceContents : undefined;
+      };
       const topCards = columnCards
         .sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0))
         .map((c) => ({
-          content: c.content,
+          content: cleanCardContent(c.content),
           votes: c.voteCount ?? 0,
           comments: commentsByCard.get(c.id) ?? [],
+          sourceContents: extractSourceContents(c.content),
         }));
 
       return {
