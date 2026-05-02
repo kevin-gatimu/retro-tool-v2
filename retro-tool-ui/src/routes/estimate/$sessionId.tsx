@@ -66,7 +66,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { TooltipProvider } from '@/components/ui/tooltip'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { getEstimateSocket } from '@/lib/socket'
 import { ESTIMATES_ENDPOINTS } from '@/lib/api-endpoints'
@@ -1006,55 +1011,60 @@ function EstimateSessionPage() {
               </h3>
               <div className="flex flex-wrap items-end gap-3 sm:gap-4">
                 {voteOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleVote(option.value)}
-                    disabled={session.status === 'revealed'}
-                    style={
-                      !isTShirtTemplate &&
-                      option.color &&
-                      selectedPoints !== option.value
-                        ? {
-                            borderColor: `${option.color}40`,
-                            color: option.color,
-                          }
-                        : undefined
-                    }
-                    className={cn(
-                      'relative rounded-lg transition-all duration-150 ease-out',
-                      'hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-                      'flex items-center justify-center active:scale-95',
-                      isTShirtTemplate
-                        ? 'w-20 h-20 sm:w-24 sm:h-24 border-0 bg-transparent p-0'
-                        : 'w-12 h-16 sm:w-14 sm:h-20 border-2 font-bold text-lg sm:text-xl bg-card',
-                      !isTShirtTemplate &&
-                        (selectedPoints === option.value
-                          ? 'border-primary bg-primary/10 text-primary shadow-lg scale-105 animate-in zoom-in-95 duration-200'
-                          : 'border-border hover:border-primary/50'),
-                      isTShirtTemplate &&
-                        selectedPoints === option.value &&
-                        'scale-110 shadow-lg drop-shadow-md animate-in zoom-in-95 duration-200',
-                      session.status === 'revealed' &&
-                        'opacity-50 cursor-not-allowed hover:scale-100',
-                    )}
-                  >
-                    {isTShirtTemplate ? (
-                      <TShirtIcon
-                        label={option.label}
-                        themeColor={option.color ?? tShirtThemeColor}
-                        selected={selectedPoints === option.value}
-                        scale={getShirtScale(option.label)}
-                      />
-                    ) : (
-                      option.label
-                    )}
-                    {selectedPoints === option.value && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center animate-in zoom-in-50 duration-200">
-                        <Check className="h-2.5 w-2.5 text-primary-foreground" />
-                      </div>
-                    )}
-                  </button>
+                  <Tooltip key={option.value}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => handleVote(option.value)}
+                        disabled={session.status === 'revealed'}
+                        style={
+                          !isTShirtTemplate &&
+                          option.color &&
+                          selectedPoints !== option.value
+                            ? {
+                                borderColor: `${option.color}40`,
+                                color: option.color,
+                              }
+                            : undefined
+                        }
+                        className={cn(
+                          'relative rounded-lg transition-all duration-150 ease-out',
+                          'hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+                          'flex flex-col items-center justify-center active:scale-95',
+                          'text-center',
+                          isTShirtTemplate
+                            ? 'w-20 h-20 sm:w-24 sm:h-24 border-0 bg-transparent p-0 overflow-hidden'
+                            : 'min-w-12 sm:min-w-14 min-h-16 sm:min-h-20 border-2 font-bold text-sm sm:text-base bg-card px-2 py-1 break-words',
+                          !isTShirtTemplate &&
+                            (selectedPoints === option.value
+                              ? 'border-primary bg-primary/10 text-primary shadow-lg scale-105 animate-in zoom-in-95 duration-200'
+                              : 'border-border hover:border-primary/50'),
+                          isTShirtTemplate &&
+                            selectedPoints === option.value &&
+                            'scale-110 shadow-lg drop-shadow-md animate-in zoom-in-95 duration-200',
+                          session.status === 'revealed' &&
+                            'opacity-50 cursor-not-allowed hover:scale-100',
+                        )}
+                      >
+                        {isTShirtTemplate ? (
+                          <TShirtIcon
+                            label={option.label}
+                            themeColor={option.color ?? tShirtThemeColor}
+                            selected={selectedPoints === option.value}
+                            scale={getShirtScale(option.label)}
+                          />
+                        ) : (
+                          option.label
+                        )}
+                        {selectedPoints === option.value && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center animate-in zoom-in-50 duration-200">
+                            <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                          </div>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{option.value}</TooltipContent>
+                  </Tooltip>
                 ))}
               </div>
             </div>
@@ -1173,7 +1183,7 @@ function EstimateSessionPage() {
                       )}
                       <div
                         className={cn(
-                          'w-10 h-12 rounded border-2 flex items-center justify-center font-bold text-sm transition-all duration-200',
+                          'w-full min-h-10 rounded border-2 flex items-center justify-center font-bold text-sm transition-all duration-200 px-1 py-1 text-center break-words',
                           hasVoted
                             ? isRevealed
                               ? 'border-primary bg-primary/10 text-primary animate-in zoom-in-95 duration-200'
@@ -1183,7 +1193,7 @@ function EstimateSessionPage() {
                       >
                         {hasVoted ? (
                           isRevealed ? (
-                            <span className="animate-in zoom-in-50 duration-150">
+                            <span className="animate-in zoom-in-50 duration-150 break-words w-full text-center leading-tight">
                               {displayVote(vote.points)}
                             </span>
                           ) : (
@@ -1303,38 +1313,41 @@ function EstimateSessionPage() {
                         >
                           Agreed Points
                         </label>
-                        {session.template && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {session.template.values
-                              .filter((v) => v.value !== '?')
-                              .map((v) => (
-                                <Button
-                                  key={v.id}
-                                  variant={
-                                    agreedPoints === v.value
-                                      ? 'default'
-                                      : 'outline'
-                                  }
-                                  size="sm"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={() =>
-                                    handleAgreedPointsChange(v.value)
-                                  }
-                                >
-                                  {v.label}
-                                </Button>
-                              ))}
-                          </div>
-                        )}
+                        <div className="flex flex-wrap gap-1.5">
+                          {voteOptions
+                            .filter((v) => v.value !== '?')
+                            .map((v) => (
+                              <Button
+                                key={v.value}
+                                variant={
+                                  agreedPoints === v.value
+                                    ? 'default'
+                                    : 'outline'
+                                }
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                onClick={() =>
+                                  handleAgreedPointsChange(v.value)
+                                }
+                              >
+                                {v.label}
+                              </Button>
+                            ))}
+                        </div>
                         <div className="relative">
                           <Input
                             id="agreed-points-input"
                             className="w-28 border-primary/60 bg-primary/5 text-center font-semibold focus-visible:ring-primary focus-visible:border-primary"
                             placeholder={stats?.avg ?? '—'}
                             value={agreedPoints}
-                            onChange={(e) =>
-                              handleAgreedPointsChange(e.target.value)
-                            }
+                            onChange={(e) => {
+                              const raw = e.target.value
+                              // Allow only digits and a single decimal point
+                              const filtered = raw
+                                .replace(/[^0-9.]/g, '')
+                                .replace(/(\..*?)\./g, '$1')
+                              handleAgreedPointsChange(filtered)
+                            }}
                             onBlur={handleAgreedPointsBlur}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {

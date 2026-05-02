@@ -1687,6 +1687,7 @@ function TemplateForm({
           value={formName}
           onChange={(e) => onNameChange(e.target.value)}
           placeholder="Sprint Retrospective"
+          maxCharacters={40}
         />
       </div>
       <div className="grid gap-2">
@@ -1733,6 +1734,7 @@ function TemplateForm({
                 value={col.name}
                 onChange={(e) => updateColumn(i, 'name', e.target.value)}
                 placeholder="Column name"
+                maxCharacters={40}
               />
               <Input
                 value={col.prompt}

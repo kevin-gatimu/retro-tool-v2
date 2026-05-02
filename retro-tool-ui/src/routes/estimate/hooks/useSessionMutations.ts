@@ -177,10 +177,10 @@ export function useSessionMutations(sessionId: string) {
       api.patch(ESTIMATES_ENDPOINTS.CONSENSUS(sessionId), { agreedPoints }),
     onSuccess: () => {
       refetchSession()
-      toast.success('Consensus saved')
+      toast.success('Agreed points saved')
     },
     onError: (error: Error) =>
-      toast.error(error.message || 'Failed to save consensus'),
+      toast.error(error.message || 'Failed to save agreed points'),
   })
 
   const revoteMutation = useMutation({

@@ -1544,6 +1544,7 @@ function OrganizationDetailPage() {
                 value={tplName}
                 onChange={(e) => setTplName(e.target.value)}
                 placeholder="Start / Stop / Continue"
+                maxCharacters={40}
               />
             </div>
             <div className="space-y-2">
@@ -1603,6 +1604,7 @@ function OrganizationDetailPage() {
                             })
                           }
                           placeholder="What went well"
+                          maxCharacters={40}
                         />
                       </div>
                     </div>
@@ -2114,6 +2116,7 @@ function OrgEstimateTemplateDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Sprint Estimation"
+              maxCharacters={40}
             />
           </div>
 
@@ -2176,7 +2179,7 @@ function OrgEstimateTemplateDialog({
                     <Input
                       placeholder="XS"
                       value={v.label}
-                      maxLength={20}
+                      maxCharacters={20}
                       onChange={(e) =>
                         setValues((vals) =>
                           vals.map((vv, j) =>
@@ -2191,7 +2194,7 @@ function OrgEstimateTemplateDialog({
                     <Input
                       placeholder="1"
                       value={v.value}
-                      maxLength={20}
+                      maxCharacters={20}
                       onChange={(e) =>
                         setValues((vals) =>
                           vals.map((vv, j) =>

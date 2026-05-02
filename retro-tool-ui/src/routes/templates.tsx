@@ -531,6 +531,7 @@ function RetroTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
                 placeholder="e.g. Team Health Check"
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
+                maxCharacters={40}
               />
             </div>
 
@@ -629,6 +630,7 @@ function RetroTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
                       <Input
                         placeholder="Column name *"
                         value={col.name}
+                        maxCharacters={40}
                         onChange={(e) =>
                           setCreateColumns((c) =>
                             c.map((cc, j) =>
