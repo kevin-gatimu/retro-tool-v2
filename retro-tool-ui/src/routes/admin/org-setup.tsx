@@ -26,7 +26,7 @@ import {
   useOrganizationMemberSearch,
   useUserSearch,
 } from './hooks'
-import { AdminNav, slugify } from './helpers'
+import { slugify } from './helpers'
 import type { CreatedOrg, SelectedUser, TeamDraft } from './types'
 
 export const Route = createFileRoute('/admin/org-setup')({
@@ -249,7 +249,6 @@ function OrgSetupWizard() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <AdminNav />
       <div>
         <h1 className="text-2xl font-bold">Organisation Setup Wizard</h1>
         <p className="text-muted-foreground">

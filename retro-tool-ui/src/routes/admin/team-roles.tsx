@@ -43,7 +43,6 @@ import { Switch } from '@/components/ui/switch'
 import { api } from '@/lib/api'
 import { TEAM_ROLES_ENDPOINTS } from '@/lib/api-endpoints'
 import { useAdminTeamRoleMutations } from './hooks/useAdminTeamRoleMutations'
-import { AdminNav } from './helpers'
 
 interface TeamRole {
   id: string
@@ -161,9 +160,7 @@ function AdminTeamRolesPage() {
   if (isLoading) return <AdminTeamRolesSkeleton />
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <AdminNav />
-
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

@@ -26,7 +26,6 @@ import {
 import { AdminDashboardSkeleton } from '@/components/skeletons'
 import { api } from '@/lib/api'
 import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
-import { AdminNav } from './helpers'
 
 type AdminUsersStats = {
   total: number
@@ -143,7 +142,6 @@ function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <AdminNav />
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
         <p className="text-muted-foreground">

@@ -767,22 +767,24 @@ function TemplateCard({
       onClick={onSelect}
     >
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">{tmpl.name}</CardTitle>
+        <div className="flex items-start justify-between gap-2">
+          <CardTitle className="text-lg leading-snug break-all min-w-0 line-clamp-2">
+            {tmpl.name}
+          </CardTitle>
           {tmpl.isBuiltIn ? (
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs shrink-0">
               Built-in
             </Badge>
           ) : (
             <Badge
               variant="outline"
-              className="text-xs border-primary/40 text-primary"
+              className="text-xs border-primary/40 text-primary shrink-0"
             >
               Org
             </Badge>
           )}
         </div>
-        <CardDescription className="text-sm">
+        <CardDescription className="text-sm line-clamp-2">
           {tmpl.description}
         </CardDescription>
       </CardHeader>
@@ -791,10 +793,10 @@ function TemplateCard({
           {tmpl.columns?.map((col) => (
             <div
               key={col.id}
-              className="flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5"
+              className="flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 max-w-full min-w-0"
             >
-              <span className="text-lg">{col.emoji}</span>
-              <span className="text-xs font-medium">{col.name}</span>
+              <span className="text-lg shrink-0">{col.emoji}</span>
+              <span className="text-xs font-medium truncate">{col.name}</span>
             </div>
           ))}
         </div>

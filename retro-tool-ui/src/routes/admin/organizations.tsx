@@ -54,7 +54,7 @@ import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { ORGANIZATIONS_ENDPOINTS } from '@/lib/api-endpoints'
 import { useAdminOrganizationMutations } from './hooks/useAdminOrganizationMutations'
-import { AdminNav, toSlug } from './helpers'
+import { toSlug } from './helpers'
 import type { OrganizationAdminRow, PaginatedOrgsResponse } from './types'
 
 const DEFAULT_PAGE_SIZE = 10
@@ -285,7 +285,6 @@ function AdminOrganizationsPage() {
 
   return (
     <div className="space-y-6">
-      <AdminNav />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Organizations</h2>

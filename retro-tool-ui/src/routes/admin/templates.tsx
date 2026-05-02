@@ -72,7 +72,7 @@ import {
   TEMPLATES_ENDPOINTS,
 } from '@/lib/api-endpoints'
 import { useAdminTemplateMutations } from './hooks/useAdminTemplateMutations'
-import { AdminNav, createEmptyColumn } from './helpers'
+import { createEmptyColumn } from './helpers'
 import type {
   EditableColumn,
   OrganizationAdminRow,
@@ -98,8 +98,6 @@ export const Route = createFileRoute('/admin/templates')({
 function AdminTemplatesPage() {
   return (
     <div className="space-y-6">
-      <AdminNav />
-
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Templates</h2>
         <p className="text-muted-foreground">

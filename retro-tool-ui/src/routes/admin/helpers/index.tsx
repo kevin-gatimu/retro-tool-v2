@@ -69,7 +69,7 @@ function NavLink({
       key={link.to}
       to={link.to}
       className={cn(
-        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors',
+        'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium whitespace-nowrap transition-colors',
         active
           ? 'bg-primary text-primary-foreground'
           : 'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -86,7 +86,7 @@ export function AdminNav() {
   const { data: currentUser } = useCurrentUser()
 
   return (
-    <nav className="flex items-center gap-1 overflow-x-auto border-b pb-2 mb-6">
+    <nav className="flex flex-wrap items-center gap-1 border-b pb-2 mb-6">
       {commonAdminLinks.map((link) => (
         <NavLink key={link.to} link={link} currentPath={currentPath} />
       ))}

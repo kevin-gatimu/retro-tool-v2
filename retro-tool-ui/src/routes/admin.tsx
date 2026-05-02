@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { AdminDashboardSkeleton } from '@/components/skeletons'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { isSystemAdmin } from '@/lib/rbac'
+import { AdminNav } from './admin/helpers'
 
 export const Route = createFileRoute('/admin')({
   pendingComponent: AdminDashboardSkeleton,
@@ -30,7 +31,7 @@ function AdminLayout() {
 
   return (
     <div className="container mx-auto py-6">
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-4 flex items-center gap-3">
         <div className="rounded-lg bg-primary p-2">
           <Shield className="h-6 w-6 text-primary-foreground" />
         </div>
@@ -43,12 +44,11 @@ function AdminLayout() {
         </div>
       </div>
 
-      <div className="flex gap-6">
-        {/* Main Content */}
-        <main className="flex-1">
-          <Outlet />
-        </main>
-      </div>
+      <AdminNav />
+
+      <main className="flex-1">
+        <Outlet />
+      </main>
     </div>
   )
 }

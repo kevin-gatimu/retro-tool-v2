@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { isSuperAdmin } from '@/lib/rbac'
-import { AdminNav } from './helpers'
+
 import {
   useConvexOperationalMetrics,
   useConvexUsageMetrics,
@@ -670,8 +670,7 @@ function ConvexAdminPage() {
 
   if (!isSuperAdmin(currentUser?.role)) {
     return (
-      <div className="p-6">
-        <AdminNav />
+      <div className="space-y-6">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -683,10 +682,8 @@ function ConvexAdminPage() {
   }
 
   return (
-    <div className="p-6">
-      <AdminNav />
-
-      <div className="flex items-center gap-2 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center gap-2">
         <Zap className="h-6 w-6" />
         <div>
           <h1 className="text-2xl font-bold">Convex Admin</h1>

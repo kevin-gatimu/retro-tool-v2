@@ -712,6 +712,15 @@ function PrivacyStatementPage() {
                   </a>
                 </p>
                 <p className="text-gray-400 text-sm">
+                  Info:{' '}
+                  <a
+                    href="mailto:info@retro-tool.com"
+                    className="text-emerald-400 hover:underline"
+                  >
+                    info@retro-tool.com
+                  </a>
+                </p>
+                <p className="text-gray-400 text-sm">
                   Website:{' '}
                   <a
                     href="https://retro-tool.com"

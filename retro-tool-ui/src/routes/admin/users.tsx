@@ -84,7 +84,7 @@ import {
   useAdminUsersQuery,
   useBulkOrgTeamMutations,
 } from './hooks'
-import { ActionIcon, ActionLabel, AdminNav, formatDetails } from './helpers'
+import { ActionIcon, ActionLabel, formatDetails } from './helpers'
 import type { UserDetails } from './types'
 
 export const Route = createFileRoute('/admin/users')({
@@ -290,7 +290,6 @@ function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <AdminNav />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
