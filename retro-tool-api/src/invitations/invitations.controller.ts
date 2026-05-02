@@ -7,7 +7,11 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
+import {
+  AllowAnonymous,
+  AuthGuard,
+  Session,
+} from '@thallesp/nestjs-better-auth';
 import {
   ApiTags,
   ApiOperation,
@@ -24,6 +28,7 @@ export class InvitationsController {
   constructor(private readonly invitationsService: InvitationsService) {}
 
   @Get('preview/:token')
+  @AllowAnonymous()
   @ApiOperation({
     summary:
       'Preview an invitation (works for both org and team tokens; public)',
