@@ -3,7 +3,12 @@ export { useAdminOrganizationMutations } from './useAdminOrganizationMutations'
 export { useAdminTemplateMutations } from './useAdminTemplateMutations'
 export { useAdminUserMutations } from './useAdminUserMutations'
 export { useAdminUsersQuery } from './useAdminUsersQuery'
-export { useOrgSetupMutations } from './useOrgSetupMutations'
+export { useOrgBulkSetupMutation } from './useOrgBulkSetupMutation'
+export type {
+  BulkSetupPayload,
+  BulkSetupResult,
+  BulkSetupTeam,
+} from './useOrgBulkSetupMutation'
 export { useBulkOrgTeamMutations } from './useBulkOrgTeamMutations'
 export { useOrganizationMemberSearch } from './useOrganizationMemberSearch'
 export { useUserSearch } from './useUserSearch'

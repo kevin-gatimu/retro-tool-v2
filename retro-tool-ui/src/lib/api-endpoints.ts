@@ -37,6 +37,7 @@ export const INVITATIONS_ENDPOINTS = {
 export const ORGANIZATIONS_ENDPOINTS = {
   LIST: '/api/organizations',
   LIST_ALL: '/api/organizations?all=true&page=1&limit=1000',
+  BULK_SETUP: '/api/organizations/bulk-setup',
 
   BY_ID: (id: string) => `/api/organizations/${id}`,
   LEAVE: (id: string) => `/api/organizations/${id}/leave`,

@@ -21,14 +21,17 @@ import {
 } from 'drizzle-orm';
 import * as orgSchema from './schema';
 import * as userSchema from '../auth/schema';
+import * as teamSchema from '../teams/schema';
 import { generateId } from '../lib/utils';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { AddMemberDto } from './dto/add-member.dto';
+import { BulkSetupOrganizationDto } from './dto/bulk-setup-organization.dto';
 import { CommonService } from '../common/common.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   ORG_MEMBER_ROLES,
+  TEAM_MEMBER_TAGS,
   TOrgAssignableRole,
   USER_STATUSES,
 } from '../common/enums';
@@ -83,6 +86,122 @@ export class OrganizationsService {
       ...org,
       memberCount: countsByOrgId.get(org.id) ?? 0,
     }));
+  }
+
+  async bulkSetupOrganization(
+    callerId: string,
+    dto: BulkSetupOrganizationDto,
+  ): Promise<{
+    org: { id: string; name: string; slug: string };
+    memberCount: number;
+    teamCount: number;
+  }> {
+    const callerIsAdmin = await this.isSystemAdmin(callerId);
+    if (!callerIsAdmin) {
+      throw new ForbiddenException(
+        'Only system admins can use the bulk organisation setup',
+      );
+    }
+
+    return await this.database.transaction(async (tx) => {
+      // 1. Check slug uniqueness
+      const [existing] = await tx
+        .select({ id: orgSchema.organization.id })
+        .from(orgSchema.organization)
+        .where(eq(orgSchema.organization.slug, dto.slug))
+        .limit(1);
+
+      if (existing) {
+        throw new ConflictException(
+          'An organisation with this slug already exists',
+        );
+      }
+
+      // 2. Create the organisation row
+      const orgId = generateId();
+      const [org] = await tx
+        .insert(orgSchema.organization)
+        .values({
+          id: orgId,
+          name: dto.name,
+          slug: dto.slug,
+          logo: dto.logo ?? null,
+          ownerId: callerId,
+        })
+        .returning();
+
+      // 3. Track which user IDs are already members (to avoid duplicates)
+      const addedUserIds = new Set<string>();
+
+      // Helper: insert member only once per user
+      const insertMember = async (
+        userId: string,
+        role: (typeof ORG_MEMBER_ROLES)[keyof typeof ORG_MEMBER_ROLES],
+      ) => {
+        if (addedUserIds.has(userId)) return;
+        addedUserIds.add(userId);
+        await tx.insert(orgSchema.organizationMember).values({
+          id: generateId(),
+          organizationId: orgId,
+          userId,
+          role,
+        });
+      };
+
+      // 4. Add caller as owner
+      await insertMember(callerId, ORG_MEMBER_ROLES.Owner);
+
+      // 5. Add specified owner (if different from caller)
+      if (dto.ownerId && dto.ownerId !== callerId) {
+        await insertMember(dto.ownerId, ORG_MEMBER_ROLES.Owner);
+      }
+
+      // 6. Add admins
+      for (const adminId of dto.adminIds ?? []) {
+        await insertMember(adminId, ORG_MEMBER_ROLES.Admin);
+      }
+
+      // 7. Add members
+      for (const memberId of dto.memberIds ?? []) {
+        await insertMember(memberId, ORG_MEMBER_ROLES.Member);
+      }
+
+      // 8. Create teams
+      const seenTeamNames = new Set<string>();
+      let teamCount = 0;
+      for (const teamInput of dto.teams ?? []) {
+        const normalizedName = teamInput.name.trim();
+        if (!normalizedName) continue;
+        const key = normalizedName.toLowerCase();
+        if (seenTeamNames.has(key)) continue;
+        seenTeamNames.add(key);
+
+        const teamId = generateId();
+        await tx.insert(teamSchema.team).values({
+          id: teamId,
+          name: normalizedName,
+          organizationId: orgId,
+          emoji: '👥',
+        });
+
+        if (teamInput.leadId) {
+          await tx.insert(teamSchema.teamMember).values({
+            id: generateId(),
+            teamId,
+            userId: teamInput.leadId,
+            tag: TEAM_MEMBER_TAGS.Lead,
+          });
+        }
+
+        teamCount++;
+      }
+
+      return {
+        org: { id: org.id, name: org.name, slug: org.slug },
+        memberCount: addedUserIds.size,
+        teamCount,
+      };
+    });
   }
 
   async createOrganization(

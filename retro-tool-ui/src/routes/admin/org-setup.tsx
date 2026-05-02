@@ -1,5 +1,6 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
+  ArrowLeft,
   Building2,
   Check,
   ChevronLeft,
@@ -21,14 +22,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import {
-  useOrgSetupMutations,
-  useOrganizationMemberSearch,
-  useUserSearch,
-} from './hooks'
+import { useOrgBulkSetupMutation, useUserSearch } from './hooks'
 import { slugify } from './helpers'
-import type { CreatedOrg, SelectedUser, TeamDraft } from './types'
+import type { SelectedUser, TeamDraft } from './types'
+import type { BulkSetupResult } from './hooks'
 
 function OrgSetupSkeleton() {
   return (
@@ -39,11 +38,11 @@ function OrgSetupSkeleton() {
       </div>
       {/* Stepper */}
       <div className="flex items-center gap-2">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="flex items-center gap-2">
             <Skeleton className="h-8 w-8 rounded-full" />
             <Skeleton className="hidden sm:block h-4 w-16" />
-            {i < 4 && <Skeleton className="h-px w-4" />}
+            {i < 5 && <Skeleton className="h-px w-4" />}
           </div>
         ))}
       </div>
@@ -79,6 +78,7 @@ const STEPS = [
   { id: 3, label: 'Add Admins', icon: Users },
   { id: 4, label: 'Add Members', icon: Users },
   { id: 5, label: 'Create Teams', icon: Building2 },
+  { id: 6, label: 'Review', icon: Check },
 ]
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -126,51 +126,6 @@ function UserSearchInput({
   )
 }
 
-function OrgMemberSearchInput({
-  placeholder,
-  onSelect,
-  exclude,
-  orgId,
-}: {
-  placeholder?: string
-  onSelect: (user: SelectedUser) => void
-  exclude?: string[]
-  orgId: string
-}) {
-  const [q, setQ] = useState('')
-  const { data: results = [] } = useOrganizationMemberSearch(orgId, q)
-  const filtered = results.filter((u) => !exclude?.includes(u.id))
-
-  return (
-    <div className="relative">
-      <Input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder={placeholder ?? 'Search org members…'}
-      />
-      {filtered.length > 0 && q.length >= 2 && (
-        <ul className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-48 overflow-y-auto">
-          {filtered.map((u) => (
-            <li key={u.id}>
-              <button
-                type="button"
-                className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
-                onClick={() => {
-                  onSelect({ id: u.id, name: u.name, email: u.email })
-                  setQ('')
-                }}
-              >
-                <span className="font-medium">{u.name}</span>{' '}
-                <span className="text-muted-foreground">{u.email}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
 function SelectedUserList({
   users,
   onRemove,
@@ -193,7 +148,7 @@ function SelectedUserList({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-6 w-6 shrink-0"
             onClick={() => onRemove(u.id)}
           >
             <Trash2 className="h-3 w-3" />
@@ -207,13 +162,14 @@ function SelectedUserList({
 // ── Wizard ────────────────────────────────────────────────────────────────────
 
 function OrgSetupWizard() {
+  const navigate = useNavigate()
   const [step, setStep] = useState(1)
+  const [result, setResult] = useState<BulkSetupResult | null>(null)
 
-  // Step 1 — Create org
+  // Step 1 — org details
   const [orgName, setOrgName] = useState('')
   const [orgSlug, setOrgSlug] = useState('')
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
-  const [createdOrg, setCreatedOrg] = useState<CreatedOrg | null>(null)
 
   // Auto-generate slug from name unless manually edited
   useEffect(() => {
@@ -234,34 +190,19 @@ function OrgSetupWizard() {
   // Step 5 — Teams
   const [teams, setTeams] = useState<TeamDraft[]>([{ name: '' }])
 
-  // ── Mutations ────────────────────────────────────────────────────────────────
+  // ── Single mutation ───────────────────────────────────────────────────────────
 
-  const {
-    createOrgMutation,
-    assignOwnerMutation,
-    addAdminsMutation,
-    addMembersMutation,
-    createTeamsMutation,
-  } = useOrgSetupMutations({
-    orgName,
-    orgSlug,
-    createdOrg,
-    owner,
-    admins,
-    members,
-    teams,
-    setCreatedOrg,
-    setStep,
-    setTeams,
-  })
+  const bulkSetupMutation = useOrgBulkSetupMutation()
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
-  const excludedIds = [
-    ...(owner ? [owner.id] : []),
-    ...admins.map((u) => u.id),
-    ...members.map((u) => u.id),
+  // All users already chosen across steps 2-4 (for the team lead picker)
+  const allSelectedUsers: SelectedUser[] = [
+    ...(owner ? [owner] : []),
+    ...admins,
+    ...members,
   ]
+  const allSelectedIds = allSelectedUsers.map((u) => u.id)
 
   const addTeam = () => setTeams((prev) => [...prev, { name: '' }])
   const removeTeam = (i: number) =>
@@ -281,33 +222,76 @@ function OrgSetupWizard() {
       ),
     )
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  const handleSubmit = () => {
+    const seen = new Set<string>()
+    const validTeams = teams
+      .filter((t) => t.name.trim())
+      .filter((t) => {
+        const key = t.name.trim().toLowerCase()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .map((t) => ({ name: t.name.trim(), leadId: t.leadId }))
 
-  const isComplete = step === 6
+    bulkSetupMutation.mutate(
+      {
+        name: orgName.trim(),
+        slug: orgSlug.trim(),
+        ownerId: owner?.id,
+        adminIds: admins.map((u) => u.id),
+        memberIds: members.map((u) => u.id),
+        teams: validTeams,
+      },
+      {
+        onSuccess: (data) => {
+          setResult(data)
+          setStep(7)
+        },
+      },
+    )
+  }
+
+  const resetWizard = () => {
+    setStep(1)
+    setResult(null)
+    setOrgName('')
+    setOrgSlug('')
+    setSlugManuallyEdited(false)
+    setOwner(null)
+    setAdmins([])
+    setMembers([])
+    setTeams([{ name: '' }])
+    bulkSetupMutation.reset()
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────────
+
+  const isComplete = step === 7
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Organisation Setup Wizard</h1>
         <p className="text-muted-foreground">
-          Create a new organisation and configure it step-by-step.
+          Configure everything first, then create the organisation in one step.
         </p>
       </div>
 
-      {/* Progress bar */}
+      {/* Progress stepper */}
       {!isComplete && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {STEPS.map((s, i) => (
-            <div key={s.id} className="flex items-center gap-2">
+            <div key={s.id} className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => createdOrg && setStep(s.id)}
+                onClick={() => step > s.id && setStep(s.id)}
                 className={cn(
                   'flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors',
                   step === s.id
                     ? 'bg-primary text-primary-foreground'
                     : step > s.id
-                      ? 'bg-green-500 text-white'
+                      ? 'cursor-pointer bg-green-500 text-white hover:bg-green-600'
                       : 'bg-muted text-muted-foreground',
                 )}
               >
@@ -326,7 +310,7 @@ function OrgSetupWizard() {
               {i < STEPS.length - 1 && (
                 <div
                   className={cn(
-                    'h-px flex-1 bg-border',
+                    'h-px w-4 flex-shrink-0 bg-border',
                     step > s.id && 'bg-green-400',
                   )}
                 />
@@ -336,14 +320,16 @@ function OrgSetupWizard() {
         </div>
       )}
 
-      {/* Step 1 — Create Org */}
+      {/* ── Step 1 — Organisation Details ── */}
       {step === 1 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" /> Create Organisation
+              <Building2 className="h-5 w-5" /> Organisation Details
             </CardTitle>
-            <CardDescription>Enter the organisation details.</CardDescription>
+            <CardDescription>
+              Enter the organisation name and slug.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1">
@@ -372,24 +358,17 @@ function OrgSetupWizard() {
               </p>
             </div>
             <Button
-              onClick={() => createOrgMutation.mutate()}
-              disabled={
-                !orgName.trim() ||
-                !orgSlug.trim() ||
-                createOrgMutation.isPending
-              }
+              onClick={() => setStep(2)}
+              disabled={!orgName.trim() || !orgSlug.trim()}
               className="w-full"
             >
-              {createOrgMutation.isPending
-                ? 'Creating…'
-                : 'Create Organisation'}
-              <ChevronRight className="ml-2 h-4 w-4" />
+              Continue <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Step 2 — Set Owner */}
+      {/* ── Step 2 — Set Owner ── */}
       {step === 2 && (
         <Card>
           <CardHeader>
@@ -397,8 +376,9 @@ function OrgSetupWizard() {
               <User className="h-5 w-5" /> Set Organisation Owner
             </CardTitle>
             <CardDescription>
-              Search for a user to make the owner of{' '}
-              <span className="font-semibold">{createdOrg?.name}</span>.
+              Optionally designate an owner for{' '}
+              <span className="font-semibold">{orgName}</span>. If skipped, you
+              (the admin) will be the sole owner.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -410,7 +390,8 @@ function OrgSetupWizard() {
             {owner && (
               <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
                 <span className="text-sm font-medium">
-                  {owner.name} — {owner.email}
+                  {owner.name}{' '}
+                  <span className="text-muted-foreground">— {owner.email}</span>
                 </span>
                 <Button
                   variant="ghost"
@@ -425,25 +406,16 @@ function OrgSetupWizard() {
               <Button variant="outline" onClick={() => setStep(1)}>
                 <ChevronLeft className="mr-1 h-4 w-4" /> Back
               </Button>
-              <Button
-                onClick={() => assignOwnerMutation.mutate()}
-                disabled={!owner || assignOwnerMutation.isPending}
-                className="flex-1"
-              >
-                {assignOwnerMutation.isPending
-                  ? 'Saving…'
-                  : 'Set Owner & Continue'}
+              <Button onClick={() => setStep(3)} className="flex-1">
+                {owner ? 'Owner Set — Continue' : 'Skip'}
                 <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button variant="ghost" onClick={() => setStep(3)}>
-                Skip
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Step 3 — Add Admins */}
+      {/* ── Step 3 — Add Admins ── */}
       {step === 3 && (
         <Card>
           <CardHeader>
@@ -452,7 +424,7 @@ function OrgSetupWizard() {
             </CardTitle>
             <CardDescription>
               Admins can manage members and teams in{' '}
-              <span className="font-semibold">{createdOrg?.name}</span>.
+              <span className="font-semibold">{orgName}</span>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -461,7 +433,10 @@ function OrgSetupWizard() {
               onSelect={(u) =>
                 setAdmins((prev) => [...prev.filter((x) => x.id !== u.id), u])
               }
-              exclude={excludedIds}
+              exclude={[
+                ...(owner ? [owner.id] : []),
+                ...admins.map((u) => u.id),
+              ]}
             />
             <SelectedUserList
               users={admins}
@@ -471,18 +446,10 @@ function OrgSetupWizard() {
               <Button variant="outline" onClick={() => setStep(2)}>
                 <ChevronLeft className="mr-1 h-4 w-4" /> Back
               </Button>
-              <Button
-                onClick={() =>
-                  admins.length > 0 ? addAdminsMutation.mutate() : setStep(4)
-                }
-                disabled={addAdminsMutation.isPending}
-                className="flex-1"
-              >
-                {addAdminsMutation.isPending
-                  ? 'Adding…'
-                  : admins.length > 0
-                    ? `Add ${admins.length} Admin(s) & Continue`
-                    : 'Continue'}
+              <Button onClick={() => setStep(4)} className="flex-1">
+                {admins.length > 0
+                  ? `${admins.length} Admin(s) Added — Continue`
+                  : 'Skip'}
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -490,7 +457,7 @@ function OrgSetupWizard() {
         </Card>
       )}
 
-      {/* Step 4 — Add Members */}
+      {/* ── Step 4 — Add Members ── */}
       {step === 4 && (
         <Card>
           <CardHeader>
@@ -498,8 +465,8 @@ function OrgSetupWizard() {
               <Users className="h-5 w-5" /> Add Members
             </CardTitle>
             <CardDescription>
-              Optionally invite additional members to{' '}
-              <span className="font-semibold">{createdOrg?.name}</span>.
+              Optionally add members to{' '}
+              <span className="font-semibold">{orgName}</span>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -508,7 +475,11 @@ function OrgSetupWizard() {
               onSelect={(u) =>
                 setMembers((prev) => [...prev.filter((x) => x.id !== u.id), u])
               }
-              exclude={excludedIds}
+              exclude={[
+                ...(owner ? [owner.id] : []),
+                ...admins.map((u) => u.id),
+                ...members.map((u) => u.id),
+              ]}
             />
             <SelectedUserList
               users={members}
@@ -518,18 +489,10 @@ function OrgSetupWizard() {
               <Button variant="outline" onClick={() => setStep(3)}>
                 <ChevronLeft className="mr-1 h-4 w-4" /> Back
               </Button>
-              <Button
-                onClick={() =>
-                  members.length > 0 ? addMembersMutation.mutate() : setStep(5)
-                }
-                disabled={addMembersMutation.isPending}
-                className="flex-1"
-              >
-                {addMembersMutation.isPending
-                  ? 'Adding…'
-                  : members.length > 0
-                    ? `Add ${members.length} Member(s) & Continue`
-                    : 'Continue'}
+              <Button onClick={() => setStep(5)} className="flex-1">
+                {members.length > 0
+                  ? `${members.length} Member(s) Added — Continue`
+                  : 'Skip'}
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -537,7 +500,7 @@ function OrgSetupWizard() {
         </Card>
       )}
 
-      {/* Step 5 — Create Teams */}
+      {/* ── Step 5 — Create Teams ── */}
       {step === 5 && (
         <Card>
           <CardHeader>
@@ -546,8 +509,8 @@ function OrgSetupWizard() {
             </CardTitle>
             <CardDescription>
               Optionally create teams within{' '}
-              <span className="font-semibold">{createdOrg?.name}</span> and
-              assign team leads.
+              <span className="font-semibold">{orgName}</span>. Assign a lead
+              from the users selected in previous steps.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -586,11 +549,43 @@ function OrgSetupWizard() {
                       Remove
                     </Button>
                   </div>
+                ) : allSelectedUsers.length > 0 ? (
+                  <select
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value=""
+                    onChange={(e) => {
+                      const selected = allSelectedUsers.find(
+                        (u) => u.id === e.target.value,
+                      )
+                      if (selected) updateTeamLead(i, selected)
+                    }}
+                  >
+                    <option value="">— pick a team lead —</option>
+                    {allSelectedUsers
+                      .filter(
+                        (u) =>
+                          !teams.some(
+                            (team, idx) => idx !== i && team.leadId === u.id,
+                          ),
+                      )
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                  </select>
                 ) : (
-                  <OrgMemberSearchInput
-                    placeholder="Search org members for team lead…"
-                    onSelect={(u) => updateTeamLead(i, u)}
-                    orgId={createdOrg!.id}
+                  <UserSearchInput
+                    placeholder="Search any user for team lead…"
+                    onSelect={(u) => {
+                      if (!allSelectedIds.includes(u.id)) {
+                        setMembers((prev) => [
+                          ...prev.filter((x) => x.id !== u.id),
+                          u,
+                        ])
+                      }
+                      updateTeamLead(i, u)
+                    }}
                     exclude={
                       teams
                         .filter((_, idx) => idx !== i)
@@ -613,20 +608,10 @@ function OrgSetupWizard() {
               <Button variant="outline" onClick={() => setStep(4)}>
                 <ChevronLeft className="mr-1 h-4 w-4" /> Back
               </Button>
-              <Button
-                onClick={() =>
-                  teams.some((t) => t.name.trim())
-                    ? createTeamsMutation.mutate()
-                    : setStep(6)
-                }
-                disabled={createTeamsMutation.isPending}
-                className="flex-1"
-              >
-                {createTeamsMutation.isPending
-                  ? 'Creating…'
-                  : teams.some((t) => t.name.trim())
-                    ? 'Create Teams & Finish'
-                    : 'Skip & Finish'}
+              <Button onClick={() => setStep(6)} className="flex-1">
+                {teams.some((t) => t.name.trim())
+                  ? `${teams.filter((t) => t.name.trim()).length} Team(s) — Review`
+                  : 'Skip — Review'}
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -634,8 +619,140 @@ function OrgSetupWizard() {
         </Card>
       )}
 
-      {/* Step 6 — Done */}
-      {isComplete && (
+      {/* ── Step 6 — Review & Submit ── */}
+      {step === 6 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Check className="h-5 w-5" /> Review &amp; Create
+            </CardTitle>
+            <CardDescription>
+              Review the configuration below. Nothing is saved until you click
+              "Create Organisation".
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Org */}
+            <div className="rounded-md border p-4 space-y-1">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                Organisation
+              </p>
+              <p className="font-semibold">{orgName}</p>
+              <p className="text-sm text-muted-foreground">/{orgSlug}</p>
+            </div>
+
+            {/* Owner */}
+            <div className="rounded-md border p-4 space-y-1">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                Owner
+              </p>
+              {owner ? (
+                <p className="text-sm">
+                  {owner.name}{' '}
+                  <span className="text-muted-foreground">— {owner.email}</span>
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  None specified — you will be the owner
+                </p>
+              )}
+            </div>
+
+            {/* Admins */}
+            <div className="rounded-md border p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                Admins ({admins.length})
+              </p>
+              {admins.length === 0 ? (
+                <p className="text-sm text-muted-foreground">None</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {admins.map((u) => (
+                    <Badge key={u.id} variant="secondary">
+                      {u.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Members */}
+            <div className="rounded-md border p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                Members ({members.length})
+              </p>
+              {members.length === 0 ? (
+                <p className="text-sm text-muted-foreground">None</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {members.map((u) => (
+                    <Badge key={u.id} variant="secondary">
+                      {u.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Teams */}
+            <div className="rounded-md border p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                Teams ({teams.filter((t) => t.name.trim()).length})
+              </p>
+              {!teams.some((t) => t.name.trim()) ? (
+                <p className="text-sm text-muted-foreground">None</p>
+              ) : (
+                <ul className="space-y-1">
+                  {teams
+                    .filter((t) => t.name.trim())
+                    .map((t, i) => (
+                      <li key={i} className="text-sm flex items-center gap-2">
+                        <span className="font-medium">{t.name}</span>
+                        {t.leadName && (
+                          <span className="text-muted-foreground text-xs">
+                            — lead: {t.leadName}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </div>
+
+            {bulkSetupMutation.isError && (
+              <p className="text-sm text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+                {bulkSetupMutation.error.message ||
+                  'Something went wrong. Please try again.'}
+              </p>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setStep(5)}
+                disabled={bulkSetupMutation.isPending}
+              >
+                <ChevronLeft className="mr-1 h-4 w-4" /> Back
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={bulkSetupMutation.isPending}
+                className="flex-1"
+              >
+                {bulkSetupMutation.isPending
+                  ? 'Creating Organisation…'
+                  : 'Create Organisation'}
+                {!bulkSetupMutation.isPending && (
+                  <Check className="ml-2 h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Step 7 — Success ── */}
+      {isComplete && result && (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-10">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
@@ -643,30 +760,25 @@ function OrgSetupWizard() {
             </div>
             <h2 className="text-xl font-bold">Setup Complete!</h2>
             <p className="text-center text-muted-foreground">
-              <span className="font-semibold">{createdOrg?.name}</span> has been
-              created and configured successfully.
+              <span className="font-semibold">{result.org.name}</span> has been
+              created with{' '}
+              <span className="font-semibold">{result.memberCount}</span>{' '}
+              member(s) and{' '}
+              <span className="font-semibold">{result.teamCount}</span> team(s).
             </p>
             <div className="flex gap-3">
-              <Button
-                onClick={() => {
-                  setStep(1)
-                  setOrgName('')
-                  setOrgSlug('')
-                  setSlugManuallyEdited(false)
-                  setCreatedOrg(null)
-                  setOwner(null)
-                  setAdmins([])
-                  setMembers([])
-                  setTeams([{ name: '' }])
-                }}
-                variant="outline"
-              >
-                Create Another
+              <Button onClick={resetWizard} variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Create Another
               </Button>
-              <Button asChild>
-                <a href={`/organizations/${createdOrg?.id}`}>
-                  View Organisation
-                </a>
+              <Button
+                onClick={() =>
+                  navigate({
+                    to: '/organizations/$orgId',
+                    params: { orgId: result.org.id },
+                  })
+                }
+              >
+                View Organisation
               </Button>
             </div>
           </CardContent>

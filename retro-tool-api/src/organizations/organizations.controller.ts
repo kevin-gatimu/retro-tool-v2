@@ -26,6 +26,8 @@ import {
   AddMemberDto,
   updateMemberRoleSchema,
   UpdateMemberRoleDto,
+  bulkSetupOrganizationSchema,
+  BulkSetupOrganizationDto,
 } from './dto';
 import {
   ApiTags,
@@ -59,6 +61,29 @@ export class OrganizationsController {
     @Session() session: SessionUser,
   ) {
     return await this.organizationsService.createOrganization(
+      session.user.id,
+      body,
+    );
+  }
+
+  // System-admin only: atomically create org + members + teams in one request
+  @Post('bulk-setup')
+  @ApiOperation({
+    summary:
+      'Admin bulk setup: create org with members and teams in one atomic operation',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Organisation created successfully',
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden - System admin only' })
+  @ApiResponse({ status: 409, description: 'Slug already in use' })
+  @UsePipes(new ZodValidationPipe(bulkSetupOrganizationSchema))
+  async bulkSetupOrganization(
+    @Body() body: BulkSetupOrganizationDto,
+    @Session() session: SessionUser,
+  ) {
+    return await this.organizationsService.bulkSetupOrganization(
       session.user.id,
       body,
     );
