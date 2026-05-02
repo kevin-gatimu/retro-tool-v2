@@ -137,10 +137,7 @@ export class EstimatesService {
     return session;
   }
 
-  private async assertCanDeleteSession(
-    sessionId: string,
-    userId: string,
-  ): Promise<void> {
+  async canManageSession(sessionId: string, userId: string): Promise<boolean> {
     const [row] = await this.database
       .select({
         createdById: estimatesSchema.storyEstimateSession.createdById,
@@ -157,8 +154,7 @@ export class EstimatesService {
 
     if (!row) throw new NotFoundException('Session not found');
 
-    // Session creator can always delete
-    if (row.createdById === userId) return;
+    if (row.createdById === userId) return true;
 
     const [fullUser] = await this.database
       .select({ role: authSchema.user.role })
@@ -168,12 +164,10 @@ export class EstimatesService {
 
     const role = fullUser?.role;
 
-    // Super admin / system admin — unrestricted
     if (role === USER_ROLES.SuperAdmin || role === USER_ROLES.SystemAdmin) {
-      return;
+      return true;
     }
 
-    // Org owner / admin — check org membership
     if (row.orgId) {
       const [orgMembership] = await this.database
         .select({ role: orgSchema.organizationMember.role })
@@ -190,11 +184,10 @@ export class EstimatesService {
         orgMembership?.role === ORG_MEMBER_ROLES.Owner ||
         orgMembership?.role === ORG_MEMBER_ROLES.Admin
       ) {
-        return;
+        return true;
       }
     }
 
-    // Team lead — check team membership
     const [teamMembership] = await this.database
       .select({ tag: teamSchema.teamMember.tag })
       .from(teamSchema.teamMember)
@@ -206,11 +199,19 @@ export class EstimatesService {
       )
       .limit(1);
 
-    if (teamMembership?.tag === TEAM_MEMBER_TAGS.Lead) return;
+    return teamMembership?.tag === TEAM_MEMBER_TAGS.Lead;
+  }
 
-    throw new ForbiddenException(
-      'You do not have permission to delete this session',
-    );
+  private async assertCanDeleteSession(
+    sessionId: string,
+    userId: string,
+  ): Promise<void> {
+    const canManage = await this.canManageSession(sessionId, userId);
+    if (!canManage) {
+      throw new ForbiddenException(
+        'You do not have permission to delete this session',
+      );
+    }
   }
 
   private async getCurrentRoundRecord(
@@ -608,9 +609,12 @@ export class EstimatesService {
     const userVote =
       currentRoundVotes.find((v) => v.voterId === userId)?.points ?? null;
 
+    const canEndSession = await this.canManageSession(sessionId, userId);
+
     const result: SessionDetail = {
       ...row.session,
       isCreator,
+      canEndSession,
       currentUserId: userId,
       userVote,
       template: sessionTemplate,
@@ -1014,7 +1018,12 @@ export class EstimatesService {
   }
 
   async endSession(sessionId: string, userId: string): Promise<void> {
-    await this.assertSessionCreator(sessionId, userId);
+    const canManage = await this.canManageSession(sessionId, userId);
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Only the session creator, team lead, or admin can end this session',
+      );
+    }
 
     await this.closeCurrentRound(sessionId, ESTIMATE_ROUND_STATUSES.Closed);
 

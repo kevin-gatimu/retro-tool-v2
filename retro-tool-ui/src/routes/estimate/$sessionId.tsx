@@ -143,6 +143,8 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
     setRoundPageMap((prev) => ({ ...prev, [roundId]: page }))
   }
 
+  const canEndSession = Boolean(session.isCreator || session.canEndSession)
+
   return (
     <>
       <style>{`
@@ -867,8 +869,179 @@ function EstimateSessionPage() {
       // Then by user name
       return a.user.name.localeCompare(b.user.name)
     })
+  const mockParticipants = import.meta.env.DEV
+    ? [
+        {
+          id: 'mock-1',
+          userId: 'mock-user-1',
+          isOnline: true,
+          user: {
+            id: 'mock-user-1',
+            name: 'Amina Solace',
+            image: null,
+            jobRole: 'Dev',
+          },
+        },
+        {
+          id: 'mock-2',
+          userId: 'mock-user-2',
+          isOnline: true,
+          user: {
+            id: 'mock-user-2',
+            name: 'Brian Holt',
+            image: null,
+            jobRole: 'QA',
+          },
+        },
+        {
+          id: 'mock-3',
+          userId: 'mock-user-3',
+          isOnline: true,
+          user: {
+            id: 'mock-user-3',
+            name: 'Chloe Kim',
+            image: null,
+            jobRole: 'QE',
+          },
+        },
+        {
+          id: 'mock-4',
+          userId: 'mock-user-4',
+          isOnline: true,
+          user: {
+            id: 'mock-user-4',
+            name: 'Davi Ortega',
+            image: null,
+            jobRole: 'DevOps',
+          },
+        },
+        {
+          id: 'mock-5',
+          userId: 'mock-user-5',
+          isOnline: true,
+          user: {
+            id: 'mock-user-5',
+            name: 'Eden Park',
+            image: null,
+            jobRole: 'BI-Dev',
+          },
+        },
+        {
+          id: 'mock-6',
+          userId: 'mock-user-6',
+          isOnline: true,
+          user: {
+            id: 'mock-user-6',
+            name: 'Fatima Noor',
+            image: null,
+            jobRole: 'QA/QE',
+          },
+        },
+        {
+          id: 'mock-7',
+          userId: 'mock-user-7',
+          isOnline: true,
+          user: {
+            id: 'mock-user-7',
+            name: 'Glen Adair',
+            image: null,
+            jobRole: 'Dev',
+          },
+        },
+        {
+          id: 'mock-8',
+          userId: 'mock-user-8',
+          isOnline: true,
+          user: {
+            id: 'mock-user-8',
+            name: 'Hana Luo',
+            image: null,
+            jobRole: 'QE',
+          },
+        },
+        {
+          id: 'mock-9',
+          userId: 'mock-user-9',
+          isOnline: true,
+          user: {
+            id: 'mock-user-9',
+            name: 'Iris Chen',
+            image: null,
+            jobRole: 'QA',
+          },
+        },
+        {
+          id: 'mock-10',
+          userId: 'mock-user-10',
+          isOnline: true,
+          user: {
+            id: 'mock-user-10',
+            name: 'Jude Okafor',
+            image: null,
+            jobRole: 'DevOps',
+          },
+        },
+        {
+          id: 'mock-11',
+          userId: 'mock-user-11',
+          isOnline: true,
+          user: {
+            id: 'mock-user-11',
+            name: 'Kari Singh',
+            image: null,
+            jobRole: 'Dev',
+          },
+        },
+        {
+          id: 'mock-12',
+          userId: 'mock-user-12',
+          isOnline: true,
+          user: {
+            id: 'mock-user-12',
+            name: 'Lina Reyes',
+            image: null,
+            jobRole: 'QA/QE',
+          },
+        },
+        {
+          id: 'mock-13',
+          userId: 'mock-user-13',
+          isOnline: true,
+          user: {
+            id: 'mock-user-13',
+            name: 'Musa Diallo',
+            image: null,
+            jobRole: 'Oversight',
+          },
+        },
+        {
+          id: 'mock-14',
+          userId: 'mock-user-14',
+          isOnline: true,
+          user: {
+            id: 'mock-user-14',
+            name: 'Nora Patel',
+            image: null,
+            jobRole: 'BI-Dev',
+          },
+        },
+        {
+          id: 'mock-15',
+          userId: 'mock-user-15',
+          isOnline: true,
+          user: {
+            id: 'mock-user-15',
+            name: 'Owen Reed',
+            image: null,
+            jobRole: 'Dev',
+          },
+        },
+      ]
+    : []
+  const displayedParticipants = [...onlineParticipants, ...mockParticipants]
   const votedCount = session.votes.length
   const isTimerActive = timeRemaining !== null && timeRemaining > 0
+  const canEndSession = Boolean(session.isCreator || session.canEndSession)
 
   return (
     <>
@@ -1064,7 +1237,8 @@ function EstimateSessionPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Participants ({votedCount}/{onlineParticipants.length} voted)
+                  Participants ({votedCount}/{displayedParticipants.length}{' '}
+                  voted)
                 </CardTitle>
                 {/* Reserve a fixed-height row so the card never shifts when
                     stats appear. Items are always rendered but invisible until
@@ -1108,7 +1282,7 @@ function EstimateSessionPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {onlineParticipants.map((participant) => {
+                {displayedParticipants.map((participant) => {
                   // Check optimistic local vote first, then server data
                   const isCurrentUser =
                     participant.userId === session.currentUserId
@@ -1253,36 +1427,40 @@ function EstimateSessionPage() {
                       </Button>
                     )}
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          disabled={endSessionMutation.isPending}
-                        >
-                          <CircleStop className="mr-2 h-4 w-4" />
-                          End Session
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>End this session?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will complete the estimation session and move
-                            it to history. All votes will be preserved for the
-                            report.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => endSessionMutation.mutate()}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    {canEndSession && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="destructive"
+                            disabled={endSessionMutation.isPending}
                           >
+                            <CircleStop className="mr-2 h-4 w-4" />
                             End Session
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              End this session?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will complete the estimation session and move
+                              it to history. All votes will be preserved for the
+                              report.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => endSessionMutation.mutate()}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              End Session
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
 
                   {/* Agreed points (only when votes are revealed) */}
@@ -1345,6 +1523,48 @@ function EstimateSessionPage() {
                       </div>
                     </>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {!session.isCreator && canEndSession && (
+            <Card>
+              <CardContent>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    As an admin or team lead, you can end this session.
+                  </p>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        disabled={endSessionMutation.isPending}
+                      >
+                        <CircleStop className="mr-2 h-4 w-4" />
+                        End Session
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>End this session?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will complete the estimation session and move it
+                          to history. All votes will be preserved for the
+                          report.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => endSessionMutation.mutate()}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          End Session
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>

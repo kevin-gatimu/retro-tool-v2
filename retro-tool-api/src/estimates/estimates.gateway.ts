@@ -155,11 +155,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
-    const isCreator = await this.estimatesService.isSessionCreator(
+    const canManage = await this.estimatesService.canManageSession(
       data.sessionId,
       userId,
     );
-    if (!isCreator) return;
+    if (!canManage) return;
 
     const votes = await this.estimatesService.revealVotes(
       data.sessionId,

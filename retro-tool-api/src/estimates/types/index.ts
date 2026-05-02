@@ -23,6 +23,7 @@ export type SessionTemplate = {
 
 export type SessionDetail = StoryEstimateSession & {
   isCreator: boolean;
+  canEndSession: boolean;
   currentUserId: string;
   userVote: string | null;
   template: SessionTemplate | null;
