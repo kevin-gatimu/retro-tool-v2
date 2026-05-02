@@ -24,11 +24,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { RETROS_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { RetroDetail } from '@/common/types/retros'
 import type { TeamMember } from '@/common/types/teams'
-import type { PaginatedResponse } from '@/common/types/utilities'
 import { cn } from '@/lib/utils'
 import { useSendRetroReport } from '@/routes/retros/hooks/useSendRetroReport'
 import type { CarriedForwardItem } from '@/routes/retros/types'
@@ -47,14 +51,20 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(
     new Set(),
   )
-  const sendRetroReportMutation = useSendRetroReport(retro.id)
+  const sendRetroReportMutation = useSendRetroReport(retro.id, {
+    onSuccess: () => setSelectedRecipients(new Set()),
+  })
 
   const { data: membersData } = useQuery({
     queryKey: ['team-members', retro.team.id],
     queryFn: () =>
-      api.get<PaginatedResponse<TeamMember>>(
-        `${TEAMS_ENDPOINTS.MEMBERS(retro.team.id)}?limit=100`,
-      ),
+      api.get<{
+        members: TeamMember[]
+        total: number
+        page: number
+        totalPages: number
+        data?: TeamMember[]
+      }>(`${TEAMS_ENDPOINTS.MEMBERS(retro.team.id)}?limit=100`),
     staleTime: 60_000,
   })
 
@@ -140,32 +150,36 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
           )}
         </button>
         <div className="flex items-center">
-          <Button
-            size="sm"
-            variant="outline"
-            className="rounded-r-none border-r-0"
-            onClick={(e) => {
-              e.stopPropagation()
-              const recipients =
-                selectedRecipients.size > 0
-                  ? Array.from(selectedRecipients)
-                  : undefined
-              sendRetroReportMutation.mutate({ recipients })
-            }}
-            disabled={sendRetroReportMutation.isPending}
-            title={
-              selectedRecipients.size > 0
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-r-none border-r-0"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const recipients =
+                    selectedRecipients.size > 0
+                      ? Array.from(selectedRecipients)
+                      : undefined
+                  sendRetroReportMutation.mutate({ recipients })
+                }}
+                disabled={sendRetroReportMutation.isPending}
+              >
+                <Mail className="h-4 w-4 mr-1.5" />
+                {sendRetroReportMutation.isPending
+                  ? 'Sending...'
+                  : selectedRecipients.size > 0
+                    ? `Email (${selectedRecipients.size} selected)`
+                    : 'Email Report'}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent sideOffset={8}>
+              {selectedRecipients.size > 0
                 ? `Send report to ${selectedRecipients.size} selected recipient${selectedRecipients.size !== 1 ? 's' : ''}`
-                : 'Send report to all team members'
-            }
-          >
-            <Mail className="h-4 w-4 mr-1.5" />
-            {sendRetroReportMutation.isPending
-              ? 'Sending...'
-              : selectedRecipients.size > 0
-                ? `Email (${selectedRecipients.size} selected)`
-                : 'Email Report'}
-          </Button>
+                : 'Send report to all team members'}
+            </TooltipContent>
+          </Tooltip>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -181,24 +195,27 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Recipients</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {(membersData?.data ?? []).map((member) => (
-                <DropdownMenuCheckboxItem
-                  key={member.userId}
-                  checked={selectedRecipients.has(member.user.email)}
-                  onCheckedChange={(checked) => {
-                    setSelectedRecipients((prev) => {
-                      const next = new Set(prev)
-                      if (checked) next.add(member.user.email)
-                      else next.delete(member.user.email)
-                      return next
-                    })
-                  }}
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  {member.user.name ?? member.user.email}
-                </DropdownMenuCheckboxItem>
-              ))}
-              {(membersData?.data ?? []).length === 0 && (
+              {(membersData?.members ?? membersData?.data ?? []).map(
+                (member) => (
+                  <DropdownMenuCheckboxItem
+                    key={member.userId}
+                    checked={selectedRecipients.has(member.user.email)}
+                    onCheckedChange={(checked) => {
+                      setSelectedRecipients((prev) => {
+                        const next = new Set(prev)
+                        if (checked) next.add(member.user.email)
+                        else next.delete(member.user.email)
+                        return next
+                      })
+                    }}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {member.user.name ?? member.user.email}
+                  </DropdownMenuCheckboxItem>
+                ),
+              )}
+              {(membersData?.members ?? membersData?.data ?? []).length ===
+                0 && (
                 <div className="px-2 py-1.5 text-sm text-muted-foreground">
                   No members found
                 </div>
