@@ -457,6 +457,7 @@ function RetroTemplatesContent() {
               setPage(1)
             }}
             loading={isLoading}
+            isFetching={isFetching}
           />
 
           <div className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">

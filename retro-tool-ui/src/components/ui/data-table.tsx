@@ -23,6 +23,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Loader2,
   RefreshCw,
 } from 'lucide-react'
 import * as React from 'react'
@@ -117,6 +118,8 @@ interface DataTableProps<TData, TValue> {
   }
   /** Show loading skeleton rows inside the table */
   loading?: boolean
+  /** Show a fetching overlay over existing data (use with keepPreviousData) */
+  isFetching?: boolean
 }
 
 // ============================================================================
@@ -152,6 +155,7 @@ export function DataTable<TData, TValue>({
   onPaginationChange,
   paginationState: controlledPaginationState,
   loading = false,
+  isFetching = false,
 }: DataTableProps<TData, TValue>) {
   const [internalSorting, setInternalSorting] = React.useState<SortingState>([])
   const [internalPaginationState, setInternalPaginationState] = React.useState({
@@ -363,79 +367,86 @@ export function DataTable<TData, TValue>({
       )}
 
       {/* Table */}
-      <div className="overflow-hidden rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead
-                      key={header.id}
-                      className={compact ? 'py-2 px-3' : undefined}
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                    </TableHead>
-                  )
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({
-                length: Math.min(
-                  table.getState().pagination.pageSize,
-                  defaultPageSize,
-                ),
-              }).map((_, i) => (
-                <TableRow key={`skeleton-${i}`}>
-                  {columns.map((__, j) => (
-                    <TableCell
-                      key={`skeleton-${i}-${j}`}
-                      className={compact ? 'py-1.5 px-3' : undefined}
-                    >
-                      <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
-                    </TableCell>
-                  ))}
+      <div className="relative">
+        {isFetching && !loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/60">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        <div className="overflow-hidden rounded-md border">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead
+                        key={header.id}
+                        className={compact ? 'py-2 px-3' : undefined}
+                      >
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                      </TableHead>
+                    )
+                  })}
                 </TableRow>
-              ))
-            ) : table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className={compact ? 'py-1.5 px-3' : undefined}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
+              ))}
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                Array.from({
+                  length: Math.min(
+                    table.getState().pagination.pageSize,
+                    defaultPageSize,
+                  ),
+                }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    {columns.map((__, j) => (
+                      <TableCell
+                        key={`skeleton-${i}-${j}`}
+                        className={compact ? 'py-1.5 px-3' : undefined}
+                      >
+                        <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : table.getRowModel().rows.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && 'selected'}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        className={compact ? 'py-1.5 px-3' : undefined}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
+                  >
+                    {emptyState || 'No results.'}
+                  </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  {emptyState || 'No results.'}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Pagination */}

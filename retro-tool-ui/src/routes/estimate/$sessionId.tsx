@@ -725,18 +725,6 @@ function EstimateSessionPage() {
     }, 600)
   }
 
-  const handleAgreedPointsBlur = () => {
-    if (saveDebounceRef.current) {
-      clearTimeout(saveDebounceRef.current)
-      saveDebounceRef.current = null
-    }
-    const trimmed = agreedPoints.trim()
-    if (trimmed && trimmed !== lastSavedAgreedPoints.current) {
-      lastSavedAgreedPoints.current = trimmed
-      setConsensusMutation.mutate(trimmed)
-    }
-  }
-
   const handleStartRound = () => {
     const ticketNumber = roundTicket.trim()
     if (!ticketNumber) {
@@ -1028,7 +1016,7 @@ function EstimateSessionPage() {
                             : undefined
                         }
                         className={cn(
-                          'relative rounded-lg transition-all duration-150 ease-out',
+                          'relative cursor-pointer rounded-lg transition-all duration-150 ease-out',
                           'hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                           'flex flex-col items-center justify-center active:scale-95',
                           'text-center',
@@ -1322,10 +1310,10 @@ function EstimateSessionPage() {
                                 variant={
                                   agreedPoints === v.value
                                     ? 'default'
-                                    : 'outline'
+                                    : 'secondary'
                                 }
                                 size="sm"
-                                className="h-7 px-2 text-xs"
+                                className="h-8 min-w-[2rem] px-2.5 text-sm font-semibold"
                                 onClick={() =>
                                   handleAgreedPointsChange(v.value)
                                 }
@@ -1337,24 +1325,10 @@ function EstimateSessionPage() {
                         <div className="relative">
                           <Input
                             id="agreed-points-input"
-                            className="w-28 border-primary/60 bg-primary/5 text-center font-semibold focus-visible:ring-primary focus-visible:border-primary"
+                            className="w-28 cursor-default border-primary/60 bg-primary/5 text-center font-semibold focus-visible:ring-primary focus-visible:border-primary"
                             placeholder={stats?.avg ?? '—'}
                             value={agreedPoints}
-                            onChange={(e) => {
-                              const raw = e.target.value
-                              // Allow only digits and a single decimal point
-                              const filtered = raw
-                                .replace(/[^0-9.]/g, '')
-                                .replace(/(\..*?)\./g, '$1')
-                              handleAgreedPointsChange(filtered)
-                            }}
-                            onBlur={handleAgreedPointsBlur}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault()
-                                handleAgreedPointsBlur()
-                              }
-                            }}
+                            readOnly
                           />
                           {setConsensusMutation.isPending && (
                             <div className="absolute right-2 top-1/2 -translate-y-1/2">

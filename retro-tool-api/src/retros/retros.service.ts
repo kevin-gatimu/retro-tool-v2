@@ -14,6 +14,7 @@ import { EmailService } from '../email/email.service';
 import {
   eq,
   and,
+  asc,
   desc,
   inArray,
   count,
@@ -213,6 +214,8 @@ export class RetrosService {
     limit: number,
     type?: 'built-in' | 'organization',
     search?: string,
+    sort?: string,
+    sortOrder?: 'asc' | 'desc',
   ): Promise<{
     templates: (Template & {
       columns: TemplateColumn[];
@@ -306,7 +309,19 @@ export class RetrosService {
         eq(retroSchema.template.organizationId, orgSchema.organization.id),
       )
       .where(whereClause)
-      .orderBy(retroSchema.template.name)
+      .orderBy(
+        sortOrder === 'desc'
+          ? desc(
+              sort === 'createdAt'
+                ? retroSchema.template.createdAt
+                : retroSchema.template.name,
+            )
+          : asc(
+              sort === 'createdAt'
+                ? retroSchema.template.createdAt
+                : retroSchema.template.name,
+            ),
+      )
       .limit(limit)
       .offset((page - 1) * limit);
 
@@ -380,12 +395,32 @@ export class RetrosService {
         .limit(1);
 
       if (
-        !membership ||
-        (membership.role !== ORG_MEMBER_ROLES.Owner &&
-          membership.role !== ORG_MEMBER_ROLES.Admin)
+        membership?.role === ORG_MEMBER_ROLES.Owner ||
+        membership?.role === ORG_MEMBER_ROLES.Admin
       ) {
+        return;
+      }
+
+      // Team leads within this org can also manage org retro templates
+      const [teamLeadship] = await this.database
+        .select({ tag: teamSchema.teamMember.tag })
+        .from(teamSchema.teamMember)
+        .innerJoin(
+          teamSchema.team,
+          eq(teamSchema.teamMember.teamId, teamSchema.team.id),
+        )
+        .where(
+          and(
+            eq(teamSchema.teamMember.userId, userId),
+            eq(teamSchema.teamMember.tag, TEAM_MEMBER_TAGS.Lead),
+            eq(teamSchema.team.organizationId, organizationId),
+          ),
+        )
+        .limit(1);
+
+      if (!teamLeadship) {
         throw new ForbiddenException(
-          'Only organization admins can manage organization templates',
+          'Only organization admins or team leads can manage organization templates',
         );
       }
     } else {

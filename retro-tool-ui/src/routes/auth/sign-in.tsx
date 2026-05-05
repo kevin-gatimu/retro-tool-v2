@@ -431,7 +431,8 @@ function SignInPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="h-11 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300"
+            readOnly={!!emailFromInvite}
+            className={`h-11 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300${emailFromInvite ? ' opacity-75 cursor-default' : ''}`}
           />
         </div>
 

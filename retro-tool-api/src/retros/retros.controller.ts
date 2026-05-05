@@ -87,9 +87,13 @@ export class RetrosController {
     @Query('limit') limit?: string,
     @Query('type') type?: string,
     @Query('search') search?: string,
+    @Query('sort') sort?: string,
+    @Query('sortOrder') sortOrder?: string,
   ) {
     const validType =
       type === 'built-in' || type === 'organization' ? type : undefined;
+    const validSortOrder =
+      sortOrder === 'asc' || sortOrder === 'desc' ? sortOrder : 'asc';
 
     return this.retrosService.getTemplatesPaginated(
       session.user.id,
@@ -97,6 +101,8 @@ export class RetrosController {
       limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 12,
       validType,
       search,
+      sort,
+      validSortOrder,
     );
   }
 

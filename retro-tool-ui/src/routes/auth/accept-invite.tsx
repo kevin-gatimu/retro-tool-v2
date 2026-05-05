@@ -317,10 +317,17 @@ function EmailMismatchView({
     setSigningOut(true)
     try {
       await authClient.signOut()
-      navigate({
-        to: '/auth/sign-in',
-        search: { inviteToken: token, email: preview.invitedEmail },
-      })
+      if (preview.isExistingUser) {
+        navigate({
+          to: '/auth/sign-in',
+          search: { inviteToken: token, email: preview.invitedEmail },
+        })
+      } else {
+        navigate({
+          to: '/auth/sign-up',
+          search: { inviteToken: token, email: preview.invitedEmail },
+        })
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to sign out')
       setSigningOut(false)

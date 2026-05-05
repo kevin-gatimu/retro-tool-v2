@@ -184,6 +184,18 @@ function OrganizationDetailPage() {
   })
   const teams = teamsData?.teams ?? []
 
+  // Fetch the current user's own teams (includes correct myRole/tag)
+  const { data: myTeamsData } = useQuery({
+    queryKey: ['my-teams'],
+    queryFn: () => api.get<{ teams: Team[] }>(TEAMS_ENDPOINTS.LIST),
+    enabled: !!organization,
+    staleTime: 30_000,
+  })
+  const isTeamLeadInOrg =
+    myTeamsData?.teams.some(
+      (t) => t.organizationId === orgId && t.myRole === 'team-lead',
+    ) ?? false
+
   const [activeTab, setActiveTab] = useState('teams')
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isInviteOpen, setIsInviteOpen] = useState(false)
@@ -256,7 +268,6 @@ function OrganizationDetailPage() {
   const isOwner = organization.myRole === 'org-owner'
   const isAdmin =
     viewerIsSystemAdmin || organization.myRole === 'org-admin' || isOwner
-  const isTeamLeadInOrg = teams.some((t) => t.myRole === 'team-lead')
   const canDeleteOrganization = viewerIsSystemAdmin || isOwner
   const canLeaveOrganization = !viewerIsSystemAdmin && !isOwner
 
@@ -1263,7 +1274,7 @@ function OrganizationDetailPage() {
               </TabsList>
 
               {/* Retro Templates sub-tab */}
-              {isAdmin && (
+              {(isAdmin || isTeamLeadInOrg) && (
                 <TabsContent value="retro" className="mt-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
