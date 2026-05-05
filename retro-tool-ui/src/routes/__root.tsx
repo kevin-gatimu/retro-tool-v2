@@ -63,7 +63,7 @@ function RootComponent() {
   const isPendingAuthRoute = pendingPath
     ? pendingPath.startsWith('/auth')
     : isCurrentAuthRoute
-  const isAuthRoute = isCurrentAuthRoute && isPendingAuthRoute
+  const isAuthRoute = isCurrentAuthRoute || isPendingAuthRoute
 
   return (
     <TanStackQueryProvider>

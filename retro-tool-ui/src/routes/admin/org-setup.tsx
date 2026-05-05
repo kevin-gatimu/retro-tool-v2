@@ -9,6 +9,7 @@ import {
   Trash2,
   User,
   Users,
+  X,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
@@ -98,11 +99,24 @@ function UserSearchInput({
 
   return (
     <div className="relative">
-      <Input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder={placeholder ?? 'Search users…'}
-      />
+      <div className="relative">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={placeholder ?? 'Search users…'}
+          className={q ? 'pr-8' : ''}
+        />
+        {q && (
+          <button
+            type="button"
+            onClick={() => setQ('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
       {filtered.length > 0 && q.length >= 2 && (
         <ul className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
           {filtered.map((u) => (
@@ -275,6 +289,10 @@ function OrgSetupWizard() {
         <h1 className="text-2xl font-bold">Organisation Setup Wizard</h1>
         <p className="text-muted-foreground">
           Configure everything first, then create the organisation in one step.
+        </p>
+        <p className="mt-1 text-sm text-amber-500">
+          Invitations are only sent to users already registered on this
+          platform.
         </p>
       </div>
 

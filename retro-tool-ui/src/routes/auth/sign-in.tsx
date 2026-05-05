@@ -504,7 +504,7 @@ function SignInPage() {
       <Button
         type="button"
         variant="outline"
-        className="w-full h-11 border-[#21262d] bg-white dark:bg-white text-gray-900 dark:text-gray-900 hover:bg-gray-50 dark:hover:bg-gray-100 font-medium transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(0,0,0,0.4)]"
+        className="w-full h-11 border-[#21262d] bg-white dark:bg-white text-gray-900 dark:text-gray-900 hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-gray-100 dark:hover:text-gray-900 font-medium transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(0,0,0,0.4)]"
         onClick={() =>
           authClient.signIn.social({
             provider: 'microsoft',

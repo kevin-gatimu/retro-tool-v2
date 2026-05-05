@@ -41,11 +41,10 @@ const dashboardRetrosQueryOptions = {
 }
 
 export const Route = createFileRoute('/dashboard/')({
-  loader: ({ context: { queryClient } }) =>
-    Promise.all([
-      queryClient.ensureQueryData(dashboardStatsQueryOptions),
-      queryClient.ensureQueryData(dashboardRetrosQueryOptions),
-    ]),
+  loader: ({ context: { queryClient } }) => {
+    void queryClient.prefetchQuery(dashboardStatsQueryOptions)
+    void queryClient.prefetchQuery(dashboardRetrosQueryOptions)
+  },
   component: DashboardIndexPage,
 })
 
