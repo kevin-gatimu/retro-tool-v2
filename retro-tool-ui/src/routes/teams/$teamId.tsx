@@ -141,7 +141,7 @@ function TeamDetailSkeleton() {
 
 export const Route = createFileRoute('/teams/$teamId')({
   loader: ({ context: { queryClient }, params: { teamId } }) =>
-    queryClient.ensureQueryData({
+    void queryClient.prefetchQuery({
       queryKey: ['team', teamId] as const,
       queryFn: () => api.get<TeamDetail>(TEAMS_ENDPOINTS.BY_ID(teamId)),
     }),

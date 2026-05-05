@@ -153,7 +153,7 @@ function OrgDetailSkeleton() {
 
 export const Route = createFileRoute('/organizations/$orgId')({
   loader: ({ context: { queryClient }, params: { orgId } }) =>
-    queryClient.ensureQueryData({
+    void queryClient.prefetchQuery({
       queryKey: ['organization', orgId] as const,
       queryFn: () =>
         api.get<OrganizationDetail>(ORGANIZATIONS_ENDPOINTS.BY_ID(orgId)),

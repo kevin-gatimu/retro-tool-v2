@@ -130,7 +130,15 @@ export class EmailService {
   // ============================================================================
 
   private logoHtml(): string {
-    return `<div style="text-align:center;margin:0 0 24px 0"><img src="${this.logoUrl}" alt="Retro Tool" height="56" style="display:inline-block;height:56px;border:0" /></div>`;
+    return `<div style="text-align:center;margin:0 0 24px 0"><span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:20px;font-weight:700;color:#1e40af;letter-spacing:-0.5px">Retro Tool</span></div>`;
+  }
+
+  /**
+   * Returns a visually-hidden preheader span that most email clients display
+   * as the preview snippet next to the subject line.
+   */
+  private previewHtml(text: string): string {
+    return `<span style="display:none;font-size:1px;color:#fefefe;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all">${this.esc(text)}&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</span>`;
   }
 
   buildAccountApprovedHtml(params: {
@@ -141,13 +149,14 @@ export class EmailService {
 <!DOCTYPE html>
 <html>
 <body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+  ${this.previewHtml('Your Retro Tool account has been approved. Sign in and start collaborating.')}
   ${this.logoHtml()}
   <h2 style="color:#1e40af">You're In!</h2>
   <p>Hi ${this.esc(params.userName)},</p>
   <p>Your account has been approved. You can now sign in and start collaborating with your teams.</p>
   <p><a href="${params.appUrl}/auth/sign-in" style="display:inline-block;padding:10px 20px;background-color:#1e40af;color:white;text-decoration:none;border-radius:4px">Sign In</a></p>
   <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-  <p style="color:#6b7280;font-size:12px">Retro Tool — Team Retrospectives Made Simple</p>
+  <p style="color:#6b7280;font-size:12px">Retro Tool &middot; Team Retrospectives Made Simple</p>
 </body>
 </html>`;
   }
@@ -174,25 +183,22 @@ export class EmailService {
     invitedEmail: string;
     acceptUrl: string;
     isExistingUser: boolean;
+    previewText: string;
   }): string {
     const stepsForExisting = `
     <ol style="padding-left:20px;margin:8px 0 0 0;color:#1f2937;font-size:14px;line-height:1.6">
       <li>Click <strong>Accept Invitation</strong> below.</li>
-      <li>If you're not signed in, log in with <strong>${this.esc(params.invitedEmail)}</strong> — the email this invite was sent to.</li>
+      <li>If you're not signed in, log in with <strong>${this.esc(params.invitedEmail)}</strong> (the email this invite was sent to).</li>
       <li>You'll be taken to your new ${params.heading.toLowerCase().includes('team') ? 'team' : 'organisation'} automatically.</li>
     </ol>`;
 
     const stepsForNewUser = `
     <ol style="padding-left:20px;margin:8px 0 0 0;color:#1f2937;font-size:14px;line-height:1.6">
       <li>Click <strong>Accept Invitation</strong> below.</li>
-      <li>Create your account using <strong>${this.esc(params.invitedEmail)}</strong> — your email will be pre-filled. <em>Use this exact address</em>, otherwise the invite cannot be accepted.</li>
+      <li>Create your account using <strong>${this.esc(params.invitedEmail)}</strong>. Your email will be pre-filled. <em>Use this exact address</em>, otherwise the invite cannot be accepted.</li>
       <li>Choose a password and finish sign-up.</li>
       <li>You'll be taken straight to your new ${params.heading.toLowerCase().includes('team') ? 'team' : 'organisation'}.</li>
-    </ol>
-    <p style="margin:12px 0 0 0;font-size:13px;color:#6b7280">
-      Already have a Retro Tool account with <strong>${this.esc(params.invitedEmail)}</strong>?
-      Use the same link — you'll be prompted to sign in instead.
-    </p>`;
+    </ol>`;
 
     const steps = params.isExistingUser ? stepsForExisting : stepsForNewUser;
 
@@ -200,6 +206,7 @@ export class EmailService {
 <!DOCTYPE html>
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:24px">
+  ${this.previewHtml(params.previewText)}
   <div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:32px">
     ${this.logoHtml()}
     <h2 style="color:#1e40af;margin:0 0 16px 0">${this.esc(params.heading)}</h2>
@@ -218,18 +225,13 @@ export class EmailService {
       <a href="${params.acceptUrl}" style="display:inline-block;padding:12px 28px;background-color:#1e40af;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:15px">Accept Invitation</a>
     </p>
 
-    <p style="margin:16px 0 0 0;font-size:12px;color:#6b7280;text-align:center">
-      Trouble with the button? Copy &amp; paste this link into your browser:<br>
-      <span style="word-break:break-all;color:#374151">${params.acceptUrl}</span>
-    </p>
-
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0 16px 0">
     <p style="color:#6b7280;font-size:12px;margin:0;text-align:center">
       You received this email because someone invited you to collaborate on Retro Tool.<br>
       If you weren't expecting this, you can safely ignore it.
     </p>
     <p style="color:#9ca3af;font-size:11px;margin:8px 0 0 0;text-align:center">
-      Retro Tool — Team Retrospectives Made Simple
+      Retro Tool &middot; Team Retrospectives Made Simple
     </p>
   </div>
 </body>
@@ -257,6 +259,7 @@ export class EmailService {
         params.invitedEmail,
       ),
       isExistingUser: true,
+      previewText: `You've been invited to join ${params.orgName} on Retro Tool.`,
     });
   }
 
@@ -279,6 +282,7 @@ export class EmailService {
         params.invitedEmail,
       ),
       isExistingUser: false,
+      previewText: `You've been invited to join ${params.orgName} on Retro Tool.`,
     });
   }
 
@@ -306,6 +310,7 @@ export class EmailService {
         params.invitedEmail,
       ),
       isExistingUser: true,
+      previewText: `You've been invited to join the ${params.teamName} team on Retro Tool.`,
     });
   }
 
@@ -331,6 +336,7 @@ export class EmailService {
         params.invitedEmail,
       ),
       isExistingUser: false,
+      previewText: `You've been invited to join the ${params.teamName} team on Retro Tool.`,
     });
   }
 
@@ -385,7 +391,7 @@ export class EmailService {
                 const sourcesHtml = card.sourceContents
                   .map(
                     (content) =>
-                      `<li style="margin:2px 0">${this.esc(content)}</li>`,
+                      `<li style="margin:2px 0">${this.esc(this.stripMergeMeta(content))}</li>`,
                   )
                   .join('');
 
@@ -398,7 +404,7 @@ export class EmailService {
                   </div>`;
               }
 
-              return `<p style="margin:4px 0;font-size:13px;color:#52525b">• ${this.esc(card.content)} <span style="color:#9ca3af">(${voteLabel})</span></p>`;
+              return `<p style="margin:4px 0;font-size:13px;color:#52525b">• ${this.esc(this.stripMergeMeta(card.content))} <span style="color:#9ca3af">(${voteLabel})</span></p>`;
             })
             .join('')}
           ${col.topCards
@@ -433,7 +439,7 @@ export class EmailService {
         ? `
       <h3 style="margin:24px 0 16px;color:#1e40af">Action Items</h3>
       <ol style="padding-left:20px">
-        ${params.actionItems.map((item) => `<li style="margin:8px 0;color:#52525b">${this.esc(item.title)}${item.assigneeName ? ` — <strong>${this.esc(item.assigneeName)}</strong>` : ''}</li>`).join('')}
+        ${params.actionItems.map((item) => `<li style="margin:8px 0;color:#52525b">${this.esc(item.title)}${item.assigneeName ? ` · <strong>${this.esc(item.assigneeName)}</strong>` : ''}</li>`).join('')}
       </ol>`
         : '';
 
@@ -441,6 +447,7 @@ export class EmailService {
 <!DOCTYPE html>
 <html>
 <body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+  ${this.previewHtml(`Retrospective report for ${params.retroName} (${params.teamName}).`)}
   ${this.logoHtml()}
   <h2 style="color:#1e40af">Retrospective Report</h2>
   <p>Hi ${this.esc(params.recipientName)},</p>
@@ -457,7 +464,7 @@ export class EmailService {
   ${actionItemsHtml}
 
   <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-  <p style="color:#6b7280;font-size:12px">Retro Tool — Team Retrospectives Made Simple</p>
+  <p style="color:#6b7280;font-size:12px">Retro Tool &middot; Team Retrospectives Made Simple</p>
 </body>
 </html>`;
   }
@@ -468,5 +475,10 @@ export class EmailService {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  /** Strip [MERGE_META:...] annotations left on merged card content. */
+  private stripMergeMeta(str: string): string {
+    return str.replace(/\[MERGE_META:[^\]]*\]/g, '').trim();
   }
 }
