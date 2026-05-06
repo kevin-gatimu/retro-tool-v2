@@ -10,12 +10,16 @@ import {
   Query,
   UseGuards,
   UsePipes,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
+  ApiBody,
+  ApiParam,
 } from '@nestjs/swagger';
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -35,6 +39,9 @@ import {
   SetConsensusSchema,
   SetConsensusBody,
   type SetConsensusDto,
+  sendEstimateReportSchema,
+  SendEstimateReportDto,
+  SendEstimateReportDtoClass,
 } from './dtos';
 
 @ApiTags('estimates')
@@ -298,5 +305,22 @@ export class EstimatesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.estimatesService.deleteSession(id, session.user.id);
+  }
+
+  @Post(':id/send-report')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Email the story estimate report to team members or specific addresses',
+  })
+  @ApiParam({ name: 'id', description: 'Estimate session ID' })
+  @ApiBody({ type: SendEstimateReportDtoClass })
+  @UsePipes(new ZodValidationPipe(sendEstimateReportSchema))
+  async sendReport(
+    @Session() session: SessionUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SendEstimateReportDto,
+  ) {
+    return this.estimatesService.sendEstimateReport(session.user.id, id, body);
   }
 }

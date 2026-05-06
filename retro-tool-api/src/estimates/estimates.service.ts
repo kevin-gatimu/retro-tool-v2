@@ -25,10 +25,12 @@ import * as orgSchema from '../organizations/schema';
 import { generateId } from '../lib/utils';
 import { StoryEstimateSession, StoryEstimateVote } from './schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 import {
   CreateEstimateSessionDto,
   NewEstimateRoundDto,
   UpdateEstimateStoryDto,
+  SendEstimateReportDto,
 } from './dtos';
 import {
   ESTIMATE_SESSION_STATUSES,
@@ -56,6 +58,7 @@ export class EstimatesService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
   ) {}
 
   private async invalidateEstimateCaches(
@@ -1314,5 +1317,178 @@ export class EstimatesService {
     );
 
     return { sessions, total: totalRow?.total ?? 0, page, limit };
+  }
+
+  async sendEstimateReport(
+    userId: string,
+    sessionId: string,
+    data: SendEstimateReportDto,
+  ): Promise<{ sent: number }> {
+    const [row] = await this.database
+      .select({
+        session: estimatesSchema.storyEstimateSession,
+        team: {
+          id: teamSchema.team.id,
+          name: teamSchema.team.name,
+        },
+      })
+      .from(estimatesSchema.storyEstimateSession)
+      .leftJoin(
+        teamSchema.team,
+        eq(estimatesSchema.storyEstimateSession.teamId, teamSchema.team.id),
+      )
+      .where(eq(estimatesSchema.storyEstimateSession.id, sessionId))
+      .limit(1);
+
+    if (!row) throw new NotFoundException('Session not found');
+
+    if (row.session.status !== ESTIMATE_SESSION_STATUSES.Completed) {
+      throw new BadRequestException('Session must be completed to send report');
+    }
+
+    const [membership] = await this.database
+      .select({ id: teamSchema.teamMember.id })
+      .from(teamSchema.teamMember)
+      .where(
+        and(
+          eq(teamSchema.teamMember.teamId, row.session.teamId),
+          eq(teamSchema.teamMember.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (!membership)
+      throw new ForbiddenException('You are not a member of this team');
+
+    // Fetch completed rounds with stats
+    const rounds = await this.database
+      .select({
+        id: estimatesSchema.storyEstimateRound.id,
+        roundNumber: estimatesSchema.storyEstimateRound.roundNumber,
+        storyName: estimatesSchema.storyEstimateRound.storyName,
+        ticketNumber: estimatesSchema.storyEstimateRound.ticketNumber,
+        agreedPoints: estimatesSchema.storyEstimateRound.agreedPoints,
+        votesCount: count(estimatesSchema.storyEstimateVote.id),
+      })
+      .from(estimatesSchema.storyEstimateRound)
+      .leftJoin(
+        estimatesSchema.storyEstimateVote,
+        eq(
+          estimatesSchema.storyEstimateVote.roundId,
+          estimatesSchema.storyEstimateRound.id,
+        ),
+      )
+      .where(eq(estimatesSchema.storyEstimateRound.sessionId, sessionId))
+      .groupBy(estimatesSchema.storyEstimateRound.id)
+      .orderBy(estimatesSchema.storyEstimateRound.roundNumber);
+
+    // Compute numeric averages per round from votes
+    const allVotes = await this.database
+      .select({
+        roundId: estimatesSchema.storyEstimateVote.roundId,
+        points: estimatesSchema.storyEstimateVote.points,
+      })
+      .from(estimatesSchema.storyEstimateVote)
+      .innerJoin(
+        estimatesSchema.storyEstimateRound,
+        eq(
+          estimatesSchema.storyEstimateVote.roundId,
+          estimatesSchema.storyEstimateRound.id,
+        ),
+      )
+      .where(eq(estimatesSchema.storyEstimateRound.sessionId, sessionId));
+
+    const avgByRound = new Map<string, number | null>();
+    const votesByRound = new Map<string, string[]>();
+    for (const v of allVotes) {
+      if (!v.roundId) continue;
+      const arr = votesByRound.get(v.roundId) ?? [];
+      arr.push(v.points);
+      votesByRound.set(v.roundId, arr);
+    }
+    for (const [roundId, pts] of votesByRound.entries()) {
+      const nums = pts.map((p) => parseFloat(p)).filter((n) => !isNaN(n));
+      avgByRound.set(
+        roundId,
+        nums.length > 0
+          ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) /
+              10
+          : null,
+      );
+    }
+
+    // Unique participants
+    const participantRows = await this.database
+      .select({ userId: estimatesSchema.storyEstimateParticipant.userId })
+      .from(estimatesSchema.storyEstimateParticipant)
+      .where(eq(estimatesSchema.storyEstimateParticipant.sessionId, sessionId));
+    const uniqueParticipants = new Set(participantRows.map((p) => p.userId))
+      .size;
+
+    const totalVotes = rounds.reduce((sum, r) => sum + (r.votesCount ?? 0), 0);
+
+    // Determine recipients
+    let recipients: string[] = [];
+    if (data.recipients && data.recipients.length > 0) {
+      recipients = data.recipients;
+    } else {
+      const teamMembers = await this.database
+        .select({ email: authSchema.user.email, name: authSchema.user.name })
+        .from(teamSchema.teamMember)
+        .innerJoin(
+          authSchema.user,
+          eq(authSchema.user.id, teamSchema.teamMember.userId),
+        )
+        .where(eq(teamSchema.teamMember.teamId, row.session.teamId));
+      recipients = teamMembers.map((m) => m.email);
+    }
+
+    if (!this.emailService.isConfigured()) {
+      return { sent: 0 };
+    }
+
+    const completedAt = row.session.updatedAt
+      ? new Date(row.session.updatedAt).toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+      : 'N/A';
+
+    const roundSummaries = rounds.map((r) => ({
+      roundNumber: r.roundNumber,
+      storyName: r.storyName,
+      ticketNumber: r.ticketNumber,
+      agreedPoints: r.agreedPoints,
+      average: avgByRound.get(r.id) ?? null,
+      votesCount: Number(r.votesCount ?? 0),
+    }));
+
+    let sent = 0;
+    for (const email of recipients) {
+      const html = this.emailService.buildEstimateReportHtml({
+        recipientName: 'Team Member',
+        sessionName: row.session.name,
+        teamName: row.team?.name ?? 'Team',
+        completedAt,
+        stats: {
+          rounds: rounds.length,
+          participants: uniqueParticipants,
+          totalVotes,
+        },
+        rounds: roundSummaries,
+      });
+
+      const ok = await this.emailService.send({
+        to: email,
+        subject: `Story Estimate Report: ${row.session.name}`,
+        html,
+        userId,
+        type: 'retro_report',
+      });
+      if (ok) sent++;
+    }
+
+    return { sent };
   }
 }

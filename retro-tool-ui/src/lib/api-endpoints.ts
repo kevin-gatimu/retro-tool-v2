@@ -139,6 +139,7 @@ export const ESTIMATES_ENDPOINTS = {
   TIMER: (id: string) => `/api/estimates/${id}/timer`,
   CONSENSUS: (id: string) => `/api/estimates/${id}/consensus`,
   REVOTE: (id: string) => `/api/estimates/${id}/revote`,
+  SEND_REPORT: (id: string) => `/api/estimates/${id}/send-report`,
 } as const
 
 // ---------------------------------------------------------------------------

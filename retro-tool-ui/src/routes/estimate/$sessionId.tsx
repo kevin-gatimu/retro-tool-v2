@@ -1,5 +1,6 @@
 import {
   useQuery as useTanStackQuery,
+  useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
 import { useSessionMutations } from './hooks/useSessionMutations'
@@ -9,10 +10,12 @@ import {
   ArrowLeft,
   CalendarClock,
   Check,
+  ChevronDown,
   Clock,
   Download,
   Eye,
   Hash,
+  Mail,
   Plus,
   RefreshCw,
   Spade,
@@ -74,13 +77,23 @@ import {
 } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { getEstimateSocket } from '@/lib/socket'
-import { ESTIMATES_ENDPOINTS } from '@/lib/api-endpoints'
+import { ESTIMATES_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { EstimateSession } from '@/common/types/estimates'
 import { cn } from '@/lib/utils'
 import { MusicPlayer } from '@/components/music-player'
 import { usesConvexForEstimates } from '@/lib/realtime-config'
 import { EstimateConvexSync } from './components/estimate-convex-sync'
 import { getRoundDurationLabel } from './helpers'
+import { useSendEstimateReport } from './hooks/useSendEstimateReport'
+import type { TeamMember } from '@/common/types/teams'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const DEFAULT_POINT_VALUES = [
   { label: '0', value: '0', color: null },
@@ -136,6 +149,27 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
   )
 
   const [roundPageMap, setRoundPageMap] = useState<Record<string, number>>({})
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(
+    new Set(),
+  )
+
+  const sendReportMutation = useSendEstimateReport(session.id, {
+    onSuccess: () => setSelectedRecipients(new Set()),
+  })
+
+  const { data: membersData } = useQuery({
+    queryKey: ['team-members', session.team.id],
+    queryFn: () =>
+      api.get<{
+        members: TeamMember[]
+        total: number
+        page: number
+        totalPages: number
+        data?: TeamMember[]
+      }>(`${TEAMS_ENDPOINTS.MEMBERS(session.team.id)}?limit=100`),
+    staleTime: 60_000,
+  })
+  const teamMembers = membersData?.members ?? membersData?.data ?? []
 
   const totalVotes = session.rounds.reduce(
     (sum, round) => sum + round.votes.length,
@@ -198,6 +232,89 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
               <Download className="mr-2 h-4 w-4" />
               Export PDF
             </Button>
+            <div className="flex items-center">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-r-none border-r-0"
+                    onClick={() =>
+                      sendReportMutation.mutate({
+                        recipients:
+                          selectedRecipients.size > 0
+                            ? Array.from(selectedRecipients)
+                            : undefined,
+                      })
+                    }
+                    disabled={sendReportMutation.isPending}
+                  >
+                    <Mail className="mr-1.5 h-4 w-4" />
+                    {sendReportMutation.isPending
+                      ? 'Sending...'
+                      : selectedRecipients.size > 0
+                        ? `Email (${selectedRecipients.size})`
+                        : 'Email Report'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={8}>
+                  {selectedRecipients.size > 0
+                    ? `Send report to ${selectedRecipients.size} selected recipient${selectedRecipients.size !== 1 ? 's' : ''}`
+                    : 'Send report to all team members'}
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-l-none px-2"
+                    disabled={sendReportMutation.isPending}
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Recipients</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {teamMembers.map((member) => (
+                    <DropdownMenuCheckboxItem
+                      key={member.userId}
+                      checked={selectedRecipients.has(member.user.email)}
+                      onCheckedChange={(checked) => {
+                        setSelectedRecipients((prev) => {
+                          const next = new Set(prev)
+                          if (checked) next.add(member.user.email)
+                          else next.delete(member.user.email)
+                          return next
+                        })
+                      }}
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      {member.user.name ?? member.user.email}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                  {teamMembers.length === 0 && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      No members found
+                    </div>
+                  )}
+                  {selectedRecipients.size > 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuCheckboxItem
+                        checked={false}
+                        onCheckedChange={() => setSelectedRecipients(new Set())}
+                        onSelect={(e) => e.preventDefault()}
+                        className="text-muted-foreground"
+                      >
+                        Clear selection
+                      </DropdownMenuCheckboxItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
 

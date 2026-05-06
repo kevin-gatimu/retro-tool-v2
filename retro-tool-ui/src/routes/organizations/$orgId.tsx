@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query'
 import { useOrgDetailMutations } from './hooks/useOrganizationMutations'
 import { useOrgTeamRoleMutations } from './hooks/useOrgTeamRoleMutations'
+import { toSlug } from './helpers'
 import { OrgLogo } from '@/components/OrgLogo'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
@@ -213,6 +214,7 @@ function OrganizationDetailPage() {
   )
 
   const [editName, setEditName] = useState('')
+  const [editSlug, setEditSlug] = useState('')
   const [editLogo, setEditLogo] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<
@@ -558,6 +560,7 @@ function OrganizationDetailPage() {
                 <DropdownMenuItem
                   onClick={() => {
                     setEditName(organization.name)
+                    setEditSlug(organization.slug)
                     setEditLogo(organization.logo ?? '')
                     setIsEditOpen(true)
                   }}
@@ -1699,7 +1702,11 @@ function OrganizationDetailPage() {
             onSubmit={(e) => {
               e.preventDefault()
               if (editName && !updateOrgMutation.isPending)
-                updateOrgMutation.mutate({ name: editName, logo: editLogo })
+                updateOrgMutation.mutate({
+                  name: editName,
+                  slug: editSlug,
+                  logo: editLogo,
+                })
             }}
           >
             <div className="grid gap-4 py-4">
@@ -1708,8 +1715,17 @@ function OrganizationDetailPage() {
                 <Input
                   id="editName"
                   value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
+                  onChange={(e) => {
+                    setEditName(e.target.value)
+                    setEditSlug(toSlug(e.target.value))
+                  }}
                 />
+                <p className="text-xs text-muted-foreground">
+                  URL slug:{' '}
+                  <span className="font-mono text-foreground">
+                    /{editSlug || toSlug(editName)}
+                  </span>
+                </p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="editLogo">Logo URL</Label>

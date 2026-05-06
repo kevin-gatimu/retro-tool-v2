@@ -5,9 +5,10 @@ import { EstimatesController } from './estimates.controller';
 import { EstimatesGateway } from './estimates.gateway';
 import { DatabaseModule } from '../database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
-  imports: [DatabaseModule, NotificationsModule],
+  imports: [DatabaseModule, NotificationsModule, EmailModule],
   controllers: [EstimatesController],
   providers: [
     EstimatesService,

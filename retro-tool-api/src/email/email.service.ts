@@ -469,6 +469,94 @@ export class EmailService {
 </html>`;
   }
 
+  buildEstimateReportHtml(params: {
+    recipientName: string;
+    sessionName: string;
+    teamName: string;
+    completedAt: string;
+    stats: {
+      rounds: number;
+      participants: number;
+      totalVotes: number;
+    };
+    rounds: Array<{
+      roundNumber: number;
+      storyName: string;
+      ticketNumber: string;
+      agreedPoints: string | null;
+      average: number | null;
+      votesCount: number;
+    }>;
+  }): string {
+    const roundsHtml = params.rounds
+      .map(
+        (r) => `
+      <tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:10px 12px;font-size:13px;color:#1f2937">#${r.roundNumber}</td>
+        <td style="padding:10px 12px;font-size:13px;color:#1f2937">${this.esc(r.ticketNumber)}</td>
+        <td style="padding:10px 12px;font-size:13px;color:#1f2937;text-align:center">${r.agreedPoints !== null ? this.esc(String(r.agreedPoints)) : r.average !== null ? `~${r.average}` : '—'}</td>
+        <td style="padding:10px 12px;font-size:13px;color:#6b7280;text-align:center">${r.votesCount}</td>
+      </tr>`,
+      )
+      .join('');
+
+    return `
+<!DOCTYPE html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:24px">
+  ${this.previewHtml(`Story estimate report for ${params.sessionName} (${params.teamName}).`)}
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:32px">
+    ${this.logoHtml()}
+    <h2 style="color:#1e40af;margin:0 0 4px 0">Story Estimate Report</h2>
+    <p style="margin:0 0 24px 0;color:#6b7280;font-size:13px">${this.esc(params.teamName)} &middot; ${params.completedAt}</p>
+
+    <p style="margin:0 0 16px 0;color:#1f2937;font-size:15px">Hi ${this.esc(params.recipientName)},</p>
+    <p style="margin:0 0 24px 0;color:#1f2937;font-size:15px">
+      Here is the report for the story estimate session <strong>${this.esc(params.sessionName)}</strong>.
+    </p>
+
+    <div style="display:flex;gap:16px;margin-bottom:24px">
+      <div style="flex:1;background:#f3f4f6;border-radius:6px;padding:12px 16px;text-align:center">
+        <p style="margin:0;font-size:22px;font-weight:700;color:#1e40af">${params.stats.rounds}</p>
+        <p style="margin:4px 0 0;font-size:12px;color:#6b7280">Rounds</p>
+      </div>
+      <div style="flex:1;background:#f3f4f6;border-radius:6px;padding:12px 16px;text-align:center">
+        <p style="margin:0;font-size:22px;font-weight:700;color:#1e40af">${params.stats.participants}</p>
+        <p style="margin:4px 0 0;font-size:12px;color:#6b7280">Participants</p>
+      </div>
+      <div style="flex:1;background:#f3f4f6;border-radius:6px;padding:12px 16px;text-align:center">
+        <p style="margin:0;font-size:22px;font-weight:700;color:#1e40af">${params.stats.totalVotes}</p>
+        <p style="margin:4px 0 0;font-size:12px;color:#6b7280">Votes Cast</p>
+      </div>
+    </div>
+
+    ${
+      params.rounds.length > 0
+        ? `
+    <h3 style="margin:0 0 12px 0;color:#1e40af;font-size:15px">Round Summary</h3>
+    <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
+      <thead>
+        <tr style="background:#f3f4f6">
+          <th style="padding:8px 12px;font-size:12px;color:#6b7280;text-align:left">Round</th>
+          <th style="padding:8px 12px;font-size:12px;color:#6b7280;text-align:left">Ticket No</th>
+          <th style="padding:8px 12px;font-size:12px;color:#6b7280;text-align:center">Agreed Points</th>
+          <th style="padding:8px 12px;font-size:12px;color:#6b7280;text-align:center">Votes</th>
+        </tr>
+      </thead>
+      <tbody>${roundsHtml}</tbody>
+    </table>`
+        : '<p style="color:#6b7280;font-size:13px">No rounds recorded for this session.</p>'
+    }
+
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0 16px 0">
+    <p style="color:#6b7280;font-size:12px;margin:0;text-align:center">
+      Retro Tool &middot; Team Retrospectives Made Simple
+    </p>
+  </div>
+</body>
+</html>`;
+  }
+
   private esc(str: string): string {
     return str
       .replace(/&/g, '&amp;')
