@@ -141,12 +141,11 @@ function passwordResetHtml({
                 </tr>
               </table>
 
-              <p style="margin:32px 0 0;font-size:13px;line-height:1.6;color:#a1a1aa;">
-                If you didn't request a password reset, you can safely ignore this email — your password won't change.
+              <p style="margin:16px 0 0;font-size:13px;line-height:1.6;color:#a1a1aa;">
+                If the button doesn't work, right-click it and select <em>Copy link</em>, then paste it into your browser.
               </p>
               <p style="margin:12px 0 0;font-size:13px;line-height:1.6;color:#a1a1aa;">
-                Or copy and paste this link into your browser:<br />
-                <a href="${resetUrl}" style="color:#52525b;word-break:break-all;">${resetUrl}</a>
+                If you didn't request a password reset, you can safely ignore this email. Your password won't change.
               </p>
             </td>
           </tr>
@@ -221,12 +220,11 @@ function emailVerificationHtml({
                 </tr>
               </table>
 
-              <p style="margin:32px 0 0;font-size:13px;line-height:1.6;color:#a1a1aa;">
-                If you didn't sign up for this account, you can safely ignore this email.
+              <p style="margin:16px 0 0;font-size:13px;line-height:1.6;color:#a1a1aa;">
+                If the button doesn't work, right-click it and select <em>Copy link</em>, then paste it into your browser.
               </p>
               <p style="margin:12px 0 0;font-size:13px;line-height:1.6;color:#a1a1aa;">
-                Or copy and paste this link into your browser:<br />
-                <a href="${verificationUrl}" style="color:#52525b;word-break:break-all;">${verificationUrl}</a>
+                If you didn't sign up for this account, you can safely ignore this email.
               </p>
             </td>
           </tr>

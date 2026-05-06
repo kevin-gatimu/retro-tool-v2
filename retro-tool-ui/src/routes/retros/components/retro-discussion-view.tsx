@@ -582,26 +582,29 @@ function DiscussionNotesPanel({
         ))}
       </div>
 
-      <div className="border-t p-3 flex gap-2 shrink-0">
-        <Input
-          placeholder="Add a discussion note…"
-          value={newCommentText}
-          onChange={(e) => onCommentChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && newCommentText.trim()) {
-              e.preventDefault()
-              onSend()
-            }
-          }}
-          className="flex-1"
-        />
-        <Button
-          size="icon"
-          onClick={onSend}
-          disabled={!newCommentText.trim() || isSending}
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+      <div className="border-t p-3 shrink-0">
+        <div className="relative">
+          <Input
+            placeholder="Add a discussion note…"
+            value={newCommentText}
+            onChange={(e) => onCommentChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && newCommentText.trim()) {
+                e.preventDefault()
+                onSend()
+              }
+            }}
+            className="w-full pr-10"
+          />
+          <Button
+            size="icon"
+            onClick={onSend}
+            disabled={!newCommentText.trim() || isSending}
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+          >
+            <Send className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
     </div>
   )
