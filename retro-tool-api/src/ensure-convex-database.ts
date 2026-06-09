@@ -1,3 +1,5 @@
+// Creates the Convex-specific PostgreSQL database if it doesn't exist.
+// Convex (self-hosted) requires its own DB separate from retro_tool_db.
 import 'dotenv/config';
 import { Pool } from 'pg';
 

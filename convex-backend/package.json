@@ -4,6 +4,8 @@
     "type": "module",
     "scripts": {
         "dev": "convex dev",
+        "dev:staging": "dotenv -e .env.staging-local -- convex dev",
+        "dev:prod": "dotenv -e .env.production-local -- convex dev",
         "codegen": "convex codegen",
         "deploy": "convex deploy",
         "build": "node -e \"console.log('convex-backend scaffold created; run pnpm codegen after configuring a Convex deployment')\"",
@@ -16,6 +18,7 @@
         "@convex-dev/aggregate": "^0.2.1"
     },
     "devDependencies": {
+        "dotenv-cli": "^8.0.0",
         "typescript": "^6.0.2"
     }
 }

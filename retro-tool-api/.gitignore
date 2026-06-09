@@ -1,6 +1,9 @@
 # agents
 .agents/
 
+# database backups
+/backups
+
 # compiled output
 /dist
 /node_modules

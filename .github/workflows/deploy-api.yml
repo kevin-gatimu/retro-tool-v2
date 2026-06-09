@@ -194,8 +194,6 @@ jobs:
           EMAIL_FROM: ${{ vars.EMAIL_FROM || secrets.EMAIL_FROM }}
           DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || vars.BETTER_AUTH_SECRET }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET }}
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID || vars.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
           MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET || vars.MICROSOFT_CLIENT_SECRET }}
           CONVEX_SYNC_ADMIN_KEY: ${{ secrets.CONVEX_SYNC_ADMIN_KEY || vars.CONVEX_SYNC_ADMIN_KEY }}
@@ -233,7 +231,6 @@ jobs:
             fi
           }
 
-          validate_oauth_pair "Google" "GOOGLE_CLIENT_ID" "GOOGLE_CLIENT_SECRET"
           validate_oauth_pair "Microsoft" "MICROSOFT_CLIENT_ID" "MICROSOFT_CLIENT_SECRET"
 
       - name: Azure login (OIDC)
@@ -272,8 +269,6 @@ jobs:
               DATABASE_URL='${{ secrets.DATABASE_URL || vars.DATABASE_URL }}' \
               BETTER_AUTH_SECRET='${{ secrets.BETTER_AUTH_SECRET || vars.BETTER_AUTH_SECRET }}' \
               BETTER_AUTH_URL='https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net' \
-              GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID }}' \
-              GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET }}' \
               MICROSOFT_CLIENT_ID='${{ secrets.MICROSOFT_CLIENT_ID || vars.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}' \
               MICROSOFT_CLIENT_SECRET='${{ secrets.MICROSOFT_CLIENT_SECRET || vars.MICROSOFT_CLIENT_SECRET }}' \
               RESEND_API_KEY='${{ secrets.RESEND_API_KEY || vars.RESEND_API_KEY }}' \

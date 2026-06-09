@@ -152,11 +152,6 @@ Authorization: Bearer {{sessionToken}}
 
 ###
 
-### Sign in with Google (browser redirect — open in browser)
-GET {{baseUrl}}/api/auth/sign-in/google
-
-###
-
 ### Sign in with Microsoft / Azure Entra ID (browser redirect — open in browser)
 GET {{baseUrl}}/api/auth/sign-in/microsoft
 

@@ -28,9 +28,9 @@ NestJS REST API + WebSocket backend for the Retro Tool application. Handles auth
 
 ### Prerequisites
 
-- Node.js 20+
-- pnpm
-- Docker (for the database)
+- Node.js 22+
+- pnpm 9+
+- Docker (for local PostgreSQL + Redis)
 
 ### 1. Install dependencies
 
@@ -41,53 +41,73 @@ pnpm install
 ### 2. Configure environment
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-Edit `.env`:
+Edit `.env.local`:
 
 ```env
 PORT=8000
+NODE_ENV=development
 
-DATABASE_URL=postgresql://postgres:password@localhost:5432/retro_tool
+DATABASE_URL=postgresql://postgres:password@localhost:5432/retro_tool_db
 
 BETTER_AUTH_SECRET=your-secret-here
-BETTER_AUTH_URL=http://localhost:8000        # must match the server PORT
+BETTER_AUTH_URL=http://localhost:8000
+BETTER_AUTH_SESSION_EXPIRES_IN=604800
 
-FRONTEND_URL=http://localhost:5173
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8000
+FRONTEND_URL=http://localhost:3000
+LOCAL_SERVER_URL=http://localhost:8000
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8000
 
-# Optional — Email (Resend)
+# OAuth (Microsoft)
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+MICROSOFT_TENANT_ID=
+
+# Email (Resend)
 RESEND_API_KEY=re_your_api_key_here
 EMAIL_FROM=Retro Tool <noreply@yourdomain.com>
 
-# Optional — Google OAuth
-# GOOGLE_CLIENT_ID=
-# GOOGLE_CLIENT_SECRET=
-
-# Optional — Browser push notifications (web-push / VAPID)
+# Browser push notifications (VAPID)
 # Generate keys with: npx web-push generate-vapid-keys
-# VAPID_PUBLIC_KEY=
-# VAPID_PRIVATE_KEY=
-# VAPID_SUBJECT=mailto:admin@yourdomain.com
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:admin@yourdomain.com
+
+# Convex projection sync
+CONVEX_SYNC_URL=http://localhost:3210
+CONVEX_SYNC_ADMIN_KEY=
+
+# Scheduled jobs
+ENABLE_CRON_JOBS=false
 ```
 
-Generate `BETTER_AUTH_SECRET` with either command:
+Generate `BETTER_AUTH_SECRET`:
 
 ```bash
-openssl rand -hex 32
-```
-
-```powershell
-$bytes = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes); ($bytes | ForEach-Object { $_.ToString('x2') }) -join ''
+openssl rand -base64 32
 ```
 
 > **Note:** `BETTER_AUTH_URL` must match the URL the server is actually running on (including port).
 
+### Environment file strategy
+
+| File | Purpose |
+| --- | --- |
+| `.env.local` | Local dev with Docker infra — **not committed** |
+| `.env.staging-local` | Local dev against staging Azure resources |
+| `.env.production-local` | Local dev against production Azure resources |
+| `.env.example` | Template for local development |
+| `.env.production.example` | Template for production app settings |
+
+The API uses `ConfigModule.forRoot` with `envFilePath: ['.env.local', '.env']`. When running `dev:staging` or `dev:prod`, `dotenv-cli` pre-loads the environment-specific file — `ConfigModule` won't overwrite existing `process.env` vars.
+
 ### 3. Start the database
 
 ```bash
-docker-compose up -d
+# From repo root — starts Postgres, Redis, Convex
+pnpm local:infra
 ```
 
 ### 4. Run migrations
@@ -114,8 +134,14 @@ See [Seed Data](#seed-data) for credentials and what gets created.
 ### 6. Start the server
 
 ```bash
-# development (watch mode)
-pnpm start:dev
+# development (watch mode — local infra)
+pnpm dev
+
+# development against staging resources
+pnpm dev:staging
+
+# development against production resources
+pnpm dev:prod
 
 # production
 pnpm start:prod
@@ -130,14 +156,24 @@ Server runs at `http://localhost:8000` by default. Swagger UI at `http://localho
 ### Commands
 
 ```bash
-pnpm db:generate          # generate a new migration from schema changes
-pnpm db:migrate           # apply pending migrations (local)
-pnpm db:migrate:prod      # apply migrations (production, from compiled dist/)
-pnpm db:studio            # open Drizzle Studio (visual DB browser)
+pnpm db:generate              # generate a new migration from schema changes
+pnpm db:migrate               # apply pending migrations (local)
+pnpm db:migrate:prod          # apply migrations (production, from compiled dist/)
+pnpm db:studio                # open Drizzle Studio (visual DB browser)
 
-pnpm db:seed              # seed dev demo data + all built-in templates
-pnpm db:seed:templates    # seed built-in templates only (idempotent)
-pnpm db:seed:prod         # production: seed built-in templates only
+pnpm db:seed                  # seed dev demo data + all built-in templates
+pnpm db:seed:templates        # seed built-in retro templates (idempotent)
+pnpm db:seed:estimate-templates  # seed estimate templates (idempotent)
+pnpm db:seed:users            # seed demo users only
+pnpm db:seed:roles            # seed team roles
+pnpm db:seed:large-org        # seed a large org (stress testing)
+pnpm db:seed:prod             # production: templates only (compiled)
+
+pnpm db:backup                # backup local DB to backups/
+pnpm db:backup:prod           # backup production DB
+
+pnpm db:ensure:convex         # create Convex-specific PostgreSQL database
+pnpm db:ensure:convex:prod    # same for production
 ```
 
 ### Schema
@@ -495,6 +531,9 @@ src/
 │   ├── data/
 │   │   └── built-in-templates.ts # Built-in template definitions (source of truth)
 │   ├── enums/                    # Type-safe enums for all modules
+│   ├── interceptors/             # LastActiveInterceptor, etc.
+│   ├── types/
+│   │   └── index.ts              # Shared TypeScript types
 │   └── pipes/
 │       └── zod-validation.pipe.ts
 ├── config/
@@ -502,28 +541,55 @@ src/
 ├── database/
 │   ├── database.module.ts        # Drizzle provider (DATABASE_CONNECTION token)
 │   └── database-connection.ts
+├── adapters/
+│   └── socket-io.adapter.ts      # Socket.IO Redis adapter
+├── convex-admin/                 # Convex projection sync service
+│   └── types/
+│       └── index.ts
 ├── email/                        # Resend wrapper + email_log table
 ├── estimates/                    # Story estimates — REST + Socket.io gateway
+│   └── types/
+│       └── index.ts
+├── estimate-templates/           # Estimate card deck templates
+│   └── types/
+│       └── index.ts
+├── invitations/                  # Org + team invitation handling
+│   └── types/
+│       └── index.ts
 ├── lib/
 │   ├── email.ts                  # Email template helpers
 │   └── utils.ts                  # generateId(), etc.
-├── notifications/                # In-app notifications — REST + Socket.io gateway
-├── organizations/                # Organisation CRUD + membership
+├── notifications/                # In-app notifications — REST + Socket.io + push
+├── organizations/                # Organisation CRUD + membership + invitations
 ├── reports/                      # Analytics — team metrics, health score
-├── retro-reminders/              # Cron: email reminders 1h before scheduledAt
 ├── retros/                       # Retrospective lifecycle, templates, cards, votes
+│   └── types/
+│       └── index.ts
 ├── seed/
-│   ├── seed.ts                   # Dev seed: users, orgs, teams, retros
-│   └── seed-templates.ts         # Built-in templates (prod-safe, idempotent)
+│   ├── seed-users.ts             # Dev seed: users, orgs, teams, retros
+│   ├── seed-templates.ts         # Retro templates (prod-safe, idempotent)
+│   ├── seed-estimate-templates.ts # Estimate templates
+│   ├── seed-team-roles.ts        # Team roles
+│   └── seed-large-org.ts         # Large org for stress testing
 ├── sessions/                     # Session listing & revocation
 ├── teams/                        # Team CRUD + membership + join requests
+├── team-roles/                   # Team role definitions
+├── action-items/                 # Retro action items
 ├── user-preferences/             # Notification preferences
 ├── users/                        # User management + admin actions
-├── weekly-digests/               # Cron: weekly digest emails
+├── health.controller.ts          # GET /health — DB connectivity check
 ├── app.module.ts                 # Root module
 ├── main.ts                       # Bootstrap (CORS, cookie-parser, Swagger)
-└── migrate.ts                    # Standalone migration runner (used in prod)
+├── migrate.ts                    # Standalone migration runner (used in prod)
+└── ensure-convex-database.ts     # Creates Convex-specific PostgreSQL database
+
+scripts/
+└── db-backup.ts                  # Database backup via pg_dump
 ```
+
+### Module type convention
+
+Each module keeps its TypeScript types in a `types/index.ts` file (not loose `*.types.ts` files).
 
 ---
 

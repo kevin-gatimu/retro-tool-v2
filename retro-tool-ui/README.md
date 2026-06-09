@@ -26,20 +26,20 @@ The frontend application for the Retro Tool platform — a collaborative agile r
 
 ## Tech Stack
 
-| Layer           | Technology                         |
-| --------------- | ---------------------------------- |
-| Framework       | React 19                           |
-| Routing         | TanStack Router (file-based)       |
-| Data Fetching   | TanStack Query                     |
-| Forms           | TanStack Form                      |
-| Tables          | TanStack Table                     |
-| Auth Client     | Better Auth (`better-auth/client`) |
-| UI Components   | Radix UI primitives                |
-| Styling         | TailwindCSS 4                      |
-| Charts          | Recharts                           |
-| Real-time       | Socket.io client                   |
-| Validation      | Zod                                |
-| Package Manager | pnpm                               |
+| Layer           | Technology                          |
+| --------------- | ----------------------------------- |
+| Framework       | React 19                            |
+| Routing         | TanStack Router (file-based)        |
+| Data Fetching   | TanStack Query                      |
+| Forms           | TanStack Form                       |
+| Tables          | TanStack Table                      |
+| Auth Client     | Better Auth (`better-auth/client`)  |
+| UI Components   | Radix UI primitives                 |
+| Styling         | TailwindCSS 4                       |
+| Charts          | Recharts                            |
+| Real-time       | Socket.IO client + Convex React SDK |
+| Validation      | Zod                                 |
+| Package Manager | pnpm                                |
 
 ---
 
@@ -452,11 +452,34 @@ See [RBAC.md](../RBAC.md) for the full permission matrix.
 
 ## Environment Setup
 
-Create a `.env` file in the project root (`retro-tool-ui/`):
+Copy the example env file:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+Key variables in `.env.local`:
 
 ```env
-# Required — points to the NestJS API server
 VITE_API_URL=http://localhost:8000
+VITE_CONVEX_URL=http://localhost:3210
+VITE_RETROS_REALTIME_BACKEND=convex       # or: socket-io
+VITE_ESTIMATES_REALTIME_BACKEND=convex    # or: socket-io
+VITE_NOTIFICATIONS_REALTIME_BACKEND=convex
+```
+
+### Running against remote environments
+
+Additional env files exist for local development against Azure resources:
+
+| File                    | Purpose                                                      |
+| ----------------------- | ------------------------------------------------------------ |
+| `.env.staging-local`    | Points at staging Convex + local API (which hits staging DB) |
+| `.env.production-local` | Points at production Convex + local API (which hits prod DB) |
+
+```powershell
+pnpm dev:staging   # Loads .env.staging-local (--mode staging-local)
+pnpm dev:prod      # Loads .env.production-local (--mode production-local)
 ```
 
 ---
@@ -470,6 +493,12 @@ pnpm install
 # Start development server (hot reload)
 pnpm dev
 
+# Start against staging resources
+pnpm dev:staging
+
+# Start against production resources
+pnpm dev:prod
+
 # Build for production
 pnpm build
 
@@ -479,14 +508,14 @@ pnpm preview
 # Lint
 pnpm lint
 
-# Format
-pnpm format
+# Type-check
+pnpm type-check
 
 # Run tests
 pnpm test
 ```
 
-App runs at `http://localhost:5173` by default.
+App runs at `http://localhost:3000` by default.
 
 > The API server must be running at `VITE_API_URL` for authentication and data fetching to work.
 

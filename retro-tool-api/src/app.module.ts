@@ -22,11 +22,6 @@ import { LastActiveInterceptor } from './common/interceptors/last-active.interce
 import configuration from './config/configuration';
 import { HealthController } from './health.controller';
 import { join } from 'path';
-import { config as loadDotenv } from 'dotenv';
-
-loadDotenv({ path: join(__dirname, '../.env'), override: true });
-// .env.local overrides .env — useful for local cloud testing without modifying .env
-loadDotenv({ path: join(__dirname, '../.env.local'), override: true });
 
 @Module({
   imports: [

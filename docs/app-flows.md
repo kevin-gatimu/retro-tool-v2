@@ -8,7 +8,7 @@ Reference for every major user-facing flow — what triggers it, what the fronte
 
 1. [Auth Flows](#1-auth-flows)
    - [Email/Password Sign-Up](#11-emailpassword-sign-up)
-   - [OAuth Sign-Up (Microsoft / Google)](#12-oauth-sign-up-microsoft--google)
+   - [OAuth Sign-Up (Microsoft)](#12-oauth-sign-up-microsoft)
    - [Email/Password Sign-In](#13-emailpassword-sign-in)
    - [OAuth Sign-In](#14-oauth-sign-in)
    - [Email Verification](#15-email-verification)
@@ -18,7 +18,7 @@ Reference for every major user-facing flow — what triggers it, what the fronte
 3. [Organization Flows](#3-organization-flows)
 4. [Team Flows](#4-team-flows)
 5. [Retro Flows](#5-retro-flows)
-6. [Estimates (Poker) Flows](#6-estimates-poker-flows)
+6. [Story Estimate Flows](#6-story-estimate-flows)
 7. [Notifications](#7-notifications)
 
 ---
@@ -64,13 +64,13 @@ Reference for every major user-facing flow — what triggers it, what the fronte
 
 ---
 
-### 1.2 OAuth Sign-Up (Microsoft / Google)
+### 1.2 OAuth Sign-Up (Microsoft)
 
-**Trigger:** User clicks "Sign up with Microsoft / Google" on `/auth/sign-up`.
+**Trigger:** User clicks "Sign up with Microsoft" on `/auth/sign-up`.
 
 **Frontend steps:**
 
-1. `authClient.signIn.social({ provider: 'microsoft' | 'google', callbackURL: '/auth/social-callback' })`.
+1. `authClient.signIn.social({ provider: 'microsoft', callbackURL: '/auth/social-callback' })`.
 2. Browser redirects to OAuth provider. User authenticates.
 3. Provider redirects back. Better Auth exchanges code for tokens, creates user + session (if new user), sets cookie.
 4. Browser lands on `/auth/social-callback`.
@@ -86,7 +86,7 @@ Reference for every major user-facing flow — what triggers it, what the fronte
 
 **Backend — Better Auth OAuth handling:**
 
-- Microsoft and Google are `trustedProviders` — email is marked `emailVerified = true` automatically.
+- Microsoft is a `trustedProvider` — email is marked `emailVerified = true` automatically.
 - New user is created with `role = 'member'`, `status = 'pending'`.
 - Account linking is enabled: if the email already exists from another provider, the new account is linked instead of creating a duplicate.
 
@@ -133,9 +133,9 @@ Same as email/password sign-up — first user becomes `super-admin` + `approved`
 
 ### 1.4 OAuth Sign-In
 
-**Trigger:** User clicks "Sign in with Microsoft / Google" on `/auth/sign-in` (existing account).
+**Trigger:** User clicks "Sign in with Microsoft" on `/auth/sign-in` (existing account).
 
-**Flow:** Identical to [1.2 OAuth Sign-Up](#12-oauth-sign-up-microsoft--google). Better Auth detects the existing user by email + provider and creates a new session instead of a new user.
+**Flow:** Identical to [1.2 OAuth Sign-Up](#12-oauth-sign-up-microsoft). Better Auth detects the existing user by email + provider and creates a new session instead of a new user.
 
 ---
 
@@ -150,7 +150,7 @@ Same as email/password sign-up — first user becomes `super-admin` + `approved`
 3. User clicks link → `GET /auth/verify-email?token=...` handled by Better Auth.
 4. Better Auth validates token, sets `emailVerified = true` on the user.
 
-**Note:** OAuth sign-ups (Microsoft/Google) skip this — `emailVerified` is set to `true` immediately as they are trusted providers. The bootstrap flow also sets `emailVerified = true` for the first user regardless of sign-up method.
+**Note:** OAuth sign-ups (Microsoft) skip this — `emailVerified` is set to `true` immediately as it is a trusted provider. The bootstrap flow also sets `emailVerified = true` for the first user regardless of sign-up method.
 
 ---
 
@@ -398,7 +398,7 @@ Retros move through phases in order. Only the creator (or system admin) can adva
 
 ---
 
-## 6. Estimates (Poker) Flows
+## 6. Story Estimate Flows
 
 ### 6.1 Create Session
 
@@ -412,7 +412,7 @@ Retros move through phases in order. Only the creator (or system admin) can adva
 
 1. User navigates to an active session, clicks "Join".
 2. `POST /api/estimates/{sessionId}/join`.
-3. Backend: adds user to `pokerParticipant`. WebSocket broadcasts `session-changed` to all connected clients.
+3. Backend: adds user to `story_estimate_participant`. WebSocket broadcasts `session-changed` to all connected clients.
 
 ### 6.3 Vote / Unvote
 
@@ -420,7 +420,7 @@ Retros move through phases in order. Only the creator (or system admin) can adva
 
 1. User clicks a point card (1, 2, 3, 5, 8, 13, 21, ☕, ?).
 2. `POST /api/estimates/{sessionId}/votes` with `{ points }`.
-3. Backend: creates or updates `pokerVote` for user.
+3. Backend: creates or updates `story_estimate_vote` for user.
 4. WebSocket: broadcasts `session-changed` — others see a dot indicating this user has voted (not the value, until revealed).
 
 **Unvote (toggle):**

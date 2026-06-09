@@ -10,6 +10,8 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/main",
     "dev": "nest start --watch",
+    "dev:staging": "dotenv -e .env.staging-local -- nest start --watch",
+    "dev:prod": "dotenv -e .env.production-local -- nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -34,6 +36,8 @@
     "db:seed:roles": "ts-node --transpile-only src/seed/seed-team-roles.ts",
     "db:seed:large-org": "ts-node --transpile-only src/seed/seed-large-org.ts",
     "db:seed:prod": "node dist/seed/seed-templates",
+    "db:backup": "ts-node --transpile-only scripts/db-backup.ts",
+    "db:backup:prod": "ts-node --transpile-only scripts/db-backup.ts --env .env.production",
     "prepare": "husky"
   },
   "dependencies": {
@@ -81,6 +85,7 @@
     "@types/pg": "^8.16.0",
     "@types/supertest": "^6.0.2",
     "@types/web-push": "^3.6.4",
+    "dotenv-cli": "^8.0.0",
     "drizzle-kit": "^0.31.9",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",

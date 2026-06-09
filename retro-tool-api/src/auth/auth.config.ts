@@ -34,8 +34,6 @@ export function createAuth(configService: ConfigService<Config>) {
 
   // Get auth config object for nested properties
   const authConfig = configService.get('auth', { infer: true });
-  const googleClientId = authConfig?.google?.clientId;
-  const googleClientSecret = authConfig?.google?.clientSecret;
   const microsoftClientId = authConfig?.microsoft?.clientId;
   const microsoftClientSecret = authConfig?.microsoft?.clientSecret;
 
@@ -196,14 +194,6 @@ export function createAuth(configService: ConfigService<Config>) {
       },
     },
     socialProviders: {
-      ...(googleClientId && googleClientSecret
-        ? {
-            google: {
-              clientId: googleClientId,
-              clientSecret: googleClientSecret,
-            },
-          }
-        : {}),
       ...(microsoftClientId && microsoftClientSecret
         ? {
             microsoft: {
@@ -228,7 +218,7 @@ export function createAuth(configService: ConfigService<Config>) {
       accountLinking: {
         enabled: true,
         // Automatically link accounts that share the same verified email
-        trustedProviders: ['microsoft', 'google'],
+        trustedProviders: ['microsoft'],
       },
     },
   });

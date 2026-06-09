@@ -10,6 +10,27 @@ This is a **pnpm monorepo** containing three applications and one shared package
 
 ---
 
+## Code conventions
+
+### API module structure
+
+Each NestJS module in `retro-tool-api/src/` follows this pattern:
+
+```
+module-name/
+├── module-name.module.ts
+├── module-name.controller.ts
+├── module-name.service.ts
+├── module-name.gateway.ts       # (if WebSocket events)
+├── dto/                         # Request/response DTOs
+├── types/
+│   └── index.ts                 # All module-specific TypeScript types
+├── schema.ts                    # Drizzle table definitions
+└── guards/                      # (if module-specific guards)
+```
+
+**Types must live in `types/index.ts`** — not in loose `*.types.ts` files.
+
 ---
 
 ## Quick-start commands
@@ -46,6 +67,20 @@ pnpm --filter convex-backend  dev             # Convex watcher
 pnpm --filter convex-backend  deploy          # Deploy to Convex Cloud
 ```
 
+### Running locally against remote environments
+
+```bash
+# Against staging (loads .env.staging-local)
+pnpm dev:api:staging
+pnpm dev:ui:staging
+pnpm dev:convex:staging
+
+# Against production (loads .env.production-local)
+pnpm dev:api:prod
+pnpm dev:ui:prod
+pnpm dev:convex:prod
+```
+
 ---
 
 ## After every code change — mandatory checks
@@ -77,6 +112,8 @@ pnpm --dir retro-tool-api db:migrate         # apply migrations
 pnpm --dir retro-tool-api db:seed            # seed demo data + templates
 pnpm --dir retro-tool-api db:seed:templates  # templates only (idempotent)
 pnpm --dir retro-tool-api db:studio          # Drizzle Studio in browser
+pnpm --dir retro-tool-api db:backup          # backup local DB to backups/
+pnpm --dir retro-tool-api db:backup:prod     # backup production DB
 ```
 
 ### Workspace-wide
@@ -114,13 +151,24 @@ retro-tool/
 │   │   ├── teams/
 │   │   ├── retros/
 │   │   ├── estimates/
+│   │   ├── estimate-templates/
 │   │   ├── notifications/
 │   │   ├── email/
 │   │   ├── reports/
 │   │   ├── users/
+│   │   ├── user-preferences/
 │   │   ├── action-items/
-│   │   ├── weekly-digests/
-│   │   └── adapters/      # Convex projection sync services
+│   │   ├── invitations/
+│   │   ├── sessions/
+│   │   ├── team-roles/
+│   │   ├── convex-admin/
+│   │   ├── adapters/      # Socket.IO adapter
+│   │   ├── common/        # Shared guards, interceptors, types
+│   │   ├── config/
+│   │   ├── database/
+│   │   ├── lib/
+│   │   └── seed/
+│   ├── scripts/           # Operational scripts (db-backup)
 │   └── drizzle/           # DB migrations
 ├── retro-tool-ui/         # React 19 + TanStack Router frontend
 │   └── src/
@@ -128,8 +176,17 @@ retro-tool/
 │       ├── components/
 │       ├── hooks/
 │       └── lib/
+├── infra/                 # Azure Bicep IaC (CLI-only deployment)
+│   ├── deploy.bicep       # Subscription-scoped entry point
+│   ├── main.bicep         # All resources
+│   ├── README.md          # Full deployment docs
+│   └── README-prod.md    # Production-specific runbook
 ├── docker/
 │   └── docker-compose.local.yml
+├── .github/workflows/
+│   ├── ci.yml             # Lint + type-check + test
+│   ├── deploy-api.yml     # Build & push API container to Azure
+│   └── deploy-ui.yml     # Deploy UI to Static Web App
 └── docs/
 ```
 
@@ -140,13 +197,25 @@ retro-tool/
 Copy these before first run:
 
 ```bash
-cp retro-tool-api/.env.example    retro-tool-api/.env
-cp retro-tool-ui/.env.example     retro-tool-ui/.env
-cp convex-backend/.env.example    convex-backend/.env
+cp retro-tool-api/.env.example    retro-tool-api/.env.local
+cp retro-tool-ui/.env.example     retro-tool-ui/.env.local
+cp convex-backend/.env.example    convex-backend/.env.local
 cp docker/.env.example            docker/.env
 ```
 
-**Key API env vars** (`retro-tool-api/.env`):
+### Environment file strategy
+
+Each package has multiple env files for different contexts:
+
+| File | Purpose |
+|---|---|
+| `.env.local` | Local dev with local infra (Docker) — **not committed** |
+| `.env.staging-local` | Local dev running against staging Azure resources |
+| `.env.production-local` | Local dev running against production Azure resources |
+| `.env.example` | Template for local development |
+| `.env.production.example` | Template for production app settings |
+
+**Key API env vars** (`retro-tool-api/.env.local`):
 
 | Variable | Purpose |
 |---|---|
@@ -154,13 +223,13 @@ cp docker/.env.example            docker/.env
 | `BETTER_AUTH_SECRET` | Session signing secret (generate: `openssl rand -base64 32`) |
 | `BETTER_AUTH_URL` | Must match API URL (`http://localhost:8000`) |
 | `FRONTEND_URL` | CORS allowed origin |
-| `REDIS_URL` | Redis connection |
 | `CONVEX_SYNC_URL` | Convex Admin API URL |
 | `CONVEX_SYNC_ADMIN_KEY` | Convex admin key for projection writes |
 | `RESEND_API_KEY` | Transactional email |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Push notifications |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | OAuth provider |
 
-**Key UI env vars** (`retro-tool-ui/.env`):
+**Key UI env vars** (`retro-tool-ui/.env.local`):
 
 ```env
 VITE_API_URL=http://localhost:8000
@@ -169,6 +238,10 @@ VITE_RETROS_REALTIME_BACKEND=convex       # or: socket-io
 VITE_ESTIMATES_REALTIME_BACKEND=convex    # or: socket-io
 VITE_NOTIFICATIONS_REALTIME_BACKEND=convex
 ```
+
+### Env loading in NestJS
+
+The API uses `ConfigModule.forRoot` with `envFilePath: ['.env.local', '.env']`. When running `dev:staging` or `dev:prod`, `dotenv-cli` pre-loads the environment-specific file — `ConfigModule` won't overwrite existing `process.env` vars, so the dotenv-cli values take precedence.
 
 ---
 
@@ -184,11 +257,13 @@ VITE_NOTIFICATIONS_REALTIME_BACKEND=convex
 | Database | PostgreSQL 16 via Drizzle ORM |
 | Auth server | Better Auth + `@thallesp/nestjs-better-auth` |
 | WebSockets | Socket.IO |
-| Realtime projection | Self-hosted Convex (local) / Convex Cloud (production) |
+| Realtime projection | Self-hosted Convex (local) / Convex Cloud (staging & production) |
 | Email | Resend |
 | Push notifications | web-push (VAPID) |
 | Scheduler | `@nestjs/schedule` |
 | Validation | class-validator + Zod |
+| Infrastructure | Azure Bicep (CLI-only, no IaC in CI) |
+| CI/CD | GitHub Actions (ci, deploy-api, deploy-ui) |
 
 ---
 
@@ -213,6 +288,25 @@ Two role dimensions:
 - **Team roles**: `team-lead` → `member`
 
 First sign-up is auto-bootstrapped as `super-admin`. Full matrices: [docs/RBAC.md](docs/RBAC.md).
+
+---
+
+## Deployment & environments
+
+Three environments mapped to branches:
+
+| Environment | Branch | Resource Group |
+|---|---|---|
+| Production | `main` | `retro-tool-prod-rg` |
+| Staging | `staging` | `retro-tool-staging-rg` |
+| Develop | `develop` | `retro-tool-dev-rg` |
+
+Infrastructure is provisioned via Azure CLI + Bicep (`infra/` folder). See [infra/README.md](infra/README.md) for full commands.
+
+GitHub Actions handle app deployment (not infra):
+- **CI** runs on all PRs (lint, type-check, test)
+- **deploy-api** builds Docker image → pushes to ACR → deploys to App Service
+- **deploy-ui** builds Vite → deploys to Azure Static Web App
 
 ---
 
@@ -246,13 +340,12 @@ First sign-up is auto-bootstrapped as `super-admin`. Full matrices: [docs/RBAC.m
 |---|---|
 | [docs/RBAC.md](docs/RBAC.md) | Full permission matrices for system, org, team, and retro actions; helper function signatures; user status lifecycle |
 | [docs/app-flows.md](docs/app-flows.md) | Step-by-step flows: auth, user approval, org/team management, retro phases, estimates, notifications |
-| [docs/deployment-guide.md](docs/deployment-guide.md) | Azure deployment walkthrough |
-| [docs/azure-cloud-resources.md](docs/azure-cloud-resources.md) | Azure resource inventory and cost estimates |
-| [docs/convex-components.md](docs/convex-components.md) | Rate limiter, aggregate B-trees, and Better Auth JWT bridge |
+| [docs/infrastructure.md](docs/infrastructure.md) | Azure infrastructure overview |
+| [docs/invitations.md](docs/invitations.md) | Invitation system (org + team) |
 | [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker (local + production) |
-| [docs/local-cloud-testing.md](docs/local-cloud-testing.md) | Testing locally against cloud resources |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and fixes |
 | [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: IceBreakers, AI summaries, Jira/ADO export, SAML |
+| [infra/README.md](infra/README.md) | Azure Bicep deployment commands, outputs, post-provisioning checklist |
+| [infra/README-prod.md](infra/README-prod.md) | Production-specific runbook with App Registration details |
 
 ### Convex AI guidelines
 
@@ -266,3 +359,4 @@ First sign-up is auto-bootstrapped as `super-admin`. Full matrices: [docs/RBAC.m
 - Node.js 22
 - pnpm 9+
 - Docker Desktop
+- Azure CLI (for infrastructure provisioning only)
