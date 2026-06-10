@@ -167,7 +167,7 @@ Create three environments in **GitHub → Settings → Environments**: `prod`, `
 | `POSTGRES_ADMIN_PASSWORD`            | The password you used during provisioning                              |
 | `DATABASE_URL`                       | Output `databaseUrl` — replace `<password>` with real password         |
 | `BETTER_AUTH_SECRET`                 | Generate: `openssl rand -base64 32` (unique per env)                   |
-| `AZURE_STATIC_WEB_APPS_API_TOKEN`   | From `az staticwebapp secrets list` command above                      |
+| `SWA_DEPLOYMENT_TOKEN`              | From `az staticwebapp secrets list` command above                      |
 | `RESEND_API_KEY`                     | From Resend dashboard                                                  |
 | `CONVEX_SYNC_ADMIN_KEY`             | From Convex dashboard                                                  |
 
@@ -204,7 +204,77 @@ az webapp config appsettings set `
     RESEND_API_KEY="<resend-key>"
 ```
 
-### 2. Push first Docker image
+### 2. Configure GitHub Actions OIDC (Federated Credentials)
+
+GitHub Actions uses OpenID Connect (OIDC) to authenticate with Azure — no stored client secrets needed. You must create a **federated identity credential** on your App Registration for each GitHub environment.
+
+#### Find your App Registration Object ID
+
+```powershell
+az ad app list --display-name "retro-tool" --query "[].{name:displayName, objectId:id, appId:appId}" -o table
+```
+
+#### Create federated credentials (one per environment)
+
+```powershell
+# Production (branch: main → environment: production)
+az ad app federated-credential create --id <APP_REGISTRATION_OBJECT_ID> --parameters '{
+  "name": "github-production",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:kevin-gatimu/retro-tool-v2:environment:production",
+  "audiences": ["api://AzureADTokenExchange"],
+  "description": "GitHub Actions OIDC for production environment"
+}'
+
+# Staging (branch: staging → environment: staging)
+az ad app federated-credential create --id <APP_REGISTRATION_OBJECT_ID> --parameters '{
+  "name": "github-staging",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:kevin-gatimu/retro-tool-v2:environment:staging",
+  "audiences": ["api://AzureADTokenExchange"],
+  "description": "GitHub Actions OIDC for staging environment"
+}'
+
+# Develop (branch: develop → environment: develop)
+az ad app federated-credential create --id <APP_REGISTRATION_OBJECT_ID> --parameters '{
+  "name": "github-develop",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:kevin-gatimu/retro-tool-v2:environment:develop",
+  "audiences": ["api://AzureADTokenExchange"],
+  "description": "GitHub Actions OIDC for develop environment"
+}'
+```
+
+> Replace `<APP_REGISTRATION_OBJECT_ID>` with the **Object ID** (not Client/App ID) from the command above.
+
+#### Verify existing credentials
+
+```powershell
+az ad app federated-credential list --id <APP_REGISTRATION_OBJECT_ID> -o table
+```
+
+#### How it works
+
+The `subject` claim must exactly match what GitHub sends during the workflow run:
+- `repo:<owner>/<repo>:environment:<environment-name>`
+
+The GitHub workflow uses `azure/login@v2` with OIDC:
+```yaml
+- uses: azure/login@v2
+  with:
+    client-id: ${{ secrets.AZURE_CLIENT_ID }}
+    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+```
+
+If you see `AADSTS700213: No matching federated identity record found`, it means the `subject` in the credential doesn't match what GitHub is sending. Double-check:
+1. The environment name in the workflow (`environment: staging`) matches the credential subject
+2. The repo name is correct (`kevin-gatimu/retro-tool-v2`)
+3. The credential is on the correct App Registration
+
+---
+
+### 3. Push first Docker image
 
 ```powershell
 az acr login --name <acrName>
