@@ -280,23 +280,20 @@ jobs:
               VAPID_SUBJECT='${{ vars.VAPID_SUBJECT || secrets.VAPID_SUBJECT }}' \
             --output none
 
-      - name: Configure Web App managed identity for ACR pull
-        env:
-          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || secrets.ACR_LOGIN_SERVER }}
+      - name: Verify ACR pull identity is configured
         run: |
-          PRINCIPAL_ID=$(az webapp identity assign \
+          ACR_CREDS=$(az webapp config show \
             --resource-group ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }} \
-            --query principalId -o tsv)
+            --query "acrUseManagedIdentityCreds" -o tsv)
 
-          echo "Web App managed identity principalId: ${PRINCIPAL_ID}"
-          echo "AcrPull role assignment must be pre-provisioned outside this pipeline."
-
-          az webapp config set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }} \
-            --generic-configurations '{"acrUseManagedIdentityCreds": true}' \
-            --only-show-errors
+          if [ "${ACR_CREDS}" != "true" ]; then
+            echo "WARNING: acrUseManagedIdentityCreds is not enabled."
+            echo "Ensure Bicep provisioning has run and configured the user-assigned managed identity with AcrPull."
+            echo "Run: az deployment sub create --template-file infra/deploy.bicep --parameters infra/environments/<env>.bicepparam"
+            exit 1
+          fi
+          echo "ACR pull via managed identity is configured."
 
       - name: Deploy container to App Service
         env:
