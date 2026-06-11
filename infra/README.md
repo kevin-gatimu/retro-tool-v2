@@ -12,9 +12,11 @@ Provisions all Azure resources for Retro Tool via CLI. Each environment (prod, s
 
 ```
 infra/
-├── deploy.bicep    # Entry point (subscription scope — creates resource group)
-├── main.bicep      # All resources (resource group scope)
-└── README.md       # This file
+├── deploy.bicep              # Entry point (subscription scope — creates resource group)
+├── main.bicep                # All resources (resource group scope)
+├── setup-oidc-credentials.ps1  # OIDC federated credential automation
+├── README.md                 # This file
+└── README-oidc.md            # OIDC setup guide
 ```
 
 ## Commands
@@ -48,20 +50,9 @@ az deployment sub create --location southafricanorth `
 ### Preview changes (what-if / dry run)
 
 ```powershell
-# Production
-az deployment sub what-if --location southafricanorth `
-  --template-file infra/deploy.bicep `
-  --parameters environment=prod postgresAdminPassword='<prod-password>'
-
-# Staging
 az deployment sub what-if --location southafricanorth `
   --template-file infra/deploy.bicep `
   --parameters environment=staging postgresAdminPassword='<staging-password>'
-
-# Development
-az deployment sub what-if --location southafricanorth `
-  --template-file infra/deploy.bicep `
-  --parameters environment=develop postgresAdminPassword='<dev-password>'
 ```
 
 ### View outputs after deployment
@@ -71,19 +62,15 @@ az deployment sub show --name deploy --location southafricanorth `
   --query "properties.outputs" --output table
 ```
 
-### Get Static Web App deployment token
-
-```powershell
-az staticwebapp secrets list --name <staticWebAppName> --query "properties.apiKey" -o tsv
-```
-
 ### Destroy an environment
 
 ```powershell
 az group delete --name retrotool-<env>-rg --yes --no-wait
 ```
 
-## Environment → Branch Mapping
+---
+
+## Environment -> Branch Mapping
 
 | Environment | Parameter              | Branch    | Resource Group          |
 | ----------- | ---------------------- | --------- | ----------------------- |
@@ -91,71 +78,110 @@ az group delete --name retrotool-<env>-rg --yes --no-wait
 | Staging     | `environment=staging`  | `staging` | `retrotool-staging-rg` |
 | Development | `environment=develop`  | `develop` | `retrotool-develop-rg` |
 
-## Deployment Outputs → GitHub Secrets & Variables
+---
 
-After deploying, use the outputs to configure each GitHub environment (`prod`, `staging`, `develop`).
+## GitHub Environment Configuration
 
-### Secrets (sensitive)
+Each GitHub environment (`production`, `staging`, `develop`) needs secrets and variables. The deploy workflow (`deploy-api.yml`) reads these to build, push, and configure the App Service.
 
-| GitHub Secret                      | Value                                           |
-| ---------------------------------- | ----------------------------------------------- |
-| `AZURE_CLIENT_ID`                  | App Registration client ID (Entra ID)           |
-| `AZURE_TENANT_ID`                  | Entra ID tenant ID                              |
-| `AZURE_SUBSCRIPTION_ID`            | Azure subscription ID                           |
-| `POSTGRES_ADMIN_PASSWORD`          | Password used during provisioning               |
-| `DATABASE_URL`                     | Output `databaseUrl` with real password         |
-| `BETTER_AUTH_SECRET`               | Generate: `openssl rand -base64 32`             |
-| `AZURE_STATIC_WEB_APPS_API_TOKEN`  | From `az staticwebapp secrets list`             |
-| `RESEND_API_KEY`                   | From Resend dashboard                           |
-| `CONVEX_SYNC_ADMIN_KEY`            | From Convex dashboard                           |
+### Secrets (sensitive — you must add these manually)
 
-### Variables (non-sensitive)
+| Secret | Description | How to get it |
+| --- | --- | --- |
+| `AZURE_CLIENT_ID` | App Registration client ID | Entra ID -> App Registrations -> Overview |
+| `AZURE_TENANT_ID` | Entra ID tenant ID | `az account show --query tenantId -o tsv` |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID | `az account show --query id -o tsv` |
+| `DATABASE_URL` | PostgreSQL connection string | Bicep output `databaseUrl` (replace `<password>`) |
+| `BETTER_AUTH_SECRET` | Session signing secret | `openssl rand -base64 32` |
+| `MICROSOFT_CLIENT_ID` | OAuth app client ID | Entra ID -> App Registration -> Overview |
+| `MICROSOFT_CLIENT_SECRET` | OAuth app client secret | Entra ID -> App Registration -> Certificates & secrets |
+| `RESEND_API_KEY` | Transactional email API key | Resend dashboard |
+| `CONVEX_SYNC_ADMIN_KEY` | Convex admin key | Convex dashboard |
+| `VAPID_PRIVATE_KEY` | Push notification private key | `npx web-push generate-vapid-keys` |
+| `SWA_DEPLOYMENT_TOKEN` | Static Web App deploy token | `az staticwebapp secrets list --name <name> --query "properties.apiKey" -o tsv` |
 
-| GitHub Variable    | Deployment Output                                              |
-| ------------------ | -------------------------------------------------------------- |
-| `ACR_LOGIN_SERVER` | `acrLoginServer` (e.g. `retrotoolprodacr.azurecr.io`)         |
-| `ACR_NAME`         | `acrName` (e.g. `retrotoolprodacr`)                           |
-| `APP_SERVICE_NAME` | `appServiceName` (e.g. `retrotool-prod-api`)                  |
-| `RESOURCE_GROUP`   | `resourceGroupName` (e.g. `retrotool-prod-rg`)                |
-| `API_URL`          | `apiUrl` (e.g. `https://retrotool-prod-api.azurewebsites.net`) |
-| `FRONTEND_URL`     | `uiUrl` (e.g. `https://nice-smoke-0118bc103.azurestaticapps.net`) |
-| `CONVEX_SYNC_URL`  | From Convex dashboard                                          |
+### Variables (non-sensitive — you must add these manually)
+
+| Variable | Description | Example (staging) |
+| --- | --- | --- |
+| `ACR_LOGIN_SERVER` | ACR login server URL | `retrotoolstagingacr.azurecr.io` |
+| `API_WEBAPP_NAME` | App Service name | `retrotool-staging-api` |
+| `AZURE_RESOURCE_GROUP` | Resource group name | `retrotool-staging-rg` |
+| `CONVEX_SYNC_URL` | Convex deployment URL | `https://neat-cod-843.eu-west-1.convex.cloud` |
+| `EMAIL_FROM` | Sender address for emails | `Retro-Tool <info@retro-tool.com>` |
+| `FRONTEND_URL` | UI URL (for CORS + redirects) | `https://calm-sky-095099503.7.azurestaticapps.net` |
+| `MICROSOFT_TENANT_ID` | OAuth tenant (if different from infra tenant) | Same as `AZURE_TENANT_ID` unless multi-tenant |
+| `VAPID_PUBLIC_KEY` | Push notification public key | From `npx web-push generate-vapid-keys` |
+| `VAPID_SUBJECT` | Push notification contact URL | `https://retrotool-staging-api.azurewebsites.net` |
+
+#### UI-only variables (used by `deploy-ui.yml`)
+
+| Variable | Description | Example (staging) |
+| --- | --- | --- |
+| `VITE_API_URL` | API base URL for the frontend | `https://retrotool-staging-api.azurewebsites.net` |
+| `VITE_APP_ENV` | Environment label | `staging` |
+| `VITE_APP_TITLE` | Browser tab title | `Retro Tool (Staging)` |
+| `VITE_CONVEX_URL` | Convex URL for realtime | `https://neat-cod-843.eu-west-1.convex.cloud` |
+| `VITE_ESTIMATES_REALTIME_BACKEND` | Realtime backend for estimates | `convex` |
+| `VITE_NOTIFICATIONS_REALTIME_BACKEND` | Realtime backend for notifications | `convex` |
+| `VITE_RETROS_REALTIME_BACKEND` | Realtime backend for retros | `convex` |
+
+### Automated by the deploy pipeline (do NOT add as GitHub vars)
+
+The `deploy-api.yml` workflow computes and pushes these to App Service automatically on every deploy. Adding them as GitHub environment variables causes conflicts.
+
+| Setting | Value | How it's set |
+| --- | --- | --- |
+| `PORT` | `8080` | Hardcoded in workflow |
+| `NODE_ENV` | `production` | Hardcoded in workflow |
+| `ENABLE_CRON_JOBS` | `true` | Hardcoded in workflow |
+| `WEEKLY_DIGEST_SEND_HOUR` | `6` | Hardcoded in workflow |
+| `BETTER_AUTH_SESSION_EXPIRES_IN` | `604800` | Hardcoded in workflow |
+| `ALLOWED_ORIGINS` | `{FRONTEND_URL},{API_URL}` | Computed from `FRONTEND_URL` + `API_WEBAPP_NAME` |
+| `BETTER_AUTH_URL` | `https://{API_WEBAPP_NAME}.azurewebsites.net` | Computed from `API_WEBAPP_NAME` |
+| `LOCAL_SERVER_URL` | `https://{API_WEBAPP_NAME}.azurewebsites.net` | Computed from `API_WEBAPP_NAME` |
+| `DEPLOYED_SERVER_URL` | `https://{API_WEBAPP_NAME}.azurewebsites.net` | Computed from `API_WEBAPP_NAME` |
+
+---
 
 ## Post-Provisioning Checklist
 
-### 1. Microsoft OAuth Redirect URIs
+### 1. Azure App Registration
 
-Add these redirect URIs to your Azure App Registration in **Entra ID → App Registrations → Authentication**:
+Create (or verify) an App Registration in **Entra ID -> App Registrations** with these settings:
+
+| Field | Value |
+| --- | --- |
+| Name | `Retro-tool-prod` |
+| Home page URL | `https://retro-tool.com` |
+| Terms of service URL | `https://retro-tool.com/termsofservice` |
+| Privacy statement URL | `https://retro-tool.com/privacystatement` |
+| Publisher domain | `retro-tool.com` |
+
+**Redirect URIs** (under Authentication -> Web):
 
 ```
 https://retrotool-prod-api.azurewebsites.net/api/auth/callback/microsoft
 https://retrotool-staging-api.azurewebsites.net/api/auth/callback/microsoft
 https://retrotool-develop-api.azurewebsites.net/api/auth/callback/microsoft
-```
-
-Also add local development:
-
-```
 http://localhost:8000/api/auth/callback/microsoft
 ```
 
-### 2. Configure App Service Environment Variables
+**Client secret** (under Certificates & secrets):
+
+- Create a new client secret and save as `MICROSOFT_CLIENT_SECRET` in each GitHub environment
+
+**IDs to note**:
+
+- `Application (client) ID` -> use as `AZURE_CLIENT_ID` and `MICROSOFT_CLIENT_ID` in GitHub secrets
+- `Directory (tenant) ID` -> use as `AZURE_TENANT_ID` in GitHub secrets
+
+### 2. OIDC Federated Credentials
+
+See [README-oidc.md](README-oidc.md) for the full guide, or run:
 
 ```powershell
-az webapp config appsettings set `
-  --resource-group retrotool-<env>-rg `
-  --name retrotool-<env>-api `
-  --settings `
-    DATABASE_URL="<databaseUrl-with-real-password>" `
-    BETTER_AUTH_SECRET="<openssl rand -base64 32>" `
-    BETTER_AUTH_URL="<apiUrl>" `
-    FRONTEND_URL="<uiUrl>" `
-    REDIS_URL="<redis-connection-string>" `
-    CONVEX_SYNC_URL="<convex-url>" `
-    CONVEX_SYNC_ADMIN_KEY="<convex-admin-key>" `
-    RESEND_API_KEY="<resend-key>" `
-    VAPID_PUBLIC_KEY="<vapid-public>" `
-    VAPID_PRIVATE_KEY="<vapid-private>"
+.\infra\setup-oidc-credentials.ps1
 ```
 
 ### 3. Push First Docker Image
@@ -180,18 +206,13 @@ $env:DATABASE_URL = "<databaseUrl-with-real-password>"
 pnpm --dir retro-tool-api db:seed:templates
 ```
 
-### 6. GitHub Actions OIDC (Federated Credentials)
+### 6. Generate VAPID Keys
 
-In your App Registration, add federated credentials for each environment:
+```powershell
+npx web-push generate-vapid-keys
+```
 
-| Environment | Subject identifier                                          |
-| ----------- | ----------------------------------------------------------- |
-| prod        | `repo:kevin-gatimu/retro-tool-v2:environment:prod`          |
-| staging     | `repo:kevin-gatimu/retro-tool-v2:environment:staging`       |
-| develop     | `repo:kevin-gatimu/retro-tool-v2:environment:develop`       |
-
-Issuer: `https://token.actions.githubusercontent.com`
-Audience: `api://AzureADTokenExchange`
+Save as `VAPID_PUBLIC_KEY` (variable) and `VAPID_PRIVATE_KEY` (secret) in the GitHub environment.
 
 ### 7. Custom Domain (optional)
 
@@ -203,14 +224,6 @@ az webapp config hostname add --resource-group retrotool-prod-rg `
 # Static Web App
 az staticwebapp hostname set --name retrotool-prod-ui --hostname app.yourdomain.com
 ```
-
-### 8. Generate VAPID Keys (push notifications)
-
-```powershell
-npx web-push generate-vapid-keys
-```
-
-Save the output as `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in App Service settings and GitHub secrets.
 
 ---
 
@@ -231,8 +244,10 @@ Save the output as `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in App Service set
 | ----- | --- |
 | `ResourceGroupNotFound` | Use `az deployment sub create` not `group create` |
 | ACR push 401 | Run `az acr login --name <acrName>` first |
+| App Service 504 Gateway Timeout | Check that `WEBSITES_PORT` is NOT set on the App Service — the workflow sets `PORT=8080` and Azure auto-detects |
 | App Service "Application Error" | `az webapp log tail --name <name> --resource-group <rg>` |
 | Bicep syntax errors | `az bicep build --file infra/main.bicep` |
 | PostgreSQL connection refused | Confirm firewall rule + `?sslmode=require` in URL |
 | OAuth callback fails | Check redirect URI matches exactly in App Registration |
 | Static Web App 404 | Ensure `staticwebapp.config.json` has `navigationFallback` set |
+| ACR pull fails (503) | Verify Bicep was deployed: `az webapp config show --name <name> --query acrUseManagedIdentityCreds` must be `true` |
