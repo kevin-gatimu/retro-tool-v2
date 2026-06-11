@@ -157,7 +157,6 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
 var baseAppSettings = [
   { name: 'DOCKER_REGISTRY_SERVER_URL', value: 'https://${acr.properties.loginServer}' }
   { name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE', value: 'false' }
-  { name: 'WEBSITES_PORT', value: '8000' }
 ]
 
 var customAppSettings = [for item in items(apiAppSettings): {
