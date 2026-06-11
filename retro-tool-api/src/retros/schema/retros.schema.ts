@@ -5,6 +5,7 @@ import {
   boolean,
   varchar,
   integer,
+  index,
   unique,
 } from 'drizzle-orm/pg-core';
 import { user } from '../../auth/schema';
@@ -17,78 +18,108 @@ import { retroStatusEnum, retroVoteTypeEnum } from '../../common/schema-enums';
 // Template Tables
 // ============================================================================
 
-export const template = pgTable('template', {
-  id: varchar('id', { length: 255 }).primaryKey(),
-  name: varchar('name', { length: 255 }).notNull(),
-  description: text('description'),
-  isBuiltIn: boolean('is_built_in').notNull().default(false),
-  organizationId: varchar('organization_id', { length: 255 }).references(
-    () => organization.id,
-    { onDelete: 'cascade' },
-  ),
-  createdAt: timestamp('created_at')
-    .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at')
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const template = pgTable(
+  'template',
+  {
+    id: varchar('id', { length: 255 }).primaryKey(),
+    name: varchar('name', { length: 255 }).notNull(),
+    description: text('description'),
+    isBuiltIn: boolean('is_built_in').notNull().default(false),
+    organizationId: varchar('organization_id', { length: 255 }).references(
+      () => organization.id,
+      { onDelete: 'cascade' },
+    ),
+    createdAt: timestamp('created_at')
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [index('template_organization_id_idx').on(table.organizationId)],
+);
 
-export const templateColumn = pgTable('template_column', {
-  id: varchar('id', { length: 255 }).primaryKey(),
-  templateId: varchar('template_id', { length: 255 })
-    .notNull()
-    .references(() => template.id, { onDelete: 'cascade' }),
-  name: varchar('name', { length: 255 }).notNull(),
-  emoji: varchar('emoji', { length: 100 }),
-  prompt: text('prompt'),
-  order: integer('order').notNull().default(0),
-});
+export const templateColumn = pgTable(
+  'template_column',
+  {
+    id: varchar('id', { length: 255 }).primaryKey(),
+    templateId: varchar('template_id', { length: 255 })
+      .notNull()
+      .references(() => template.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 255 }).notNull(),
+    emoji: varchar('emoji', { length: 100 }),
+    prompt: text('prompt'),
+    order: integer('order').notNull().default(0),
+  },
+  (table) => [
+    index('template_column_template_id_idx').on(table.templateId),
+    index('template_column_template_id_order_idx').on(
+      table.templateId,
+      table.order,
+    ),
+  ],
+);
 
 // ============================================================================
 // Retrospective Tables
 // ============================================================================
 
-export const retrospective = pgTable('retrospective', {
-  id: varchar('id', { length: 255 }).primaryKey(),
-  name: varchar('name', { length: 255 }).notNull(),
-  teamId: varchar('team_id', { length: 255 })
-    .notNull()
-    .references(() => team.id, { onDelete: 'cascade' }),
-  templateId: varchar('template_id', { length: 255 })
-    .notNull()
-    .references(() => template.id),
-  status: retroStatusEnum('status').notNull().default(RETRO_STATUSES.Draft),
-  isAnonymous: boolean('is_anonymous').notNull().default(true),
-  maxVotesPerUser: integer('max_votes_per_user').notNull().default(3),
-  voteType: retroVoteTypeEnum('vote_type')
-    .notNull()
-    .default(RETRO_VOTE_TYPES.Multi),
-  timerDuration: integer('timer_duration'),
-  timerStartedAt: timestamp('timer_started_at'),
-  timerEndsAt: timestamp('timer_ends_at'),
-  createdById: varchar('created_by_id', { length: 255 }).references(
-    () => user.id,
-    { onDelete: 'set null' },
-  ),
-  createdAt: timestamp('created_at')
-    .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at')
-    .notNull()
-    .$defaultFn(() => new Date()),
-  completedAt: timestamp('completed_at'),
-  scheduledAt: timestamp('scheduled_at'),
-  reminderSentAt: timestamp('reminder_sent_at'),
-  lobbyStartedAt: timestamp('lobby_started_at'),
-  lobbyAutoStartsAt: timestamp('lobby_auto_starts_at'),
-  currentDiscussionCardId: varchar('current_discussion_card_id', {
-    length: 255,
-  }),
-  currentDiscussionActionItemId: varchar('current_discussion_action_item_id', {
-    length: 255,
-  }),
-});
+export const retrospective = pgTable(
+  'retrospective',
+  {
+    id: varchar('id', { length: 255 }).primaryKey(),
+    name: varchar('name', { length: 255 }).notNull(),
+    teamId: varchar('team_id', { length: 255 })
+      .notNull()
+      .references(() => team.id, { onDelete: 'cascade' }),
+    templateId: varchar('template_id', { length: 255 })
+      .notNull()
+      .references(() => template.id),
+    status: retroStatusEnum('status').notNull().default(RETRO_STATUSES.Draft),
+    isAnonymous: boolean('is_anonymous').notNull().default(true),
+    maxVotesPerUser: integer('max_votes_per_user').notNull().default(3),
+    voteType: retroVoteTypeEnum('vote_type')
+      .notNull()
+      .default(RETRO_VOTE_TYPES.Multi),
+    timerDuration: integer('timer_duration'),
+    timerStartedAt: timestamp('timer_started_at'),
+    timerEndsAt: timestamp('timer_ends_at'),
+    createdById: varchar('created_by_id', { length: 255 }).references(
+      () => user.id,
+      { onDelete: 'set null' },
+    ),
+    createdAt: timestamp('created_at')
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .$defaultFn(() => new Date()),
+    completedAt: timestamp('completed_at'),
+    scheduledAt: timestamp('scheduled_at'),
+    reminderSentAt: timestamp('reminder_sent_at'),
+    lobbyStartedAt: timestamp('lobby_started_at'),
+    lobbyAutoStartsAt: timestamp('lobby_auto_starts_at'),
+    currentDiscussionCardId: varchar('current_discussion_card_id', {
+      length: 255,
+    }),
+    currentDiscussionActionItemId: varchar(
+      'current_discussion_action_item_id',
+      { length: 255 },
+    ),
+  },
+  (table) => [
+    index('retrospective_team_id_idx').on(table.teamId),
+    index('retrospective_template_id_idx').on(table.templateId),
+    index('retrospective_status_idx').on(table.status),
+    index('retrospective_created_by_id_idx').on(table.createdById),
+    index('retrospective_team_status_idx').on(table.teamId, table.status),
+    index('retrospective_team_created_at_idx').on(
+      table.teamId,
+      table.createdAt,
+    ),
+    index('retrospective_created_at_idx').on(table.createdAt),
+  ],
+);
 
 export const retroParticipant = pgTable(
   'retro_participant',
@@ -109,6 +140,8 @@ export const retroParticipant = pgTable(
       table.retroId,
       table.userId,
     ),
+    index('retro_participant_retro_id_idx').on(table.retroId),
+    index('retro_participant_user_id_idx').on(table.userId),
   ],
 );
 
