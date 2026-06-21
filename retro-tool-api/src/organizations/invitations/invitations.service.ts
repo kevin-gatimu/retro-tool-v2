@@ -77,6 +77,25 @@ export class OrgInvitationsService {
       .where(eq(userSchema.user.email, email))
       .limit(1);
 
+    if (invitee) {
+      const [existingMember] = await this.database
+        .select({ id: orgSchema.organizationMember.id })
+        .from(orgSchema.organizationMember)
+        .where(
+          and(
+            eq(orgSchema.organizationMember.organizationId, orgId),
+            eq(orgSchema.organizationMember.userId, invitee.id),
+          ),
+        )
+        .limit(1);
+
+      if (existingMember) {
+        throw new ConflictException(
+          'This user is already a member of this organisation',
+        );
+      }
+    }
+
     const [existingInvite] = await this.database
       .select()
       .from(orgSchema.orgInvitation)
@@ -149,7 +168,7 @@ export class OrgInvitationsService {
     actorId: string,
     orgId: string,
     email: string,
-  ): Promise<{ registered: boolean; name?: string }> {
+  ): Promise<{ registered: boolean; name?: string; isMember?: boolean }> {
     const isAdmin = await this.commonService.isSystemAdmin(actorId);
     const isOrgAdmin = await this.commonService.isOrgAdmin(actorId, orgId);
 
@@ -165,7 +184,24 @@ export class OrgInvitationsService {
       .where(eq(userSchema.user.email, email))
       .limit(1);
 
-    return user ? { registered: true, name: user.name } : { registered: false };
+    if (!user) return { registered: false };
+
+    const [existingMember] = await this.database
+      .select({ id: orgSchema.organizationMember.id })
+      .from(orgSchema.organizationMember)
+      .where(
+        and(
+          eq(orgSchema.organizationMember.organizationId, orgId),
+          eq(orgSchema.organizationMember.userId, user.id),
+        ),
+      )
+      .limit(1);
+
+    return {
+      registered: true,
+      name: user.name,
+      isMember: !!existingMember,
+    };
   }
 
   async listInvitations(

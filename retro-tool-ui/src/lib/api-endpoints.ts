@@ -87,6 +87,7 @@ export const TEAMS_ENDPOINTS = {
     `/api/teams/${id}/invitations/${invId}`,
   RESEND_INVITATION: (id: string, invId: string) =>
     `/api/teams/${id}/invitations/${invId}/resend`,
+  CHECK_INVITE_EMAIL: (id: string) => `/api/teams/${id}/check-invite-email`,
 } as const
 
 // ---------------------------------------------------------------------------

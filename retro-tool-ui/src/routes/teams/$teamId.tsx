@@ -218,6 +218,7 @@ function TeamDetailPage() {
   const [inviteEmailCheck, setInviteEmailCheck] = useState<{
     registered: boolean
     name?: string
+    isMember?: boolean
   } | null>(null)
 
   // Sync edit form when team loads
@@ -706,8 +707,9 @@ function TeamDetailPage() {
                                 const result = await api.get<{
                                   registered: boolean
                                   name?: string
+                                  isMember?: boolean
                                 }>(
-                                  `${ORGANIZATIONS_ENDPOINTS.CHECK_INVITE_EMAIL(team.organizationId)}?email=${encodeURIComponent(inviteEmail)}`,
+                                  `${TEAMS_ENDPOINTS.CHECK_INVITE_EMAIL(teamId)}?email=${encodeURIComponent(inviteEmail)}`,
                                 )
                                 setInviteEmailCheck(result)
                               } catch {
@@ -717,11 +719,13 @@ function TeamDetailPage() {
                           />
                           {inviteEmailCheck !== null && (
                             <p
-                              className={`text-xs ${inviteEmailCheck.registered ? 'text-emerald-400' : 'text-gray-400'}`}
+                              className={`text-xs ${inviteEmailCheck.isMember ? 'text-destructive' : inviteEmailCheck.registered ? 'text-emerald-400' : 'text-gray-400'}`}
                             >
-                              {inviteEmailCheck.registered
-                                ? `Account found${inviteEmailCheck.name ? ` (${inviteEmailCheck.name})` : ''} — invitation email will be sent`
-                                : 'No account found — invitation email will be sent to register'}
+                              {inviteEmailCheck.isMember
+                                ? 'This user is already a member of this team'
+                                : inviteEmailCheck.registered
+                                  ? `Account found${inviteEmailCheck.name ? ` (${inviteEmailCheck.name})` : ''} — invitation email will be sent`
+                                  : 'No account found — invitation email will be sent to register'}
                             </p>
                           )}
                         </div>
@@ -756,7 +760,9 @@ function TeamDetailPage() {
                         <Button
                           type="submit"
                           disabled={
-                            !inviteEmail || inviteMemberMutation.isPending
+                            !inviteEmail ||
+                            inviteMemberMutation.isPending ||
+                            !!inviteEmailCheck?.isMember
                           }
                         >
                           {inviteMemberMutation.isPending

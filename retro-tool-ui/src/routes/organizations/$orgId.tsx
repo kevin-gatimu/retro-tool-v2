@@ -225,6 +225,7 @@ function OrganizationDetailPage() {
   const [inviteEmailCheck, setInviteEmailCheck] = useState<{
     registered: boolean
     name?: string
+    isMember?: boolean
   } | null>(null)
   const [addMemberSearch, setAddMemberSearch] = useState('')
   const [addMemberUserId, setAddMemberUserId] = useState('')
@@ -907,6 +908,7 @@ function OrganizationDetailPage() {
                                   const result = await api.get<{
                                     registered: boolean
                                     name?: string
+                                    isMember?: boolean
                                   }>(
                                     `${ORGANIZATIONS_ENDPOINTS.CHECK_INVITE_EMAIL(orgId)}?email=${encodeURIComponent(inviteEmail)}`,
                                   )
@@ -918,11 +920,13 @@ function OrganizationDetailPage() {
                             />
                             {inviteEmailCheck !== null && (
                               <p
-                                className={`text-xs ${inviteEmailCheck.registered ? 'text-emerald-400' : 'text-gray-400'}`}
+                                className={`text-xs ${inviteEmailCheck.isMember ? 'text-destructive' : inviteEmailCheck.registered ? 'text-emerald-400' : 'text-gray-400'}`}
                               >
-                                {inviteEmailCheck.registered
-                                  ? `Account found${inviteEmailCheck.name ? ` (${inviteEmailCheck.name})` : ''} — invitation email will be sent`
-                                  : 'No account found — invitation email will be sent to register'}
+                                {inviteEmailCheck.isMember
+                                  ? 'This user is already a member of this organisation'
+                                  : inviteEmailCheck.registered
+                                    ? `Account found${inviteEmailCheck.name ? ` (${inviteEmailCheck.name})` : ''} — invitation email will be sent`
+                                    : 'No account found — invitation email will be sent to register'}
                               </p>
                             )}
                           </div>
@@ -964,7 +968,9 @@ function OrganizationDetailPage() {
                           <Button
                             type="submit"
                             disabled={
-                              !inviteEmail || inviteOrgMemberMutation.isPending
+                              !inviteEmail ||
+                              inviteOrgMemberMutation.isPending ||
+                              !!inviteEmailCheck?.isMember
                             }
                           >
                             {inviteOrgMemberMutation.isPending

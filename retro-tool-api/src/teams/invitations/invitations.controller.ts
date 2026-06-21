@@ -115,6 +115,35 @@ export class TeamInvitationsController {
     );
   }
 
+  @Get(':id/check-invite-email')
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth('session')
+  @ApiOperation({
+    summary: 'Check if an email belongs to a registered user and team member',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    format: 'uuid',
+    description: 'Team ID',
+  })
+  @ApiQuery({ name: 'email', required: true, type: String })
+  @ApiResponse({
+    status: 200,
+    description: '{ registered: boolean, name?: string, isMember?: boolean }',
+  })
+  async checkInviteEmail(
+    @Param('id') id: string,
+    @Query('email') email: string,
+    @Session() session: SessionUser,
+  ) {
+    return this.teamInvitationsService.checkInviteEmail(
+      session.user.id,
+      id,
+      email,
+    );
+  }
+
   @Post(':id/invite')
   @UseGuards(AuthGuard)
   @ApiBearerAuth('session')

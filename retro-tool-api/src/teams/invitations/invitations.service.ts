@@ -67,6 +67,31 @@ export class TeamInvitationsService {
 
     if (!team) throw new NotFoundException('Team not found');
 
+    const [invitee] = await this.database
+      .select({ id: userSchema.user.id, name: userSchema.user.name })
+      .from(userSchema.user)
+      .where(eq(userSchema.user.email, email))
+      .limit(1);
+
+    if (invitee) {
+      const [existingMember] = await this.database
+        .select({ id: teamSchema.teamMember.id })
+        .from(teamSchema.teamMember)
+        .where(
+          and(
+            eq(teamSchema.teamMember.teamId, teamId),
+            eq(teamSchema.teamMember.userId, invitee.id),
+          ),
+        )
+        .limit(1);
+
+      if (existingMember) {
+        throw new ConflictException(
+          'This user is already a member of this team',
+        );
+      }
+    }
+
     const appUrl =
       this.configService.get('frontend.url', { infer: true }) ?? '';
 
@@ -99,12 +124,6 @@ export class TeamInvitationsService {
       createdById: actorId,
       expiresAt,
     });
-
-    const [invitee] = await this.database
-      .select({ id: userSchema.user.id, name: userSchema.user.name })
-      .from(userSchema.user)
-      .where(eq(userSchema.user.email, email))
-      .limit(1);
 
     if (invitee) {
       void this.emailService
@@ -351,6 +370,44 @@ export class TeamInvitationsService {
     }
 
     return { resent: true };
+  }
+
+  async checkInviteEmail(
+    actorId: string,
+    teamId: string,
+    email: string,
+  ): Promise<{ registered: boolean; name?: string; isMember?: boolean }> {
+    const canManage = await this.commonService.canManageTeam(actorId, teamId);
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Only team managers can check invite emails',
+      );
+    }
+
+    const [user] = await this.database
+      .select({ id: userSchema.user.id, name: userSchema.user.name })
+      .from(userSchema.user)
+      .where(eq(userSchema.user.email, email))
+      .limit(1);
+
+    if (!user) return { registered: false };
+
+    const [existingMember] = await this.database
+      .select({ id: teamSchema.teamMember.id })
+      .from(teamSchema.teamMember)
+      .where(
+        and(
+          eq(teamSchema.teamMember.teamId, teamId),
+          eq(teamSchema.teamMember.userId, user.id),
+        ),
+      )
+      .limit(1);
+
+    return {
+      registered: true,
+      name: user.name,
+      isMember: !!existingMember,
+    };
   }
 
   async getTeamInvitationPreview(token: string) {
