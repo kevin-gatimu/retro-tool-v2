@@ -1447,7 +1447,9 @@ function RetroDetailPage() {
     )
   }
 
-  const canControl = Boolean(retro.isCreator || retro.isTeamLead)
+  const canControl = Boolean(
+    retro.isCreator || retro.isTeamLead || retro.isSystemAdmin,
+  )
   const retroStatus = retro.status
   const currentDiscussionCardId = retro.currentDiscussionCardId ?? null
   const retroName = retro.name || 'Untitled Retrospective'
