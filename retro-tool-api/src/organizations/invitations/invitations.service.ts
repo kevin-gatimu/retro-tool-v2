@@ -10,7 +10,7 @@ import { DATABASE_CONNECTION } from '../../database/database-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Config } from '../../config/configuration';
 import { EmailService } from '../../email/email.service';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull, ilike, count, desc } from 'drizzle-orm';
 import * as orgSchema from '../schema';
 import * as userSchema from '../../auth/schema';
 import { generateId } from '../../lib/utils';
@@ -168,6 +168,197 @@ export class OrgInvitationsService {
     return user ? { registered: true, name: user.name } : { registered: false };
   }
 
+  async listInvitations(
+    actorId: string,
+    orgId: string,
+    {
+      page = 1,
+      limit = 10,
+      search,
+    }: { page?: number; limit?: number; search?: string },
+  ) {
+    const isAdmin = await this.commonService.isSystemAdmin(actorId);
+    const isOrgAdmin = await this.commonService.isOrgAdmin(actorId, orgId);
+    if (!isAdmin && !isOrgAdmin) {
+      throw new ForbiddenException('Only admins can view invitations');
+    }
+
+    const conditions = [
+      eq(orgSchema.orgInvitation.organizationId, orgId),
+      isNull(orgSchema.orgInvitation.acceptedAt),
+    ];
+    if (search && search.length >= 2) {
+      conditions.push(ilike(orgSchema.orgInvitation.email, `%${search}%`));
+    }
+
+    const where = and(...conditions);
+    const offset = (page - 1) * limit;
+
+    const [invitations, [{ total }]] = await Promise.all([
+      this.database
+        .select({
+          id: orgSchema.orgInvitation.id,
+          email: orgSchema.orgInvitation.email,
+          role: orgSchema.orgInvitation.role,
+          createdAt: orgSchema.orgInvitation.createdAt,
+          expiresAt: orgSchema.orgInvitation.expiresAt,
+          invitedByName: userSchema.user.name,
+          invitedByEmail: userSchema.user.email,
+          invitedById: userSchema.user.id,
+        })
+        .from(orgSchema.orgInvitation)
+        .leftJoin(
+          userSchema.user,
+          eq(userSchema.user.id, orgSchema.orgInvitation.createdById),
+        )
+        .where(where)
+        .orderBy(desc(orgSchema.orgInvitation.createdAt))
+        .limit(limit)
+        .offset(offset),
+      this.database
+        .select({ total: count() })
+        .from(orgSchema.orgInvitation)
+        .where(where),
+    ]);
+
+    return {
+      invitations: invitations.map((inv) => ({
+        id: inv.id,
+        email: inv.email,
+        role: inv.role,
+        createdAt: inv.createdAt,
+        expiresAt: inv.expiresAt,
+        invitedBy: {
+          id: inv.invitedById,
+          name: inv.invitedByName,
+          email: inv.invitedByEmail,
+        },
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async revokeInvitation(actorId: string, orgId: string, invitationId: string) {
+    const isAdmin = await this.commonService.isSystemAdmin(actorId);
+    const isOrgAdmin = await this.commonService.isOrgAdmin(actorId, orgId);
+    if (!isAdmin && !isOrgAdmin) {
+      throw new ForbiddenException('Only admins can revoke invitations');
+    }
+
+    const [invitation] = await this.database
+      .select()
+      .from(orgSchema.orgInvitation)
+      .where(
+        and(
+          eq(orgSchema.orgInvitation.id, invitationId),
+          eq(orgSchema.orgInvitation.organizationId, orgId),
+        ),
+      )
+      .limit(1);
+
+    if (!invitation) throw new NotFoundException('Invitation not found');
+    if (invitation.acceptedAt) {
+      throw new ConflictException(
+        'Cannot revoke an already accepted invitation',
+      );
+    }
+
+    await this.database
+      .delete(orgSchema.orgInvitation)
+      .where(eq(orgSchema.orgInvitation.id, invitationId));
+
+    return { revoked: true };
+  }
+
+  async resendInvitation(actorId: string, orgId: string, invitationId: string) {
+    const isAdmin = await this.commonService.isSystemAdmin(actorId);
+    const isOrgAdmin = await this.commonService.isOrgAdmin(actorId, orgId);
+    if (!isAdmin && !isOrgAdmin) {
+      throw new ForbiddenException('Only admins can resend invitations');
+    }
+
+    const [invitation] = await this.database
+      .select()
+      .from(orgSchema.orgInvitation)
+      .where(
+        and(
+          eq(orgSchema.orgInvitation.id, invitationId),
+          eq(orgSchema.orgInvitation.organizationId, orgId),
+        ),
+      )
+      .limit(1);
+
+    if (!invitation) throw new NotFoundException('Invitation not found');
+    if (invitation.acceptedAt) {
+      throw new ConflictException(
+        'Cannot resend an already accepted invitation',
+      );
+    }
+
+    const newToken = crypto.randomUUID();
+    const newExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+
+    await this.database
+      .update(orgSchema.orgInvitation)
+      .set({ token: newToken, expiresAt: newExpiresAt })
+      .where(eq(orgSchema.orgInvitation.id, invitationId));
+
+    const [org] = await this.database
+      .select({ name: orgSchema.organization.name })
+      .from(orgSchema.organization)
+      .where(eq(orgSchema.organization.id, orgId))
+      .limit(1);
+
+    const appUrl =
+      this.configService.get('frontend.url', { infer: true }) ?? '';
+
+    const [invitee] = await this.database
+      .select()
+      .from(userSchema.user)
+      .where(eq(userSchema.user.email, invitation.email))
+      .limit(1);
+
+    if (invitee) {
+      void this.emailService
+        .send({
+          to: invitee.email,
+          subject: `You've been invited to join ${org?.name ?? 'an organisation'}`,
+          html: this.emailService.buildOrgInviteHtml({
+            userName: invitee.name,
+            invitedEmail: invitation.email,
+            orgName: org?.name ?? '',
+            role: invitation.role as TOrgMemberRole,
+            appUrl,
+            token: newToken,
+          }),
+          userId: invitee.id,
+          type: EMAIL_LOG_TYPES.OrgInvite,
+        })
+        .catch(() => undefined);
+    } else {
+      void this.emailService
+        .send({
+          to: invitation.email,
+          subject: `You've been invited to join ${org?.name ?? 'an organisation'}`,
+          html: this.emailService.buildOrgExternalInviteHtml({
+            orgName: org?.name ?? '',
+            role: invitation.role as TOrgMemberRole,
+            appUrl,
+            token: newToken,
+            invitedEmail: invitation.email,
+          }),
+          userId: actorId,
+          type: EMAIL_LOG_TYPES.OrgInviteExternal,
+        })
+        .catch(() => undefined);
+    }
+
+    return { resent: true };
+  }
+
   async getOrgInvitationPreview(token: string) {
     const [invitation] = await this.database
       .select({
@@ -225,7 +416,7 @@ export class OrgInvitationsService {
       .where(eq(userSchema.user.id, userId))
       .limit(1);
 
-    if (!user || user.email !== invitation.email) {
+    if (!user || user.email.toLowerCase() !== invitation.email.toLowerCase()) {
       throw new ForbiddenException(
         'This invitation was sent to a different email address',
       );

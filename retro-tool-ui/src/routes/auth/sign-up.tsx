@@ -350,6 +350,13 @@ function SignUpPage() {
                         . You must use this email — it's the address the invite
                         was sent to.
                       </p>
+                      <p className="text-gray-400 text-xs leading-relaxed mt-2">
+                        Fill in your name and password below, or use{' '}
+                        <span className="text-white font-medium">
+                          Sign up with Microsoft
+                        </span>{' '}
+                        at the bottom.
+                      </p>
                     </div>
                   )}
 

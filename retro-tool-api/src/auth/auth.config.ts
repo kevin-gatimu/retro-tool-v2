@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, bearer, multiSession } from 'better-auth/plugins';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { Config } from '../config/configuration';
@@ -119,7 +119,7 @@ export function createAuth(configService: ConfigService<Config>) {
           .from(orgInvitation)
           .where(
             and(
-              eq(orgInvitation.email, user.email),
+              eq(sql`lower(${orgInvitation.email})`, user.email.toLowerCase()),
               isNull(orgInvitation.acceptedAt),
               gt(orgInvitation.expiresAt, now),
             ),
@@ -132,7 +132,7 @@ export function createAuth(configService: ConfigService<Config>) {
           .from(teamInvitation)
           .where(
             and(
-              eq(teamInvitation.email, user.email),
+              eq(sql`lower(${teamInvitation.email})`, user.email.toLowerCase()),
               isNull(teamInvitation.acceptedAt),
               gt(teamInvitation.expiresAt, now),
             ),
