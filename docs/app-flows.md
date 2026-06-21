@@ -70,16 +70,17 @@ Reference for every major user-facing flow — what triggers it, what the fronte
 
 **Frontend steps:**
 
-1. `authClient.signIn.social({ provider: 'microsoft', callbackURL: '/auth/social-callback' })`.
+1. `authClient.signIn.social({ provider: 'microsoft', callbackURL: '/auth/social-callback?inviteToken=...' })` — the `inviteToken` query param is included when the user arrived from an invitation link.
 2. Browser redirects to OAuth provider. User authenticates.
 3. Provider redirects back. Better Auth exchanges code for tokens, creates user + session (if new user), sets cookie.
-4. Browser lands on `/auth/social-callback`.
+4. Browser lands on `/auth/social-callback` (with `?inviteToken=...` preserved if present).
 5. Social callback page:
    a. `GET /api/users/me` — fetch current user.
    b. `POST /api/users/admin/bootstrap` — attempt bootstrap.
       - **Success** → first user, now `super-admin` + `approved`. Navigate to `/dashboard`.
       - **Failure (400)** → admin already exists. Fall through.
-   c. Check `user.status`:
+   c. If `inviteToken` is present → navigate to `/auth/accept-invite?token={inviteToken}` (invitation acceptance auto-approves pending users).
+   d. Check `user.status`:
       - `pending` → `signOutWithCleanup()`, navigate to `/auth/sign-in?status=pending`.
       - `rejected` → `signOutWithCleanup()`, navigate to `/auth/sign-in?status=rejected`.
       - `approved` → navigate to `/dashboard`.
@@ -135,7 +136,9 @@ Same as email/password sign-up — first user becomes `super-admin` + `approved`
 
 **Trigger:** User clicks "Sign in with Microsoft" on `/auth/sign-in` (existing account).
 
-**Flow:** Identical to [1.2 OAuth Sign-Up](#12-oauth-sign-up-microsoft). Better Auth detects the existing user by email + provider and creates a new session instead of a new user.
+**Flow:** Identical to [1.2 OAuth Sign-Up](#12-oauth-sign-up-microsoft). Better Auth detects the existing user by email + provider and creates a new session instead of a new user. If the user originally signed up with email/password, the Microsoft account is automatically linked (same user, new `account` row) because Microsoft is a `trustedProvider`.
+
+**Invitation-aware:** When the sign-in page carries an `inviteToken` (the user arrived from an invitation link), the OAuth `callbackURL` includes it as a query param. After OAuth completes, the social callback redirects to `/auth/accept-invite?token={inviteToken}` instead of the dashboard.
 
 ---
 

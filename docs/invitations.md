@@ -99,6 +99,22 @@ When `/auth/sign-in` is opened with `?inviteToken=...&email=...` (the invite-awa
 
 This eliminates the previous dead-end where an invited user with no account would receive `Invalid email or password` with no clear way forward.
 
+### Microsoft OAuth in invite mode
+
+When the user clicks **"Sign in with Microsoft"** (or "Sign up with Microsoft" on the sign-up page) while an `inviteToken` is present, the OAuth `callbackURL` includes the token as a query param:
+
+```
+/auth/social-callback?inviteToken={token}
+```
+
+After OAuth completes, the social callback page detects the `inviteToken` and redirects to `/auth/accept-invite?token={token}` — the invitation is then accepted normally.
+
+**Account linking:** If the invited email already has an email/password account, the Microsoft OAuth account is automatically linked to the same user (no duplicate created). This is because Microsoft is configured as a `trustedProvider` in Better Auth's `accountLinking` settings, which also marks the email as verified without requiring Microsoft to provide the `email_verified` claim.
+
+This means invited users can:
+1. Accept the invitation via email/password sign-up, then later sign in with Microsoft (accounts merge automatically).
+2. Accept the invitation directly via Microsoft OAuth sign-in (the account is created or linked, then the invitation is accepted).
+
 ---
 
 ## Add Member flow (direct, no email)
