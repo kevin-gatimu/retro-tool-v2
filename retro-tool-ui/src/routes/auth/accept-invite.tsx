@@ -157,7 +157,6 @@ function AcceptInvitePage() {
       return (
         <EmailMismatchView
           preview={preview}
-          token={token}
           currentEmail={session.user.email}
         />
       )
@@ -303,33 +302,20 @@ function NotAuthenticatedView({
 
 function EmailMismatchView({
   preview,
-  token,
   currentEmail,
 }: {
   preview: InvitationPreview
-  token: string
   currentEmail: string
 }) {
-  const navigate = useNavigate()
   const [signingOut, setSigningOut] = useState(false)
 
   const handleSwitchAccount = async () => {
     setSigningOut(true)
     try {
       await authClient.signOut()
-      if (preview.isExistingUser) {
-        navigate({
-          to: '/auth/sign-in',
-          search: { inviteToken: token, email: preview.invitedEmail },
-        })
-      } else {
-        navigate({
-          to: '/auth/sign-up',
-          search: { inviteToken: token, email: preview.invitedEmail },
-        })
-      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to sign out')
+    } finally {
       setSigningOut(false)
     }
   }
@@ -387,7 +373,7 @@ function EmailMismatchView({
           variant="outline"
           className="h-11 px-6 border-[#21262d] text-gray-300 hover:bg-[#21262d]"
         >
-          <Link to="/dashboard">Cancel</Link>
+          <Link to="/auth/sign-in">Cancel</Link>
         </Button>
       </div>
     </div>

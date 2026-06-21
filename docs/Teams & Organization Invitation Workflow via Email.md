@@ -98,8 +98,52 @@
 │       ├── expired: true        → "Invitation Expired" message              │
 │       ├── accepted: true       → "Already Accepted" + go to team           │
 │       ├── !authenticated       → NotAuthenticatedView (see Step 3)         │
-│       ├── email mismatch       → "Wrong Account Signed In"                 │
+│       ├── email mismatch       → "Wrong Account Signed In" (see Step 2B)   │
 │       └── email matches        → "Accept Invitation" button (Step 5)       │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2B: Wrong Account Signed In — Email Mismatch                          │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  FILE: retro-tool-ui/src/routes/auth/accept-invite.tsx                     │
+│  COMPONENT: EmailMismatchView                                              │
+│                                                                            │
+│  Shown when: user is authenticated but session email != invited email       │
+│                                                                            │
+│  Displays:                                                                 │
+│    - "Wrong Account Signed In" heading                                     │
+│    - Signed in as: {currentEmail}                                          │
+│    - Invited: {invitedEmail}                                               │
+│                                                                            │
+│  Actions:                                                                  │
+│  ┌─── [Sign Out & Continue] (primary, emerald) ───────────────────┐       │
+│  │                                                                 │       │
+│  │  1. Calls authClient.signOut()                                  │       │
+│  │  2. Session clears, page re-renders as unauthenticated          │       │
+│  │  3. Shows NotAuthenticatedView (Step 3) on same page            │       │
+│  │     (token stays in URL, no navigation needed)                  │       │
+│  │                                                                 │       │
+│  └─────────────────────────────────────────────────────────────────┘       │
+│  ┌─── [Cancel] (outline) ─────────────────────────────────────────┐       │
+│  │                                                                 │       │
+│  │  Navigates to /auth/sign-in (login page)                        │       │
+│  │                                                                 │       │
+│  └─────────────────────────────────────────────────────────────────┘       │
+│                                                                            │
+│  Code (accept-invite.tsx):                                                 │
+│  ┌─────────────────────────────────────────────────────────┐               │
+│  │ const handleSwitchAccount = async () => {               │               │
+│  │   setSigningOut(true)                                   │               │
+│  │   try {                                                 │               │
+│  │     await authClient.signOut()                          │               │
+│  │   } catch (err) {                                       │               │
+│  │     toast.error(err.message || 'Failed to sign out')    │               │
+│  │   } finally {                                           │               │
+│  │     setSigningOut(false)                                │               │
+│  │   }                                                     │               │
+│  │ }                                                       │               │
+│  └─────────────────────────────────────────────────────────┘               │
 └────────────────────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────────────────────┐
