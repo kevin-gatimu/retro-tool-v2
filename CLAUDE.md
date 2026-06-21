@@ -107,13 +107,15 @@ pnpm --filter retro-tool-ui  lint
 ### Database commands (API package)
 
 ```bash
-pnpm --dir retro-tool-api db:generate        # generate Drizzle migration
-pnpm --dir retro-tool-api db:migrate         # apply migrations
-pnpm --dir retro-tool-api db:seed            # seed demo data + templates
-pnpm --dir retro-tool-api db:seed:templates  # templates only (idempotent)
-pnpm --dir retro-tool-api db:studio          # Drizzle Studio in browser
-pnpm --dir retro-tool-api db:backup          # backup local DB to backups/
-pnpm --dir retro-tool-api db:backup:prod     # backup production DB
+pnpm --dir retro-tool-api db:generate             # generate Drizzle migration
+pnpm --dir retro-tool-api db:migrate              # apply migrations
+pnpm --dir retro-tool-api db:seed                 # seed all (templates + roles + demo users)
+pnpm --dir retro-tool-api db:seed:templates       # retro + estimate templates (idempotent)
+pnpm --dir retro-tool-api db:seed:templates:staging # templates against staging
+pnpm --dir retro-tool-api db:seed:templates:prod  # templates against production
+pnpm --dir retro-tool-api db:seed:staging         # all prod-safe seeds against staging
+pnpm --dir retro-tool-api db:seed:prod            # all prod-safe seeds against production
+pnpm --dir retro-tool-api db:studio               # Drizzle Studio in browser
 ```
 
 ### Workspace-wide
@@ -168,7 +170,6 @@ retro-tool/
 │   │   ├── database/
 │   │   ├── lib/
 │   │   └── seed/
-│   ├── scripts/           # Operational scripts (db-backup)
 │   └── drizzle/           # DB migrations
 ├── retro-tool-ui/         # React 19 + TanStack Router frontend
 │   └── src/
@@ -213,7 +214,6 @@ Each package has multiple env files for different contexts:
 | `.env.staging-local` | Local dev running against staging Azure resources |
 | `.env.production-local` | Local dev running against production Azure resources |
 | `.env.example` | Template for local development |
-| `.env.production.example` | Template for production app settings |
 
 **Key API env vars** (`retro-tool-api/.env.local`):
 

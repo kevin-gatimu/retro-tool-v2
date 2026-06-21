@@ -1,4 +1,4 @@
-# Azure Resouces Guide for Retro Tool
+# Azure Resources Guide for Retro Tool
 
 This document is a self-contained package for migrating **Retro Tool** to a new Azure account
 

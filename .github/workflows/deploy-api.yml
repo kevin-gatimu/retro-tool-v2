@@ -178,9 +178,42 @@ jobs:
           NODE_ENV: production
         run: pnpm db:migrate
 
+  # ─────────────────────────── Seed (idempotent) ──────────────────────
+  seed:
+    needs: [set-env, build, migrate]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-env.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0-rc.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build API
+        run: pnpm --filter retro-tool-api build
+
+      - name: Seed templates and roles
+        working-directory: retro-tool-api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
+          NODE_ENV: production
+        run: |
+          node dist/seed/seed-retro-templates.js
+          node dist/seed/seed-estimate-templates.js
+          node dist/seed/seed-team-roles.js
+
   # ─────────────────────────── Deploy to App Service ──────────────────
   deploy:
-    needs: [set-env, build, migrate]
+    needs: [set-env, build, migrate, seed]
     runs-on: ubuntu-latest
     environment: ${{ needs.set-env.outputs.environment }}
     steps:

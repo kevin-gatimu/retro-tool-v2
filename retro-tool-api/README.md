@@ -99,7 +99,6 @@ openssl rand -base64 32
 | `.env.staging-local` | Local dev against staging Azure resources |
 | `.env.production-local` | Local dev against production Azure resources |
 | `.env.example` | Template for local development |
-| `.env.production.example` | Template for production app settings |
 
 The API uses `ConfigModule.forRoot` with `envFilePath: ['.env.local', '.env']`. When running `dev:staging` or `dev:prod`, `dotenv-cli` pre-loads the environment-specific file — `ConfigModule` won't overwrite existing `process.env` vars.
 
@@ -119,13 +118,18 @@ pnpm db:migrate
 ### 5. Seed the database
 
 ```bash
-# Dev — seeds demo users, orgs, teams, retros + all built-in templates
+# Dev — seeds retro templates + estimate templates + roles + demo users
 pnpm db:seed
 
-# Built-in templates only (idempotent — safe to re-run anytime)
+# All templates only (retro + estimate, idempotent — safe to re-run anytime)
 pnpm db:seed:templates
 
-# Production — templates only (compiled)
+# Templates against staging/prod
+pnpm db:seed:templates:staging
+pnpm db:seed:templates:prod
+
+# All prod-safe seeds (templates + roles) against staging/prod
+pnpm db:seed:staging
 pnpm db:seed:prod
 ```
 
@@ -161,16 +165,15 @@ pnpm db:migrate               # apply pending migrations (local)
 pnpm db:migrate:prod          # apply migrations (production, from compiled dist/)
 pnpm db:studio                # open Drizzle Studio (visual DB browser)
 
-pnpm db:seed                  # seed dev demo data + all built-in templates
-pnpm db:seed:templates        # seed built-in retro templates (idempotent)
-pnpm db:seed:estimate-templates  # seed estimate templates (idempotent)
-pnpm db:seed:users            # seed demo users only
-pnpm db:seed:roles            # seed team roles
-pnpm db:seed:large-org        # seed a large org (stress testing)
-pnpm db:seed:prod             # production: templates only (compiled)
-
-pnpm db:backup                # backup local DB to backups/
-pnpm db:backup:prod           # backup production DB
+pnpm db:seed                     # seed all (templates + roles + demo users)
+pnpm db:seed:templates           # retro + estimate templates (idempotent)
+pnpm db:seed:templates:staging   # templates against staging
+pnpm db:seed:templates:prod      # templates against production
+pnpm db:seed:roles               # seed team roles (idempotent)
+pnpm db:seed:users               # seed demo users only (dev)
+pnpm db:seed:large-org           # seed a large org (stress testing)
+pnpm db:seed:staging             # all prod-safe seeds against staging
+pnpm db:seed:prod                # all prod-safe seeds against production
 
 pnpm db:ensure:convex         # create Convex-specific PostgreSQL database
 pnpm db:ensure:convex:prod    # same for production
@@ -254,6 +257,16 @@ async feed(@Session() session: UserSession | null) { ... }
 Auth → Users → Organizations → Teams → Retrospectives
                                      → Estimate Sessions
 ```
+
+### Health
+
+These endpoints are excluded from the `/api` prefix and accessible at the root path. No authentication required.
+
+| Method | Path            | Description                                                      |
+| ------ | --------------- | ---------------------------------------------------------------- |
+| `GET`  | `/health`       | Full health check with DB status (`ok` / `degraded`)             |
+| `GET`  | `/health/live`  | Lightweight liveness probe — always responds if process is up    |
+| `GET`  | `/health/ready` | Readiness probe — checks DB connectivity (`ready` / `not_ready`) |
 
 ### Sessions
 
@@ -501,7 +514,7 @@ TechCo Inc (org-techco)           — owner: frank@example.com
 
 ### `pnpm db:seed:templates` (any environment)
 
-Seeds all 8 built-in retrospective templates. Idempotent — safe to re-run.
+Seeds all 8 built-in retrospective templates and estimate templates. Idempotent — safe to re-run.
 
 | Template                | Columns                                              |
 | ----------------------- | ---------------------------------------------------- |
@@ -514,9 +527,41 @@ Seeds all 8 built-in retrospective templates. Idempotent — safe to re-run.
 | Sailboat                | Wind, Anchor, Rocks, Island                          |
 | 5 Whys                  | Problem, Why #1, Why #2, Why #3–5, Action            |
 
-### `pnpm db:seed:prod` (production)
+### `pnpm db:seed:templates:staging` / `pnpm db:seed:templates:prod`
 
-Runs only the templates seed — equivalent to `db:seed:templates` but uses the compiled `dist/` output.
+Runs retro + estimate template seeds against the target environment using compiled `dist/` output.
+
+### `pnpm db:seed:roles` (any environment)
+
+Seeds all 57 built-in team roles. Idempotent — safe to re-run.
+
+| Role | Role | Role |
+| --- | --- | --- |
+| Backend Developer | BE Dev | BI Dev |
+| BI Developer | Business Analyst | Cloud Engineer |
+| CTO | Data Analyst | Data Eng |
+| Data Engineer | Data Scientist | Dev |
+| Developer | DevOps | DevOps Engineer |
+| Engineering Manager | FE Dev | Frontend Developer |
+| FS Dev | Full Stack Developer | Jr Dev |
+| JRS Lead | JRS Oversight | Junior Developer |
+| Machine Learning Engineer | ML Eng | Mobile Developer |
+| PM | PO | Product Manager |
+| Product Owner | Project Manager | QA |
+| QA/QE | QA/Scrum Master | QE |
+| QE/Scrum Master | Quality Analyst | Quality Engineer |
+| Release Manager | Salesforce Developer | Salesforce System Admin |
+| Scrum Master | Security Engineer | Senior Business Analyst |
+| Senior Developer | SF Admin | SF Dev |
+| Solution Architect | Sr BA | Sr Dev |
+| Tech Lead | Technical Writer | UI Designer |
+| UX Designer | UX/UI Designer | VP of Engineering |
+
+### `pnpm db:seed:staging` / `pnpm db:seed:prod`
+
+Runs all production-safe seeds (templates + team roles) against the target environment using compiled `dist/` output.
+
+> **Note:** Seeding also runs automatically in CI after migrations during every deployment (idempotent — no-ops if data already exists).
 
 ---
 
@@ -567,7 +612,7 @@ src/
 │       └── index.ts
 ├── seed/
 │   ├── seed-users.ts             # Dev seed: users, orgs, teams, retros
-│   ├── seed-templates.ts         # Retro templates (prod-safe, idempotent)
+│   ├── seed-retro-templates.ts   # Retro templates (prod-safe, idempotent)
 │   ├── seed-estimate-templates.ts # Estimate templates
 │   ├── seed-team-roles.ts        # Team roles
 │   └── seed-large-org.ts         # Large org for stress testing
@@ -577,14 +622,11 @@ src/
 ├── action-items/                 # Retro action items
 ├── user-preferences/             # Notification preferences
 ├── users/                        # User management + admin actions
-├── health.controller.ts          # GET /health — DB connectivity check
+├── health.controller.ts          # GET /health, /health/live, /health/ready
 ├── app.module.ts                 # Root module
 ├── main.ts                       # Bootstrap (CORS, cookie-parser, Swagger)
 ├── migrate.ts                    # Standalone migration runner (used in prod)
 └── ensure-convex-database.ts     # Creates Convex-specific PostgreSQL database
-
-scripts/
-└── db-backup.ts                  # Database backup via pg_dump
 ```
 
 ### Module type convention

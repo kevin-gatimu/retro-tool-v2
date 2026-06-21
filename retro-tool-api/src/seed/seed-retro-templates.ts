@@ -1,6 +1,6 @@
 /**
- * Production-safe template seeding script.
- * Seeds all built-in templates — idempotent and safe to run in any environment.
+ * Production-safe retro template seeding script.
+ * Seeds all built-in retro templates — idempotent and safe to run in any environment.
  *
  * Run locally:  pnpm db:seed:templates
  */

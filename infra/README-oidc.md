@@ -114,7 +114,7 @@ az account show --query "{tenantId:tenantId, subscriptionId:id}" -o table
 
 ---
 
-## How Workflows Use ocu 
+## How Workflows Use OIDC
 
 The deploy workflows use `azure/login@v2` with OIDC:
 
