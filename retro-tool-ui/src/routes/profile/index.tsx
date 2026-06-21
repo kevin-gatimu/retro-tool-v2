@@ -1,4 +1,5 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { useMutation } from '@tanstack/react-query'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   AlertCircle,
   Camera,
@@ -9,16 +10,29 @@ import {
   User,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { authClient } from '@/lib/auth-client'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { api } from '@/lib/api'
+import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
+import { authClient, signOutWithCleanup } from '@/lib/auth-client'
 import { useUpdateProfile } from './hooks/useUpdateProfile'
 import type { UserData } from './types'
 import { getInitials } from './helpers'
-import { Skeleton } from '@/components/ui/skeleton'
 
 function ProfileSkeleton() {
   return (
@@ -80,11 +94,13 @@ export const Route = createFileRoute('/profile/')({
 })
 
 function ProfilePage() {
+  const navigate = useNavigate()
   const { data: session } = authClient.useSession()
   const [user, setUser] = useState<UserData | null>(null)
   const [isSaved, setIsSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({ name: '' })
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const { data: userData, isLoading: isUserLoading } = useCurrentUser()
 
@@ -94,6 +110,17 @@ function ProfilePage() {
       setFormData({ name: userData.name })
     }
   }, [userData])
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => api.delete(USERS_ENDPOINTS.BY_ID(user!.id)),
+    onSuccess: async () => {
+      toast.success('Your account has been deleted')
+      await signOutWithCleanup()
+      navigate({ to: '/auth/sign-in' })
+    },
+    onError: (err: Error) =>
+      toast.error(err.message || 'Failed to delete account'),
+  })
 
   const updateProfileMutation = useUpdateProfile({
     onSuccess: () => {
@@ -307,10 +334,34 @@ function ProfilePage() {
         <Button
           variant="outline"
           className="border-destructive/50 text-destructive hover:bg-destructive/10"
+          onClick={() => setDeleteOpen(true)}
         >
           Delete Account
         </Button>
       </div>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your account and all associated data.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAccountMutation.mutate()}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deleteAccountMutation.isPending
+                ? 'Deleting...'
+                : 'Permanently Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
