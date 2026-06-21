@@ -5,6 +5,7 @@ import {
   timestamp,
   boolean,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { USER_ROLES, USER_STATUSES } from '../../common/enums';
 import {
@@ -106,7 +107,10 @@ export const account = pgTable(
   },
   (table) => [
     index('account_user_id_idx').on(table.userId),
-    index('account_provider_account_idx').on(table.providerId, table.accountId),
+    uniqueIndex('account_provider_account_unique').on(
+      table.providerId,
+      table.accountId,
+    ),
   ],
 );
 

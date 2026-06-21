@@ -7,6 +7,7 @@ import {
   integer,
   index,
   unique,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { user } from '../../auth/schema';
 import { team } from '../../teams/schema';
@@ -53,7 +54,7 @@ export const templateColumn = pgTable(
   },
   (table) => [
     index('template_column_template_id_idx').on(table.templateId),
-    index('template_column_template_id_order_idx').on(
+    uniqueIndex('template_column_template_order_unique').on(
       table.templateId,
       table.order,
     ),

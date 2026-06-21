@@ -55,6 +55,10 @@ export const estimateTemplateValue = pgTable(
   },
   (table) => [
     index('estimate_template_value_template_id_idx').on(table.templateId),
+    uniqueIndex('estimate_template_value_template_order_unique').on(
+      table.templateId,
+      table.order,
+    ),
   ],
 );
 
@@ -136,6 +140,10 @@ export const storyEstimateRound = pgTable(
     index('story_estimate_round_session_status_idx').on(
       table.sessionId,
       table.status,
+    ),
+    uniqueIndex('story_estimate_round_session_number_unique').on(
+      table.sessionId,
+      table.roundNumber,
     ),
   ],
 );

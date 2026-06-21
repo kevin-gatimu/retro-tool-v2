@@ -40,7 +40,10 @@ export const teamRole = pgTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (table) => [index('team_role_org_id_idx').on(table.orgId)],
+  (table) => [
+    index('team_role_org_id_idx').on(table.orgId),
+    uniqueIndex('team_role_org_name_unique').on(table.orgId, table.name),
+  ],
 );
 
 // Per-org activation overrides for built-in roles
@@ -87,6 +90,7 @@ export const team = pgTable(
   (table) => [
     index('team_organization_id_idx').on(table.organizationId),
     index('team_created_at_idx').on(table.createdAt),
+    uniqueIndex('team_org_name_unique').on(table.organizationId, table.name),
   ],
 );
 

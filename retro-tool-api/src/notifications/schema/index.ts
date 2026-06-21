@@ -4,6 +4,7 @@ import {
   index,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
 import { user } from '../../auth/schema';
@@ -55,7 +56,10 @@ export const pushSubscription = pgTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (table) => [index('push_subscription_user_id_idx').on(table.userId)],
+  (table) => [
+    index('push_subscription_user_id_idx').on(table.userId),
+    uniqueIndex('push_subscription_endpoint_unique').on(table.endpoint),
+  ],
 );
 
 // ============================================================================
