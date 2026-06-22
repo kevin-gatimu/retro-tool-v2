@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, bearer, multiSession } from 'better-auth/plugins';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { Config } from '../config/configuration';
@@ -34,8 +34,6 @@ export function createAuth(configService: ConfigService<Config>) {
 
   // Get auth config object for nested properties
   const authConfig = configService.get('auth', { infer: true });
-  const googleClientId = authConfig?.google?.clientId;
-  const googleClientSecret = authConfig?.google?.clientSecret;
   const microsoftClientId = authConfig?.microsoft?.clientId;
   const microsoftClientSecret = authConfig?.microsoft?.clientSecret;
 
@@ -63,6 +61,17 @@ export function createAuth(configService: ConfigService<Config>) {
   const authUrl = authConfig?.url || `http://localhost:${port}`;
 
   return betterAuth({
+    // Per-IP rate limiting (in-memory, uses x-forwarded-for via advanced.ipAddress config)
+    rateLimit: {
+      enabled: true,
+      window: 60, // default: 100 requests per 60s for all routes
+      max: 100,
+      customRules: {
+        '/sign-up/email': { window: 300, max: 5 }, // 5 signup attempts per 5 min
+        '/sign-in/email': { window: 60, max: 10 }, // 10 login attempts per min
+        '/forgot-password': { window: 300, max: 3 }, // 3 resets per 5 min
+      },
+    },
     database: drizzleAdapter(db, {
       provider: 'pg',
       schema: {
@@ -121,7 +130,7 @@ export function createAuth(configService: ConfigService<Config>) {
           .from(orgInvitation)
           .where(
             and(
-              eq(orgInvitation.email, user.email),
+              eq(sql`lower(${orgInvitation.email})`, user.email.toLowerCase()),
               isNull(orgInvitation.acceptedAt),
               gt(orgInvitation.expiresAt, now),
             ),
@@ -134,7 +143,7 @@ export function createAuth(configService: ConfigService<Config>) {
           .from(teamInvitation)
           .where(
             and(
-              eq(teamInvitation.email, user.email),
+              eq(sql`lower(${teamInvitation.email})`, user.email.toLowerCase()),
               isNull(teamInvitation.acceptedAt),
               gt(teamInvitation.expiresAt, now),
             ),
@@ -196,14 +205,6 @@ export function createAuth(configService: ConfigService<Config>) {
       },
     },
     socialProviders: {
-      ...(googleClientId && googleClientSecret
-        ? {
-            google: {
-              clientId: googleClientId,
-              clientSecret: googleClientSecret,
-            },
-          }
-        : {}),
       ...(microsoftClientId && microsoftClientSecret
         ? {
             microsoft: {
@@ -228,7 +229,7 @@ export function createAuth(configService: ConfigService<Config>) {
       accountLinking: {
         enabled: true,
         // Automatically link accounts that share the same verified email
-        trustedProviders: ['microsoft', 'google'],
+        trustedProviders: ['microsoft'],
       },
     },
   });

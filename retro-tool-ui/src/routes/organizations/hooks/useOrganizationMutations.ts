@@ -133,6 +133,7 @@ export function useOrgDetailMutations(orgId: string) {
     onSuccess: async (_, variables) => {
       toast.success(`Invitation sent to ${variables.email}`)
       await invalidate()
+      queryClient.invalidateQueries({ queryKey: ['org-invitations', orgId] })
     },
     onError: (error) =>
       toast.error(error.message || 'Failed to send invitation'),

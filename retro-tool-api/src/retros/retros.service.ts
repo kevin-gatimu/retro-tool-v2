@@ -1448,24 +1448,37 @@ export class RetrosService {
 
     if (!retro) throw new NotFoundException('Retrospective not found');
 
-    const [membership] = await this.database
-      .select()
-      .from(teamSchema.teamMember)
-      .where(
-        and(
-          eq(teamSchema.teamMember.teamId, retro.teamId),
-          eq(teamSchema.teamMember.userId, userId),
-        ),
-      )
+    const [userRecord] = await this.database
+      .select({ role: authSchema.user.role })
+      .from(authSchema.user)
+      .where(eq(authSchema.user.id, userId))
       .limit(1);
 
-    if (
-      !membership ||
-      (membership.tag !== TEAM_MEMBER_TAGS.Lead && retro.createdById !== userId)
-    ) {
-      throw new ForbiddenException(
-        'Only the creator or team lead can complete the retrospective',
-      );
+    const isSystemAdmin =
+      userRecord?.role === USER_ROLES.SuperAdmin ||
+      userRecord?.role === USER_ROLES.SystemAdmin;
+
+    if (!isSystemAdmin) {
+      const [membership] = await this.database
+        .select()
+        .from(teamSchema.teamMember)
+        .where(
+          and(
+            eq(teamSchema.teamMember.teamId, retro.teamId),
+            eq(teamSchema.teamMember.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (
+        !membership ||
+        (membership.tag !== TEAM_MEMBER_TAGS.Lead &&
+          retro.createdById !== userId)
+      ) {
+        throw new ForbiddenException(
+          'Only the creator or team lead can complete the retrospective',
+        );
+      }
     }
 
     if (retro.status !== RETRO_STATUSES.Discussing) {

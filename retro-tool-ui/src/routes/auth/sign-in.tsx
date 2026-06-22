@@ -509,7 +509,9 @@ function SignInPage() {
         onClick={() =>
           authClient.signIn.social({
             provider: 'microsoft',
-            callbackURL: `${window.location.origin}/auth/social-callback`,
+            callbackURL: inviteToken
+              ? `${window.location.origin}/auth/social-callback?inviteToken=${encodeURIComponent(inviteToken)}`
+              : `${window.location.origin}/auth/social-callback`,
           })
         }
       >

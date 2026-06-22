@@ -34,7 +34,7 @@ Retro Tool provides everything a team needs to run effective agile ceremonies:
 | **Reports & Analytics** | Live dashboards for retro completion rates, card counts, vote counts, and action item health — powered by Convex aggregates |
 | **Notifications** | In-app notification centre + browser push notifications (VAPID) |
 | **Email Workflows** | Retro reminders, weekly digests, and transactional email via Resend |
-| **Multi-Session Auth** | Email/password + OAuth (Microsoft, Google) via Better Auth with multi-session support |
+| **Multi-Session Auth** | Email/password + OAuth (Microsoft) via Better Auth with multi-session support |
 
 ---
 
@@ -261,10 +261,21 @@ Socket.IO remains the fallback transport when either flag is set to `socket-io`.
 │   │   ├── teams/            # Team management
 │   │   ├── retros/           # Retro lifecycle, cards, votes
 │   │   ├── estimates/        # Story estimate sessions
+│   │   ├── estimate-templates/
 │   │   ├── notifications/    # In-app + push notifications
 │   │   ├── email/            # Transactional email (Resend)
 │   │   ├── reports/          # Analytics endpoints
-│   │   └── adapters/         # Convex projection sync services
+│   │   ├── invitations/      # Org + team invitation handling
+│   │   ├── sessions/         # Session management
+│   │   ├── action-items/     # Retro action items
+│   │   ├── team-roles/       # Team role definitions
+│   │   ├── convex-admin/     # Convex projection sync
+│   │   ├── user-preferences/ # Notification preferences
+│   │   ├── adapters/         # Socket.IO adapter
+│   │   ├── common/           # Shared guards, interceptors, types
+│   │   ├── database/         # Drizzle provider
+│   │   └── seed/             # Seed scripts
+│   ├── scripts/              # Operational scripts (db-backup)
 │   └── drizzle/              # Database migrations
 │
 ├── retro-tool-ui/            # React 19 frontend
@@ -274,11 +285,20 @@ Socket.IO remains the fallback transport when either flag is set to `socket-io`.
 │       ├── hooks/            # Auth, push, theme hooks
 │       └── lib/              # API client, RBAC helpers
 │
+├── infra/                    # Azure Bicep IaC (CLI-only)
+│   ├── deploy.bicep          # Subscription-scoped entry point
+│   ├── main.bicep            # All resources
+│   └── README.md             # Deployment documentation
+│
+├── .github/workflows/        # CI/CD pipelines
+│   ├── ci.yml                # Lint + type-check + test
+│   ├── deploy-api.yml        # Docker build → ACR → App Service
+│   └── deploy-ui.yml         # Vite build → Static Web App
+│
 ├── docker/
 │   └── docker-compose.local.yml
 │
-├── docs/                     # Project-wide documentation
-└── scripts/                  # Deployment and admin scripts
+└── docs/                     # Project-wide documentation
 ```
 
 ---
@@ -396,13 +416,16 @@ Use `Terminal: Run Task` to launch any of the pre-configured tasks:
 pnpm install
 ```
 
-### 2. API environment
+### 2. Copy environment files
 
 ```powershell
-Copy-Item retro-tool-api/.env.example retro-tool-api/.env
+Copy-Item retro-tool-api/.env.example retro-tool-api/.env.local
+Copy-Item retro-tool-ui/.env.example retro-tool-ui/.env.local
+Copy-Item convex-backend/.env.example convex-backend/.env.local
+Copy-Item docker/.env.example docker/.env
 ```
 
-Key variables in [retro-tool-api/.env.example](retro-tool-api/.env.example):
+### 3. API environment (`retro-tool-api/.env.local`)
 
 | Variable | Purpose |
 | --- | --- |
@@ -410,38 +433,41 @@ Key variables in [retro-tool-api/.env.example](retro-tool-api/.env.example):
 | `BETTER_AUTH_SECRET` | Session signing secret |
 | `BETTER_AUTH_URL` | Must match server URL + port |
 | `FRONTEND_URL` | CORS allowed origin |
-| `REDIS_URL` | Redis connection string |
 | `CONVEX_SYNC_URL` | Convex HTTP Admin API URL |
 | `CONVEX_SYNC_ADMIN_KEY` | Convex admin key for projection sync |
 | `RESEND_API_KEY` | Transactional email |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Browser push notifications |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | OAuth (Microsoft) |
 
-> See [retro-tool-api/docs/Email.md](retro-tool-api/docs/Email.md) for email setup. See [retro-tool-api/docs/Cache.md](retro-tool-api/docs/Cache.md) for Redis/cache details.
-
-### 3. UI environment
-
-```powershell
-Copy-Item retro-tool-ui/.env.example retro-tool-ui/.env
-```
-
-Key variables in [retro-tool-ui/.env.example](retro-tool-ui/.env.example):
+### 4. UI environment (`retro-tool-ui/.env.local`)
 
 ```env
 VITE_API_URL=http://localhost:8000
 VITE_CONVEX_URL=http://localhost:3210
-VITE_RETROS_REALTIME_BACKEND=socket-io     # or: convex
-VITE_ESTIMATES_REALTIME_BACKEND=socket-io  # or: convex
+VITE_RETROS_REALTIME_BACKEND=convex       # or: socket-io
+VITE_ESTIMATES_REALTIME_BACKEND=convex    # or: socket-io
+VITE_NOTIFICATIONS_REALTIME_BACKEND=convex
 ```
 
-Switch either `BACKEND` flag to `convex` to test Convex-driven real-time locally.
+### 5. Convex environment (`convex-backend/.env.local`)
 
-### 4. Convex environment
+Variables: `CONVEX_URL` (local: `http://localhost:3210`), `CONVEX_DEPLOY_KEY`.
+
+### 6. Running against remote environments
+
+Each package has `.env.staging-local` and `.env.production-local` files for running locally against Azure resources. Uses `dotenv-cli` to load env before the process starts:
 
 ```powershell
-Copy-Item convex-backend/.env.example convex-backend/.env
+pnpm dev:api:staging    # API against staging DB + Convex
+pnpm dev:ui:staging     # UI pointing at staging Convex
+pnpm dev:convex:staging # Convex CLI against staging
+
+pnpm dev:api:prod       # API against production
+pnpm dev:ui:prod        # UI pointing at production Convex
+pnpm dev:convex:prod    # Convex CLI against production
 ```
 
-Variables: `CONVEX_SELF_HOSTED_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`, `CONVEX_CLOUD_URL`, `CONVEX_DEPLOYMENT`.
+> `NODE_ENV` stays `development` in all local env files regardless of which remote resources you target.
 
 ---
 
@@ -492,7 +518,7 @@ pnpm local:logs     # tail container logs
 
 ## Deployment
 
-The project targets **Azure** with a CI/CD pipeline driven by GitHub Actions.
+The project targets **Azure** with infrastructure provisioned via Bicep (CLI-only) and app deployment via GitHub Actions.
 
 ### Deployment model
 
@@ -501,8 +527,8 @@ The project targets **Azure** with a CI/CD pipeline driven by GitHub Actions.
 │                        AZURE                                │
 │                                                             │
 │  ┌──────────────────┐    ┌──────────────────────────────┐  │
-│  │ Static Web App   │    │ App Service (Linux)          │  │
-│  │ (React UI)       │    │ (NestJS API — zip deploy)    │  │
+│  │ Static Web App   │    │ App Service for Containers   │  │
+│  │ (React UI)       │    │ (NestJS API via ACR)         │  │
 │  └──────────────────┘    └──────────────────────────────┘  │
 │                                    │                        │
 │              ┌────────────────────┬┘                        │
@@ -510,37 +536,55 @@ The project targets **Azure** with a CI/CD pipeline driven by GitHub Actions.
 │  ┌─────────────────┐   ┌──────────────────────────────┐    │
 │  │ PostgreSQL      │   │ Convex Cloud                 │    │
 │  │ Flexible Server │   │ (managed, per environment)   │    │
-│  │ (shared)        │   └──────────────────────────────┘    │
-│  └─────────────────┘                                        │
+│  └─────────────────┘   └──────────────────────────────┘    │
+│                                                             │
+│  ┌─────────────────┐   ┌──────────────────────────────┐    │
+│  │ Container       │   │ User-assigned Managed        │    │
+│  │ Registry (ACR)  │   │ Identity (AcrPull)           │    │
+│  └─────────────────┘   └──────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Branch model
 
-| Branch | Environment |
-| --- | --- |
-| `staging` | Staging (Free F1 App Service) |
-| `main` | Production (target: S1 Standard) |
+| Branch | Environment | Resource Group |
+| --- | --- | --- |
+| `main` | Production | `retro-tool-prod-rg` |
+| `staging` | Staging | `retro-tool-staging-rg` |
+| `develop` | Develop | `retro-tool-dev-rg` |
 
-Both environments share one PostgreSQL Flexible Server. Convex functions are deployed to **Convex Cloud** (not self-hosted) in production.
+Each environment has its own App Service, ACR, Static Web App, and Managed Identity. PostgreSQL Flexible Server is per-environment.
 
-### CI/CD
+### Infrastructure (Bicep — CLI only)
 
-- [.github/workflows/deploy-api.yml](.github/workflows/deploy-api.yml) — builds and deploys the NestJS API
-- [.github/workflows/deploy-ui.yml](.github/workflows/deploy-ui.yml) — builds and deploys the React UI
+Infrastructure is provisioned manually via Azure CLI + Bicep templates in the `infra/` folder. See [infra/README.md](infra/README.md) for full commands and outputs.
 
-> The workflows are scaffolds. Replace placeholder Azure tenant, subscription, App Service name, and Static Web App token values before first deployment.
+```powershell
+# Preview changes
+az deployment sub what-if --location southafricanorth --template-file infra/deploy.bicep --parameters environmentName=prod ...
+
+# Deploy
+az deployment sub create --location southafricanorth --template-file infra/deploy.bicep --parameters environmentName=prod ...
+```
+
+### CI/CD (GitHub Actions)
+
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) — lint, type-check, test on all PRs
+- [.github/workflows/deploy-api.yml](.github/workflows/deploy-api.yml) — builds Docker image, pushes to ACR, deploys to App Service
+- [.github/workflows/deploy-ui.yml](.github/workflows/deploy-ui.yml) — builds Vite, deploys to Azure Static Web App
 
 ### Deployment checklist
 
-- [ ] `BETTER_AUTH_SECRET`, `DATABASE_URL`, `CONVEX_SYNC_URL`, `CONVEX_SYNC_ADMIN_KEY` set in App Service config
-- [ ] All UI `VITE_*` values and Convex feature flags set for each environment
-- [ ] Database migrations run (`pnpm db:migrate`) before first start
-- [ ] `pnpm db:seed:templates` run to load built-in retro templates
-- [ ] VAPID keys generated and set if push notifications are enabled
-- [ ] Resend API key configured if email workflows are enabled
+- [ ] Infrastructure provisioned via `infra/deploy.bicep` for the target environment
+- [ ] GitHub environment secrets set (from Bicep outputs): `ACR_LOGIN_SERVER`, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`
+- [ ] App Service application settings configured (auth, DB, Convex, email, VAPID, OAuth)
+- [ ] Database migrations run (`pnpm db:migrate:prod`)
+- [ ] Templates seeded (`pnpm db:seed:prod`)
+- [ ] OIDC federated credentials configured for GitHub Actions
+- [ ] Custom domains and SSL configured
+- [ ] OAuth redirect URIs updated in App Registration
 
-> Full step-by-step: [docs/deployment-guide.md](docs/deployment-guide.md) · Azure resources: [docs/azure-cloud-resources.md](docs/azure-cloud-resources.md)
+> Full step-by-step: [infra/README.md](infra/README.md) · Production runbook: [infra/README-prod.md](infra/README-prod.md)
 
 ---
 
@@ -552,37 +596,37 @@ Both environments share one PostgreSQL Flexible Server. Convex functions are dep
 | --- | --- |
 | [docs/RBAC.md](docs/RBAC.md) | Complete role and permission matrices |
 | [docs/app-flows.md](docs/app-flows.md) | Every major user-facing flow (auth, org, team, retro, estimates) |
-| [docs/deployment-guide.md](docs/deployment-guide.md) | Step-by-step Azure deployment |
-| [docs/azure-cloud-resources.md](docs/azure-cloud-resources.md) | Azure resource inventory and cost estimates |
-| [docs/local-cloud-testing.md](docs/local-cloud-testing.md) | Testing locally against cloud resources |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and fixes |
+| [docs/invitations.md](docs/invitations.md) | Invitation system (org + team) |
+| [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker (local + production) |
 | [docs/future-roadmap.md](docs/future-roadmap.md) | Planned features: IceBreakers, AI summaries, Jira/ADO export, SAML |
+
+### Infrastructure & Deployment
+
+| Document | Description |
+| --- | --- |
+| [infra/README.md](infra/README.md) | Bicep deployment commands, what-if, outputs, post-provisioning checklist |
+| [infra/README-prod.md](infra/README-prod.md) | Production-specific runbook with App Registration details |
+| [docs/Azure Infrastructure Provisioning Guide.md](docs/Azure%20Infrastructure%20Provisioning%20Guide.md) | Full provisioning walkthrough |
+| [docs/Azure Resouces Guide.md](docs/Azure%20Resouces%20Guide.md) | Azure resource inventory and architecture |
 
 ### Backend
 
 | Document | Description |
 | --- | --- |
-| [retro-tool-api/README.md](retro-tool-api/README.md) | API setup, modules, auth, seed credentials |
-| [retro-tool-api/docs/RBAC.md](retro-tool-api/docs/RBAC.md) | Backend permission guards reference |
-| [retro-tool-api/docs/Email.md](retro-tool-api/docs/Email.md) | Email workflow setup (Resend) |
-| [retro-tool-api/docs/Cache.md](retro-tool-api/docs/Cache.md) | Redis caching strategy |
+| [retro-tool-api/README.md](retro-tool-api/README.md) | API setup, modules, auth, seed credentials, WebSocket events |
 
 ### Frontend
 
 | Document | Description |
 | --- | --- |
-| [retro-tool-ui/README.md](retro-tool-ui/README.md) | UI setup, route map, RBAC helpers |
-| [retro-tool-ui/docs/Email.md](retro-tool-ui/docs/Email.md) | Email-related UI flows |
-| [retro-tool-ui/docs/Cache.md](retro-tool-ui/docs/Cache.md) | TanStack Query cache strategy |
+| [retro-tool-ui/README.md](retro-tool-ui/README.md) | UI setup, route map, RBAC helpers, realtime |
 
 ### Realtime
 
 | Document | Description |
 | --- | --- |
-| [plan-convex-realtime.md](plan-convex-realtime.md) | Convex architecture, data flow, and rollout plan |
-| [docs/convex-components.md](docs/convex-components.md) | Rate limiter, aggregate, and auth bridge reference |
 | [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker (local and production) |
-| [convex-backend/README.md](convex-backend/README.md) | Convex package notes |
+| [convex-backend/README.md](convex-backend/README.md) | Convex backend setup and modules |
 
 ---
 

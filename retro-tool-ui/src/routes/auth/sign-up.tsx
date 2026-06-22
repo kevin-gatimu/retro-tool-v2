@@ -209,7 +209,9 @@ function SignUpPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState(emailFromInvite ?? '')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [success, setSuccess] = useState(false)
   const [isFirstUser, setIsFirstUser] = useState(false)
 
@@ -236,10 +238,11 @@ function SignUpPage() {
     [password],
   )
   const allRequirementsMet = allPasswordRequirementsMet(passwordRequirements)
+  const passwordsMatch = password === confirmPassword
 
   const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault()
-    if (!allRequirementsMet) return
+    if (!allRequirementsMet || !passwordsMatch) return
     signUpMutation.mutate({ name, email, password })
   }
 
@@ -347,6 +350,13 @@ function SignUpPage() {
                         . You must use this email — it's the address the invite
                         was sent to.
                       </p>
+                      <p className="text-gray-400 text-xs leading-relaxed mt-2">
+                        Fill in your name and password below, or use{' '}
+                        <span className="text-white font-medium">
+                          Sign up with Microsoft
+                        </span>{' '}
+                        at the bottom.
+                      </p>
                     </div>
                   )}
 
@@ -434,9 +444,50 @@ function SignUpPage() {
                       )}
                     </div>
 
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="confirmPassword"
+                        className="text-gray-300 text-sm"
+                      >
+                        Confirm password
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          placeholder="Re-enter your password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          required
+                          className="pr-10 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 h-11"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
+                          tabIndex={-1}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-emerald-400 transition-colors"
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      {confirmPassword && !passwordsMatch && (
+                        <p className="text-xs text-red-400 mt-1">
+                          Passwords do not match
+                        </p>
+                      )}
+                    </div>
+
                     <Button
                       type="submit"
-                      disabled={loading || !allRequirementsMet}
+                      disabled={
+                        loading || !allRequirementsMet || !passwordsMatch
+                      }
                       className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_15px_30px_-10px_rgba(16,185,129,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0 mt-2"
                     >
                       {loading ? (
@@ -475,7 +526,9 @@ function SignUpPage() {
                     onClick={() =>
                       authClient.signIn.social({
                         provider: 'microsoft',
-                        callbackURL: `${window.location.origin}/auth/social-callback`,
+                        callbackURL: inviteToken
+                          ? `${window.location.origin}/auth/social-callback?inviteToken=${encodeURIComponent(inviteToken)}`
+                          : `${window.location.origin}/auth/social-callback`,
                       })
                     }
                   >

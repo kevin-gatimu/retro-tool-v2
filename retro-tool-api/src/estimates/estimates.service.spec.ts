@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EstimatesService } from './estimates.service';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 
 describe('EstimatesService', () => {
   let service: EstimatesService;
@@ -14,6 +15,10 @@ describe('EstimatesService', () => {
         {
           provide: NotificationsService,
           useValue: { notifyTeamOfEstimateSession: jest.fn() },
+        },
+        {
+          provide: EmailService,
+          useValue: { sendEmail: jest.fn() },
         },
       ],
     }).compile();

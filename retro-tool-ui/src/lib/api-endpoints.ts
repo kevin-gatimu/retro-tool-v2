@@ -42,6 +42,11 @@ export const ORGANIZATIONS_ENDPOINTS = {
   BY_ID: (id: string) => `/api/organizations/${id}`,
   LEAVE: (id: string) => `/api/organizations/${id}/leave`,
   INVITE: (id: string) => `/api/organizations/${id}/invite`,
+  INVITATIONS: (id: string) => `/api/organizations/${id}/invitations`,
+  REVOKE_INVITATION: (id: string, invId: string) =>
+    `/api/organizations/${id}/invitations/${invId}`,
+  RESEND_INVITATION: (id: string, invId: string) =>
+    `/api/organizations/${id}/invitations/${invId}/resend`,
   ADD_MEMBER: (id: string) => `/api/organizations/${id}/members`,
   CHECK_INVITE_EMAIL: (id: string) =>
     `/api/organizations/${id}/check-invite-email`,
@@ -77,6 +82,12 @@ export const TEAMS_ENDPOINTS = {
     `/api/teams/${id}/join-requests/bulk-approve`,
   JOIN_REQUESTS_ALL: '/api/teams/join-requests/all',
   INVITE: (id: string) => `/api/teams/${id}/invite`,
+  INVITATIONS: (id: string) => `/api/teams/${id}/invitations`,
+  REVOKE_INVITATION: (id: string, invId: string) =>
+    `/api/teams/${id}/invitations/${invId}`,
+  RESEND_INVITATION: (id: string, invId: string) =>
+    `/api/teams/${id}/invitations/${invId}/resend`,
+  CHECK_INVITE_EMAIL: (id: string) => `/api/teams/${id}/check-invite-email`,
 } as const
 
 // ---------------------------------------------------------------------------

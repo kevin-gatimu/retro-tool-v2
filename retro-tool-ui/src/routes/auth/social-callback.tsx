@@ -15,6 +15,9 @@ function SocialCallbackPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const inviteToken = params.get('inviteToken')
+
     async function checkApproval() {
       try {
         const user = await api.get<User>(USERS_ENDPOINTS.ME)
@@ -31,6 +34,16 @@ function SocialCallbackPage() {
           return
         } catch {
           // Admin already exists — fall through to normal status check.
+        }
+
+        // If user arrived via an invitation link, redirect to accept-invite
+        // regardless of approval status — accepting the invite auto-approves.
+        if (inviteToken) {
+          navigate({
+            to: '/auth/accept-invite',
+            search: { token: inviteToken },
+          })
+          return
         }
 
         if (user.status === 'pending') {

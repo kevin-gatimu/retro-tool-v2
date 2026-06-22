@@ -30,6 +30,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { getOrgMemberColumns } from '@/components/tables/member-columns'
 import type { OrgMemberRow } from '@/components/tables/member-columns'
+import { getOrgInvitationColumns } from '@/components/tables/invitation-columns'
+import type { OrgInvitationRow } from '@/components/tables/invitation-columns'
 import { getOrgRoleBadge } from '@/components/UserRoleBadges'
 import {
   AlertDialog,
@@ -212,6 +214,7 @@ function OrganizationDetailPage() {
   const selectedMemberIds = Object.keys(memberRowSelection).filter(
     (id) => memberRowSelection[id],
   )
+  const [memberFilter, setMemberFilter] = useState<'all' | 'unassigned'>('all')
 
   const [editName, setEditName] = useState('')
   const [editSlug, setEditSlug] = useState('')
@@ -223,6 +226,7 @@ function OrganizationDetailPage() {
   const [inviteEmailCheck, setInviteEmailCheck] = useState<{
     registered: boolean
     name?: string
+    isMember?: boolean
   } | null>(null)
   const [addMemberSearch, setAddMemberSearch] = useState('')
   const [addMemberUserId, setAddMemberUserId] = useState('')
@@ -354,6 +358,12 @@ function OrganizationDetailPage() {
   })
 
   const orgMembers = organization.members
+  const filteredOrgMembers = useMemo(() => {
+    if (memberFilter === 'unassigned') {
+      return orgMembers.filter((m) => m.teamIds.length === 0)
+    }
+    return orgMembers
+  }, [orgMembers, memberFilter])
 
   // Close create team dialog and reset form on successful creation
   useEffect(() => {
@@ -838,9 +848,25 @@ function OrganizationDetailPage() {
         {/* Members Tab */}
         <TabsContent value="members" className="mt-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold">
-              Members ({orgMembers.length})
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold">
+                Members ({filteredOrgMembers.length})
+              </h2>
+              <Select
+                value={memberFilter}
+                onValueChange={(v) =>
+                  setMemberFilter(v as 'all' | 'unassigned')
+                }
+              >
+                <SelectTrigger className="h-8 w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All members</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-2">
               {isAdmin && (
                 <>
@@ -905,6 +931,7 @@ function OrganizationDetailPage() {
                                   const result = await api.get<{
                                     registered: boolean
                                     name?: string
+                                    isMember?: boolean
                                   }>(
                                     `${ORGANIZATIONS_ENDPOINTS.CHECK_INVITE_EMAIL(orgId)}?email=${encodeURIComponent(inviteEmail)}`,
                                   )
@@ -916,11 +943,13 @@ function OrganizationDetailPage() {
                             />
                             {inviteEmailCheck !== null && (
                               <p
-                                className={`text-xs ${inviteEmailCheck.registered ? 'text-emerald-400' : 'text-gray-400'}`}
+                                className={`text-xs ${inviteEmailCheck.isMember ? 'text-destructive' : inviteEmailCheck.registered ? 'text-emerald-400' : 'text-gray-400'}`}
                               >
-                                {inviteEmailCheck.registered
-                                  ? `Account found${inviteEmailCheck.name ? ` (${inviteEmailCheck.name})` : ''} — invitation email will be sent`
-                                  : 'No account found — invitation email will be sent to register'}
+                                {inviteEmailCheck.isMember
+                                  ? 'This user is already a member of this organisation'
+                                  : inviteEmailCheck.registered
+                                    ? `Account found${inviteEmailCheck.name ? ` (${inviteEmailCheck.name})` : ''} — invitation email will be sent`
+                                    : 'No account found — invitation email will be sent to register'}
                               </p>
                             )}
                           </div>
@@ -962,7 +991,9 @@ function OrganizationDetailPage() {
                           <Button
                             type="submit"
                             disabled={
-                              !inviteEmail || inviteOrgMemberMutation.isPending
+                              !inviteEmail ||
+                              inviteOrgMemberMutation.isPending ||
+                              !!inviteEmailCheck?.isMember
                             }
                           >
                             {inviteOrgMemberMutation.isPending
@@ -1112,7 +1143,7 @@ function OrganizationDetailPage() {
                 updateRoleMutation.mutate({ userId, role }),
               onRemove: (userId) => setRemoveMemberId(userId),
             })}
-            data={orgMembers as OrgMemberRow[]}
+            data={filteredOrgMembers as OrgMemberRow[]}
             searchColumn="user"
             searchPlaceholder="Search members..."
             pagination
@@ -1150,6 +1181,8 @@ function OrganizationDetailPage() {
               </Button>
             </div>
           )}
+
+          {isAdmin && <OrgInvitationsSection orgId={orgId} />}
         </TabsContent>
 
         {/* Team Roles Tab */}
@@ -2269,5 +2302,84 @@ function OrgEstimateTemplateDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ============================================================================
+// Org Invitations Section
+// ============================================================================
+
+function OrgInvitationsSection({ orgId }: { orgId: string }) {
+  const queryClient = useQueryClient()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  const invitationsQuery = useQuery({
+    queryKey: ['org-invitations', orgId, page, pageSize],
+    queryFn: () =>
+      api.get<{
+        invitations: OrgInvitationRow[]
+        total: number
+        page: number
+        limit: number
+        totalPages: number
+      }>(
+        `${ORGANIZATIONS_ENDPOINTS.INVITATIONS(orgId)}?page=${page}&limit=${pageSize}`,
+      ),
+  })
+
+  const revokeMutation = useMutation({
+    mutationFn: (invitationId: string) =>
+      api.delete(
+        ORGANIZATIONS_ENDPOINTS.REVOKE_INVITATION(orgId, invitationId),
+      ),
+    onSuccess: () => {
+      toast.success('Invitation revoked')
+      queryClient.invalidateQueries({ queryKey: ['org-invitations', orgId] })
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const resendMutation = useMutation({
+    mutationFn: (invitationId: string) =>
+      api.post(ORGANIZATIONS_ENDPOINTS.RESEND_INVITATION(orgId, invitationId)),
+    onSuccess: () => {
+      toast.success('Invitation resent')
+      queryClient.invalidateQueries({ queryKey: ['org-invitations', orgId] })
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const data = invitationsQuery.data
+
+  if (!data || (data.total === 0 && !invitationsQuery.isFetching)) return null
+
+  return (
+    <div className="mt-8 space-y-4">
+      <h2 className="text-xl font-semibold flex items-center gap-2">
+        <Mail className="h-5 w-5" />
+        Pending Invitations ({data.total})
+      </h2>
+      <DataTable
+        columns={getOrgInvitationColumns({
+          onResend: (id) => resendMutation.mutate(id),
+          onRevoke: (id) => revokeMutation.mutate(id),
+        })}
+        data={data.invitations}
+        searchColumn="email"
+        searchPlaceholder="Search invitations by email..."
+        manualPagination
+        pageCount={data.totalPages}
+        rowCount={data.total}
+        paginationState={{ pageIndex: page - 1, pageSize }}
+        onPaginationChange={(p) => {
+          setPage(p.pageIndex + 1)
+          setPageSize(p.pageSize)
+        }}
+        isFetching={invitationsQuery.isFetching}
+        onRefresh={() => invitationsQuery.refetch()}
+        defaultPageSize={10}
+      />
+    </div>
   )
 }

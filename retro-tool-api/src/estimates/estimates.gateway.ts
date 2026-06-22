@@ -179,11 +179,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
-    const isCreator = await this.estimatesService.isSessionCreator(
+    const canManage = await this.estimatesService.canManageSession(
       data.sessionId,
       userId,
     );
-    if (!isCreator) return;
+    if (!canManage) return;
 
     await this.estimatesService.clearVotes(data.sessionId, userId, {
       storyName: data.storyName,
@@ -203,11 +203,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
-    const isCreator = await this.estimatesService.isSessionCreator(
+    const canManage = await this.estimatesService.canManageSession(
       data.sessionId,
       userId,
     );
-    if (!isCreator) return;
+    if (!canManage) return;
 
     await this.estimatesService.startRound(data.sessionId, userId, {
       storyName: data.storyName,
@@ -227,11 +227,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
-    const isCreator = await this.estimatesService.isSessionCreator(
+    const canManage = await this.estimatesService.canManageSession(
       data.sessionId,
       userId,
     );
-    if (!isCreator) return;
+    if (!canManage) return;
 
     await this.estimatesService.updateStory(data.sessionId, userId, {
       storyName: data.storyName,
@@ -254,11 +254,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId || !data?.duration) return;
 
-    const isCreator = await this.estimatesService.isSessionCreator(
+    const canManage = await this.estimatesService.canManageSession(
       data.sessionId,
       userId,
     );
-    if (!isCreator) return;
+    if (!canManage) return;
 
     const timerEndsAt = await this.estimatesService.startTimer(
       data.sessionId,
@@ -279,11 +279,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
-    const isCreator = await this.estimatesService.isSessionCreator(
+    const canManage = await this.estimatesService.canManageSession(
       data.sessionId,
       userId,
     );
-    if (!isCreator) return;
+    if (!canManage) return;
 
     await this.estimatesService.endSession(data.sessionId, userId);
     this.server.to(`session:${data.sessionId}`).emit('session-ended');

@@ -28,9 +28,9 @@ NestJS REST API + WebSocket backend for the Retro Tool application. Handles auth
 
 ### Prerequisites
 
-- Node.js 20+
-- pnpm
-- Docker (for the database)
+- Node.js 22+
+- pnpm 9+
+- Docker (for local PostgreSQL + Redis)
 
 ### 1. Install dependencies
 
@@ -41,53 +41,72 @@ pnpm install
 ### 2. Configure environment
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-Edit `.env`:
+Edit `.env.local`:
 
 ```env
 PORT=8000
+NODE_ENV=development
 
-DATABASE_URL=postgresql://postgres:password@localhost:5432/retro_tool
+DATABASE_URL=postgresql://postgres:password@localhost:5432/retro_tool_db
 
 BETTER_AUTH_SECRET=your-secret-here
-BETTER_AUTH_URL=http://localhost:8000        # must match the server PORT
+BETTER_AUTH_URL=http://localhost:8000
+BETTER_AUTH_SESSION_EXPIRES_IN=604800
 
-FRONTEND_URL=http://localhost:5173
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:8000
+FRONTEND_URL=http://localhost:3000
+LOCAL_SERVER_URL=http://localhost:8000
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8000
 
-# Optional — Email (Resend)
+# OAuth (Microsoft)
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+MICROSOFT_TENANT_ID=
+
+# Email (Resend)
 RESEND_API_KEY=re_your_api_key_here
 EMAIL_FROM=Retro Tool <noreply@yourdomain.com>
 
-# Optional — Google OAuth
-# GOOGLE_CLIENT_ID=
-# GOOGLE_CLIENT_SECRET=
-
-# Optional — Browser push notifications (web-push / VAPID)
+# Browser push notifications (VAPID)
 # Generate keys with: npx web-push generate-vapid-keys
-# VAPID_PUBLIC_KEY=
-# VAPID_PRIVATE_KEY=
-# VAPID_SUBJECT=mailto:admin@yourdomain.com
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:admin@yourdomain.com
+
+# Convex projection sync
+CONVEX_SYNC_URL=http://localhost:3210
+CONVEX_SYNC_ADMIN_KEY=
+
+# Scheduled jobs
+ENABLE_CRON_JOBS=false
 ```
 
-Generate `BETTER_AUTH_SECRET` with either command:
+Generate `BETTER_AUTH_SECRET`:
 
 ```bash
-openssl rand -hex 32
-```
-
-```powershell
-$bytes = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes); ($bytes | ForEach-Object { $_.ToString('x2') }) -join ''
+openssl rand -base64 32
 ```
 
 > **Note:** `BETTER_AUTH_URL` must match the URL the server is actually running on (including port).
 
+### Environment file strategy
+
+| File | Purpose |
+| --- | --- |
+| `.env.local` | Local dev with Docker infra — **not committed** |
+| `.env.staging-local` | Local dev against staging Azure resources |
+| `.env.production-local` | Local dev against production Azure resources |
+| `.env.example` | Template for local development |
+
+The API uses `ConfigModule.forRoot` with `envFilePath: ['.env.local', '.env']`. When running `dev:staging` or `dev:prod`, `dotenv-cli` pre-loads the environment-specific file — `ConfigModule` won't overwrite existing `process.env` vars.
+
 ### 3. Start the database
 
 ```bash
-docker-compose up -d
+# From repo root — starts Postgres, Redis, Convex
+pnpm local:infra
 ```
 
 ### 4. Run migrations
@@ -99,13 +118,18 @@ pnpm db:migrate
 ### 5. Seed the database
 
 ```bash
-# Dev — seeds demo users, orgs, teams, retros + all built-in templates
+# Dev — seeds retro templates + estimate templates + roles + demo users
 pnpm db:seed
 
-# Built-in templates only (idempotent — safe to re-run anytime)
+# All templates only (retro + estimate, idempotent — safe to re-run anytime)
 pnpm db:seed:templates
 
-# Production — templates only (compiled)
+# Templates against staging/prod
+pnpm db:seed:templates:staging
+pnpm db:seed:templates:prod
+
+# All prod-safe seeds (templates + roles) against staging/prod
+pnpm db:seed:staging
 pnpm db:seed:prod
 ```
 
@@ -114,8 +138,14 @@ See [Seed Data](#seed-data) for credentials and what gets created.
 ### 6. Start the server
 
 ```bash
-# development (watch mode)
-pnpm start:dev
+# development (watch mode — local infra)
+pnpm dev
+
+# development against staging resources
+pnpm dev:staging
+
+# development against production resources
+pnpm dev:prod
 
 # production
 pnpm start:prod
@@ -130,14 +160,23 @@ Server runs at `http://localhost:8000` by default. Swagger UI at `http://localho
 ### Commands
 
 ```bash
-pnpm db:generate          # generate a new migration from schema changes
-pnpm db:migrate           # apply pending migrations (local)
-pnpm db:migrate:prod      # apply migrations (production, from compiled dist/)
-pnpm db:studio            # open Drizzle Studio (visual DB browser)
+pnpm db:generate              # generate a new migration from schema changes
+pnpm db:migrate               # apply pending migrations (local)
+pnpm db:migrate:prod          # apply migrations (production, from compiled dist/)
+pnpm db:studio                # open Drizzle Studio (visual DB browser)
 
-pnpm db:seed              # seed dev demo data + all built-in templates
-pnpm db:seed:templates    # seed built-in templates only (idempotent)
-pnpm db:seed:prod         # production: seed built-in templates only
+pnpm db:seed                     # seed all (templates + roles + demo users)
+pnpm db:seed:templates           # retro + estimate templates (idempotent)
+pnpm db:seed:templates:staging   # templates against staging
+pnpm db:seed:templates:prod      # templates against production
+pnpm db:seed:roles               # seed team roles (idempotent)
+pnpm db:seed:users               # seed demo users only (dev)
+pnpm db:seed:large-org           # seed a large org (stress testing)
+pnpm db:seed:staging             # all prod-safe seeds against staging
+pnpm db:seed:prod                # all prod-safe seeds against production
+
+pnpm db:ensure:convex         # create Convex-specific PostgreSQL database
+pnpm db:ensure:convex:prod    # same for production
 ```
 
 ### Schema
@@ -218,6 +257,16 @@ async feed(@Session() session: UserSession | null) { ... }
 Auth → Users → Organizations → Teams → Retrospectives
                                      → Estimate Sessions
 ```
+
+### Health
+
+These endpoints are excluded from the `/api` prefix and accessible at the root path. No authentication required.
+
+| Method | Path            | Description                                                      |
+| ------ | --------------- | ---------------------------------------------------------------- |
+| `GET`  | `/health`       | Full health check with DB status (`ok` / `degraded`)             |
+| `GET`  | `/health/live`  | Lightweight liveness probe — always responds if process is up    |
+| `GET`  | `/health/ready` | Readiness probe — checks DB connectivity (`ready` / `not_ready`) |
 
 ### Sessions
 
@@ -465,7 +514,7 @@ TechCo Inc (org-techco)           — owner: frank@example.com
 
 ### `pnpm db:seed:templates` (any environment)
 
-Seeds all 8 built-in retrospective templates. Idempotent — safe to re-run.
+Seeds all 8 built-in retrospective templates and estimate templates. Idempotent — safe to re-run.
 
 | Template                | Columns                                              |
 | ----------------------- | ---------------------------------------------------- |
@@ -478,9 +527,41 @@ Seeds all 8 built-in retrospective templates. Idempotent — safe to re-run.
 | Sailboat                | Wind, Anchor, Rocks, Island                          |
 | 5 Whys                  | Problem, Why #1, Why #2, Why #3–5, Action            |
 
-### `pnpm db:seed:prod` (production)
+### `pnpm db:seed:templates:staging` / `pnpm db:seed:templates:prod`
 
-Runs only the templates seed — equivalent to `db:seed:templates` but uses the compiled `dist/` output.
+Runs retro + estimate template seeds against the target environment using compiled `dist/` output.
+
+### `pnpm db:seed:roles` (any environment)
+
+Seeds all 57 built-in team roles. Idempotent — safe to re-run.
+
+| Role | Role | Role |
+| --- | --- | --- |
+| Backend Developer | BE Dev | BI Dev |
+| BI Developer | Business Analyst | Cloud Engineer |
+| CTO | Data Analyst | Data Eng |
+| Data Engineer | Data Scientist | Dev |
+| Developer | DevOps | DevOps Engineer |
+| Engineering Manager | FE Dev | Frontend Developer |
+| FS Dev | Full Stack Developer | Jr Dev |
+| JRS Lead | JRS Oversight | Junior Developer |
+| Machine Learning Engineer | ML Eng | Mobile Developer |
+| PM | PO | Product Manager |
+| Product Owner | Project Manager | QA |
+| QA/QE | QA/Scrum Master | QE |
+| QE/Scrum Master | Quality Analyst | Quality Engineer |
+| Release Manager | Salesforce Developer | Salesforce System Admin |
+| Scrum Master | Security Engineer | Senior Business Analyst |
+| Senior Developer | SF Admin | SF Dev |
+| Solution Architect | Sr BA | Sr Dev |
+| Tech Lead | Technical Writer | UI Designer |
+| UX Designer | UX/UI Designer | VP of Engineering |
+
+### `pnpm db:seed:staging` / `pnpm db:seed:prod`
+
+Runs all production-safe seeds (templates + team roles) against the target environment using compiled `dist/` output.
+
+> **Note:** Seeding also runs automatically in CI after migrations during every deployment (idempotent — no-ops if data already exists).
 
 ---
 
@@ -495,6 +576,9 @@ src/
 │   ├── data/
 │   │   └── built-in-templates.ts # Built-in template definitions (source of truth)
 │   ├── enums/                    # Type-safe enums for all modules
+│   ├── interceptors/             # LastActiveInterceptor, etc.
+│   ├── types/
+│   │   └── index.ts              # Shared TypeScript types
 │   └── pipes/
 │       └── zod-validation.pipe.ts
 ├── config/
@@ -502,28 +586,52 @@ src/
 ├── database/
 │   ├── database.module.ts        # Drizzle provider (DATABASE_CONNECTION token)
 │   └── database-connection.ts
+├── adapters/
+│   └── socket-io.adapter.ts      # Socket.IO Redis adapter
+├── convex-admin/                 # Convex projection sync service
+│   └── types/
+│       └── index.ts
 ├── email/                        # Resend wrapper + email_log table
 ├── estimates/                    # Story estimates — REST + Socket.io gateway
+│   └── types/
+│       └── index.ts
+├── estimate-templates/           # Estimate card deck templates
+│   └── types/
+│       └── index.ts
+├── invitations/                  # Org + team invitation handling
+│   └── types/
+│       └── index.ts
 ├── lib/
 │   ├── email.ts                  # Email template helpers
 │   └── utils.ts                  # generateId(), etc.
-├── notifications/                # In-app notifications — REST + Socket.io gateway
-├── organizations/                # Organisation CRUD + membership
+├── notifications/                # In-app notifications — REST + Socket.io + push
+├── organizations/                # Organisation CRUD + membership + invitations
 ├── reports/                      # Analytics — team metrics, health score
-├── retro-reminders/              # Cron: email reminders 1h before scheduledAt
 ├── retros/                       # Retrospective lifecycle, templates, cards, votes
+│   └── types/
+│       └── index.ts
 ├── seed/
-│   ├── seed.ts                   # Dev seed: users, orgs, teams, retros
-│   └── seed-templates.ts         # Built-in templates (prod-safe, idempotent)
+│   ├── seed-users.ts             # Dev seed: users, orgs, teams, retros
+│   ├── seed-retro-templates.ts   # Retro templates (prod-safe, idempotent)
+│   ├── seed-estimate-templates.ts # Estimate templates
+│   ├── seed-team-roles.ts        # Team roles
+│   └── seed-large-org.ts         # Large org for stress testing
 ├── sessions/                     # Session listing & revocation
 ├── teams/                        # Team CRUD + membership + join requests
+├── team-roles/                   # Team role definitions
+├── action-items/                 # Retro action items
 ├── user-preferences/             # Notification preferences
 ├── users/                        # User management + admin actions
-├── weekly-digests/               # Cron: weekly digest emails
+├── health.controller.ts          # GET /health, /health/live, /health/ready
 ├── app.module.ts                 # Root module
 ├── main.ts                       # Bootstrap (CORS, cookie-parser, Swagger)
-└── migrate.ts                    # Standalone migration runner (used in prod)
+├── migrate.ts                    # Standalone migration runner (used in prod)
+└── ensure-convex-database.ts     # Creates Convex-specific PostgreSQL database
 ```
+
+### Module type convention
+
+Each module keeps its TypeScript types in a `types/index.ts` file (not loose `*.types.ts` files).
 
 ---
 

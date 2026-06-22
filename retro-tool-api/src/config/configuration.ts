@@ -13,12 +13,6 @@ const configSchema = z.object({
     url: z.string().optional(),
     sessionExpiresIn: z.number().default(60 * 60 * 24 * 7), // 7 days
     cookieSecure: z.boolean().default(false),
-    google: z
-      .object({
-        clientId: z.string().optional(),
-        clientSecret: z.string().optional(),
-      })
-      .optional(),
     microsoft: z
       .object({
         clientId: z.string().optional(),
@@ -68,10 +62,6 @@ export default (): Config => {
         : undefined,
       // Derived from NODE_ENV — true only in production
       cookieSecure: nodeEnv === 'production',
-      google: {
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      },
       microsoft: {
         clientId: process.env.MICROSOFT_CLIENT_ID,
         clientSecret: process.env.MICROSOFT_CLIENT_SECRET,

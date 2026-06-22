@@ -2,7 +2,7 @@ name: Deploy API
 
 on:
   push:
-    branches: [main, staging]
+    branches: [main, staging, develop]
     paths:
       - 'retro-tool-api/**'
       - 'packages/shared/contracts/**'
@@ -13,7 +13,7 @@ on:
         description: 'Target environment'
         required: true
         type: choice
-        options: [staging, production]
+        options: [develop, staging, production]
 
 concurrency:
   group: deploy-api-${{ github.ref_name }}
@@ -56,6 +56,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "develop" ]; then
+            echo "environment=develop" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.ref_name }}" = "staging" ]; then
             echo "environment=staging" >> "$GITHUB_OUTPUT"
           else
@@ -176,9 +178,42 @@ jobs:
           NODE_ENV: production
         run: pnpm db:migrate
 
+  # ─────────────────────────── Seed (idempotent) ──────────────────────
+  seed:
+    needs: [set-env, build, migrate]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-env.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0-rc.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build API
+        run: pnpm --filter retro-tool-api build
+
+      - name: Seed templates and roles
+        working-directory: retro-tool-api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
+          NODE_ENV: production
+        run: |
+          node dist/seed/seed-retro-templates.js
+          node dist/seed/seed-estimate-templates.js
+          node dist/seed/seed-team-roles.js
+
   # ─────────────────────────── Deploy to App Service ──────────────────
   deploy:
-    needs: [set-env, build, migrate]
+    needs: [set-env, build, migrate, seed]
     runs-on: ubuntu-latest
     environment: ${{ needs.set-env.outputs.environment }}
     steps:
@@ -194,8 +229,6 @@ jobs:
           EMAIL_FROM: ${{ vars.EMAIL_FROM || secrets.EMAIL_FROM }}
           DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || vars.BETTER_AUTH_SECRET }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET }}
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID || vars.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
           MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET || vars.MICROSOFT_CLIENT_SECRET }}
           CONVEX_SYNC_ADMIN_KEY: ${{ secrets.CONVEX_SYNC_ADMIN_KEY || vars.CONVEX_SYNC_ADMIN_KEY }}
@@ -233,7 +266,6 @@ jobs:
             fi
           }
 
-          validate_oauth_pair "Google" "GOOGLE_CLIENT_ID" "GOOGLE_CLIENT_SECRET"
           validate_oauth_pair "Microsoft" "MICROSOFT_CLIENT_ID" "MICROSOFT_CLIENT_SECRET"
 
       - name: Azure login (OIDC)
@@ -272,8 +304,6 @@ jobs:
               DATABASE_URL='${{ secrets.DATABASE_URL || vars.DATABASE_URL }}' \
               BETTER_AUTH_SECRET='${{ secrets.BETTER_AUTH_SECRET || vars.BETTER_AUTH_SECRET }}' \
               BETTER_AUTH_URL='https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net' \
-              GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID }}' \
-              GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET }}' \
               MICROSOFT_CLIENT_ID='${{ secrets.MICROSOFT_CLIENT_ID || vars.MICROSOFT_CLIENT_ID || secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}' \
               MICROSOFT_CLIENT_SECRET='${{ secrets.MICROSOFT_CLIENT_SECRET || vars.MICROSOFT_CLIENT_SECRET }}' \
               RESEND_API_KEY='${{ secrets.RESEND_API_KEY || vars.RESEND_API_KEY }}' \
@@ -283,23 +313,20 @@ jobs:
               VAPID_SUBJECT='${{ vars.VAPID_SUBJECT || secrets.VAPID_SUBJECT }}' \
             --output none
 
-      - name: Configure Web App managed identity for ACR pull
-        env:
-          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER || secrets.ACR_LOGIN_SERVER }}
+      - name: Verify ACR pull identity is configured
         run: |
-          PRINCIPAL_ID=$(az webapp identity assign \
+          ACR_CREDS=$(az webapp config show \
             --resource-group ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }} \
-            --query principalId -o tsv)
+            --query "acrUseManagedIdentityCreds" -o tsv)
 
-          echo "Web App managed identity principalId: ${PRINCIPAL_ID}"
-          echo "AcrPull role assignment must be pre-provisioned outside this pipeline."
-
-          az webapp config set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }} \
-            --generic-configurations '{"acrUseManagedIdentityCreds": true}' \
-            --only-show-errors
+          if [ "${ACR_CREDS}" != "true" ]; then
+            echo "WARNING: acrUseManagedIdentityCreds is not enabled."
+            echo "Ensure Bicep provisioning has run and configured the user-assigned managed identity with AcrPull."
+            echo "Run: az deployment sub create --template-file infra/deploy.bicep --parameters infra/environments/<env>.bicepparam"
+            exit 1
+          fi
+          echo "ACR pull via managed identity is configured."
 
       - name: Deploy container to App Service
         env:

@@ -13,8 +13,14 @@
         "local:down": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml down",
         "local:logs": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml logs -f",
         "dev:api": "pnpm --dir retro-tool-api start:dev",
+        "dev:api:staging": "pnpm --dir retro-tool-api dev:staging",
+        "dev:api:prod": "pnpm --dir retro-tool-api dev:prod",
         "dev:ui": "pnpm --dir retro-tool-ui dev",
-        "dev:convex": "pnpm --dir convex-backend dev"
+        "dev:ui:staging": "pnpm --dir retro-tool-ui dev:staging",
+        "dev:ui:prod": "pnpm --dir retro-tool-ui dev:prod",
+        "dev:convex": "pnpm --dir convex-backend dev",
+        "dev:convex:staging": "pnpm --dir convex-backend dev:staging",
+        "dev:convex:prod": "pnpm --dir convex-backend dev:prod"
     },
     "devDependencies": {
         "@commitlint/cli": "^20.5.0",

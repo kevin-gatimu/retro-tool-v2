@@ -10,7 +10,7 @@ import { DATABASE_CONNECTION } from '../../database/database-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Config } from '../../config/configuration';
 import { EmailService } from '../../email/email.service';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull, ilike, count, desc } from 'drizzle-orm';
 import * as teamSchema from '../schema';
 import * as orgSchema from '../../organizations/schema';
 import * as userSchema from '../../auth/schema';
@@ -67,6 +67,31 @@ export class TeamInvitationsService {
 
     if (!team) throw new NotFoundException('Team not found');
 
+    const [invitee] = await this.database
+      .select({ id: userSchema.user.id, name: userSchema.user.name })
+      .from(userSchema.user)
+      .where(eq(userSchema.user.email, email))
+      .limit(1);
+
+    if (invitee) {
+      const [existingMember] = await this.database
+        .select({ id: teamSchema.teamMember.id })
+        .from(teamSchema.teamMember)
+        .where(
+          and(
+            eq(teamSchema.teamMember.teamId, teamId),
+            eq(teamSchema.teamMember.userId, invitee.id),
+          ),
+        )
+        .limit(1);
+
+      if (existingMember) {
+        throw new ConflictException(
+          'This user is already a member of this team',
+        );
+      }
+    }
+
     const appUrl =
       this.configService.get('frontend.url', { infer: true }) ?? '';
 
@@ -99,12 +124,6 @@ export class TeamInvitationsService {
       createdById: actorId,
       expiresAt,
     });
-
-    const [invitee] = await this.database
-      .select({ id: userSchema.user.id, name: userSchema.user.name })
-      .from(userSchema.user)
-      .where(eq(userSchema.user.email, email))
-      .limit(1);
 
     if (invitee) {
       void this.emailService
@@ -144,6 +163,251 @@ export class TeamInvitationsService {
     }
 
     return { pending: true };
+  }
+
+  async listInvitations(
+    actorId: string,
+    teamId: string,
+    {
+      page = 1,
+      limit = 10,
+      search,
+    }: { page?: number; limit?: number; search?: string },
+  ) {
+    const canManage = await this.commonService.canManageTeam(actorId, teamId);
+    if (!canManage) {
+      throw new ForbiddenException('Only team managers can view invitations');
+    }
+
+    const conditions = [
+      eq(teamSchema.teamInvitation.teamId, teamId),
+      isNull(teamSchema.teamInvitation.acceptedAt),
+    ];
+    if (search && search.length >= 2) {
+      conditions.push(ilike(teamSchema.teamInvitation.email, `%${search}%`));
+    }
+
+    const where = and(...conditions);
+    const offset = (page - 1) * limit;
+
+    const [invitations, [{ total }]] = await Promise.all([
+      this.database
+        .select({
+          id: teamSchema.teamInvitation.id,
+          email: teamSchema.teamInvitation.email,
+          tag: teamSchema.teamInvitation.tag,
+          createdAt: teamSchema.teamInvitation.createdAt,
+          expiresAt: teamSchema.teamInvitation.expiresAt,
+          invitedByName: userSchema.user.name,
+          invitedByEmail: userSchema.user.email,
+          invitedById: userSchema.user.id,
+        })
+        .from(teamSchema.teamInvitation)
+        .leftJoin(
+          userSchema.user,
+          eq(userSchema.user.id, teamSchema.teamInvitation.createdById),
+        )
+        .where(where)
+        .orderBy(desc(teamSchema.teamInvitation.createdAt))
+        .limit(limit)
+        .offset(offset),
+      this.database
+        .select({ total: count() })
+        .from(teamSchema.teamInvitation)
+        .where(where),
+    ]);
+
+    return {
+      invitations: invitations.map((inv) => ({
+        id: inv.id,
+        email: inv.email,
+        tag: inv.tag,
+        createdAt: inv.createdAt,
+        expiresAt: inv.expiresAt,
+        invitedBy: {
+          id: inv.invitedById,
+          name: inv.invitedByName,
+          email: inv.invitedByEmail,
+        },
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async revokeInvitation(
+    actorId: string,
+    teamId: string,
+    invitationId: string,
+  ) {
+    const canManage = await this.commonService.canManageTeam(actorId, teamId);
+    if (!canManage) {
+      throw new ForbiddenException('Only team managers can revoke invitations');
+    }
+
+    const [invitation] = await this.database
+      .select()
+      .from(teamSchema.teamInvitation)
+      .where(
+        and(
+          eq(teamSchema.teamInvitation.id, invitationId),
+          eq(teamSchema.teamInvitation.teamId, teamId),
+        ),
+      )
+      .limit(1);
+
+    if (!invitation) throw new NotFoundException('Invitation not found');
+    if (invitation.acceptedAt) {
+      throw new ConflictException(
+        'Cannot revoke an already accepted invitation',
+      );
+    }
+
+    await this.database
+      .delete(teamSchema.teamInvitation)
+      .where(eq(teamSchema.teamInvitation.id, invitationId));
+
+    return { revoked: true };
+  }
+
+  async resendInvitation(
+    actorId: string,
+    teamId: string,
+    invitationId: string,
+  ) {
+    const canManage = await this.commonService.canManageTeam(actorId, teamId);
+    if (!canManage) {
+      throw new ForbiddenException('Only team managers can resend invitations');
+    }
+
+    const [invitation] = await this.database
+      .select()
+      .from(teamSchema.teamInvitation)
+      .where(
+        and(
+          eq(teamSchema.teamInvitation.id, invitationId),
+          eq(teamSchema.teamInvitation.teamId, teamId),
+        ),
+      )
+      .limit(1);
+
+    if (!invitation) throw new NotFoundException('Invitation not found');
+    if (invitation.acceptedAt) {
+      throw new ConflictException(
+        'Cannot resend an already accepted invitation',
+      );
+    }
+
+    const newToken = crypto.randomUUID();
+    const newExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+
+    await this.database
+      .update(teamSchema.teamInvitation)
+      .set({ token: newToken, expiresAt: newExpiresAt })
+      .where(eq(teamSchema.teamInvitation.id, invitationId));
+
+    const [team] = await this.database
+      .select({
+        id: teamSchema.team.id,
+        name: teamSchema.team.name,
+        organizationId: teamSchema.team.organizationId,
+        orgName: orgSchema.organization.name,
+      })
+      .from(teamSchema.team)
+      .innerJoin(
+        orgSchema.organization,
+        eq(orgSchema.organization.id, teamSchema.team.organizationId),
+      )
+      .where(eq(teamSchema.team.id, teamId))
+      .limit(1);
+
+    const appUrl =
+      this.configService.get('frontend.url', { infer: true }) ?? '';
+
+    const [invitee] = await this.database
+      .select({ id: userSchema.user.id, name: userSchema.user.name })
+      .from(userSchema.user)
+      .where(eq(userSchema.user.email, invitation.email))
+      .limit(1);
+
+    if (invitee) {
+      void this.emailService
+        .send({
+          to: invitation.email,
+          subject: `You've been invited to join ${team?.name ?? 'a team'}`,
+          html: this.emailService.buildTeamInviteHtml({
+            userName: invitee.name,
+            invitedEmail: invitation.email,
+            orgName: team?.orgName ?? '',
+            teamName: team?.name ?? '',
+            tag: invitation.tag,
+            appUrl,
+            token: newToken,
+          }),
+          userId: invitee.id,
+          type: EMAIL_LOG_TYPES.TeamInvite,
+        })
+        .catch(() => undefined);
+    } else {
+      void this.emailService
+        .send({
+          to: invitation.email,
+          subject: `You've been invited to join ${team?.name ?? 'a team'}`,
+          html: this.emailService.buildTeamExternalInviteHtml({
+            orgName: team?.orgName ?? '',
+            teamName: team?.name ?? '',
+            tag: invitation.tag,
+            appUrl,
+            token: newToken,
+            invitedEmail: invitation.email,
+          }),
+          userId: actorId,
+          type: EMAIL_LOG_TYPES.TeamInviteExternal,
+        })
+        .catch(() => undefined);
+    }
+
+    return { resent: true };
+  }
+
+  async checkInviteEmail(
+    actorId: string,
+    teamId: string,
+    email: string,
+  ): Promise<{ registered: boolean; name?: string; isMember?: boolean }> {
+    const canManage = await this.commonService.canManageTeam(actorId, teamId);
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Only team managers can check invite emails',
+      );
+    }
+
+    const [user] = await this.database
+      .select({ id: userSchema.user.id, name: userSchema.user.name })
+      .from(userSchema.user)
+      .where(eq(userSchema.user.email, email))
+      .limit(1);
+
+    if (!user) return { registered: false };
+
+    const [existingMember] = await this.database
+      .select({ id: teamSchema.teamMember.id })
+      .from(teamSchema.teamMember)
+      .where(
+        and(
+          eq(teamSchema.teamMember.teamId, teamId),
+          eq(teamSchema.teamMember.userId, user.id),
+        ),
+      )
+      .limit(1);
+
+    return {
+      registered: true,
+      name: user.name,
+      isMember: !!existingMember,
+    };
   }
 
   async getTeamInvitationPreview(token: string) {
@@ -211,7 +475,7 @@ export class TeamInvitationsService {
       .where(eq(userSchema.user.id, userId))
       .limit(1);
 
-    if (!user || user.email !== invitation.email) {
+    if (!user || user.email.toLowerCase() !== invitation.email.toLowerCase()) {
       throw new ForbiddenException(
         'This invitation was sent to a different email address',
       );

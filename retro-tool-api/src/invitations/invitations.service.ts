@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { OrgInvitationsService } from '../organizations/invitations/invitations.service';
 import { TeamInvitationsService } from '../teams/invitations/invitations.service';
-import type { InvitationPreview } from './invitations.types';
+import type { InvitationPreview } from './types';
 
 @Injectable()
 export class InvitationsService {

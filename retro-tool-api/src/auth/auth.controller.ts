@@ -323,33 +323,6 @@ export class AuthController {
   }
 
   /**
-   * Google OAuth sign in
-   * GET /auth/sign-in/google
-   */
-  @Get('sign-in/google')
-  @ApiOperation({ summary: 'Sign in with Google OAuth' })
-  @ApiResponse({ status: 302, description: 'Redirects to Google OAuth' })
-  signInGoogle() {
-    // Handled by better-auth
-    return;
-  }
-
-  /**
-   * Google OAuth callback
-   * GET /auth/callback/google
-   */
-  @Get('callback/google')
-  @ApiOperation({ summary: 'Google OAuth callback' })
-  @ApiResponse({
-    status: 302,
-    description: 'Redirects to frontend with session',
-  })
-  googleCallback() {
-    // Handled by better-auth
-    return;
-  }
-
-  /**
    * Microsoft OAuth sign in
    * GET /auth/sign-in/microsoft
    */
