@@ -61,6 +61,17 @@ export function createAuth(configService: ConfigService<Config>) {
   const authUrl = authConfig?.url || `http://localhost:${port}`;
 
   return betterAuth({
+    // Per-IP rate limiting (in-memory, uses x-forwarded-for via advanced.ipAddress config)
+    rateLimit: {
+      enabled: true,
+      window: 60, // default: 100 requests per 60s for all routes
+      max: 100,
+      customRules: {
+        '/sign-up/email': { window: 300, max: 5 }, // 5 signup attempts per 5 min
+        '/sign-in/email': { window: 60, max: 10 }, // 10 login attempts per min
+        '/forgot-password': { window: 300, max: 3 }, // 3 resets per 5 min
+      },
+    },
     database: drizzleAdapter(db, {
       provider: 'pg',
       schema: {

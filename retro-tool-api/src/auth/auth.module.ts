@@ -1,12 +1,16 @@
-import { Module } from '@nestjs/common';
+import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Module, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthModule as BetterAuthModule } from '@thallesp/nestjs-better-auth';
-import { Config } from '../config/configuration';
+import type { Config } from '../config/configuration';
+import { DatabaseModule } from '../database/database.module';
 import { createAuth } from './auth.config';
 import { AuthController } from './auth.controller';
+import { SignupCleanupMiddleware } from './auth-signup.middleware';
 
 @Module({
   imports: [
+    DatabaseModule,
     BetterAuthModule.forRootAsync({
       useFactory: (configService: ConfigService<Config>) => ({
         auth: createAuth(configService),
@@ -17,4 +21,10 @@ import { AuthController } from './auth.controller';
   controllers: [AuthController],
   exports: [BetterAuthModule],
 })
-export class AuthModule {}
+export class AuthModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(SignupCleanupMiddleware)
+      .forRoutes({ path: 'auth/sign-up/email', method: RequestMethod.POST });
+  }
+}

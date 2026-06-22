@@ -1094,7 +1094,7 @@ function EstimateSessionPage() {
                   </>
                 ) : (
                   <span className="text-muted-foreground italic">
-                    {session.isCreator
+                    {canEndSession
                       ? "Click 'Start Round' in the controls below to begin the first round."
                       : 'Waiting for the host to start the first round...'}
                   </span>
@@ -1315,14 +1315,13 @@ function EstimateSessionPage() {
             </CardContent>
           </Card>
 
-          {/* Controls (for session creator) */}
-          {session.isCreator && (
+          {/* Controls (for session creator or admins) */}
+          {canEndSession && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Session Controls</CardTitle>
                 <CardDescription>
-                  As the session creator, you can control the voting. You can
-                  also change the Agreed Points.
+                  You can control the voting and change the Agreed Points.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1371,40 +1370,36 @@ function EstimateSessionPage() {
                       </Button>
                     )}
 
-                    {canEndSession && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="destructive"
-                            disabled={endSessionMutation.isPending}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          disabled={endSessionMutation.isPending}
+                        >
+                          <CircleStop className="mr-2 h-4 w-4" />
+                          End Session
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>End this session?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will complete the estimation session and move
+                            it to history. All votes will be preserved for the
+                            report.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => endSessionMutation.mutate()}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           >
-                            <CircleStop className="mr-2 h-4 w-4" />
                             End Session
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              End this session?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will complete the estimation session and move
-                              it to history. All votes will be preserved for the
-                              report.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => endSessionMutation.mutate()}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              End Session
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
 
                   {/* Agreed points (only when votes are revealed) */}
@@ -1456,48 +1451,6 @@ function EstimateSessionPage() {
                       </div>
                     </>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {!session.isCreator && canEndSession && (
-            <Card>
-              <CardContent>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    As an admin or team lead, you can end this session.
-                  </p>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        disabled={endSessionMutation.isPending}
-                      >
-                        <CircleStop className="mr-2 h-4 w-4" />
-                        End Session
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>End this session?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will complete the estimation session and move it
-                          to history. All votes will be preserved for the
-                          report.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => endSessionMutation.mutate()}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          End Session
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>
