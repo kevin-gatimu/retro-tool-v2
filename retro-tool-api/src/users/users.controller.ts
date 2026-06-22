@@ -138,6 +138,11 @@ export class UsersController {
     enum: ['name', 'email', 'status', 'role', 'createdAt', 'lastActiveAt'],
   })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
+  @ApiQuery({
+    name: 'membership',
+    required: false,
+    enum: ['all', 'no-org', 'no-team'],
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'Returns paginated list of users' })
@@ -150,6 +155,7 @@ export class UsersController {
     @Query('search') search?: string,
     @Query('status') status?: TUserStatusFilter,
     @Query('role') role?: TUserRoleFilter,
+    @Query('membership') membership?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
@@ -159,6 +165,7 @@ export class UsersController {
       search,
       status,
       role,
+      membership,
       sortBy,
       sortOrder,
       page,

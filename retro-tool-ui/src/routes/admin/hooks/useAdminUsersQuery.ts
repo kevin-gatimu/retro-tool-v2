@@ -7,6 +7,7 @@ interface AdminUsersQueryParams {
   page: number
   pageSize: number
   search?: string
+  membership?: string
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
 }
@@ -21,6 +22,7 @@ export function useAdminUsersQuery(params: AdminUsersQueryParams) {
       params.page,
       params.pageSize,
       params.search,
+      params.membership,
       params.sortBy,
       params.sortOrder,
     ],
@@ -30,6 +32,8 @@ export function useAdminUsersQuery(params: AdminUsersQueryParams) {
         limit: String(params.pageSize),
       })
       if (params.search) urlParams.set('search', params.search)
+      if (params.membership && params.membership !== 'all')
+        urlParams.set('membership', params.membership)
       if (params.sortBy) urlParams.set('sortBy', params.sortBy)
       if (params.sortOrder) urlParams.set('sortOrder', params.sortOrder)
       return api.get<UsersPage>(`${USERS_ENDPOINTS.LIST}?${urlParams}`)

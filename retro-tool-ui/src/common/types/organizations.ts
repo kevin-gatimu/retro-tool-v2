@@ -37,6 +37,7 @@ export interface OrganizationDetail extends Organization {
     organizationId: string
     role: TOrgMemberRole
     createdAt: Date | string
+    teamIds: string[]
     user: {
       id: string
       name: string | null

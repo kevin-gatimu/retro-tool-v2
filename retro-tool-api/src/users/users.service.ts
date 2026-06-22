@@ -18,6 +18,7 @@ import {
   or,
   like,
   inArray,
+  notInArray,
   desc,
   asc,
   count,
@@ -186,6 +187,7 @@ export class UsersService {
       search?: string;
       status?: TUserStatusFilter;
       role?: TUserRoleFilter;
+      membership?: string;
       page?: number;
       limit?: number;
       sortBy?: string;
@@ -216,6 +218,24 @@ export class UsersService {
 
     if (options?.role && options.role !== 'all') {
       conditions.push(eq(userSchema.user.role, options.role));
+    }
+
+    if (options?.membership === 'no-org') {
+      const orgMemberUserIds = this.database
+        .select({ userId: orgSchema.organizationMember.userId })
+        .from(orgSchema.organizationMember);
+      conditions.push(notInArray(userSchema.user.id, orgMemberUserIds));
+    }
+
+    if (options?.membership === 'no-team') {
+      const orgMemberUserIds = this.database
+        .select({ userId: orgSchema.organizationMember.userId })
+        .from(orgSchema.organizationMember);
+      const teamMemberUserIds = this.database
+        .select({ userId: teamSchema.teamMember.userId })
+        .from(teamSchema.teamMember);
+      conditions.push(inArray(userSchema.user.id, orgMemberUserIds));
+      conditions.push(notInArray(userSchema.user.id, teamMemberUserIds));
     }
 
     const sortableColumns: Record<string, unknown> = {

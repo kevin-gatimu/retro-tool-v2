@@ -434,11 +434,34 @@ export class OrganizationsService {
       .where(eq(orgSchema.organizationMember.organizationId, orgId))
       .orderBy(desc(orgSchema.organizationMember.createdAt));
 
+    const orgTeamMembers = await this.database
+      .select({
+        userId: teamSchema.teamMember.userId,
+        teamId: teamSchema.teamMember.teamId,
+      })
+      .from(teamSchema.teamMember)
+      .innerJoin(
+        teamSchema.team,
+        eq(teamSchema.team.id, teamSchema.teamMember.teamId),
+      )
+      .where(eq(teamSchema.team.organizationId, orgId));
+
+    const teamsByUser = new Map<string, string[]>();
+    for (const row of orgTeamMembers) {
+      const arr = teamsByUser.get(row.userId) ?? [];
+      arr.push(row.teamId);
+      teamsByUser.set(row.userId, arr);
+    }
+
     return {
       ...org,
       myRole: membership?.role ?? null,
       memberCount: members.length,
-      members: members.map(({ member, user }) => ({ ...member, user })),
+      members: members.map(({ member, user }) => ({
+        ...member,
+        user,
+        teamIds: teamsByUser.get(member.userId) ?? [],
+      })),
     };
   }
 

@@ -103,6 +103,7 @@ function AdminUsersPage() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [membershipFilter, setMembershipFilter] = useState('all')
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -179,6 +180,7 @@ function AdminUsersPage() {
     page,
     pageSize,
     search: debouncedSearch,
+    membership: membershipFilter,
     sortBy,
     sortOrder,
   })
@@ -432,8 +434,8 @@ function AdminUsersPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               )}
-              <div className="max-w-sm mb-4">
-                <div className="relative">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="relative max-w-sm">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={search}
@@ -442,6 +444,23 @@ function AdminUsersPage() {
                     className="pl-9 h-8"
                   />
                 </div>
+                <Select
+                  value={membershipFilter}
+                  onValueChange={(v) => {
+                    setMembershipFilter(v)
+                    setPage(1)
+                    setRowSelection({})
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All users</SelectItem>
+                    <SelectItem value="no-org">No organization</SelectItem>
+                    <SelectItem value="no-team">No team</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <DataTable
                 columns={columns}

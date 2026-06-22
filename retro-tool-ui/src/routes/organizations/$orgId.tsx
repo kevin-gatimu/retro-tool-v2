@@ -214,6 +214,7 @@ function OrganizationDetailPage() {
   const selectedMemberIds = Object.keys(memberRowSelection).filter(
     (id) => memberRowSelection[id],
   )
+  const [memberFilter, setMemberFilter] = useState<'all' | 'unassigned'>('all')
 
   const [editName, setEditName] = useState('')
   const [editSlug, setEditSlug] = useState('')
@@ -357,6 +358,12 @@ function OrganizationDetailPage() {
   })
 
   const orgMembers = organization.members
+  const filteredOrgMembers = useMemo(() => {
+    if (memberFilter === 'unassigned') {
+      return orgMembers.filter((m) => m.teamIds.length === 0)
+    }
+    return orgMembers
+  }, [orgMembers, memberFilter])
 
   // Close create team dialog and reset form on successful creation
   useEffect(() => {
@@ -841,9 +848,25 @@ function OrganizationDetailPage() {
         {/* Members Tab */}
         <TabsContent value="members" className="mt-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold">
-              Members ({orgMembers.length})
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold">
+                Members ({filteredOrgMembers.length})
+              </h2>
+              <Select
+                value={memberFilter}
+                onValueChange={(v) =>
+                  setMemberFilter(v as 'all' | 'unassigned')
+                }
+              >
+                <SelectTrigger className="h-8 w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All members</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-2">
               {isAdmin && (
                 <>
@@ -1120,7 +1143,7 @@ function OrganizationDetailPage() {
                 updateRoleMutation.mutate({ userId, role }),
               onRemove: (userId) => setRemoveMemberId(userId),
             })}
-            data={orgMembers as OrgMemberRow[]}
+            data={filteredOrgMembers as OrgMemberRow[]}
             searchColumn="user"
             searchPlaceholder="Search members..."
             pagination
