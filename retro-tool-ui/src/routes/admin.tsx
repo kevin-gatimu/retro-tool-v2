@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router'
 import { Shield } from 'lucide-react'
 import { useEffect } from 'react'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 import { isSystemAdmin } from '@/lib/rbac'
 import { AdminNav } from './admin/helpers'
 import { AdminShellSkeleton } from './admin/skeleton'

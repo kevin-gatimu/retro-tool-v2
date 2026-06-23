@@ -28,7 +28,7 @@ import {
   StatusBadge,
 } from '@/components/tables/user-columns'
 import type { UserRow } from '@/components/tables/user-columns'
-import { UserAvatar } from '@/components/UserAvatar'
+import { UserAvatar } from '@/components/user-avatar'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,7 +71,7 @@ import { FilterPills } from '@/components/ui/filter-pills'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { AdminUsersSkeleton } from './skeleton'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 import { api } from '@/lib/api'
 import {
   ORGANIZATIONS_ENDPOINTS,

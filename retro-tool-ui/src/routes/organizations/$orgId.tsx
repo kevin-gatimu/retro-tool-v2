@@ -4,10 +4,10 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query'
-import { useOrgDetailMutations } from './hooks/useOrganizationMutations'
-import { useOrgTeamRoleMutations } from './hooks/useOrgTeamRoleMutations'
+import { useOrgDetailMutations } from './hooks/use-organization-mutations'
+import { useOrgTeamRoleMutations } from './hooks/use-org-team-role-mutations'
 import { toSlug } from './helpers'
-import { OrgLogo } from '@/components/OrgLogo'
+import { OrgLogo } from '@/components/org-logo'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
   ArrowLeft,
@@ -32,7 +32,7 @@ import { getOrgMemberColumns } from '@/components/tables/member-columns'
 import type { OrgMemberRow } from '@/components/tables/member-columns'
 import { getOrgInvitationColumns } from '@/components/tables/invitation-columns'
 import type { OrgInvitationRow } from '@/components/tables/invitation-columns'
-import { getOrgRoleBadge } from '@/components/UserRoleBadges'
+import { getOrgRoleBadge } from '@/components/user-role-badges'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -99,7 +99,7 @@ import type {
   CreateEstimateTemplateInput,
 } from '@/common/types/estimates'
 import { isSystemAdmin } from '@/lib/rbac'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 import type { OrganizationDetail } from '@/common/types/organizations'
 import type { Team } from '@/common/types/teams'
 

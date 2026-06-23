@@ -2,7 +2,7 @@ import { Check, LogIn, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { UserAvatar } from '@/components/UserAvatar'
+import { UserAvatar } from '@/components/user-avatar'
 import { authClient } from '@/lib/auth-client'
 import {
   DropdownMenuSeparator,

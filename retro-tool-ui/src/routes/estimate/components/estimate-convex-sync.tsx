@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useQuery as useConvexQuery } from 'convex/react'
 import type { FunctionReference } from 'convex/server'
 import type { EstimateSession } from '@/common/types/estimates'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 
 const estimateBoardQuery =
   'liveEstimates:getEstimateBoard' as unknown as FunctionReference<'query'>

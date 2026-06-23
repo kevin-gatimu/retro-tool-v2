@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { usePushNotifications } from '@/hooks/use-push-notifications'
 import { authClient } from '@/lib/auth-client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

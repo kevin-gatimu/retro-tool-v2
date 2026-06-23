@@ -14,7 +14,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
-import { useSessionActions } from './hooks/useSessionActions'
+import { useSessionActions } from './hooks/use-session-actions'
 import type { SessionData } from './types'
 import { getDeviceIcon, getBrowserInfo, getOSInfo } from './helpers'
 import { SessionsSkeleton } from './skeleton'

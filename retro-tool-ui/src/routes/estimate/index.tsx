@@ -39,12 +39,12 @@ import type { Team } from '@/common/types/teams'
 import { usesConvexForEstimates } from '@/lib/realtime-config'
 import { EstimateListConvexSync } from './components/estimate-list-convex-sync'
 import type { HistoryResponse } from './types'
-import { SpaceSwitcher } from '@/components/spaces/SpaceSwitcher'
-import { ViewConfigToolbar } from '@/components/spaces/ViewConfigToolbar'
-import { GroupedSessionView } from '@/components/spaces/GroupedSessionView'
-import { LoadMoreFooter } from '@/components/spaces/LoadMoreFooter'
-import type { CompletedPage } from '@/components/spaces/useSessionList'
-import { useSessionList } from '@/components/spaces/useSessionList'
+import { SpaceSwitcher } from '@/components/spaces/space-switcher'
+import { ViewConfigToolbar } from '@/components/spaces/view-config-toolbar'
+import { GroupedSessionView } from '@/components/spaces/grouped-session-view'
+import { LoadMoreFooter } from '@/components/spaces/load-more-footer'
+import type { CompletedPage } from '@/components/spaces/use-session-list'
+import { useSessionList } from '@/components/spaces/use-session-list'
 import type { StatusBucket } from '@/components/spaces/utils'
 import {
   SPACE_ALL,
@@ -52,7 +52,7 @@ import {
   nextCollapsedGroups,
   toggleFavorite,
 } from '@/components/spaces/utils'
-import { useSessionViewPreferences } from '@/hooks/useSessionViewPreferences'
+import { useSessionViewPreferences } from '@/hooks/use-session-view-preferences'
 import { EstimateListSkeleton } from './skeleton'
 
 const COMPLETED_PAGE_SIZE = 12

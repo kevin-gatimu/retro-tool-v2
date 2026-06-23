@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { api } from '@/lib/api'
 import { USER_PREFERENCES_ENDPOINTS } from '@/lib/api-endpoints'
 import type { UserNotificationPreferences } from '@/common/types/user-preferences'
-import { useUserPreferencesMutation } from './hooks/useUserPreferencesMutation'
+import { useUserPreferencesMutation } from './hooks/use-user-preferences-mutation'
 import { SettingsSkeleton } from './skeleton'
 
 const userPreferencesQueryOptions = {

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useSyncExternalStore } from 'react'
-import { UserAvatar } from '@/components/UserAvatar'
+import { UserAvatar } from '@/components/user-avatar'
 import {
   Collapsible,
   CollapsibleContent,
@@ -42,7 +42,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { AccountSwitcher } from '@/components/AccountSwitcher'
+import { AccountSwitcher } from '@/components/account-switcher'
 import { useTheme } from '@/hooks/use-theme'
 import { api } from '@/lib/api'
 import { USERS_ENDPOINTS } from '@/lib/api-endpoints'

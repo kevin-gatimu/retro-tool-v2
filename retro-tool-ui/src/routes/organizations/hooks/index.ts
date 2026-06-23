@@ -1,1 +1,1 @@
-export { useOrgDetailMutations } from './useOrganizationMutations'
+export { useOrgDetailMutations } from './use-organization-mutations'

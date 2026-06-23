@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { authClient } from '@/lib/auth-client'
 import { api } from '@/lib/api'
 import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
-import { CURRENT_USER_QUERY_KEY } from '@/hooks/useCurrentUser'
+import { CURRENT_USER_QUERY_KEY } from '@/hooks/use-current-user'
 
 export function useUpdateProfile({
   onSuccess,

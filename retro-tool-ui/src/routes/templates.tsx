@@ -61,7 +61,7 @@ import {
   TShirtIcon,
   getShirtScale,
   isTShirtTemplateName,
-} from '@/components/TShirtIcon'
+} from '@/components/t-shirt-icon'
 import { api } from '@/lib/api'
 import {
   ESTIMATE_TEMPLATES_ENDPOINTS,
@@ -71,7 +71,7 @@ import {
   TEAMS_ENDPOINTS,
 } from '@/lib/api-endpoints'
 import { isSystemAdmin } from '@/lib/rbac'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 
 type TemplateWithColumns = Template & {
   columns: Array<{

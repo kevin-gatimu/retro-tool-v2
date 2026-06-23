@@ -22,7 +22,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { isSuperAdmin } from '@/lib/rbac'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 // Import common helpers
 import { slugify, toSlug, createEmptyColumn } from '@/common/helpers'
 

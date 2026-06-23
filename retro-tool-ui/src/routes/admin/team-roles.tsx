@@ -41,7 +41,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { api } from '@/lib/api'
 import { TEAM_ROLES_ENDPOINTS } from '@/lib/api-endpoints'
-import { useAdminTeamRoleMutations } from './hooks/useAdminTeamRoleMutations'
+import { useAdminTeamRoleMutations } from './hooks/use-admin-team-role-mutations'
 import { AdminTeamRolesSkeleton } from './skeleton'
 
 interface TeamRole {

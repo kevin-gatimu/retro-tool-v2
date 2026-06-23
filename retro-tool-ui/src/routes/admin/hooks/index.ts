@@ -1,23 +1,23 @@
-export { useAdminActionLogQuery } from './useAdminActionLogQuery'
-export { useAdminOrganizationMutations } from './useAdminOrganizationMutations'
-export { useAdminTemplateMutations } from './useAdminTemplateMutations'
-export { useAdminUserMutations } from './useAdminUserMutations'
-export { useAdminUsersQuery } from './useAdminUsersQuery'
-export { useOrgBulkSetupMutation } from './useOrgBulkSetupMutation'
+export { useAdminActionLogQuery } from './use-admin-action-log-query'
+export { useAdminOrganizationMutations } from './use-admin-organization-mutations'
+export { useAdminTemplateMutations } from './use-admin-template-mutations'
+export { useAdminUserMutations } from './use-admin-user-mutations'
+export { useAdminUsersQuery } from './use-admin-users-query'
+export { useOrgBulkSetupMutation } from './use-org-bulk-setup-mutation'
 export type {
   BulkSetupPayload,
   BulkSetupResult,
   BulkSetupTeam,
-} from './useOrgBulkSetupMutation'
-export { useBulkOrgTeamMutations } from './useBulkOrgTeamMutations'
-export { useOrganizationMemberSearch } from './useOrganizationMemberSearch'
-export { useUserSearch } from './useUserSearch'
+} from './use-org-bulk-setup-mutation'
+export { useBulkOrgTeamMutations } from './use-bulk-org-team-mutations'
+export { useOrganizationMemberSearch } from './use-organization-member-search'
+export { useUserSearch } from './use-user-search'
 export {
   useConvexOperationalMetrics,
   useConvexUsageMetrics,
   useConvexCronConfig,
-} from './useConvexAdminMetrics'
+} from './use-convex-admin-metrics'
 export {
   useUpdateCronConfig,
   useClearConvexTables,
-} from './useConvexAdminMutations'
+} from './use-convex-admin-mutations'

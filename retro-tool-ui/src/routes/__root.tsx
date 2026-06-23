@@ -9,9 +9,9 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import { useEffect } from 'react'
 
 import { AppSidebar } from '@/components/app-sidebar'
-import { NotificationBell } from '@/components/NotificationBell'
-import { ThemeProvider } from '@/components/ThemeProvider'
-import { ThemeToggle } from '@/components/ThemeToggle'
+import { NotificationBell } from '@/components/notification-bell'
+import { ThemeProvider } from '@/components/theme-provider'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Separator } from '@/components/ui/separator'
 import {
   SidebarInset,
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { authClient } from '@/lib/auth-client'
-import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { usePushNotifications } from '@/hooks/use-push-notifications'
 
 import TanStackQueryProvider from '../integrations/tanstack-query/root-provider'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'

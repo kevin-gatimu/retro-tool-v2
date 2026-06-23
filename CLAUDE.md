@@ -31,6 +31,20 @@ module-name/
 
 **Types must live in `types/index.ts`** — not in loose `*.types.ts` files.
 
+### UI file naming
+
+Frontend source files (`retro-tool-ui/src/`) use **`kebab-case`** file names — `notification-bell.tsx`,
+`use-current-user.ts`, `api-endpoints.ts`. The **file name is kebab; the export keeps its idiomatic
+case** — React components stay `PascalCase` (`export function NotificationBell()`), hooks stay
+`useCamelCase` (`export function useCurrentUser()`), prefixed `use-` on the file too. Module-specific
+types live in a colocated `types/index.ts`.
+
+**Exception:** files under `routes/` that define routes are named by TanStack Router (`index.tsx`,
+`$teamId.tsx`, `__root.tsx`, …) — leave those as the router expects. Skeletons follow
+`skeleton/index.tsx` (route group) or `<name>.skeleton.tsx` (single route).
+
+Full reference: [docs/file-naming-conventions.md](docs/file-naming-conventions.md).
+
 ---
 
 ## Quick-start commands
@@ -339,6 +353,7 @@ GitHub Actions handle app deployment (not infra):
 | Document | What it covers |
 |---|---|
 | [docs/RBAC.md](docs/RBAC.md) | Full permission matrices for system, org, team, and retro actions; helper function signatures; user status lifecycle |
+| [docs/file-naming-conventions.md](docs/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
 | [docs/app-flows.md](docs/app-flows.md) | Step-by-step flows: auth, user approval, org/team management, retro phases, estimates, notifications |
 | [docs/infrastructure.md](docs/infrastructure.md) | Azure infrastructure overview |
 | [docs/invitations.md](docs/invitations.md) | Invitation system (org + team) |

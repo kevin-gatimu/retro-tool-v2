@@ -47,9 +47,9 @@ import {
 import { api } from '@/lib/api'
 import { ORGANIZATIONS_ENDPOINTS } from '@/lib/api-endpoints'
 import { isSystemAdmin } from '@/lib/rbac'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { OrgLogo } from '@/components/OrgLogo'
-import { useOrganizationMutations } from './hooks/useOrganizationMutations'
+import { useCurrentUser } from '@/hooks/use-current-user'
+import { OrgLogo } from '@/components/org-logo'
+import { useOrganizationMutations } from './hooks/use-organization-mutations'
 import type { PaginatedOrgsResponse } from './types'
 import { OrganizationsListSkeleton } from './skeleton'
 

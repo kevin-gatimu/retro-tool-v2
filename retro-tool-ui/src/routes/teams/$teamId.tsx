@@ -35,8 +35,8 @@ import type {
 } from '@/components/tables/member-columns'
 import { getTeamInvitationColumns } from '@/components/tables/invitation-columns'
 import type { TeamInvitationRow } from '@/components/tables/invitation-columns'
-import { UserAvatar } from '@/components/UserAvatar'
-import { getTeamRoleBadge } from '@/components/UserRoleBadges'
+import { UserAvatar } from '@/components/user-avatar'
+import { getTeamRoleBadge } from '@/components/user-role-badges'
 import {
   AlertDialog,
   AlertDialogAction,

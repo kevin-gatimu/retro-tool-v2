@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useQuery as useConvexQuery } from 'convex/react'
 import type { FunctionReference } from 'convex/server'
 import type { RetroDetail } from '@/common/types/retros'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 import type { CarriedForwardItem } from '../types'
 
 const retroBoardQuery =

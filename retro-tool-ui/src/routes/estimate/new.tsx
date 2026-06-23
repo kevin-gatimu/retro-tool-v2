@@ -37,7 +37,7 @@ import {
   ESTIMATE_TEMPLATES_ENDPOINTS,
   TEAMS_ENDPOINTS,
 } from '@/lib/api-endpoints'
-import { useEstimateMutations } from './hooks/useEstimateMutations'
+import { useEstimateMutations } from './hooks/use-estimate-mutations'
 import type { Team } from '@/common/types/teams'
 import type {
   EstimateTemplate,

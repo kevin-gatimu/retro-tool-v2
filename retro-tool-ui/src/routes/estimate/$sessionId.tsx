@@ -3,7 +3,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { useSessionMutations } from './hooks/useSessionMutations'
+import { useSessionMutations } from './hooks/use-session-mutations'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import {
@@ -29,7 +29,7 @@ import {
   TShirtIcon,
   getShirtScale,
   isTShirtTemplateName,
-} from '@/components/TShirtIcon'
+} from '@/components/t-shirt-icon'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   AlertDialog,
@@ -85,7 +85,7 @@ import { usesConvexForEstimates } from '@/lib/realtime-config'
 import { EstimateConvexSync } from './components/estimate-convex-sync'
 import { EstimateSessionDetailSkeleton } from './skeleton'
 import { getRoundDurationLabel } from './helpers'
-import { useSendEstimateReport } from './hooks/useSendEstimateReport'
+import { useSendEstimateReport } from './hooks/use-send-estimate-report'
 import type { TeamMember } from '@/common/types/teams'
 import {
   DropdownMenu,

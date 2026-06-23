@@ -34,7 +34,7 @@ import { RETROS_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { RetroDetail } from '@/common/types/retros'
 import type { TeamMember } from '@/common/types/teams'
 import { cn } from '@/lib/utils'
-import { useSendRetroReport } from '@/routes/retros/hooks/useSendRetroReport'
+import { useSendRetroReport } from '@/routes/retros/hooks/use-send-retro-report'
 import type { CarriedForwardItem } from '@/routes/retros/types'
 
 interface RetroReportProps {

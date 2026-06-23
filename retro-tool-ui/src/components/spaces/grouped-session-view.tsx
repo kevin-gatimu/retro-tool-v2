@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import type { SessionView } from '@/common/types/user-preferences'
 import { cn } from '@/lib/utils'
-import { SessionGroupSection } from './SessionGroupSection'
+import { SessionGroupSection } from './session-group-section'
 import type { Space, StatusBucket } from './utils'
 import {
   SPACE_ALL,

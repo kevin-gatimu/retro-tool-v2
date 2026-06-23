@@ -43,8 +43,8 @@ import {
   useMutation as useConvexMutation,
 } from 'convex/react'
 import type { FunctionReference } from 'convex/server'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { useRetroMutations } from './hooks/useRetroMutations'
+import { useCurrentUser } from '@/hooks/use-current-user'
+import { useRetroMutations } from './hooks/use-retro-mutations'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,

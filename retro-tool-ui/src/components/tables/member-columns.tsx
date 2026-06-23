@@ -12,7 +12,7 @@ import {
   UserMinus,
   X,
 } from 'lucide-react'
-import { UserAvatar } from '@/components/UserAvatar'
+import { UserAvatar } from '@/components/user-avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'

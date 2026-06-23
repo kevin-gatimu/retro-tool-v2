@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { CONVEX_ADMIN_ENDPOINTS } from '@/lib/api-endpoints'
 import type { ConvexCronConfigResponse } from '../types'
-import { CONVEX_CRON_CONFIG_KEY } from './useConvexAdminMetrics'
+import { CONVEX_CRON_CONFIG_KEY } from './use-convex-admin-metrics'
 
 interface UpdateCronConfigPayload {
   schedule?: string

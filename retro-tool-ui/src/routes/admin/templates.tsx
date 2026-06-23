@@ -28,7 +28,7 @@ import {
   TShirtIcon,
   getShirtScale,
   isTShirtTemplateName,
-} from '@/components/TShirtIcon'
+} from '@/components/t-shirt-icon'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -71,7 +71,7 @@ import {
   ORGANIZATIONS_ENDPOINTS,
   TEMPLATES_ENDPOINTS,
 } from '@/lib/api-endpoints'
-import { useAdminTemplateMutations } from './hooks/useAdminTemplateMutations'
+import { useAdminTemplateMutations } from './hooks/use-admin-template-mutations'
 import { createEmptyColumn } from './helpers'
 import type {
   EditableColumn,

@@ -53,7 +53,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { ORGANIZATIONS_ENDPOINTS } from '@/lib/api-endpoints'
-import { useAdminOrganizationMutations } from './hooks/useAdminOrganizationMutations'
+import { useAdminOrganizationMutations } from './hooks/use-admin-organization-mutations'
 import { toSlug } from './helpers'
 import type { OrganizationAdminRow, PaginatedOrgsResponse } from './types'
 

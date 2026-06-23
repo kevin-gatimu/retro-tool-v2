@@ -43,12 +43,12 @@ import { authClient } from '@/lib/auth-client'
 import { usesConvexForRetros } from '@/lib/realtime-config'
 import { getRetroSocket } from '@/lib/socket'
 import { RetroListConvexSync } from './components/retro-list-convex-sync'
-import { SpaceSwitcher } from '@/components/spaces/SpaceSwitcher'
-import { ViewConfigToolbar } from '@/components/spaces/ViewConfigToolbar'
-import { GroupedSessionView } from '@/components/spaces/GroupedSessionView'
-import { LoadMoreFooter } from '@/components/spaces/LoadMoreFooter'
-import type { CompletedPage } from '@/components/spaces/useSessionList'
-import { useSessionList } from '@/components/spaces/useSessionList'
+import { SpaceSwitcher } from '@/components/spaces/space-switcher'
+import { ViewConfigToolbar } from '@/components/spaces/view-config-toolbar'
+import { GroupedSessionView } from '@/components/spaces/grouped-session-view'
+import { LoadMoreFooter } from '@/components/spaces/load-more-footer'
+import type { CompletedPage } from '@/components/spaces/use-session-list'
+import { useSessionList } from '@/components/spaces/use-session-list'
 import {
   SPACE_ALL,
   deriveSpaces,
@@ -56,7 +56,7 @@ import {
   retroStatusBucket,
   toggleFavorite,
 } from '@/components/spaces/utils'
-import { useSessionViewPreferences } from '@/hooks/useSessionViewPreferences'
+import { useSessionViewPreferences } from '@/hooks/use-session-view-preferences'
 
 const COMPLETED_PAGE_SIZE = 12
 const ONGOING_LIMIT = 100
@@ -121,7 +121,6 @@ function teamsQueryOptions() {
 
 export const Route = createFileRoute('/retros/')({
   component: RetrosPage,
-  pendingComponent: RetrosListSkeleton,
 })
 
 function RetrosPage() {
@@ -272,6 +271,17 @@ function RetrosPage() {
       </Link>
     </Card>
   )
+
+  // First load (nothing fetched yet) → structure-matching skeleton, so the
+  // empty-state ("No retrospectives match…") never flashes before data arrives.
+  if (isLoading && retros.length === 0) {
+    return (
+      <>
+        {usesConvexRealtime ? <RetroListConvexSync /> : null}
+        <RetrosListSkeleton />
+      </>
+    )
+  }
 
   return (
     <div className="space-y-6">

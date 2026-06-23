@@ -58,12 +58,12 @@ import {
   REPORTS_ENDPOINTS,
   TEAMS_ENDPOINTS,
 } from '@/lib/api-endpoints'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 import { cn } from '@/lib/utils'
 
 // Lazy load chart component
 const ActionItemsPieChart = lazy(() =>
-  import('@/components/ActionItemsPieChart').then((module) => ({
+  import('@/components/action-items-pie-chart').then((module) => ({
     default: module.ActionItemsPieChart,
   })),
 )
