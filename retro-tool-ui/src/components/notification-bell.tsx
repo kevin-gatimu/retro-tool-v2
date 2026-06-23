@@ -73,9 +73,9 @@ export function NotificationBell() {
         description: notification.message,
         action: notification.link
           ? {
-            label: 'View',
-            onClick: () => router.navigate({ to: notification.link! }),
-          }
+              label: 'View',
+              onClick: () => router.navigate({ to: notification.link! }),
+            }
           : undefined,
       })
       // Real-time membership update: when the current user is approved to a team,
