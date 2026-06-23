@@ -40,8 +40,7 @@
     "db:seed:users": "ts-node --transpile-only src/seed/seed-users.ts",
     "db:seed:large-org": "ts-node --transpile-only src/seed/seed-large-org.ts",
     "db:seed:staging": "pnpm build && node -r dotenv/config dist/seed/seed-retro-templates.js dotenv_config_path=.env.staging-local && node -r dotenv/config dist/seed/seed-estimate-templates.js dotenv_config_path=.env.staging-local && node -r dotenv/config dist/seed/seed-team-roles.js dotenv_config_path=.env.staging-local",
-    "db:seed:prod": "pnpm build && node -r dotenv/config dist/seed/seed-retro-templates.js dotenv_config_path=.env.production-local && node -r dotenv/config dist/seed/seed-estimate-templates.js dotenv_config_path=.env.production-local && node -r dotenv/config dist/seed/seed-team-roles.js dotenv_config_path=.env.production-local",
-    "prepare": "husky"
+    "db:seed:prod": "pnpm build && node -r dotenv/config dist/seed/seed-retro-templates.js dotenv_config_path=.env.production-local && node -r dotenv/config dist/seed/seed-estimate-templates.js dotenv_config_path=.env.production-local && node -r dotenv/config dist/seed/seed-team-roles.js dotenv_config_path=.env.production-local"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

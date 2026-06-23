@@ -15,8 +15,7 @@
     "lint": "eslint",
     "format": "prettier --check .",
     "check": "prettier --write . && eslint --fix",
-    "type-check": "tsc --noEmit",
-    "prepare": "husky"
+    "type-check": "tsc --noEmit"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
