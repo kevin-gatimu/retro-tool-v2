@@ -308,6 +308,7 @@ export class EstimatesService {
         team: {
           id: teamSchema.team.id,
           name: teamSchema.team.name,
+          emoji: teamSchema.team.emoji,
         },
       })
       .from(estimatesSchema.storyEstimateSession)
@@ -334,7 +335,11 @@ export class EstimatesService {
 
         return {
           ...row.session,
-          team: row.team ?? { id: row.session.teamId, name: 'Unknown Team' },
+          team: row.team ?? {
+            id: row.session.teamId,
+            name: 'Unknown Team',
+            emoji: null,
+          },
           participants,
         };
       }),
@@ -345,10 +350,14 @@ export class EstimatesService {
 
   async getActiveSessions(userId: string): Promise<SessionSummary[]> {
     const all = await this.getSessions(userId);
+    // "Active" = any non-completed (live) session. Revealed sessions are still
+    // in progress (awaiting consensus), so they belong here — without this they
+    // are invisible (neither active nor in completed history).
     return all.filter(
       (s) =>
         s.status === ESTIMATE_SESSION_STATUSES.Waiting ||
-        s.status === ESTIMATE_SESSION_STATUSES.Voting,
+        s.status === ESTIMATE_SESSION_STATUSES.Voting ||
+        s.status === ESTIMATE_SESSION_STATUSES.Revealed,
     );
   }
 
@@ -1134,6 +1143,7 @@ export class EstimatesService {
       name: string;
       teamId: string;
       teamName: string | null;
+      teamEmoji: string | null;
       orgId: string | null;
       orgName: string | null;
       currentStory: string | null;
@@ -1258,6 +1268,7 @@ export class EstimatesService {
         name: estimatesSchema.storyEstimateSession.name,
         teamId: estimatesSchema.storyEstimateSession.teamId,
         teamName: teamSchema.team.name,
+        teamEmoji: teamSchema.team.emoji,
         orgId: teamSchema.team.organizationId,
         orgName: orgSchema.organization.name,
         currentStory: estimatesSchema.storyEstimateSession.currentStory,

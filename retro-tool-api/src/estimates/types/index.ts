@@ -1,7 +1,7 @@
 import type { StoryEstimateSession } from '../schema';
 
 export type SessionSummary = StoryEstimateSession & {
-  team: { id: string; name: string };
+  team: { id: string; name: string; emoji: string | null };
   participants: { userId: string; isOnline: boolean }[];
 };
 

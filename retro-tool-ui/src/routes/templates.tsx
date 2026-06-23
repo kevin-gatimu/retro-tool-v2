@@ -10,11 +10,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  FileText,
-  Layers,
+  History,
   Plus,
   RefreshCw,
   Search,
+  Spade,
   Trash2,
   X,
 } from 'lucide-react'
@@ -247,11 +247,11 @@ function TemplatesPage() {
       <Tabs defaultValue="retro">
         <TabsList>
           <TabsTrigger value="retro">
-            <FileText className="h-4 w-4 mr-2" />
+            <History className="h-4 w-4 mr-2" />
             Retro Templates
           </TabsTrigger>
           <TabsTrigger value="estimate">
-            <Layers className="h-4 w-4 mr-2" />
+            <Spade className="h-4 w-4 mr-2" />
             Story Estimate Templates
           </TabsTrigger>
         </TabsList>
@@ -427,7 +427,7 @@ function RetroTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
       {isEmpty ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
+            <History className="mb-4 h-12 w-12 text-muted-foreground" />
             <CardTitle className="mb-2">No templates available</CardTitle>
             <CardDescription className="text-center">
               Templates will appear here once they are created.
@@ -476,7 +476,7 @@ function RetroTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
           {builtInTotal > 0 && (
             <section className="space-y-4">
               <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-muted-foreground" />
+                <History className="h-5 w-5 text-muted-foreground" />
                 <h2 className="text-lg font-semibold">Global Templates</h2>
                 <Badge variant="secondary">{builtInTotal}</Badge>
               </div>
@@ -831,7 +831,7 @@ function EstimateTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
       {isEmpty ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Layers className="mb-4 h-12 w-12 text-muted-foreground" />
+            <Spade className="mb-4 h-12 w-12 text-muted-foreground" />
             <CardTitle className="mb-2">
               No estimate templates available
             </CardTitle>
@@ -883,7 +883,7 @@ function EstimateTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
           {builtInTotal > 0 && (
             <section className="space-y-4">
               <div className="flex items-center gap-2">
-                <Layers className="h-5 w-5 text-muted-foreground" />
+                <Spade className="h-5 w-5 text-muted-foreground" />
                 <h2 className="text-lg font-semibold">Global Templates</h2>
                 <Badge variant="secondary">{builtInTotal}</Badge>
               </div>

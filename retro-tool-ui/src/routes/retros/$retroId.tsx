@@ -112,7 +112,7 @@ function RetroAccessError({ error }: { error: Error }) {
   const navigate = useNavigate()
   useEffect(() => {
     toast.error(error.message)
-    void navigate({ to: '/retros', search: { page: 1, limit: 6 } })
+    void navigate({ to: '/retros' })
   }, [error, navigate])
   return null
 }
@@ -1046,7 +1046,7 @@ function RetroDetailPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['retros'] })
       toast.success('Retrospective deleted')
-      void navigate({ to: '/retros', search: { page: 1, limit: 6 } })
+      void navigate({ to: '/retros' })
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to delete retro'),
   })
@@ -1423,11 +1423,7 @@ function RetroDetailPage() {
         <p className="text-muted-foreground">
           This retrospective does not exist or you do not have access.
         </p>
-        <Button
-          onClick={() =>
-            navigate({ to: '/retros', search: { page: 1, limit: 6 } })
-          }
-        >
+        <Button onClick={() => navigate({ to: '/retros' })}>
           Back to Retrospectives
         </Button>
       </div>

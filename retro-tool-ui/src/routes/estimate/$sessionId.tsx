@@ -875,16 +875,58 @@ function EstimateSessionPage() {
           <EstimateConvexSync sessionId={sessionId} />
         ) : null}
         <div className="space-y-6">
-          <div className="h-12 animate-pulse rounded-lg bg-muted" />
-          <div className="h-24 animate-pulse rounded-lg bg-muted" />
-          <div className="flex flex-wrap gap-3">
-            {[...Array(13)].map((_, i) => (
-              <div
-                key={i}
-                className="h-20 w-14 animate-pulse rounded-lg bg-muted"
-              />
-            ))}
+          {/* Header: back button + title/subtitle on the left, status on the right */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="h-9 w-9 shrink-0 animate-pulse rounded-md bg-muted" />
+              <div className="space-y-2">
+                <div className="h-7 w-56 animate-pulse rounded-md bg-muted" />
+                <div className="h-4 w-40 animate-pulse rounded-md bg-muted" />
+              </div>
+            </div>
+            <div className="h-6 w-32 animate-pulse rounded-full bg-muted" />
           </div>
+
+          {/* Current Story card */}
+          <Card>
+            <CardHeader className="py-3 px-3">
+              <div className="h-4 w-28 animate-pulse rounded-md bg-muted" />
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-0 space-y-2">
+              <div className="h-5 w-2/3 animate-pulse rounded-md bg-muted" />
+              <div className="h-4 w-1/2 animate-pulse rounded-md bg-muted" />
+            </CardContent>
+          </Card>
+
+          {/* Select your estimate — heading + point cards */}
+          <div className="space-y-3">
+            <div className="h-4 w-36 animate-pulse rounded-md bg-muted" />
+            <div className="flex flex-wrap items-end gap-3 sm:gap-4">
+              {[...Array(13)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-16 w-12 sm:h-20 sm:w-14 animate-pulse rounded-lg bg-muted"
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Participants & Votes card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="h-5 w-48 animate-pulse rounded-md bg-muted" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-20 w-24 animate-pulse rounded-lg bg-muted"
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </>
     )

@@ -203,11 +203,17 @@ export class RetrosController {
     @Session() session: SessionUser,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('teamId') teamId?: string,
   ) {
+    const normalizedStatus =
+      status === 'ongoing' || status === 'completed' ? status : undefined;
     return this.retrosService.getRecentRetros(
       session.user.id,
       page ? Math.max(1, parseInt(page, 10)) : 1,
       limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 12,
+      normalizedStatus,
+      teamId,
     );
   }
 

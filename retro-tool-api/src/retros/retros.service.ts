@@ -13,6 +13,7 @@ import { Config } from '../config/configuration';
 import { EmailService } from '../email/email.service';
 import {
   eq,
+  ne,
   and,
   asc,
   desc,
@@ -648,6 +649,8 @@ export class RetrosService {
     userId: string,
     page = 1,
     limit = 12,
+    status?: 'ongoing' | 'completed',
+    teamId?: string,
   ): Promise<{
     retros: {
       id: string;
@@ -672,7 +675,7 @@ export class RetrosService {
 
     if (!fullUser) throw new NotFoundException('User not found');
 
-    let teamFilter: ReturnType<typeof inArray> | undefined = undefined;
+    const conditions: SQL[] = [];
 
     if (
       fullUser.role !== USER_ROLES.SuperAdmin &&
@@ -685,13 +688,29 @@ export class RetrosService {
 
       const teamIds = memberships.map((m) => m.teamId);
       if (teamIds.length === 0) return { retros: [], total: 0, page, limit };
-      teamFilter = inArray(retroSchema.retrospective.teamId, teamIds);
+      conditions.push(inArray(retroSchema.retrospective.teamId, teamIds));
     }
+
+    if (teamId) {
+      conditions.push(eq(retroSchema.retrospective.teamId, teamId));
+    }
+
+    // 'completed' = the completed status; 'ongoing' = everything else (draft,
+    // waiting, active, grouping, voting, discussing). Using ne() keeps "ongoing"
+    // robust if new in-progress statuses are added. Undefined = no status filter
+    // (preserves the dashboard's mixed-list behavior).
+    if (status === 'completed') {
+      conditions.push(eq(retroSchema.retrospective.status, 'completed'));
+    } else if (status === 'ongoing') {
+      conditions.push(ne(retroSchema.retrospective.status, 'completed'));
+    }
+
+    const whereClause = conditions.length ? and(...conditions) : undefined;
 
     const [totalRow] = await this.database
       .select({ total: count() })
       .from(retroSchema.retrospective)
-      .where(teamFilter);
+      .where(whereClause);
 
     const retros = await this.database
       .select({
@@ -714,7 +733,7 @@ export class RetrosService {
         retroSchema.template,
         eq(retroSchema.retrospective.templateId, retroSchema.template.id),
       )
-      .where(teamFilter)
+      .where(whereClause)
       .orderBy(desc(retroSchema.retrospective.createdAt))
       .limit(limit)
       .offset((page - 1) * limit);

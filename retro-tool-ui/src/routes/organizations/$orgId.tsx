@@ -79,6 +79,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { FilterPills } from '@/components/ui/filter-pills'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -852,20 +853,23 @@ function OrganizationDetailPage() {
               <h2 className="text-xl font-semibold">
                 Members ({filteredOrgMembers.length})
               </h2>
-              <Select
+              <FilterPills
+                ariaLabel="Filter members"
                 value={memberFilter}
-                onValueChange={(v) =>
-                  setMemberFilter(v as 'all' | 'unassigned')
-                }
-              >
-                <SelectTrigger className="h-8 w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All members</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(v) => setMemberFilter(v)}
+                options={[
+                  {
+                    value: 'all',
+                    label: 'All members',
+                    description: 'Everyone in this organization',
+                  },
+                  {
+                    value: 'unassigned',
+                    label: 'Unassigned',
+                    description: 'Members not assigned to any team',
+                  },
+                ]}
+              />
             </div>
             <div className="flex items-center gap-2">
               {isAdmin && (

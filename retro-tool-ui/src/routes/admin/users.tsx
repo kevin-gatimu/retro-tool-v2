@@ -67,6 +67,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { FilterPills } from '@/components/ui/filter-pills'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { AdminUsersSkeleton } from '@/components/skeletons'
@@ -444,23 +445,32 @@ function AdminUsersPage() {
                     className="pl-9 h-8"
                   />
                 </div>
-                <Select
+                <FilterPills
+                  ariaLabel="Filter users by membership"
                   value={membershipFilter}
-                  onValueChange={(v) => {
+                  onChange={(v) => {
                     setMembershipFilter(v)
                     setPage(1)
                     setRowSelection({})
                   }}
-                >
-                  <SelectTrigger className="h-8 w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All users</SelectItem>
-                    <SelectItem value="no-org">No organization</SelectItem>
-                    <SelectItem value="no-team">No team</SelectItem>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    {
+                      value: 'all',
+                      label: 'All users',
+                      description: 'Every registered user',
+                    },
+                    {
+                      value: 'no-org',
+                      label: 'No organization',
+                      description: 'Users not in any organization',
+                    },
+                    {
+                      value: 'no-team',
+                      label: 'No team',
+                      description: 'Users not assigned to any team',
+                    },
+                  ]}
+                />
               </div>
               <DataTable
                 columns={columns}

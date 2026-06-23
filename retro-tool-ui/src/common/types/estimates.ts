@@ -146,6 +146,7 @@ export interface EstimateSession {
   team: {
     id: string
     name: string
+    emoji?: string | null
   }
   createdBy: {
     id: string
