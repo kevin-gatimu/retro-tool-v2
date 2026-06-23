@@ -35,7 +35,6 @@ import type {
 } from '@/components/tables/member-columns'
 import { getTeamInvitationColumns } from '@/components/tables/invitation-columns'
 import type { TeamInvitationRow } from '@/components/tables/invitation-columns'
-import { Skeleton } from '@/components/ui/skeleton'
 import { UserAvatar } from '@/components/UserAvatar'
 import { getTeamRoleBadge } from '@/components/UserRoleBadges'
 import {
@@ -88,58 +87,7 @@ import {
 import type { TeamDetail, TeamMember } from '@/common/types/teams'
 import type { Organization } from '@/common/types/organizations'
 import type { User } from '@/common/types/users'
-
-function TeamDetailSkeleton() {
-  return (
-    <div className="container py-8 space-y-8">
-      <Skeleton className="h-5 w-40" />
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-16 w-16 rounded-xl" />
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-5 w-16 rounded-full" />
-            </div>
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-10 w-32" />
-          <Skeleton className="h-10 w-10" />
-        </div>
-      </div>
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-6 w-32" />
-        <Skeleton className="h-10 w-32" />
-      </div>
-      <div className="border rounded-lg">
-        <div className="flex items-center gap-4 p-4 border-b bg-muted/50">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-20" />
-        </div>
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex items-center gap-4 p-4 border-b last:border-0"
-          >
-            <div className="flex items-center gap-3 flex-1">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-48" />
-              </div>
-            </div>
-            <Skeleton className="h-5 w-16 rounded-full" />
-            <Skeleton className="h-8 w-8" />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+import { TeamDetailSkeleton } from './skeleton'
 
 export const Route = createFileRoute('/teams/$teamId')({
   loader: ({ context: { queryClient }, params: { teamId } }) =>

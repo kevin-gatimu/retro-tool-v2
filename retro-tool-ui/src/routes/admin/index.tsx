@@ -23,7 +23,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { AdminDashboardSkeleton } from '@/components/skeletons'
+import { AdminDashboardSkeleton } from './skeleton'
 import { api } from '@/lib/api'
 import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
 

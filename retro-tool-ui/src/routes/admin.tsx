@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { isSystemAdmin } from '@/lib/rbac'
 import { AdminNav } from './admin/helpers'
-import { Skeleton } from '@/components/ui/skeleton'
+import { AdminShellSkeleton } from './admin/skeleton'
 
 export const Route = createFileRoute('/admin')({
   component: AdminLayout,
@@ -45,60 +45,7 @@ function AdminLayout() {
       </div>
 
       {showSkeleton ? (
-        <>
-          {/* Skeleton nav — same height/layout as the real AdminNav */}
-          <div className="flex flex-wrap items-center gap-1 border-b pb-2 mb-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-8 w-20 rounded-md" />
-            ))}
-          </div>
-          {/* Generic content skeleton */}
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-4 w-72" />
-            </div>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="border rounded-lg px-3 py-2.5">
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <Skeleton className="h-3 w-20" />
-                      <Skeleton className="h-6 w-6 rounded-md" />
-                    </div>
-                    <Skeleton className="h-7 w-12" />
-                    <Skeleton className="h-3 w-28" />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="border rounded-lg p-6 space-y-3">
-                <Skeleton className="h-6 w-32" />
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-              <div className="border rounded-lg p-6 space-y-3">
-                <Skeleton className="h-6 w-36" />
-                <Skeleton className="h-4 w-40" />
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <Skeleton
-                      key={i}
-                      className="h-8 w-8 rounded-full shrink-0"
-                    />
-                    <div className="space-y-1">
-                      <Skeleton className="h-4 w-48" />
-                      <Skeleton className="h-3 w-32" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </>
+        <AdminShellSkeleton />
       ) : (
         <>
           <AdminNav />

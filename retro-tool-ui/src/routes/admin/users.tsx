@@ -70,7 +70,7 @@ import { Separator } from '@/components/ui/separator'
 import { FilterPills } from '@/components/ui/filter-pills'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { AdminUsersSkeleton } from '@/components/skeletons'
+import { AdminUsersSkeleton } from './skeleton'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { api } from '@/lib/api'
 import {

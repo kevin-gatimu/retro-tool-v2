@@ -53,6 +53,7 @@ import {
   toggleFavorite,
 } from '@/components/spaces/utils'
 import { useSessionViewPreferences } from '@/hooks/useSessionViewPreferences'
+import { EstimateListSkeleton } from './skeleton'
 
 const COMPLETED_PAGE_SIZE = 12
 
@@ -184,6 +185,7 @@ function EstimateIndexPage() {
     completedTotal,
     completedLoaded,
     hasMore,
+    isLoading,
     isFetching,
     isFetchingNextPage,
     loadMore,
@@ -207,6 +209,16 @@ function EstimateIndexPage() {
     ) : (
       <SessionHistoryCard item={item} />
     )
+
+  // First load (nothing fetched yet) → structure-matching skeleton.
+  if (isLoading && items.length === 0) {
+    return (
+      <>
+        {usesConvexRealtime ? <EstimateListConvexSync /> : null}
+        <EstimateListSkeleton />
+      </>
+    )
+  }
 
   return (
     <div className="space-y-6">

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { AdminTemplatesSkeleton } from '@/components/skeletons'
+import { AdminTemplatesSkeleton } from './skeleton'
 import {
   TShirtIcon,
   getShirtScale,

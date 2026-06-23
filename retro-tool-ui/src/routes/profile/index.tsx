@@ -25,7 +25,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { api } from '@/lib/api'
 import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
@@ -33,60 +32,7 @@ import { authClient, signOutWithCleanup } from '@/lib/auth-client'
 import { useUpdateProfile } from './hooks/useUpdateProfile'
 import type { UserData } from './types'
 import { getInitials } from './helpers'
-
-function ProfileSkeleton() {
-  return (
-    <div className="max-w-2xl mx-auto space-y-8">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-4 w-96" />
-      </div>
-      <div className="bg-card rounded-xl border p-6 space-y-4">
-        <Skeleton className="h-6 w-32" />
-        <div className="flex items-center gap-6">
-          <Skeleton className="h-24 w-24 rounded-full" />
-          <div className="space-y-2">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-4 w-40" />
-            <div className="flex gap-2 pt-2">
-              <Skeleton className="h-8 w-28" />
-              <Skeleton className="h-8 w-24" />
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="bg-card rounded-xl border p-6 space-y-6">
-        <Skeleton className="h-6 w-48" />
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </div>
-        <div className="pt-4 border-t">
-          <Skeleton className="h-4 w-32" />
-          <div className="grid grid-cols-2 gap-4 mt-3">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </div>
-        </div>
-        <div className="flex justify-end pt-4 border-t">
-          <Skeleton className="h-10 w-32" />
-        </div>
-      </div>
-      <div className="bg-card rounded-xl border border-destructive/20 p-6 space-y-4">
-        <Skeleton className="h-6 w-32" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-10 w-32" />
-      </div>
-    </div>
-  )
-}
+import { ProfileSkeleton } from './skeleton'
 
 export const Route = createFileRoute('/profile/')({
   pendingComponent: ProfileSkeleton,

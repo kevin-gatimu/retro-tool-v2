@@ -87,6 +87,7 @@ import { usesConvexForRetros } from '@/lib/realtime-config'
 import { RetroConvexSync } from './components/retro-convex-sync'
 import { RetroDiscussionView } from './components/retro-discussion-view'
 import type { CarriedForwardItem } from './types'
+import { RetroDetailSkeleton } from './skeleton'
 
 const startTypingMutationRef =
   'liveRetros:startTyping' as unknown as FunctionReference<'mutation'>
@@ -125,6 +126,7 @@ export const Route = createFileRoute('/retros/$retroId')({
       staleTime: 5_000,
     }),
   errorComponent: RetroAccessError,
+  pendingComponent: RetroDetailSkeleton,
   component: RetroDetailPage,
 })
 

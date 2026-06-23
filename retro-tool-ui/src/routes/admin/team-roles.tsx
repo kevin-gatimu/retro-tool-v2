@@ -19,7 +19,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,6 +42,7 @@ import { Switch } from '@/components/ui/switch'
 import { api } from '@/lib/api'
 import { TEAM_ROLES_ENDPOINTS } from '@/lib/api-endpoints'
 import { useAdminTeamRoleMutations } from './hooks/useAdminTeamRoleMutations'
+import { AdminTeamRolesSkeleton } from './skeleton'
 
 interface TeamRole {
   id: string
@@ -52,34 +52,6 @@ interface TeamRole {
   sortOrder: number
   createdAt: string
   updatedAt: string
-}
-
-function AdminTeamRolesSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-32" />
-          <Skeleton className="h-4 w-64" />
-        </div>
-        <Skeleton className="h-10 w-36" />
-      </div>
-      <div className="border rounded-lg divide-y">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="flex items-center justify-between p-4">
-            <div className="space-y-1">
-              <Skeleton className="h-5 w-32" />
-              <Skeleton className="h-4 w-20" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-8 w-8" />
-              <Skeleton className="h-8 w-8" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 export const Route = createFileRoute('/admin/team-roles')({

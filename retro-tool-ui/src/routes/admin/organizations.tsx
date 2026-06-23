@@ -18,7 +18,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { OrganizationsListSkeleton } from '@/components/skeletons'
+import { OrganizationsListSkeleton } from './skeleton'
 import { Button } from '@/components/ui/button'
 import {
   Card,

@@ -32,7 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import {
   ESTIMATE_TEMPLATES_ENDPOINTS,
@@ -45,6 +44,7 @@ import type {
   PaginatedEstimateTemplatesResponse,
 } from '@/common/types/estimates'
 import { cn } from '@/lib/utils'
+import { NewEstimateSkeleton } from './skeleton'
 
 const DEFAULT_TEMPLATE_PAGE_SIZE = 6
 
@@ -72,53 +72,6 @@ const estimateNewTeamsQueryOptions = {
   queryKey: ['teams'] as const,
   queryFn: () => api.get<{ teams: Team[] }>(TEAMS_ENDPOINTS.LIST),
   staleTime: 30_000,
-}
-
-function NewEstimateSkeleton() {
-  return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Skeleton className="h-10 w-10" />
-        <div className="space-y-2">
-          <Skeleton className="h-9 w-48" />
-          <Skeleton className="h-5 w-72" />
-        </div>
-      </div>
-      <div className="flex items-center justify-between">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="flex items-center">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-4 w-16 ml-2" />
-            {i < 3 && <Skeleton className="h-0.5 w-16 mx-4" />}
-          </div>
-        ))}
-      </div>
-      <div className="min-h-100 space-y-4">
-        <Skeleton className="h-7 w-40" />
-        <Skeleton className="h-5 w-96" />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="border rounded-lg p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-6 w-32" />
-                <Skeleton className="h-5 w-16 rounded-full" />
-              </div>
-              <Skeleton className="h-4 w-full" />
-              <div className="flex flex-wrap gap-2">
-                {Array.from({ length: 4 }).map((__, j) => (
-                  <Skeleton key={j} className="h-6 w-10 rounded-full" />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="flex justify-between pt-4">
-        <Skeleton className="h-10 w-24" />
-        <Skeleton className="h-10 w-24" />
-      </div>
-    </div>
-  )
 }
 
 export const Route = createFileRoute('/estimate/new')({

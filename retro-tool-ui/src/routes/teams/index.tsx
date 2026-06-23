@@ -33,10 +33,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { Team } from '@/common/types/teams'
+import { UserTeamsSkeleton } from './skeleton'
 
 type PaginatedTeamsResponse = {
   teams: Team[]
@@ -65,40 +65,6 @@ function fetchTeams(page: number, limit: number, search: string) {
 
   return api.get<PaginatedTeamsResponse>(
     `${TEAMS_ENDPOINTS.LIST}?${params.toString()}`,
-  )
-}
-
-function UserTeamsSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-9 w-24" />
-          <Skeleton className="h-5 w-64" />
-        </div>
-        <Skeleton className="h-10 w-32" />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="border rounded-lg p-6 space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 rounded-lg" />
-                <div className="space-y-2">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              </div>
-              <Skeleton className="h-5 w-16 rounded-full" />
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <Skeleton className="h-4 w-4" />
-              <Skeleton className="h-4 w-28" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
   )
 }
 
