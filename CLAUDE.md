@@ -353,6 +353,7 @@ GitHub Actions handle app deployment (not infra):
 | Document | What it covers |
 |---|---|
 | [docs/RBAC.md](docs/RBAC.md) | Full permission matrices for system, org, team, and retro actions; helper function signatures; user status lifecycle |
+| [docs/api-security.md](docs/api-security.md) | API hardening: Helmet, rate limiting (throttler + Better Auth), CORS, and the CSRF posture / residual risk |
 | [docs/file-naming-conventions.md](docs/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
 | [docs/app-flows.md](docs/app-flows.md) | Step-by-step flows: auth, user approval, org/team management, retro phases, estimates, notifications |
 | [docs/infrastructure.md](docs/infrastructure.md) | Azure infrastructure overview |

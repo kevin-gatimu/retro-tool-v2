@@ -32,6 +32,17 @@ export const INVITATIONS_ENDPOINTS = {
 } as const
 
 // ---------------------------------------------------------------------------
+// Email OTP (server-driven; proxies to Better Auth's emailOTP plugin)
+// ---------------------------------------------------------------------------
+export const OTP_ENDPOINTS = {
+  SEND: '/api/otp/send',
+  SIGN_IN: '/api/otp/sign-in',
+  VERIFY_EMAIL: '/api/otp/verify-email',
+  RESET_PASSWORD_SEND: '/api/otp/reset-password/send',
+  RESET_PASSWORD: '/api/otp/reset-password',
+} as const
+
+// ---------------------------------------------------------------------------
 // Organizations
 // ---------------------------------------------------------------------------
 export const ORGANIZATIONS_ENDPOINTS = {

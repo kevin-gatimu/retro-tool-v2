@@ -5,26 +5,88 @@ import {
   testCookiesWorking,
   clearBearerToken,
   getBearerToken,
+  storeBearerToken,
   detectPrivateWindow,
 } from '@/lib/auth-client'
 import { api } from '@/lib/api'
-import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
+import { USERS_ENDPOINTS, OTP_ENDPOINTS } from '@/lib/api-endpoints'
+import { env } from '#/env'
 import { toast } from 'sonner'
 import type { User } from '@/common/types/users'
 
-export function useSignIn({
-  onPendingApproval,
-  onRejected,
-  onSuspended,
-  redirect,
-}: {
+type SignInOutcome = 'pending' | 'rejected' | 'suspended' | 'success'
+
+interface SignInCallbacks {
   onPendingApproval: () => void
   onRejected: () => void
   onSuspended: () => void
   redirect?: string
-}) {
+}
+
+/**
+ * After a session is established (by any method), detect the cookie/bearer
+ * situation and resolve the user's account status. Shared by password and
+ * OTP sign-in so both behave identically.
+ */
+async function resolveSignInOutcome(): Promise<SignInOutcome> {
+  // Wait a tick for cookies to be set, then decide cookie vs bearer fallback.
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  const cookiesWorking = testCookiesWorking()
+  const hasBearerToken = !!getBearerToken()
+
+  if (!cookiesWorking && hasBearerToken) {
+    const isPrivateWindow = await detectPrivateWindow()
+    if (isPrivateWindow) {
+      toast.info(
+        'Private browsing detected. Session will not persist after closing this window.',
+        { duration: 5000 },
+      )
+    }
+  } else if (cookiesWorking) {
+    clearBearerToken()
+  }
+
+  const user = await api.get<User>(USERS_ENDPOINTS.ME)
+
+  if (
+    user.status === 'pending' ||
+    user.status === 'rejected' ||
+    user.status === 'suspended'
+  ) {
+    await authClient.signOut()
+    clearBearerToken()
+    return user.status
+  }
+
+  return 'success'
+}
+
+function useSignInSuccessHandler({
+  onPendingApproval,
+  onRejected,
+  onSuspended,
+  redirect,
+}: SignInCallbacks) {
   const navigate = useNavigate()
   const router = useRouter()
+
+  return async (outcome: SignInOutcome) => {
+    if (outcome === 'pending') return onPendingApproval()
+    if (outcome === 'rejected') return onRejected()
+    if (outcome === 'suspended') return onSuspended()
+    await router.invalidate()
+    if (redirect) {
+      window.location.href = redirect
+    } else {
+      navigate({ to: '/dashboard' })
+    }
+  }
+}
+
+/** Password sign-in. */
+export function useSignIn(callbacks: SignInCallbacks) {
+  const handleSuccess = useSignInSuccessHandler(callbacks)
 
   return useMutation({
     mutationFn: async ({
@@ -37,70 +99,47 @@ export function useSignIn({
       const result = await authClient.signIn.email({ email, password })
       if (result.error)
         throw new Error(result.error.message ?? 'Sign in failed')
+      return resolveSignInOutcome()
+    },
+    onSuccess: handleSuccess,
+  })
+}
 
-      // Check if cookies are working after sign-in
-      // Wait a tick for cookies to be set
-      await new Promise((resolve) => setTimeout(resolve, 100))
+/** Send a passwordless sign-in OTP (server-driven). */
+export function useSendSignInOtp() {
+  return useMutation({
+    mutationFn: async (email: string) => {
+      await api.post(OTP_ENDPOINTS.SEND, { email, type: 'sign-in' })
+    },
+  })
+}
 
-      const cookiesWorking = testCookiesWorking()
-      const hasBearerToken = !!getBearerToken()
+/** Passwordless sign-in: verify the OTP, then run the shared status flow. */
+export function useSignInOtp(callbacks: SignInCallbacks) {
+  const handleSuccess = useSignInSuccessHandler(callbacks)
 
-      if (!cookiesWorking && hasBearerToken) {
-        // Private window detected - using bearer token fallback
-        // Only show toast if we can confirm this is actually a private/incognito window
-        const isPrivateWindow = await detectPrivateWindow()
-        if (isPrivateWindow) {
-          toast.info(
-            'Private browsing detected. Session will not persist after closing this window.',
-            { duration: 5000 },
-          )
+  return useMutation({
+    mutationFn: async ({ email, otp }: { email: string; otp: string }) => {
+      // Our /api/otp/sign-in proxies to Better Auth and propagates the session
+      // cookie + set-auth-token header. Use a direct fetch so we can capture the
+      // bearer token for the private-window fallback (the shared `api` helper
+      // discards response headers), then run the shared status resolver.
+      const res = await fetch(`${env.VITE_API_URL}${OTP_ENDPOINTS.SIGN_IN}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, otp }),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          message?: string
         }
-      } else if (cookiesWorking) {
-        // Cookies work, no need for bearer token fallback
-        clearBearerToken()
+        throw new Error(body.message || 'Sign in failed')
       }
-
-      const user = await api.get<User>(USERS_ENDPOINTS.ME)
-
-      if (user.status === 'pending') {
-        await authClient.signOut()
-        clearBearerToken()
-        return { outcome: 'pending' } as const
-      }
-
-      if (user.status === 'rejected') {
-        await authClient.signOut()
-        clearBearerToken()
-        return { outcome: 'rejected' } as const
-      }
-
-      if (user.status === 'suspended') {
-        await authClient.signOut()
-        clearBearerToken()
-        return { outcome: 'suspended' } as const
-      }
-
-      return { outcome: 'success' } as const
+      const authToken = res.headers.get('set-auth-token')
+      if (authToken) storeBearerToken(authToken)
+      return resolveSignInOutcome()
     },
-    onSuccess: async (data) => {
-      if (data.outcome === 'pending') {
-        onPendingApproval()
-        return
-      }
-      if (data.outcome === 'rejected') {
-        onRejected()
-        return
-      }
-      if (data.outcome === 'suspended') {
-        onSuspended()
-        return
-      }
-      await router.invalidate()
-      if (redirect) {
-        window.location.href = redirect
-      } else {
-        navigate({ to: '/dashboard' })
-      }
-    },
+    onSuccess: handleSuccess,
   })
 }

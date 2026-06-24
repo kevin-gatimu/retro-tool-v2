@@ -1,23 +1,21 @@
 import { useMutation } from '@tanstack/react-query'
-import { authClient } from '@/lib/auth-client'
+import { api } from '@/lib/api'
+import { OTP_ENDPOINTS } from '@/lib/api-endpoints'
 
+/**
+ * Sends a password-reset OTP via our server-driven endpoint. On success the
+ * caller routes the user to the reset-password screen carrying the email, where
+ * they enter the code + a new password.
+ */
 export function useForgotPassword({
   onSuccess,
 }: {
-  onSuccess: (message: string) => void
+  onSuccess: (email: string) => void
 }) {
   return useMutation({
     mutationFn: async (email: string) => {
-      const { data, error } = await authClient.requestPasswordReset({
-        email,
-        redirectTo: `${window.location.origin}/auth/reset-password`,
-      })
-      if (error)
-        throw new Error(error.message ?? 'Failed to request password reset')
-      return (
-        data.message ||
-        'If this email exists in our system, check your email for the reset link'
-      )
+      await api.post(OTP_ENDPOINTS.RESET_PASSWORD_SEND, { email })
+      return email
     },
     onSuccess,
   })

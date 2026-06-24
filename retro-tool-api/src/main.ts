@@ -3,12 +3,61 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import type { Express } from 'express';
 import { Config } from './config/configuration';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { SocketIoAdapter } from './adapters/socket-io.adapter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+
+  // Trust the reverse proxy (Azure App Service = one hop) so Express populates
+  // req.ips from X-Forwarded-For. The throttler's proxy-aware tracker and
+  // Better Auth's forwarded-IP handling both depend on this; without it req.ips
+  // is empty and per-IP limits silently key off the proxy's socket address.
+  const expressInstance = app.getHttpAdapter().getInstance() as Express;
+  expressInstance.set('trust proxy', 1);
+
+  // Better Auth reads the client IP only from the configured forwarded headers
+  // (x-forwarded-for, …). Direct/non-proxied requests (local dev) have none, so
+  // the session's ipAddress would be null. Backfill x-forwarded-for from the
+  // resolved socket IP when no forwarded header is present — this never
+  // overrides a real proxy header, so production behavior is unchanged.
+  app.use(
+    (
+      req: {
+        headers: Record<string, string | string[] | undefined>;
+        ip?: string;
+      },
+      _res: unknown,
+      next: () => void,
+    ) => {
+      if (!req.headers['x-forwarded-for'] && req.ip) {
+        req.headers['x-forwarded-for'] = req.ip;
+      }
+      next();
+    },
+  );
+
+  // Security response headers (must run before other middleware so it covers
+  // every response). CSP is relaxed enough for Swagger UI's inline assets.
+  app.use(
+    helmet({
+      // Swagger UI ships inline scripts/styles and data-URI images.
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: [`'self'`],
+          scriptSrc: [`'self'`, `'unsafe-inline'`],
+          styleSrc: [`'self'`, `'unsafe-inline'`],
+          imgSrc: [`'self'`, 'data:', 'https:'],
+          connectSrc: [`'self'`],
+        },
+      },
+      // Avoid blocking cross-origin asset/resource loads (Swagger, etc.).
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
 
   // Get configuration service first so CORS can use it immediately
   const configService = app.get(ConfigService<Config>);
@@ -37,7 +86,19 @@ async function bootstrap() {
 
   // Configure CORS FIRST — before any middleware or module handlers,
   // so preflight OPTIONS requests are handled before better-auth intercepts them
-  const allowedOrigins = configService.get('allowedOrigins', { infer: true });
+  const nodeEnv = configService.get('nodeEnv', { infer: true });
+  const allowedOrigins = (
+    configService.get('allowedOrigins', { infer: true }) ?? []
+  ).filter((origin): origin is string => Boolean(origin));
+
+  // Fail fast in production rather than booting with an empty/undefined origin
+  // list (which would silently block the UI or, worse, allow nothing safely).
+  if (nodeEnv === 'production' && allowedOrigins.length === 0) {
+    throw new Error(
+      'No CORS origins resolved in production. Set ALLOWED_ORIGINS (or FRONTEND_URL).',
+    );
+  }
+
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,

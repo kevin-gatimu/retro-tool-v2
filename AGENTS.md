@@ -264,6 +264,7 @@ pnpm --dir retro-tool-api db:seed
 | Document | What it covers |
 |---|---|
 | [docs/RBAC.md](docs/RBAC.md) | Full permission matrices, helper functions, user status lifecycle |
+| [docs/api-security.md](docs/api-security.md) | API hardening: Helmet, rate limiting, CORS, CSRF posture/residual risk |
 | [docs/file-naming-conventions.md](docs/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
 | [docs/app-flows.md](docs/app-flows.md) | Every major user-facing flow end-to-end |
 | [docs/deployment-guide.md](docs/deployment-guide.md) | Azure deployment step-by-step |

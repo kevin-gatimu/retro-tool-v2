@@ -7,6 +7,8 @@ import { DatabaseModule } from '../database/database.module';
 import { createAuth } from './auth.config';
 import { AuthController } from './auth.controller';
 import { SignupCleanupMiddleware } from './auth-signup.middleware';
+import { OtpController } from './otp/otp.controller';
+import { OtpService } from './otp/otp.service';
 
 @Module({
   imports: [
@@ -18,7 +20,8 @@ import { SignupCleanupMiddleware } from './auth-signup.middleware';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, OtpController],
+  providers: [OtpService],
   exports: [BetterAuthModule],
 })
 export class AuthModule implements NestModule {
