@@ -105,6 +105,27 @@ export function useSignIn(callbacks: SignInCallbacks) {
   })
 }
 
+/**
+ * Passwordless sign-in with a passkey (WebAuthn). The browser ceremony runs via
+ * the client plugin; on success we run the same status/navigation flow as
+ * password sign-in. `authClient.signIn.passkey()` establishes the session
+ * (cookie + set-auth-token captured by the auth-client onSuccess hook), so we
+ * only need to resolve the account-status outcome afterward.
+ */
+export function useSignInPasskey(callbacks: SignInCallbacks) {
+  const handleSuccess = useSignInSuccessHandler(callbacks)
+
+  return useMutation({
+    mutationFn: async () => {
+      const result = await authClient.signIn.passkey()
+      if (result.error)
+        throw new Error(result.error.message ?? 'Passkey sign in failed')
+      return resolveSignInOutcome()
+    },
+    onSuccess: handleSuccess,
+  })
+}
+
 /** Send a passwordless sign-in OTP (server-driven). */
 export function useSendSignInOtp() {
   return useMutation({

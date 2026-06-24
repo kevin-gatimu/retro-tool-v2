@@ -125,7 +125,8 @@ consumer (Convex/UI).**
 ### Phase 5 — DB index hardening (independent; can land any time)
 
 Add Better Auth's recommended indexes where missing, then generate a Drizzle migration. This codebase
-does **not** enable the org/passkey/twoFactor Better Auth plugins (those are custom tables), so:
+enables the **passkey** plugin (see [PASSKEY-PLAN.md](PASSKEY-PLAN.md)) but not the org/twoFactor Better
+Auth plugins (those are custom tables), so:
 
 | Table | Fields to index | Source |
 |---|---|---|
@@ -133,10 +134,12 @@ does **not** enable the org/passkey/twoFactor Better Auth plugins (those are cus
 | `account` | `userId` | core |
 | `session` | `userId`, `token` | core |
 | `verification` | `identifier` | core |
+| `passkey` | `userId`, `credentialID` | passkey plugin |
 
 Mirror the spirit of the org-plugin guidance on the **custom** tables where missing:
 `organizationMember(userId, organizationId)`, `orgInvitation(email, organizationId)`,
-`organization(slug)`, `teamMember(userId, teamId)`. The upstream `passkey`/`twoFactor` rows are **N/A**.
+`organization(slug)`, `teamMember(userId, teamId)`. The `passkey` indexes ship with the table created in
+[PASSKEY-PLAN.md](PASSKEY-PLAN.md); the upstream `twoFactor` rows remain **N/A**.
 Verify each index doesn't already exist; `pnpm --filter retro-tool-api db:generate`, then apply.
 
 ## Critical files

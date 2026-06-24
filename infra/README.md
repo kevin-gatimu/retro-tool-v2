@@ -70,6 +70,39 @@ az group delete --name retrotool-<env>-rg --yes --no-wait
 
 ---
 
+## Provision via GitHub Actions (manual trigger)
+
+Instead of running the CLI locally, you can provision any environment from the
+**Provision Infrastructure** workflow (`.github/workflows/provision-infra.yml`).
+It authenticates with the same Azure OIDC trust used by the deploy workflows — no
+local `az login` required.
+
+**How to run it:**
+
+1. GitHub → **Actions** → **Provision Infrastructure** → **Run workflow**.
+2. Pick the **environment** (`production`, `staging`, or `develop`) and a **mode**:
+   - `what-if` (default) — dry run that prints the resource diff and changes nothing.
+   - `deploy` — provisions for real, then writes the Bicep outputs to the run summary.
+3. Recommended flow: run `what-if` first, review the diff, then re-run with `deploy`.
+
+The workflow maps the GitHub environment name `production` to the Bicep parameter
+`environment=prod` automatically (`staging`/`develop` map 1:1).
+
+### Prerequisites for the workflow
+
+Provisioning targets a **separate Azure account / tenant / subscription** from the app
+deploy workflows, so it uses its own `PROVISION_AZURE_*` credentials. The deploy workflows'
+`AZURE_*` secrets are left untouched and continue to point at the original account.
+
+| Requirement | Why |
+| --- | --- |
+| App Registration + OIDC federated credential in the **provisioning tenant** | A distinct registration from the deploy account. Credential subject must be `repo:<owner>/<repo>:environment:<env>`. See [README-oidc.md](README-oidc.md). |
+| `PROVISION_AZURE_CLIENT_ID` / `PROVISION_AZURE_TENANT_ID` / `PROVISION_AZURE_SUBSCRIPTION_ID` per GitHub environment | The new account's client/tenant/subscription IDs. Kept separate from the deploy workflows' `AZURE_*`. |
+| `POSTGRES_ADMIN_PASSWORD` secret in each GitHub environment | Supplies the required `postgresAdminPassword` Bicep parameter (it has no default). |
+| Provisioning service principal holds **Owner** or **User Access Administrator** at subscription scope | `main.bicep` creates an AcrPull **role assignment**, which Contributor cannot grant. |
+
+---
+
 ## Environment -> Branch Mapping
 
 | Environment | Parameter              | Branch    | Resource Group          |

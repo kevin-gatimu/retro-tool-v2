@@ -13,6 +13,10 @@ const configSchema = z.object({
     url: z.string().optional(),
     sessionExpiresIn: z.number().default(60 * 60 * 24 * 7), // 7 days
     cookieSecure: z.boolean().default(false),
+    // WebAuthn relying-party identity. rpId is the registrable UI domain
+    // (no scheme/port); passkeys are bound to it, so it must be stable.
+    rpId: z.string(),
+    rpName: z.string().default('Retro-Tool'),
     microsoft: z
       .object({
         clientId: z.string().optional(),
@@ -48,6 +52,18 @@ export type Config = z.infer<typeof configSchema>;
 export default (): Config => {
   const nodeEnv = process.env.NODE_ENV as Config['nodeEnv'] | undefined;
 
+  // WebAuthn rpId is the registrable hostname of the UI domain. Default it from
+  // FRONTEND_URL (overridable via WEBAUTHN_RP_ID), falling back to 'localhost'.
+  const deriveRpId = (): string => {
+    if (process.env.WEBAUTHN_RP_ID) return process.env.WEBAUTHN_RP_ID;
+    try {
+      return new URL(process.env.FRONTEND_URL ?? 'http://localhost:3000')
+        .hostname;
+    } catch {
+      return 'localhost';
+    }
+  };
+
   return configSchema.parse({
     port: process.env.PORT ? parseInt(process.env.PORT, 10) : undefined,
     nodeEnv,
@@ -62,6 +78,8 @@ export default (): Config => {
         : undefined,
       // Derived from NODE_ENV — true only in production
       cookieSecure: nodeEnv === 'production',
+      rpId: deriveRpId(),
+      rpName: process.env.WEBAUTHN_RP_NAME,
       microsoft: {
         clientId: process.env.MICROSOFT_CLIENT_ID,
         clientSecret: process.env.MICROSOFT_CLIENT_SECRET,

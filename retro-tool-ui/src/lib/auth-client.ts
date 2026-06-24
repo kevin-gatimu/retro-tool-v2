@@ -1,4 +1,5 @@
 import { createAuthClient } from 'better-auth/react'
+import { passkeyClient } from '@better-auth/passkey/client'
 import { env } from '#/env'
 
 // Storage key for bearer token fallback (used when cookies are blocked in private windows)
@@ -62,6 +63,9 @@ export async function detectPrivateWindow(): Promise<boolean> {
 
 export const authClient = createAuthClient({
   baseURL: env.VITE_API_URL + '/api/auth',
+  // Passkey (WebAuthn) support: exposes authClient.signIn.passkey() and
+  // authClient.passkey.{addPasskey,listUserPasskeys,updatePasskey,deletePasskey}.
+  plugins: [passkeyClient()],
   fetchOptions: {
     credentials: 'include',
     onSuccess: (ctx) => {

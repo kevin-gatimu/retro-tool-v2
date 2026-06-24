@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, bearer, emailOTP, multiSession } from 'better-auth/plugins';
+import { passkey } from '@better-auth/passkey';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
@@ -43,6 +44,14 @@ export function createAuth(configService: ConfigService<Config>) {
   const authConfig = configService.get('auth', { infer: true });
   const microsoftClientId = authConfig?.microsoft?.clientId;
   const microsoftClientSecret = authConfig?.microsoft?.clientSecret;
+
+  // WebAuthn relying-party identity. rpID/origin must match the UI domain (UI
+  // and API deploy separately), so derive the origin from frontend.url and the
+  // rpID from config (defaulted from FRONTEND_URL's hostname in configuration.ts).
+  const passkeyRpId = authConfig?.rpId ?? 'localhost';
+  const passkeyRpName = authConfig?.rpName ?? 'Retro-Tool';
+  const passkeyOrigin =
+    frontendUrl?.replace(/\/$/, '') ?? 'http://localhost:3000';
 
   // Create database pool and drizzle instance using ConfigService
   // Check if this is an Azure PostgreSQL connection
@@ -125,6 +134,7 @@ export function createAuth(configService: ConfigService<Config>) {
         session: schema.session,
         account: schema.account,
         verification: schema.verification,
+        passkey: schema.passkey,
       },
     }),
     // Allow configured origins for Swagger UI and frontend
@@ -217,6 +227,14 @@ export function createAuth(configService: ConfigService<Config>) {
               console.error(`[Auth] sendOtpEmail (${type}) failed:`, err);
             });
         },
+      }),
+      // WebAuthn passkeys for passwordless sign-in. rpID/origin are bound to the
+      // UI domain; the plugin auto-mounts /sign-in/passkey and /passkey/* under
+      // /api/auth and owns the `passkey` table.
+      passkey({
+        rpID: passkeyRpId,
+        rpName: passkeyRpName,
+        origin: passkeyOrigin,
       }),
     ],
     // Configure session settings

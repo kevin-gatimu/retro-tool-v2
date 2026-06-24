@@ -17,8 +17,9 @@ import {
   KeyRound,
   Loader2,
   ArrowLeft,
+  Fingerprint,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,8 +30,17 @@ import {
   InputOTPSlot,
 } from '@/components/ui/input-otp'
 import { authClient } from '@/lib/auth-client'
-import { useSendSignInOtp, useSignIn, useSignInOtp } from './hooks'
+import {
+  useSendSignInOtp,
+  useSignIn,
+  useSignInOtp,
+  useSignInPasskey,
+} from './hooks'
 import type { SignInSearch } from './types'
+
+/** WebAuthn is available only in secure contexts with the credentials API. */
+const passkeysSupported =
+  typeof window !== 'undefined' && !!window.PublicKeyCredential
 
 export const Route = createFileRoute('/auth/sign-in')({
   validateSearch: (search: Record<string, unknown>): SignInSearch => ({
@@ -256,8 +266,11 @@ function SignInPage() {
   const [rejected, setRejected] = useState(status === 'rejected')
   const [suspended, setSuspended] = useState(false)
 
-  // Passwordless OTP sign-in: 'password' (default) or 'code' (OTP entered).
-  const [mode, setMode] = useState<'password' | 'code'>('password')
+  // Sign-in mode:
+  //  'password' — default email + password form
+  //  'request'  — passwordless: enter email to request a one-time code
+  //  'code'     — enter the one-time code that was emailed
+  const [mode, setMode] = useState<'password' | 'request' | 'code'>('password')
   const [otp, setOtp] = useState('')
 
   const statusCallbacks = {
@@ -270,11 +283,33 @@ function SignInPage() {
   const signInMutation = useSignIn(statusCallbacks)
   const signInOtpMutation = useSignInOtp(statusCallbacks)
   const sendOtpMutation = useSendSignInOtp()
+  const signInPasskeyMutation = useSignInPasskey(statusCallbacks)
+
+  // Conditional-UI autofill: on supporting browsers, surface saved passkeys in
+  // the email field's autocomplete dropdown. Runs once on mount; failures
+  // (including user dismissal) are non-fatal — the explicit button still works.
+  useEffect(() => {
+    if (!passkeysSupported) return
+    if (
+      typeof PublicKeyCredential.isConditionalMediationAvailable !== 'function'
+    ) {
+      return
+    }
+    void PublicKeyCredential.isConditionalMediationAvailable().then(
+      (available) => {
+        if (available) {
+          void authClient.signIn.passkey({ autoFill: true })
+        }
+      },
+    )
+    // Intentionally run only once on mount.
+  }, [])
 
   const error =
     signInMutation.error?.message ??
     signInOtpMutation.error?.message ??
     sendOtpMutation.error?.message ??
+    signInPasskeyMutation.error?.message ??
     ''
   const loading = signInMutation.isPending
   const otpComplete = otp.length === 6
@@ -295,6 +330,11 @@ function SignInPage() {
     if (!email) return
     resetStatuses()
     sendOtpMutation.mutate(email, { onSuccess: () => setMode('code') })
+  }
+
+  const handleRequestCode = (e: React.SyntheticEvent) => {
+    e.preventDefault()
+    handleSendCode()
   }
 
   const handleVerifyCode = (e: React.SyntheticEvent) => {
@@ -431,18 +471,76 @@ function SignInPage() {
         </div>
       )}
 
-      {mode === 'code' ? (
+      {mode === 'request' ? (
+        <form onSubmit={handleRequestCode} className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setMode('password')}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-emerald-400 transition-colors group"
+          >
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+            Back to sign in
+          </button>
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold text-white">
+              Passwordless sign-in
+            </h3>
+            <p className="text-sm text-gray-400 leading-relaxed">
+              Enter your email and we'll send you a one-time code to sign in —
+              no password needed.
+            </p>
+          </div>
+          {error && (
+            <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="otp-email" className="text-gray-300 text-sm">
+              Email
+            </Label>
+            <Input
+              id="otp-email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              readOnly={!!emailFromInvite}
+              className={`h-11 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300${emailFromInvite ? ' opacity-75 cursor-default' : ''}`}
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={!email || sendOtpMutation.isPending}
+            className="w-full h-11 text-black font-semibold transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_15px_30px_-10px_rgba(255,187,0,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0 mt-2 hover:brightness-95"
+            style={{ backgroundColor: 'rgb(255, 187, 0)' }}
+          >
+            {sendOtpMutation.isPending ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Sending code…
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                Email me a sign-in code
+              </span>
+            )}
+          </Button>
+        </form>
+      ) : mode === 'code' ? (
         <form onSubmit={handleVerifyCode} className="space-y-4">
           <button
             type="button"
             onClick={() => {
               setOtp('')
-              setMode('password')
+              setMode('request')
             }}
             className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-emerald-400 transition-colors group"
           >
             <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-            Back to sign in
+            Back
           </button>
           {error && (
             <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-400">
@@ -532,6 +630,7 @@ function SignInPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 readOnly={!!emailFromInvite}
+                autoComplete={emailFromInvite ? 'email' : 'email webauthn'}
                 className={`h-11 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300${emailFromInvite ? ' opacity-75 cursor-default' : ''}`}
               />
             </div>
@@ -629,30 +728,45 @@ function SignInPage() {
             Sign in with Microsoft
           </Button>
 
+          {passkeysSupported && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={signInPasskeyMutation.isPending}
+              onClick={() => {
+                resetStatuses()
+                signInPasskeyMutation.mutate()
+              }}
+              className="w-full h-11 mt-3 border-[#21262d] bg-[#0d1117] text-white hover:bg-[#161b22] hover:text-emerald-400 hover:border-emerald-500/40 font-medium transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0"
+            >
+              {signInPasskeyMutation.isPending ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Waiting for passkey…
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Fingerprint className="h-4 w-4" />
+                  Sign in with a passkey
+                </span>
+              )}
+            </Button>
+          )}
+
           <Button
             type="button"
-            variant="outline"
-            disabled={!email || sendOtpMutation.isPending}
-            onClick={handleSendCode}
-            className="w-full h-11 mt-3 border border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-600 hover:text-white hover:border-emerald-600 font-semibold transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(16,185,129,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0"
+            onClick={() => {
+              resetStatuses()
+              setMode('request')
+            }}
+            className="w-full h-11 mt-3 text-black font-semibold transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(255,187,0,0.4)] hover:brightness-95"
+            style={{ backgroundColor: 'rgb(255, 187, 0)' }}
           >
-            {sendOtpMutation.isPending ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Sending code…
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <KeyRound className="h-4 w-4" />
-                Email me a sign-in code
-              </span>
-            )}
+            <span className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4" />
+              Email me a sign-in code
+            </span>
           </Button>
-          {!email && (
-            <p className="mt-2 text-center text-xs text-gray-600">
-              Enter your email above to receive a sign-in code.
-            </p>
-          )}
         </>
       )}
 

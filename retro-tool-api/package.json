@@ -43,6 +43,7 @@
     "db:seed:prod": "pnpm build && node -r dotenv/config dist/seed/seed-retro-templates.js dotenv_config_path=.env.production-local && node -r dotenv/config dist/seed/seed-estimate-templates.js dotenv_config_path=.env.production-local && node -r dotenv/config dist/seed/seed-team-roles.js dotenv_config_path=.env.production-local"
   },
   "dependencies": {
+    "@better-auth/passkey": "^1.6.2",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",

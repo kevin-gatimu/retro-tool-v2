@@ -4,7 +4,9 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "esModuleInterop": true,
-    "declaration": true,
+    // App emits no consumed .d.ts; declarations off avoids TS2883 portability
+    // errors from Better Auth plugin types (e.g. @simplewebauthn/server).
+    "declaration": false,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,

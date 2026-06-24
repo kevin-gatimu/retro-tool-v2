@@ -4,6 +4,7 @@ import {
   varchar,
   timestamp,
   boolean,
+  integer,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -125,4 +126,30 @@ export const verification = pgTable(
     updatedAt: timestamp('updated_at'),
   },
   (table) => [index('verification_identifier_idx').on(table.identifier)],
+);
+
+// WebAuthn passkeys (owned by Better Auth's @better-auth/passkey plugin). Property
+// keys are the plugin's camelCase field names so the Drizzle adapter maps them
+// correctly; SQL columns stay snake_case to match the rest of this schema.
+export const passkey = pgTable(
+  'passkey',
+  {
+    id: text('id').primaryKey(),
+    name: text('name'),
+    publicKey: text('public_key').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    credentialID: text('credential_id').notNull(),
+    counter: integer('counter').notNull(),
+    deviceType: text('device_type').notNull(),
+    backedUp: boolean('backed_up').notNull(),
+    transports: text('transports'),
+    aaguid: text('aaguid'),
+    createdAt: timestamp('created_at'),
+  },
+  (table) => [
+    index('passkey_user_id_idx').on(table.userId),
+    index('passkey_credential_id_idx').on(table.credentialID),
+  ],
 );

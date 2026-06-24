@@ -24,6 +24,10 @@ Agreed direction:
 3. Sign-in OTP is an **additional** option alongside password.
 4. OTP params: **6 digits, 5 min expiry, 3 attempts** (`otpLength: 6, expiresIn: 300, allowedAttempts: 3`).
 
+> **Note:** The sign-in page hosts **multiple** passwordless options — the email-OTP code (this plan) and
+> **passkeys** (see [PASSKEY-PLAN.md](PASSKEY-PLAN.md)). `/profile/security` is where users manage them.
+> This plan is unaffected by passkeys; they coexist as parallel choices.
+
 ## Server methods (exact, non-deprecated)
 
 Called via the injected `AuthService.api`:
