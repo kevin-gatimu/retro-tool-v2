@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
 import {
-  ChevronRight,
   Clock,
   Eye,
   EyeOff,
@@ -18,6 +17,7 @@ import {
   Loader2,
   ArrowLeft,
   Fingerprint,
+  LogIn,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -683,7 +683,7 @@ function SignInPage() {
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <ChevronRight className="h-4 w-4" strokeWidth={3} />
+                  <LogIn className="h-4 w-4" strokeWidth={3} />
                   Sign in
                 </span>
               )}
@@ -737,7 +737,7 @@ function SignInPage() {
                 resetStatuses()
                 signInPasskeyMutation.mutate()
               }}
-              className="w-full h-11 mt-3 border-[#21262d] bg-[#0d1117] text-white hover:bg-[#161b22] hover:text-emerald-400 hover:border-emerald-500/40 font-medium transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0"
+              className="w-full h-11 mt-3 border-[#4a525c] dark:border-[#4a525c] bg-[#3d444d] dark:bg-[#3d444d] text-white hover:bg-[#4a525c] dark:hover:bg-[#4a525c] hover:text-emerald-400 dark:hover:text-emerald-400 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 font-medium transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0"
             >
               {signInPasskeyMutation.isPending ? (
                 <span className="flex items-center gap-2">

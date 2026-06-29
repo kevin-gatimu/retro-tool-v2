@@ -1,5 +1,12 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { AlertCircle, ArrowLeft, Loader2, Mail, Sparkles } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowLeft,
+  Loader2,
+  Mail,
+  Send,
+  Sparkles,
+} from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -94,7 +101,10 @@ function ForgotPasswordPage() {
                 Sending...
               </span>
             ) : (
-              'Send reset code'
+              <span className="flex items-center gap-2">
+                <Send className="w-4 h-4" />
+                Send reset code
+              </span>
             )}
           </Button>
         </form>
