@@ -25,23 +25,29 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
-  const url = event.notification.data?.url || '/'
+  // The API sends an absolute URL for this environment's UI; fall back to the
+  // SW's own origin for any legacy relative/empty value.
+  const target = new URL(event.notification.data?.url || '/', self.location.origin)
+  const url = target.href
 
   event.waitUntil(
     clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((windowClients) => {
-        // If there's already an open window/tab for our app, focus it and navigate
-        for (const client of windowClients) {
-          if ('focus' in client) {
-            client.focus()
-            if ('navigate' in client) {
-              return client.navigate(url)
-            }
-            return
-          }
+        // Reuse a same-origin tab. Prefer one already on the target URL, else
+        // navigate the first same-origin tab to it.
+        const sameOrigin = windowClients.filter(
+          (client) => new URL(client.url).origin === target.origin,
+        )
+        const exact = sameOrigin.find((client) => client.url === url)
+        if (exact) {
+          return exact.focus()
         }
-        // Otherwise open a new window
+        const reusable = sameOrigin[0]
+        if (reusable && 'navigate' in reusable) {
+          return reusable.focus().then(() => reusable.navigate(url))
+        }
+        // No reusable tab for this origin — open a fresh window.
         if (clients.openWindow) {
           return clients.openWindow(url)
         }
