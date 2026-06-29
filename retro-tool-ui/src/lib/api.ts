@@ -1,5 +1,5 @@
 import { env } from '#/env'
-import { getBearerToken, shouldUseBearerToken } from './auth-client'
+import { getBearerToken } from './auth-client'
 
 const API_BASE_URL = env.VITE_API_URL
 
@@ -13,12 +13,11 @@ async function apiFetch<T = {}>(
     'Content-Type': 'application/json',
   }
 
-  // Add bearer token if cookies are blocked (private window mode)
-  if (shouldUseBearerToken()) {
-    const token = getBearerToken()
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
+  // Attach the bearer token whenever we have one — it's the primary credential.
+  // `credentials:'include'` below keeps the cookie as a fallback during rollout.
+  const token = getBearerToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
   }
 
   const response = await fetch(`${API_BASE_URL}${url}`, {

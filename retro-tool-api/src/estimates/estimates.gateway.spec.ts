@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EstimatesGateway } from './estimates.gateway';
-import { DATABASE_CONNECTION } from '../database/database-connection';
 import { EstimatesService } from './estimates.service';
 import { EstimatesProjectionSyncService } from './estimates-projection-sync.service';
+import { WsAuthService } from '../auth/ws-auth';
 
 describe('EstimatesGateway', () => {
   let gateway: EstimatesGateway;
@@ -11,9 +11,9 @@ describe('EstimatesGateway', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EstimatesGateway,
-        { provide: DATABASE_CONNECTION, useValue: {} },
         { provide: EstimatesService, useValue: {} },
         { provide: EstimatesProjectionSyncService, useValue: {} },
+        { provide: WsAuthService, useValue: {} },
       ],
     }).compile();
 

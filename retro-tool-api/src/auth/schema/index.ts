@@ -153,3 +153,14 @@ export const passkey = pgTable(
     index('passkey_credential_id_idx').on(table.credentialID),
   ],
 );
+
+// JWKS key pairs for the Better Auth `jwt` plugin (RS256). Property keys are the
+// plugin's camelCase field names so the Drizzle adapter maps them; SQL columns
+// stay snake_case. `privateKey` is stored AES-encrypted by the plugin.
+export const jwks = pgTable('jwks', {
+  id: text('id').primaryKey(),
+  publicKey: text('public_key').notNull(),
+  privateKey: text('private_key').notNull(),
+  createdAt: timestamp('created_at').notNull(),
+  expiresAt: timestamp('expires_at'),
+});

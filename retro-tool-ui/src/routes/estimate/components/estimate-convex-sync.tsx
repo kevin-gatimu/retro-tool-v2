@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useQuery as useConvexQuery } from 'convex/react'
+import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
 import type { FunctionReference } from 'convex/server'
 import type { EstimateSession } from '@/common/types/estimates'
-import { useCurrentUser } from '@/hooks/use-current-user'
 
 const estimateBoardQuery =
   'liveEstimates:getEstimateBoard' as unknown as FunctionReference<'query'>
@@ -18,12 +17,14 @@ interface EstimateConvexSyncProps {
 
 export function EstimateConvexSync({ sessionId }: EstimateConvexSyncProps) {
   const queryClient = useQueryClient()
-  const { data: currentUser } = useCurrentUser()
+  const { isAuthenticated } = useConvexAuth()
   const lastUpdatedAtRef = useRef<number | null>(null)
-  const board = useConvexQuery(estimateBoardQuery, {
-    sessionId,
-    userId: currentUser?.id ?? '',
-  }) as
+  // Convex derives the user from the JWT; don't pass userId. Skip until the
+  // Convex client is authenticated so the query doesn't throw Unauthenticated.
+  const board = useConvexQuery(
+    estimateBoardQuery,
+    isAuthenticated ? { sessionId } : 'skip',
+  ) as
     | { sessionId: string; snapshot: string; updatedAt: number }
     | null
     | undefined

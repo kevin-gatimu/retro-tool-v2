@@ -24,17 +24,22 @@ interface SignInCallbacks {
 }
 
 /**
- * After a session is established (by any method), detect the cookie/bearer
- * situation and resolve the user's account status. Shared by password and
- * OTP sign-in so both behave identically.
+ * After a session is established (by any method), resolve the user's account
+ * status. Shared by password and OTP sign-in so both behave identically.
+ *
+ * The bearer token is the primary credential and is kept regardless of whether
+ * cookies work (we no longer discard it), so the app authenticates by header on
+ * every subsequent request. The cookie remains as a fallback during rollout.
  */
 async function resolveSignInOutcome(): Promise<SignInOutcome> {
-  // Wait a tick for cookies to be set, then decide cookie vs bearer fallback.
+  // Wait a tick for the session to settle (cookie set / token captured).
   await new Promise((resolve) => setTimeout(resolve, 100))
 
+  // Informational only: in a private window cookies are blocked, so warn that
+  // the session won't persist after the window closes. The app still works
+  // fully on the bearer token, which we keep either way.
   const cookiesWorking = testCookiesWorking()
   const hasBearerToken = !!getBearerToken()
-
   if (!cookiesWorking && hasBearerToken) {
     const isPrivateWindow = await detectPrivateWindow()
     if (isPrivateWindow) {
@@ -43,8 +48,6 @@ async function resolveSignInOutcome(): Promise<SignInOutcome> {
         { duration: 5000 },
       )
     }
-  } else if (cookiesWorking) {
-    clearBearerToken()
   }
 
   const user = await api.get<User>(USERS_ENDPOINTS.ME)

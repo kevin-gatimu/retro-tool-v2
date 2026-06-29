@@ -1,7 +1,8 @@
-import { mutation, query } from './server'
+import { mutation, query, internalMutation } from './server'
 import { v } from 'convex/values'
+import { requireIdentity } from './lib/authz'
 
-export const upsertNotificationProjection = mutation({
+export const upsertNotificationProjection = internalMutation({
   args: {
     notificationId: v.string(),
     userId: v.string(),
@@ -49,7 +50,7 @@ export const upsertNotificationProjection = mutation({
   },
 })
 
-export const markNotificationReadProjection = mutation({
+export const markNotificationReadProjection = internalMutation({
   args: {
     notificationId: v.string(),
     userId: v.string(),
@@ -83,7 +84,7 @@ export const markNotificationReadProjection = mutation({
   },
 })
 
-export const markAllNotificationsReadProjection = mutation({
+export const markAllNotificationsReadProjection = internalMutation({
   args: {
     userId: v.string(),
     updatedAt: v.number(),
@@ -116,15 +117,19 @@ export const markAllNotificationsReadProjection = mutation({
 
 export const listUserNotifications = query({
   args: {
-    userId: v.string(),
+    // Deprecated: identity is derived server-side from the JWT. Kept optional so
+    // older clients that still send it don't fail arg validation (removed once
+    // all clients are updated). The value is ignored for authorization.
+    userId: v.optional(v.string()),
     unreadOnly: v.optional(v.boolean()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx)
     const projections = await ctx.db
       .query('liveNotifications')
       .withIndex('by_user_id', (queryBuilder) =>
-        queryBuilder.eq('userId', args.userId),
+        queryBuilder.eq('userId', identity.subject),
       )
       .collect()
 
@@ -155,13 +160,15 @@ export const listUserNotifications = query({
 
 export const getUnreadCount = query({
   args: {
-    userId: v.string(),
+    // Deprecated: identity is derived server-side from the JWT. Ignored.
+    userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx)
     const unread = await ctx.db
       .query('liveNotifications')
       .withIndex('by_user_read', (queryBuilder) =>
-        queryBuilder.eq('userId', args.userId),
+        queryBuilder.eq('userId', identity.subject),
       )
       .filter((q) => q.eq(q.field('read'), false))
       .collect()

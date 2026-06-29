@@ -1,5 +1,6 @@
-import { mutation, query } from './server'
+import { mutation, query, internalMutation } from './server'
 import { v } from 'convex/values'
+import { requireIdentity } from './lib/authz'
 
 const estimateSessionStatus = v.union(
   v.literal('waiting'),
@@ -10,7 +11,7 @@ const estimateSessionStatus = v.union(
 
 // ── Lightweight projection (used by list pages) ──────────────────────────────
 
-export const upsertSessionProjection = mutation({
+export const upsertSessionProjection = internalMutation({
   args: {
     sessionId: v.string(),
     teamId: v.string(),
@@ -44,7 +45,7 @@ export const upsertSessionProjection = mutation({
   },
 })
 
-export const deleteSessionProjection = mutation({
+export const deleteSessionProjection = internalMutation({
   args: {
     sessionId: v.string(),
   },
@@ -80,6 +81,7 @@ export const getSessionProjection = query({
     sessionId: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireIdentity(ctx)
     const projection = await ctx.db
       .query('liveEstimateSessions')
       .withIndex('by_session_id', (queryBuilder) =>
@@ -103,6 +105,7 @@ export const getSessionProjection = query({
 export const listActiveSessionProjections = query({
   args: {},
   handler: async (ctx) => {
+    await requireIdentity(ctx)
     const projections = await ctx.db.query('liveEstimateSessions').collect()
 
     return projections
@@ -118,7 +121,7 @@ export const listActiveSessionProjections = query({
 
 // ── Full board snapshot (used by the estimate detail page) ───────────────────
 
-export const upsertEstimateBoard = mutation({
+export const upsertEstimateBoard = internalMutation({
   args: {
     sessionId: v.string(),
     userId: v.string(),
@@ -154,15 +157,19 @@ export const upsertEstimateBoard = mutation({
 export const getEstimateBoard = query({
   args: {
     sessionId: v.string(),
-    userId: v.string(),
+    // Deprecated: identity is derived server-side from the JWT. Kept optional so
+    // older clients that still send it don't fail arg validation (removed once
+    // all clients are updated). The value is ignored for authorization.
+    userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx)
     const board = (
       await ctx.db
       .query('liveEstimateBoards')
       .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
       .collect()
-    ).find((item) => item.userId === args.userId)
+    ).find((item) => item.userId === identity.subject)
 
     if (!board) {
       return null

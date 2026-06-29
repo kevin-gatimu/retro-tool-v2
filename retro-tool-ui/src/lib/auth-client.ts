@@ -1,21 +1,14 @@
 import { createAuthClient } from 'better-auth/react'
 import { passkeyClient } from '@better-auth/passkey/client'
+import { jwtClient } from 'better-auth/client/plugins'
 import { env } from '#/env'
 
-// Storage key for bearer token fallback (used when cookies are blocked in private windows)
+// Storage key for the session bearer token. The bearer is the primary API
+// credential; the cookie is kept as a fallback during the cookie→bearer rollout.
 const BEARER_TOKEN_KEY = 'retro_tool_bearer_token'
 
 /**
- * Check if cookies are likely blocked (private/incognito window scenarios)
- * Returns true if we should use bearer token fallback
- */
-export function shouldUseBearerToken(): boolean {
-  const token = sessionStorage.getItem(BEARER_TOKEN_KEY)
-  return !!token
-}
-
-/**
- * Store bearer token for fallback auth (used when cookies are blocked)
+ * Store the session bearer token (captured from the `set-auth-token` header).
  */
 export function storeBearerToken(token: string): void {
   sessionStorage.setItem(BEARER_TOKEN_KEY, token)
@@ -65,24 +58,27 @@ export const authClient = createAuthClient({
   baseURL: env.VITE_API_URL + '/api/auth',
   // Passkey (WebAuthn) support: exposes authClient.signIn.passkey() and
   // authClient.passkey.{addPasskey,listUserPasskeys,updatePasskey,deletePasskey}.
-  plugins: [passkeyClient()],
+  // jwtClient adds authClient.token() — used to fetch the RS256 JWT that
+  // authenticates the Convex client (see realtime-providers.tsx).
+  plugins: [passkeyClient(), jwtClient()],
   fetchOptions: {
+    // Cookie kept as a fallback during the cookie→bearer rollout; the bearer
+    // (below) is the primary credential when present.
     credentials: 'include',
     onSuccess: (ctx) => {
-      // Capture bearer token from sign-in response for fallback
+      // Capture the session bearer token from any auth response that sets it.
       const authToken = ctx.response.headers.get('set-auth-token')
       if (authToken) {
-        // Store token - we'll decide whether to use it after checking cookies
         storeBearerToken(authToken)
       }
     },
-    // Use bearer token if cookies are blocked
-    auth: shouldUseBearerToken()
-      ? {
-          type: 'Bearer',
-          token: () => getBearerToken() || '',
-        }
-      : undefined,
+    // Always attach the bearer dynamically — the token getter is evaluated per
+    // request (not once at module load), so it picks up the token captured on
+    // sign-in. Better Auth omits the header when the token is empty.
+    auth: {
+      type: 'Bearer',
+      token: () => getBearerToken() ?? '',
+    },
   },
 })
 

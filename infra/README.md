@@ -247,7 +247,40 @@ npx web-push generate-vapid-keys
 
 Save as `VAPID_PUBLIC_KEY` (variable) and `VAPID_PRIVATE_KEY` (secret) in the GitHub environment.
 
-### 7. Custom Domain (optional)
+### 7. Configure Convex JWT auth (required for realtime)
+
+Convex verifies the RS256 JWTs the API issues (`GET /api/auth/token`, keys at
+`GET /api/auth/jwks`) before serving any projection query. Convex reads three
+variables via `process.env` **inside its functions** (`convex/auth.config.ts`),
+so they must be set **on the Convex deployment** — they are NOT read from the
+API's App Service settings or any `.env` file.
+
+Set them once per Convex deployment (CLI with `CONVEX_DEPLOY_KEY` set, or
+dashboard → Deployment Settings → Environment Variables):
+
+```powershell
+# Values shown for production; use the matching API host per environment.
+convex env set JWT_ISSUER   https://retrotool-prod-api.azurewebsites.net
+convex env set JWT_AUDIENCE convex
+convex env set JWT_JWKS_URL https://retrotool-prod-api.azurewebsites.net/api/auth/jwks
+convex env list   # verify
+```
+
+| Variable | Must equal | Notes |
+| --- | --- | --- |
+| `JWT_ISSUER` | the API's `BETTER_AUTH_URL` (`https://{API_WEBAPP_NAME}.azurewebsites.net`, computed by `deploy-api.yml`) | **Byte-for-byte** identity match against the token `iss`. A trailing-slash / scheme / port mismatch silently breaks all Convex auth. Not fetched over the network. |
+| `JWT_AUDIENCE` | the API's `BETTER_AUTH_JWT_AUDIENCE` (default `convex`) | Matched against the token `aud`. |
+| `JWT_JWKS_URL` | `${JWT_ISSUER}/api/auth/jwks` | **Fetched** by Convex Cloud over the public internet, so the API host must be publicly reachable. |
+
+> The API side needs no extra config: `BETTER_AUTH_JWT_ISSUER` defaults to
+> `BETTER_AUTH_URL` and `BETTER_AUTH_JWT_AUDIENCE` defaults to `convex`. Only set
+> those overrides if you change the values here.
+>
+> **Verify:** open the app signed-in and confirm a board/notifications load with
+> no `Unauthenticated` errors in the Convex logs. If every query throws
+> `Unauthenticated`, re-check `JWT_ISSUER` against a decoded token's `iss`.
+
+### 8. Custom Domain (optional)
 
 ```powershell
 # App Service
@@ -257,6 +290,10 @@ az webapp config hostname add --resource-group retrotool-prod-rg `
 # Static Web App
 az staticwebapp hostname set --name retrotool-prod-ui --hostname app.yourdomain.com
 ```
+
+> If you set a custom API domain, update the Convex `JWT_ISSUER` / `JWT_JWKS_URL`
+> (step 7) and the API's `BETTER_AUTH_URL` to the new host — the issuer must keep
+> matching the token `iss` byte-for-byte.
 
 ---
 

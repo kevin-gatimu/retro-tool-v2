@@ -1,12 +1,20 @@
 import type { Socket } from 'socket.io-client'
 import { io } from 'socket.io-client'
 import { env } from '#/env'
+import { getBearerToken } from './auth-client'
 
 let notificationSocket: Socket | null = null
 let retroSocket: Socket | null = null
 let estimateSocket: Socket | null = null
 
 const SOCKET_OPTS = {
+  // Bearer token (primary) — the API validates it via Better Auth's getSession.
+  // A function so reconnects re-read the current token. `withCredentials` keeps
+  // the cookie as a fallback during the cookie→bearer rollout; the server
+  // accepts either. Returns undefined when no token yet → cookie covers it.
+  auth: (cb: (data: Record<string, unknown>) => void) => {
+    cb({ token: getBearerToken() ?? undefined })
+  },
   withCredentials: true,
   autoConnect: false,
   transports: ['websocket', 'polling'] as string[],

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useQuery as useConvexQuery } from 'convex/react'
+import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
 import type { FunctionReference } from 'convex/server'
 
 interface ActiveEstimateProjection {
@@ -14,10 +14,12 @@ const activeEstimateProjectionQuery =
 
 export function EstimateListConvexSync() {
   const queryClient = useQueryClient()
+  const { isAuthenticated } = useConvexAuth()
   const lastSnapshotRef = useRef<string | null>(null)
-  const projections = useConvexQuery(activeEstimateProjectionQuery, {}) as
-    | ActiveEstimateProjection[]
-    | undefined
+  const projections = useConvexQuery(
+    activeEstimateProjectionQuery,
+    isAuthenticated ? {} : 'skip',
+  ) as ActiveEstimateProjection[] | undefined
 
   useEffect(() => {
     if (!projections) {

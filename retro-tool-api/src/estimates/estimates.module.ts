@@ -6,9 +6,10 @@ import { EstimatesGateway } from './estimates.gateway';
 import { DatabaseModule } from '../database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { EmailModule } from '../email/email.module';
+import { WsAuthModule } from '../auth/ws-auth.module';
 
 @Module({
-  imports: [DatabaseModule, NotificationsModule, EmailModule],
+  imports: [DatabaseModule, NotificationsModule, EmailModule, WsAuthModule],
   controllers: [EstimatesController],
   providers: [
     EstimatesService,

@@ -157,16 +157,16 @@ function RetroDetailPage() {
     // Only fire mutation on idle → typing transition
     if (!isTypingRef.current) {
       isTypingRef.current = true
+      // userId is derived server-side from the JWT; only displayName is sent.
       startTypingConvex({
         retroId,
-        userId: currentUser.id,
         displayName: currentUser.name,
       })
     }
     typingTimeoutRef.current = setTimeout(() => {
       isTypingRef.current = false
       typingTimeoutRef.current = null
-      stopTypingConvex({ retroId, userId: currentUser.id })
+      stopTypingConvex({ retroId })
     }, 3000)
   }, [
     usesConvexRealtime,
@@ -184,7 +184,7 @@ function RetroDetailPage() {
     }
     if (isTypingRef.current) {
       isTypingRef.current = false
-      stopTypingConvex({ retroId, userId: currentUser.id })
+      stopTypingConvex({ retroId })
     }
   }, [usesConvexRealtime, currentUser, retroId, stopTypingConvex])
 
@@ -217,9 +217,9 @@ function RetroDetailPage() {
     if (!usesConvexRealtime || !currentUser) return
     const next = !myReady
     if (next) setReadyAnimating(true)
+    // userId is derived server-side from the JWT; only displayName is sent.
     setReadyStatusConvex({
       retroId,
-      userId: currentUser.id,
       displayName: currentUser.name,
       isReady: next,
     })
@@ -266,7 +266,7 @@ function RetroDetailPage() {
     const prev = prevRetroStatusRef.current
     if (prev === 'active' && retro?.status !== 'active' && usesConvexRealtime) {
       if (currentUser) {
-        stopTypingConvex({ retroId, userId: currentUser.id })
+        stopTypingConvex({ retroId })
       }
       clearAllReadyConvex({ retroId })
     }

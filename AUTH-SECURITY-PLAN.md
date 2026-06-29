@@ -19,6 +19,52 @@ Agreed direction:
 3. **API guards** → confirm the **global guard / fail-closed** posture and audit public routes.
 4. **DB** → add Better Auth's recommended **indexes**.
 
+## Implementation status (2026-06)
+
+| Decision | Status |
+| --- | --- |
+| **1. Convex JWT auth (T2/T3)** | ✅ **DONE** — API issues RS256 JWTs + JWKS; Convex `customJwt` provider verifies them; every projection query/mutation derives identity via `ctx.auth.getUserIdentity()`; server-driven writes are `internalMutation` (admin-key only). See the *Convex JWT — what shipped* section below. |
+| **3. API guard audit** | ✅ **Verified** — global `AuthGuard` is active and fail-closed; public routes carry `@AllowAnonymous` (see findings below). |
+| **4. DB indexes (Phase 5)** | ✅ **Verified** — all recommended indexes already exist (`session.token` unique, `session.userId`, `user.email` unique, `passkey.*`); no migration needed. |
+| **WebSocket auth (T8)** | ✅ **DONE** — the 3 gateways now authenticate via `WsAuthService` (token-or-cookie through `auth.api.getSession`); the hand-rolled cookie-regex + raw `session`-table lookups are gone. See *Socket + bearer + CSP — what shipped* below. |
+| **CSP / XSS hardening (T5)** | ✅ **DONE** — strict global CSP (no `'unsafe-inline'`); Swagger gated off in production with a relaxed CSP scoped to `/api/docs` in dev/staging. |
+| **2. CSRF → bearer (T1)** | ◐ **PARTIAL** — bearer is now the **primary** REST + socket credential (fixes private windows, shrinks CSRF surface), but cookies are still **accepted as a fallback**, so CSRF is *reduced, not eliminated*. Full elimination (drop cookie reliance + OAuth post-redirect bearer capture) is still deferred — see *Remaining work*. |
+
+### Convex JWT — what shipped
+
+- API (`auth/auth.config.ts`): `jwt()` plugin, **RS256** (`jwks.keyPairConfig`), `expirationTime: '15m'`, `issuer`/`audience` pinned via `auth.jwtIssuer`/`auth.jwtAudience` (`config/configuration.ts`), `definePayload` injects `role` for `getSystemStats`. New `jwks` Drizzle table + migration `0015_dazzling_black_cat`.
+- Convex (`convex/auth.config.ts`): `{ type: 'customJwt', issuer, applicationID, jwks, algorithm: 'RS256' }` from `process.env.JWT_ISSUER/JWT_AUDIENCE/JWT_JWKS_URL`. `convex/server.ts` exports `internalMutation`/`internalQuery`; `convex/lib/authz.ts` has `requireIdentity`. Authz compares `identity.subject` (= Better Auth user id = stored `userId`), **not** `tokenIdentifier`.
+- UI (`lib/realtime-providers.tsx`): `ConvexProviderWithAuth` + a `useAuth` hook fetching the JWT from `GET /api/auth/token`; `jwtClient()` added to `auth-client.ts`; Convex queries gate on `isAuthenticated` and no longer pass `userId`.
+- **Decisions that diverged from the original sketch:** signing alg is **RS256** (Convex's `customJwt` verifier supports only RS256/ES256, not the EdDSA default); **no hand-written `.well-known/openid-configuration`** (the `customJwt` provider takes the JWKS URL directly); the official `@convex-dev/better-auth` component is **not** used (it requires Better Auth to run inside Convex, inverting our "Postgres is the system of record" architecture).
+- **Deploy-time config (required, per environment):** set `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_JWKS_URL` on the **Convex deployment** (`convex env set`). `JWT_ISSUER` must byte-match the API's `BETTER_AUTH_URL`; `JWT_JWKS_URL` must be network-reachable from Convex (`host.docker.internal` locally). Full instructions: [infra/README.md](infra/README.md) step 7, the `convex-backend/.env*.example` files, and [docs/convex-self-hosting.md](docs/convex-self-hosting.md).
+- **Residual:** team-scoped reads (typing/ready/list projections, `getTeamStats`) enforce *authenticated* but not *team membership*, since Convex holds no membership data — a membership projection is the follow-up. JWT TTL means Convex authorization lags session revocation by ≤15 min (acceptable for read-only projections).
+
+### Socket + bearer + CSP — what shipped
+
+Additive hardening (deploy order C → A-API → A-UI → B-UI; every step accepts
+token-or-cookie so nothing breaks mid-deploy):
+
+- **T8 (sockets):** new `WsAuthService` (`auth/ws-auth.ts`, provided via `auth/ws-auth.module.ts`)
+  validates `handshake.auth.token` **or** the cookie through `authService.api.getSession({ headers })`
+  — the `bearer()` plugin accepts either and Better Auth enforces expiry. All 3 gateways
+  (`retros`/`estimates`/`notifications`) call it; the duplicated cookie-regex + raw `session`
+  lookups, the per-gateway `DATABASE_CONNECTION` inject, and the dead `WsSessionData` type
+  were removed. `BetterAuthModule` is now `isGlobal`. UI `lib/socket.ts` sends
+  `auth: { token: () => getBearerToken() }` (function form so reconnects re-read it),
+  keeping `withCredentials` as the rollout fallback.
+- **T1 (bearer-primary REST):** fixed the latent bug where `auth-client.ts`'s
+  `fetchOptions.auth` was evaluated once at module load — it's now an always-present
+  dynamic token getter. `lib/api.ts` + `lib/realtime-providers.tsx` attach the bearer
+  whenever present (no longer gated on the cookie heuristic). `use-sign-in.ts` no longer
+  discards the bearer when cookies work (bearer is primary; the private-window toast stays
+  informational). The dead `shouldUseBearerToken` helper was removed. **Cookies remain
+  accepted as a fallback** — full removal is the deferred follow-up.
+- **T5 (CSP):** `main.ts` serves a strict global CSP (`scriptSrc/styleSrc: ['self']`,
+  `objectSrc:'none'`, `baseUri:'self'`, `frameAncestors:'none'`) — no `'unsafe-inline'`.
+  Swagger is disabled when `NODE_ENV==='production'`; in dev/staging a relaxed CSP is
+  scoped to `/api/docs` + `/api/docs-json` only. Scope: this protects **API-origin**
+  responses only (the UI is a separate origin with its own CSP).
+
 ## Code-verified findings (corrections to initial assumptions)
 
 - **The global `AuthGuard` is ALREADY active.** `@thallesp/nestjs-better-auth` v2.6.0 registers
@@ -142,16 +188,56 @@ Mirror the spirit of the org-plugin guidance on the **custom** tables where miss
 [PASSKEY-PLAN.md](PASSKEY-PLAN.md); the upstream `twoFactor` rows remain **N/A**.
 Verify each index doesn't already exist; `pnpm --filter retro-tool-api db:generate`, then apply.
 
+## Remaining work — finish CSRF elimination (Phase 4, deferred)
+
+The additive half of the CSRF work is **done** (see *Socket + bearer + CSP — what shipped*):
+Phase 1 (JWT/JWKS producer), Phase 2 (bearer-primary REST + sockets, token-or-cookie
+gateways), T8, and T5 all shipped. **What's left is the subtractive Phase 4** — removing
+cookie reliance so CSRF is *eliminated*, not just reduced. It was deferred because of one
+hard blocker:
+
+**The OAuth blocker (must be solved first).** After a full-page Microsoft redirect the SPA
+can't read the callback's response headers, and the bearer plugin only emits
+`set-auth-token` on responses that *also set a cookie* (verified in
+`better-auth/dist/plugins/bearer/index.mjs`) — a plain session read does **not**. So an
+OAuth user currently has **no** captured bearer. Removing cookies without first giving
+OAuth users a session bearer would lock them out. A spike is needed (e.g. a dedicated
+post-callback endpoint that returns the session token, or a BA config that emits
+`set-auth-token` on session reads).
+
+**Phase 4 (subtractive — after the OAuth capture is solved):**
+
+- `social-callback.tsx`: capture a **session** bearer on landing (NOT `GET /api/auth/token`
+  — that returns the Convex RS256 JWT, not the session token).
+- Drop `credentials:'include'` (`lib/api.ts`, `auth-client.ts` `fetchOptions`,
+  `realtime-providers.tsx`) and `withCredentials` (`lib/socket.ts`). Keep cookies only for
+  the OAuth top-level navigation flow.
+- `auth/ws-auth.ts`: stop reading the handshake cookie; require `handshake.auth.token`.
+  Optionally set CORS `credentials:false`. Optionally delete the now-redundant
+  `@UseGuards(AuthGuard)` decorators (global guard is active).
+- **Verify:** a cross-site credentialed `fetch` with no `Authorization` → 401; cookie-only
+  socket connect → disconnected; OAuth still completes and yields a working bearer.
+
+**Cross-cutting:** bearer-in-`sessionStorage` raises XSS impact (T5) — the API-side CSP is
+done, but the **UI-origin** CSP + input sanitization (separate repo) plus the short JWT TTL
+are the real mitigations. OAuth (Microsoft) **stays cookie-based** for the redirect/state
+flow regardless (T11).
+
 ## Critical files
 
-- **API:** `auth/auth.config.ts`, `auth/auth.module.ts`, `main.ts`, new `well-known.controller.ts`,
-  `config/configuration.ts`, gateways (`retros`/`estimates`/`notifications`), Better Auth schema + new
-  migration.
-- **Convex:** `convex/auth.config.ts`, `liveRetros.ts`, `liveNotifications.ts`, `liveEstimates.ts`.
-- **UI:** `lib/auth-client.ts`, `lib/api.ts`, `lib/socket.ts`, `lib/convex-client.ts`, post-OAuth token
-  capture.
-- **Docs:** new `docs/auth-threat-model.md`; update `docs/api-security.md`; pointers in `CLAUDE.md` /
-  `AGENTS.md`.
+- **API:** `auth/auth.config.ts`, `auth/auth.module.ts`, `main.ts`, `config/configuration.ts`,
+  `auth/ws-auth.ts` + `auth/ws-auth.module.ts` (socket auth), gateways
+  (`retros`/`estimates`/`notifications`), Better Auth schema + migrations.
+  (No `well-known.controller.ts` — the `customJwt` provider takes the JWKS URL directly, so
+  the hand-written OIDC discovery doc the original sketch assumed was never needed.)
+- **Convex:** `convex/auth.config.ts`, `convex/server.ts`, `convex/lib/authz.ts`, `liveRetros.ts`,
+  `liveNotifications.ts`, `liveEstimates.ts`, `liveReports.ts`, `admin.ts`.
+- **UI:** `lib/auth-client.ts`, `lib/api.ts`, `lib/socket.ts`, `lib/realtime-providers.tsx`,
+  `routes/auth/hooks/use-sign-in.ts`; **Phase 4 (pending):** `routes/auth/social-callback.tsx`
+  post-OAuth session-bearer capture.
+- **Docs:** `docs/convex-architecture.md`, `docs/convex-nestjs-auth.md`, `docs/auth-workflows.md`
+  (shipped). The originally-planned `docs/auth-threat-model.md` was **superseded** by those;
+  `docs/api-security.md` covers the CSRF posture.
 
 ## Verification summary
 

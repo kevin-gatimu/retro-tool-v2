@@ -1,7 +1,13 @@
 import { ConfigService } from '@nestjs/config';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { admin, bearer, emailOTP, multiSession } from 'better-auth/plugins';
+import {
+  admin,
+  bearer,
+  emailOTP,
+  jwt,
+  multiSession,
+} from 'better-auth/plugins';
 import { passkey } from '@better-auth/passkey';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -76,6 +82,12 @@ export function createAuth(configService: ConfigService<Config>) {
   // Use BETTER_AUTH_URL if set (required for production); fall back to localhost for local dev
   const authUrl = authConfig?.url || `http://localhost:${port}`;
 
+  // JWT issuer/audience for Convex's customJwt verification. Issuer defaults to
+  // the API origin (where the JWKS lives) and must be byte-stable across deploys
+  // — pin explicitly rather than relying on the plugin's baseURL default.
+  const jwtIssuer = authConfig?.jwtIssuer || authUrl;
+  const jwtAudience = authConfig?.jwtAudience ?? 'convex';
+
   // Whether an active (unaccepted, unexpired) org/team invitation exists for an
   // email — used to suppress the standalone email-verification message, since
   // accepting the invite verifies the email anyway.
@@ -135,6 +147,7 @@ export function createAuth(configService: ConfigService<Config>) {
         account: schema.account,
         verification: schema.verification,
         passkey: schema.passkey,
+        jwks: schema.jwks,
       },
     }),
     // Allow configured origins for Swagger UI and frontend
@@ -235,6 +248,22 @@ export function createAuth(configService: ConfigService<Config>) {
         rpID: passkeyRpId,
         rpName: passkeyRpName,
         origin: passkeyOrigin,
+      }),
+      // RS256 JWTs for Convex's customJwt verification (Convex supports only
+      // RS256/ES256, not the EdDSA default). Serves GET /api/auth/jwks and
+      // GET /api/auth/token; owns the `jwks` table. `sub` defaults to user.id
+      // (matches the userId stored in Convex projections). `role` is injected so
+      // Convex role-gated reads (e.g. liveReports.getSystemStats) can authorize.
+      jwt({
+        jwt: {
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          expirationTime: '15m',
+          definePayload: (session) => ({
+            role: (session.user as { role?: string }).role,
+          }),
+        },
+        jwks: { keyPairConfig: { alg: 'RS256', modulusLength: 2048 } },
       }),
     ],
     // Configure session settings

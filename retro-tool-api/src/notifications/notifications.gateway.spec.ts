@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsGateway } from './notifications.gateway';
-import { DATABASE_CONNECTION } from '../database/database-connection';
+import { WsAuthService } from '../auth/ws-auth';
 
 describe('NotificationsGateway', () => {
   let gateway: NotificationsGateway;
@@ -9,7 +9,7 @@ describe('NotificationsGateway', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsGateway,
-        { provide: DATABASE_CONNECTION, useValue: {} },
+        { provide: WsAuthService, useValue: {} },
       ],
     }).compile();
 

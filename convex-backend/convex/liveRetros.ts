@@ -1,5 +1,6 @@
-import { mutation, query } from './server'
+import { mutation, query, internalMutation } from './server'
 import { v } from 'convex/values'
+import { requireIdentity } from './lib/authz'
 
 const retroStatus = v.union(
   v.literal('draft'),
@@ -13,7 +14,7 @@ const retroStatus = v.union(
 
 // ── Lightweight projection (used by list pages) ──────────────────────────────
 
-export const upsertRetroProjection = mutation({
+export const upsertRetroProjection = internalMutation({
   args: {
     retroId: v.string(),
     teamId: v.string(),
@@ -52,7 +53,7 @@ export const upsertRetroProjection = mutation({
   },
 })
 
-export const deleteRetroProjection = mutation({
+export const deleteRetroProjection = internalMutation({
   args: {
     retroId: v.string(),
   },
@@ -88,6 +89,7 @@ export const getRetroProjection = query({
     retroId: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireIdentity(ctx)
     const projection = await ctx.db
       .query('liveRetroSessions')
       .withIndex('by_retro_id', (queryBuilder) =>
@@ -112,6 +114,7 @@ export const getRetroProjection = query({
 export const listRecentRetroProjections = query({
   args: {},
   handler: async (ctx) => {
+    await requireIdentity(ctx)
     const projections = await ctx.db.query('liveRetroSessions').collect()
 
     return projections
@@ -126,7 +129,7 @@ export const listRecentRetroProjections = query({
 
 // ── Full board snapshot (used by the retro detail page) ──────────────────────
 
-export const upsertRetroBoard = mutation({
+export const upsertRetroBoard = internalMutation({
   args: {
     retroId: v.string(),
     userId: v.string(),
@@ -165,15 +168,19 @@ export const upsertRetroBoard = mutation({
 export const getRetroBoard = query({
   args: {
     retroId: v.string(),
-    userId: v.string(),
+    // Deprecated: identity is derived server-side from the JWT. Kept optional so
+    // older clients that still send it don't fail arg validation (removed once
+    // all clients are updated). The value is ignored for authorization.
+    userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx)
     const board = (
       await ctx.db
       .query('liveRetroBoards')
       .withIndex('by_retro_id', (q) => q.eq('retroId', args.retroId))
       .collect()
-    ).find((item) => item.userId === args.userId)
+    ).find((item) => item.userId === identity.subject)
 
     if (!board) {
       return null
@@ -192,16 +199,18 @@ export const getRetroBoard = query({
 export const startTyping = mutation({
   args: {
     retroId: v.string(),
-    userId: v.string(),
+    // Deprecated: derived from identity server-side. Ignored for authorization.
+    userId: v.optional(v.string()),
     displayName: v.string(),
   },
   handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx)
     const existing = (
       await ctx.db
         .query('liveTyping')
         .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
         .collect()
-    ).find((r) => r.userId === args.userId)
+    ).find((r) => r.userId === identity.subject)
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -211,7 +220,7 @@ export const startTyping = mutation({
     } else {
       await ctx.db.insert('liveTyping', {
         retroId: args.retroId,
-        userId: args.userId,
+        userId: identity.subject,
         displayName: args.displayName,
         updatedAt: Date.now(),
       })
@@ -222,15 +231,17 @@ export const startTyping = mutation({
 export const stopTyping = mutation({
   args: {
     retroId: v.string(),
-    userId: v.string(),
+    // Deprecated: derived from identity server-side. Ignored for authorization.
+    userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx)
     const existing = (
       await ctx.db
         .query('liveTyping')
         .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
         .collect()
-    ).find((r) => r.userId === args.userId)
+    ).find((r) => r.userId === identity.subject)
 
     if (existing) {
       await ctx.db.delete(existing._id)
@@ -243,6 +254,7 @@ export const getTypingUsers = query({
     retroId: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireIdentity(ctx)
     return ctx.db
       .query('liveTyping')
       .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
@@ -255,17 +267,19 @@ export const getTypingUsers = query({
 export const setReadyStatus = mutation({
   args: {
     retroId: v.string(),
-    userId: v.string(),
+    // Deprecated: derived from identity server-side. Ignored for authorization.
+    userId: v.optional(v.string()),
     displayName: v.string(),
     isReady: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx)
     const existing = (
       await ctx.db
         .query('liveReadyStatus')
         .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
         .collect()
-    ).find((r) => r.userId === args.userId)
+    ).find((r) => r.userId === identity.subject)
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -276,7 +290,7 @@ export const setReadyStatus = mutation({
     } else {
       await ctx.db.insert('liveReadyStatus', {
         retroId: args.retroId,
-        userId: args.userId,
+        userId: identity.subject,
         displayName: args.displayName,
         isReady: args.isReady,
         updatedAt: Date.now(),
@@ -290,6 +304,7 @@ export const getReadyStatus = query({
     retroId: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireIdentity(ctx)
     return ctx.db
       .query('liveReadyStatus')
       .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
@@ -302,6 +317,7 @@ export const clearAllReady = mutation({
     retroId: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireIdentity(ctx)
     const statuses = await ctx.db
       .query('liveReadyStatus')
       .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))

@@ -9,6 +9,7 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as lib_authz from "../lib/authz.js";
 import type * as liveEstimates from "../liveEstimates.js";
 import type * as liveNotifications from "../liveNotifications.js";
 import type * as liveReports from "../liveReports.js";
@@ -24,6 +25,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  "lib/authz": typeof lib_authz;
   liveEstimates: typeof liveEstimates;
   liveNotifications: typeof liveNotifications;
   liveReports: typeof liveReports;

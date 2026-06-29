@@ -17,6 +17,11 @@ const configSchema = z.object({
     // (no scheme/port); passkeys are bound to it, so it must be stable.
     rpId: z.string(),
     rpName: z.string().default('Retro-Tool'),
+    // JWT (for Convex customJwt verification). `iss` must be byte-stable across
+    // deploys (Convex matches it exactly) and `aud` must equal Convex's
+    // applicationID. Issuer defaults to the API origin; audience to 'convex'.
+    jwtIssuer: z.string().optional(),
+    jwtAudience: z.string().default('convex'),
     microsoft: z
       .object({
         clientId: z.string().optional(),
@@ -80,6 +85,8 @@ export default (): Config => {
       cookieSecure: nodeEnv === 'production',
       rpId: deriveRpId(),
       rpName: process.env.WEBAUTHN_RP_NAME,
+      jwtIssuer: process.env.BETTER_AUTH_JWT_ISSUER,
+      jwtAudience: process.env.BETTER_AUTH_JWT_AUDIENCE,
       microsoft: {
         clientId: process.env.MICROSOFT_CLIENT_ID,
         clientSecret: process.env.MICROSOFT_CLIENT_SECRET,

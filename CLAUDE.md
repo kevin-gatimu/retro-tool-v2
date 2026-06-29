@@ -356,8 +356,11 @@ GitHub Actions handle app deployment (not infra):
 | [docs/api-security.md](docs/api-security.md) | API hardening: Helmet, rate limiting (throttler + Better Auth), CORS, and the CSRF posture / residual risk |
 | [docs/file-naming-conventions.md](docs/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
 | [docs/app-flows.md](docs/app-flows.md) | Step-by-step flows: auth, user approval, org/team management, retro phases, estimates, notifications |
+| [docs/auth-workflows.md](docs/auth-workflows.md) | Per-flow file traces (which UI/API/DB/Convex files get hit) for sign-up/in, OTP, passkey, OAuth, verification, reset, session validation, sockets, sign-out, RBAC |
 | [docs/infrastructure.md](docs/infrastructure.md) | Azure infrastructure overview |
 | [docs/invitations.md](docs/invitations.md) | Invitation system (org + team) |
+| [docs/convex-architecture.md](docs/convex-architecture.md) | How the app uses Convex: deployment topology, every key/secret, projection schema, NestJS→Convex sync layer, UI consumption, JWT auth, deploy workflow |
+| [docs/convex-nestjs-auth.md](docs/convex-nestjs-auth.md) | Deep dive on Convex ↔ NestJS auth: RS256 JWT issue/verify, JWKS exchange, the JWT_ISSUER/AUDIENCE/JWKS_URL config, request lifecycle, vs the admin-key sync path |
 | [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker (local + production) |
 | [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: IceBreakers, AI summaries, Jira/ADO export, SAML |
 | [infra/README.md](infra/README.md) | Azure Bicep deployment commands, outputs, post-provisioning checklist |

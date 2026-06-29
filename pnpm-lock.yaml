@@ -33,6 +33,9 @@ importers:
         specifier: ^1.18.0
         version: 1.35.1(react@19.2.5)
     devDependencies:
+      '@types/node':
+        specifier: ^22.10.7
+        version: 22.19.17
       dotenv-cli:
         specifier: ^8.0.0
         version: 8.0.0

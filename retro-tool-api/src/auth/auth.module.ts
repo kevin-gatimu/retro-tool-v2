@@ -14,6 +14,9 @@ import { OtpService } from './otp/otp.service';
   imports: [
     DatabaseModule,
     BetterAuthModule.forRootAsync({
+      // isGlobal so AuthService is injectable app-wide (e.g. in WsAuthService /
+      // the realtime gateways) without re-importing BetterAuthModule everywhere.
+      isGlobal: true,
       useFactory: (configService: ConfigService<Config>) => ({
         auth: createAuth(configService),
       }),

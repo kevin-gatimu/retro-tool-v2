@@ -1,5 +1,5 @@
 import { ConvexError } from 'convex/values'
-import { mutation, query } from './server'
+import { query, internalMutation } from './server'
 import { v } from 'convex/values'
 import { Aggregate } from '@convex-dev/aggregate'
 import { components } from './_generated/api'
@@ -58,7 +58,7 @@ function requireSystemAdmin(
 
 // ── Write mutations (called from NestJS HTTP Admin API) ───────────────────────
 
-export const upsertRetroStat = mutation({
+export const upsertRetroStat = internalMutation({
   args: {
     retroId: v.string(),
     teamId: v.string(),
@@ -78,7 +78,7 @@ export const upsertRetroStat = mutation({
   },
 })
 
-export const upsertCardStat = mutation({
+export const upsertCardStat = internalMutation({
   args: {
     cardId: v.string(),
     teamId: v.string(),
@@ -101,7 +101,7 @@ export const upsertCardStat = mutation({
   },
 })
 
-export const upsertVoteStat = mutation({
+export const upsertVoteStat = internalMutation({
   args: {
     voteId: v.string(),
     teamId: v.string(),
@@ -124,7 +124,7 @@ export const upsertVoteStat = mutation({
   },
 })
 
-export const upsertActionItemStat = mutation({
+export const upsertActionItemStat = internalMutation({
   args: {
     itemId: v.string(),
     teamId: v.string(),
@@ -169,7 +169,7 @@ export const upsertActionItemStat = mutation({
   },
 })
 
-export const upsertEstimateSessionStat = mutation({
+export const upsertEstimateSessionStat = internalMutation({
   args: {
     sessionId: v.string(),
     teamId: v.string(),
@@ -187,7 +187,7 @@ export const upsertEstimateSessionStat = mutation({
   },
 })
 
-export const upsertUserStat = mutation({
+export const upsertUserStat = internalMutation({
   args: {
     userId: v.string(),
     createdAtMs: v.number(),
@@ -389,7 +389,9 @@ export const getTeamStats = query({
 export const getUserStats = query({
   args: {
     teamId: v.string(),
-    userId: v.string(),
+    // Deprecated: stats are scoped to the authenticated caller (derived from the
+    // JWT). Kept optional for back-compat with older clients; ignored.
+    userId: v.optional(v.string()),
     sinceMs: v.optional(v.number()),
     untilMs: v.optional(v.number()),
   },
@@ -398,9 +400,8 @@ export const getUserStats = query({
     if (!identity) {
       throw new ConvexError('Unauthenticated')
     }
-    if (identity.subject !== args.userId) {
-      throw new ConvexError("Forbidden: cannot access another user's stats")
-    }
+    // Always scope to the caller's own id — never a client-supplied userId.
+    const userId = identity.subject
 
     const since = args.sinceMs ?? 0
     const until = args.untilMs ?? Number.MAX_SAFE_INTEGER
@@ -409,11 +410,11 @@ export const getUserStats = query({
       cardsByTeamUser.count(ctx, {
         bounds: {
           lower: {
-            key: [args.teamId, args.userId, since] as [string, string, number],
+            key: [args.teamId, userId, since] as [string, string, number],
             inclusive: true,
           },
           upper: {
-            key: [args.teamId, args.userId, until] as [string, string, number],
+            key: [args.teamId, userId, until] as [string, string, number],
             inclusive: true,
           },
         },
@@ -421,11 +422,11 @@ export const getUserStats = query({
       votesByTeamUser.count(ctx, {
         bounds: {
           lower: {
-            key: [args.teamId, args.userId, since] as [string, string, number],
+            key: [args.teamId, userId, since] as [string, string, number],
             inclusive: true,
           },
           upper: {
-            key: [args.teamId, args.userId, until] as [string, string, number],
+            key: [args.teamId, userId, until] as [string, string, number],
             inclusive: true,
           },
         },
@@ -434,7 +435,7 @@ export const getUserStats = query({
 
     return {
       teamId: args.teamId,
-      userId: args.userId,
+      userId,
       cardCount,
       voteCount,
     }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useQuery as useConvexQuery } from 'convex/react'
+import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
 import type { FunctionReference } from 'convex/server'
 
 interface RecentRetroProjection {
@@ -21,10 +21,12 @@ const recentRetroProjectionQuery =
 
 export function RetroListConvexSync() {
   const queryClient = useQueryClient()
+  const { isAuthenticated } = useConvexAuth()
   const lastSnapshotRef = useRef<string | null>(null)
-  const projections = useConvexQuery(recentRetroProjectionQuery, {}) as
-    | RecentRetroProjection[]
-    | undefined
+  const projections = useConvexQuery(
+    recentRetroProjectionQuery,
+    isAuthenticated ? {} : 'skip',
+  ) as RecentRetroProjection[] | undefined
 
   useEffect(() => {
     if (!projections) {
