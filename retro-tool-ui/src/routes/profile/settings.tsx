@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { api } from '@/lib/api'
 import { USER_PREFERENCES_ENDPOINTS } from '@/lib/api-endpoints'
 import type { UserNotificationPreferences } from '@/common/types/user-preferences'
+import { usePushNotifications } from '@/hooks/use-push-notifications'
 import { useUserPreferencesMutation } from './hooks/use-user-preferences-mutation'
 import { SettingsSkeleton } from './skeleton'
 
@@ -35,6 +36,24 @@ function SettingsPage() {
   const { data: preferences } = useSuspenseQuery(userPreferencesQueryOptions)
 
   const updateMutation = useUserPreferencesMutation()
+
+  const {
+    isSupported: pushSupported,
+    isSubscribed: pushSubscribed,
+    isLoading: pushLoading,
+    subscribe: subscribePush,
+    unsubscribe: unsubscribePush,
+  } = usePushNotifications()
+
+  const handlePushToggle = async (checked: boolean) => {
+    if (checked) {
+      await subscribePush()
+    } else {
+      await unsubscribePush()
+    }
+    // Remember the intent in the shared preferences record.
+    updateMutation.mutate({ uiPreferences: { pushNotifications: checked } })
+  }
 
   return (
     <div className="space-y-6">
@@ -72,6 +91,22 @@ function SettingsPage() {
               onCheckedChange={(checked) =>
                 updateMutation.mutate({ emailVerificationReminders: checked })
               }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Push notifications</Label>
+              <p className="text-sm text-muted-foreground">
+                {pushSupported
+                  ? 'Get browser push notifications on this device'
+                  : 'Not supported in this browser'}
+              </p>
+            </div>
+            <Switch
+              checked={pushSubscribed}
+              disabled={!pushSupported || pushLoading}
+              onCheckedChange={(checked) => void handlePushToggle(checked)}
             />
           </div>
         </CardContent>

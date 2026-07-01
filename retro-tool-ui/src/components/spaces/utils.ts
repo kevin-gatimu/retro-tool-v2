@@ -28,7 +28,8 @@ export interface SessionLike {
  * sessions (so a session whose team you've since left still shows). Names and
  * emojis are seeded from `/api/teams` first, falling back to the fields carried
  * on each session. `count` is the number of sessions per team in the supplied
- * (already space-agnostic) list.
+ * (already space-agnostic) list. Teams with no sessions are omitted — an empty
+ * space is not a useful filter.
  */
 export function deriveSpaces(
   teams: Pick<Team, 'id' | 'name' | 'emoji'>[],
@@ -60,7 +61,9 @@ export function deriveSpaces(
     }
   }
 
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  return Array.from(map.values())
+    .filter((space) => space.count > 0)
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** Retro completed bucket iff status === 'completed'. */
@@ -74,6 +77,11 @@ export function retroStatusBucket(status: string): StatusBucket {
  * getActiveSessions, which includes revealed.
  */
 export function estimateStatusBucket(status: string): StatusBucket {
+  return status === 'completed' ? 'completed' : 'ongoing'
+}
+
+/** Icebreaker completed bucket iff status === 'completed'; else ongoing. */
+export function icebreakerStatusBucket(status: string): StatusBucket {
   return status === 'completed' ? 'completed' : 'ongoing'
 }
 

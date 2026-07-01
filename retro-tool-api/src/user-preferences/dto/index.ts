@@ -21,9 +21,12 @@ export const uiPreferencesSchema = z.looseObject({
     .looseObject({
       retros: sessionViewSchema.optional(),
       estimates: sessionViewSchema.optional(),
+      icebreakers: sessionViewSchema.optional(),
     })
     .partial()
     .optional(),
+  theme: z.enum(['light', 'dark', 'system']).optional(),
+  pushNotifications: z.boolean().optional(),
 });
 
 // Zod schemas for validation
@@ -48,6 +51,7 @@ export type {
   GroupByMode,
   LayoutMode,
   SortMode,
+  ThemePreference,
 } from '../types';
 
 // Swagger DTO classes

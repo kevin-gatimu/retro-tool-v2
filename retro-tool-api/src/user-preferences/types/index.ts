@@ -46,10 +46,18 @@ export interface SessionView {
   collapsedGroups?: string[];
 }
 
+/** Preferred colour theme. `system` follows the OS setting. */
+export type ThemePreference = 'light' | 'dark' | 'system';
+
 /** Root jsonb blob. Keyed by list page so each remembers its own view. */
 export interface UiPreferences {
   sessionViews?: {
     retros?: Partial<SessionView>;
     estimates?: Partial<SessionView>;
+    icebreakers?: Partial<SessionView>;
   };
+  /** Colour theme, synced across devices (localStorage still caches it). */
+  theme?: ThemePreference;
+  /** Whether the user has opted into browser push notifications. */
+  pushNotifications?: boolean;
 }
