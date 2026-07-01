@@ -14,6 +14,8 @@ import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { EstimatesModule } from './estimates/estimates.module';
 import { EstimateTemplatesModule } from './estimate-templates/estimate-templates.module';
+import { IcebreakersModule } from './icebreakers/icebreakers.module';
+import { IcebreakerTemplatesModule } from './icebreaker-templates/icebreaker-templates.module';
 import { TeamsModule } from './teams/teams.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { ActionItemsModule } from './action-items/action-items.module';
@@ -50,6 +52,8 @@ import { join } from 'path';
     NotificationsModule,
     EstimateTemplatesModule,
     EstimatesModule,
+    IcebreakerTemplatesModule,
+    IcebreakersModule,
     TeamsModule,
     SessionsModule,
     ActionItemsModule,

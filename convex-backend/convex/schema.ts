@@ -60,6 +60,32 @@ export default defineSchema({
     .index('by_session_id', ['sessionId'])
     .index('by_session_user', ['sessionId', 'userId']),
 
+  liveIcebreakerSessions: defineTable({
+    sessionId: v.string(),
+    teamId: v.string(),
+    status: v.union(
+      v.literal('waiting'),
+      v.literal('curating'),
+      v.literal('presenting'),
+      v.literal('completed'),
+    ),
+    currentPromptId: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index('by_session_id', ['sessionId'])
+    .index('by_team_id', ['teamId']),
+
+  // Full icebreaker session snapshot pushed from NestJS after each mutation.
+  liveIcebreakerBoards: defineTable({
+    sessionId: v.string(),
+    userId: v.string(),
+    // JSON-serialised icebreaker SessionDetail (deck, prompts, responses, etc.)
+    snapshot: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_session_id', ['sessionId'])
+    .index('by_session_user', ['sessionId', 'userId']),
+
   liveNotifications: defineTable({
     notificationId: v.string(),
     userId: v.string(),

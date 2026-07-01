@@ -5,7 +5,8 @@ import {
   ChevronRight,
   FileText,
   Lock,
-  Zap,
+  LogIn,
+  UserPlus,
   Shield,
   BarChart3,
   Bell,
@@ -15,7 +16,6 @@ import {
   CalendarClock,
   Music,
   CheckCircle2,
-  ArrowRight,
   Cpu,
   Globe,
   MessageSquare,
@@ -740,14 +740,15 @@ function LandingNav() {
               <div className="w-px h-4 bg-gray-800 mx-1" />
               <Link
                 to="/auth/sign-in"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all duration-200 font-mono"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-gray-600 text-gray-100 hover:text-white hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all duration-200 font-mono"
               >
+                <LogIn className="h-3.5 w-3.5" />
                 Sign In
               </Link>
               <Link to="/auth/sign-up">
                 <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-black bg-emerald-500 hover:bg-emerald-400 transition-all duration-200 font-mono cursor-pointer">
+                  <UserPlus className="h-3.5 w-3.5" strokeWidth={3} />
                   Sign Up
-                  <ChevronRight className="h-3.5 w-3.5" strokeWidth={3} />
                 </button>
               </Link>
             </nav>
@@ -840,7 +841,7 @@ function LandingPage() {
                 hover:shadow-[0_20px_40px_-10px_rgba(16,185,129,0.5)]"
             >
               <Link to="/auth/sign-up">
-                <Zap className="h-4 w-4" />
+                <UserPlus className="h-4 w-4" />
                 Sign Up
               </Link>
             </Button>
@@ -848,12 +849,12 @@ function LandingPage() {
               size="lg"
               variant="outline"
               asChild
-              className="w-full sm:w-auto gap-2 border-gray-700 text-gray-300 hover:border-emerald-500/50 hover:text-white hover:bg-emerald-500/5 font-medium px-8
+              className="w-full sm:w-auto gap-2 border-gray-600 dark:border-gray-600 bg-transparent dark:bg-transparent text-gray-100 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 hover:text-white hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 font-medium px-8
                 transition-all duration-300 hover:scale-105 hover:-translate-y-1"
             >
               <Link to="/auth/sign-in">
+                <LogIn className="h-4 w-4" />
                 Sign In
-                <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
           </div>
@@ -1384,19 +1385,19 @@ function LandingPage() {
                 hover:shadow-[0_25px_50px_-10px_rgba(16,185,129,0.5)]"
             >
               <Link to="/auth/sign-up">
-                <Zap className="h-5 w-5" />
+                <UserPlus className="h-5 w-5" />
                 Sign Up
               </Link>
             </Button>
             <Button
               size="lg"
-              variant="ghost"
+              variant="outline"
               asChild
-              className="w-full sm:w-auto gap-2 text-gray-400 hover:text-white hover:bg-white/5 font-medium px-8"
+              className="w-full sm:w-auto gap-2 border-gray-600 dark:border-gray-600 bg-transparent dark:bg-transparent text-gray-100 hover:text-white hover:border-emerald-500/50 dark:hover:border-emerald-500/50 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 font-medium px-8"
             >
               <Link to="/auth/sign-in">
+                <LogIn className="h-4 w-4" />
                 Already have an account? Sign in
-                <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
           </div>

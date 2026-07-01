@@ -6,6 +6,7 @@ import { getBearerToken } from './auth-client'
 let notificationSocket: Socket | null = null
 let retroSocket: Socket | null = null
 let estimateSocket: Socket | null = null
+let icebreakerSocket: Socket | null = null
 
 const SOCKET_OPTS = {
   // Bearer token (primary) — the API validates it via Better Auth's getSession.
@@ -41,4 +42,11 @@ export function getEstimateSocket(): Socket {
     estimateSocket = io(`${env.VITE_API_URL}/estimates`, SOCKET_OPTS)
   }
   return estimateSocket
+}
+
+export function getIcebreakerSocket(): Socket {
+  if (!icebreakerSocket) {
+    icebreakerSocket = io(`${env.VITE_API_URL}/icebreakers`, SOCKET_OPTS)
+  }
+  return icebreakerSocket
 }

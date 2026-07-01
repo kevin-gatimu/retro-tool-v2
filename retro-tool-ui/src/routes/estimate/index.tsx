@@ -339,9 +339,14 @@ function ActiveSessionCard({ item }: { item: EstimateListItem }) {
   return (
     <Card className="hover:border-primary/50 transition-colors h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">{item.name}</CardTitle>
-          <Badge variant={status === 'voting' ? 'default' : 'secondary'}>
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <CardTitle className="min-w-0 flex-1 truncate text-lg">
+            {item.name}
+          </CardTitle>
+          <Badge
+            variant={status === 'voting' ? 'default' : 'secondary'}
+            className="shrink-0 whitespace-nowrap"
+          >
             {status === 'waiting'
               ? 'Waiting'
               : status === 'voting'
@@ -349,7 +354,7 @@ function ActiveSessionCard({ item }: { item: EstimateListItem }) {
                 : 'Revealed'}
           </Badge>
         </div>
-        <CardDescription>{item.teamName}</CardDescription>
+        <CardDescription className="truncate">{item.teamName}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-between">
@@ -388,7 +393,7 @@ function SessionHistoryCard({ item }: { item: EstimateListItem }) {
     <>
       <Card className="hover:border-primary/50 transition-colors">
         <CardHeader className="pb-2">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start justify-between gap-4">
             <Link
               to="/estimate/$sessionId"
               params={{ sessionId: item.id }}
@@ -405,7 +410,9 @@ function SessionHistoryCard({ item }: { item: EstimateListItem }) {
               </CardDescription>
             </Link>
             <div className="flex items-center gap-2 shrink-0">
-              <Badge variant="secondary">Completed</Badge>
+              <Badge variant="secondary" className="whitespace-nowrap">
+                Completed
+              </Badge>
               {c?.canDelete && (
                 <Button
                   variant="ghost"
@@ -423,7 +430,7 @@ function SessionHistoryCard({ item }: { item: EstimateListItem }) {
         </CardHeader>
         <Link to="/estimate/$sessionId" params={{ sessionId: item.id }}>
           <CardContent className="pt-0">
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
                 {c?.participantCount ?? 0} participants

@@ -165,6 +165,22 @@ export const ESTIMATES_ENDPOINTS = {
 } as const
 
 // ---------------------------------------------------------------------------
+// Icebreakers (icebreaker sessions)
+// ---------------------------------------------------------------------------
+export const ICEBREAKERS_ENDPOINTS = {
+  LIST: '/api/icebreakers',
+  ACTIVE: '/api/icebreakers/active',
+  HISTORY: '/api/icebreakers/history',
+
+  BY_ID: (id: string) => `/api/icebreakers/${id}`,
+  PERMANENT_DELETE: (id: string) => `/api/icebreakers/${id}/permanent`,
+  JOIN: (id: string) => `/api/icebreakers/${id}/join`,
+  SWIPE: (id: string) => `/api/icebreakers/${id}/swipe`,
+  ADVANCE: (id: string) => `/api/icebreakers/${id}/advance`,
+  TIMER: (id: string) => `/api/icebreakers/${id}/timer`,
+} as const
+
+// ---------------------------------------------------------------------------
 // Sessions (auth / user sessions)
 // ---------------------------------------------------------------------------
 export const SESSIONS_ENDPOINTS = {
@@ -248,6 +264,15 @@ export const ESTIMATE_TEMPLATES_ENDPOINTS = {
   LIST: '/api/estimates/templates',
   SEED: '/api/estimates/templates/seed',
   BY_ID: (id: string) => `/api/estimates/templates/${id}`,
+} as const
+
+// ---------------------------------------------------------------------------
+// Icebreaker Templates
+// ---------------------------------------------------------------------------
+export const ICEBREAKER_TEMPLATES_ENDPOINTS = {
+  LIST: '/api/icebreakers/templates',
+  SEED: '/api/icebreakers/templates/seed',
+  BY_ID: (id: string) => `/api/icebreakers/templates/${id}`,
 } as const
 
 // ---------------------------------------------------------------------------

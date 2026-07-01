@@ -176,6 +176,29 @@ export class NotificationsService {
     );
   }
 
+  async notifyTeamOfIcebreakerSession(
+    sessionId: string,
+    sessionName: string,
+    teamId: string,
+  ): Promise<void> {
+    const members = await this.database
+      .select({ userId: teamSchema.teamMember.userId })
+      .from(teamSchema.teamMember)
+      .where(eq(teamSchema.teamMember.teamId, teamId));
+
+    await Promise.all(
+      members.map((m) =>
+        this.createAndEmit({
+          userId: m.userId,
+          type: NOTIFICATION_TYPES.IcebreakerSessionCreated,
+          title: 'New icebreaker session',
+          message: `A new icebreaker session "${sessionName}" has started.`,
+          link: `/icebreakers/${sessionId}`,
+        }),
+      ),
+    );
+  }
+
   async notifyTeamOfRetroLobbyOpen(
     retroId: string,
     retroName: string,

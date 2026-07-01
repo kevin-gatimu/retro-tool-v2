@@ -3,6 +3,7 @@ export type RealtimeBackend = 'socket-io' | 'convex'
 export interface RealtimeFeatureFlags {
   estimatesRealtimeBackend: RealtimeBackend
   retrosRealtimeBackend: RealtimeBackend
+  icebreakersRealtimeBackend: RealtimeBackend
   notificationsRealtimeBackend: RealtimeBackend
 }
 
@@ -10,7 +11,7 @@ export interface ProjectionSyncEnvelope<TPayload> {
   eventId: string
   eventType: string
   aggregateId: string
-  aggregateType: 'estimate' | 'retro'
+  aggregateType: 'estimate' | 'retro' | 'icebreaker'
   occurredAt: string
   payload: TPayload
 }
@@ -34,6 +35,13 @@ export interface RetroProjectionPayload {
     | 'completed'
   currentDiscussionCardId?: string
   currentDiscussionActionItemId?: string
+  updatedAt: string
+}
+
+export interface IcebreakerProjectionPayload {
+  sessionId: string
+  currentPromptId?: string
+  status: 'waiting' | 'curating' | 'presenting' | 'completed'
   updatedAt: string
 }
 

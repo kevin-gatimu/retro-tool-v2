@@ -24,6 +24,7 @@ import { Route as TeamsIndexRouteImport } from './routes/teams/index'
 import { Route as RetrosIndexRouteImport } from './routes/retros/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
 import { Route as OrganizationsIndexRouteImport } from './routes/organizations/index'
+import { Route as IcebreakersIndexRouteImport } from './routes/icebreakers/index'
 import { Route as EstimateIndexRouteImport } from './routes/estimate/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
@@ -34,6 +35,8 @@ import { Route as ProfileSettingsRouteImport } from './routes/profile/settings'
 import { Route as ProfileSessionsRouteImport } from './routes/profile/sessions'
 import { Route as ProfileSecurityRouteImport } from './routes/profile/security'
 import { Route as OrganizationsOrgIdRouteImport } from './routes/organizations/$orgId'
+import { Route as IcebreakersNewRouteImport } from './routes/icebreakers/new'
+import { Route as IcebreakersSessionIdRouteImport } from './routes/icebreakers/$sessionId'
 import { Route as EstimateNewRouteImport } from './routes/estimate/new'
 import { Route as EstimateSessionIdRouteImport } from './routes/estimate/$sessionId'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard/settings'
@@ -130,6 +133,11 @@ const OrganizationsIndexRoute = OrganizationsIndexRouteImport.update({
   path: '/organizations/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IcebreakersIndexRoute = IcebreakersIndexRouteImport.update({
+  id: '/icebreakers/',
+  path: '/icebreakers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EstimateIndexRoute = EstimateIndexRouteImport.update({
   id: '/estimate/',
   path: '/estimate/',
@@ -178,6 +186,16 @@ const ProfileSecurityRoute = ProfileSecurityRouteImport.update({
 const OrganizationsOrgIdRoute = OrganizationsOrgIdRouteImport.update({
   id: '/organizations/$orgId',
   path: '/organizations/$orgId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IcebreakersNewRoute = IcebreakersNewRouteImport.update({
+  id: '/icebreakers/new',
+  path: '/icebreakers/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IcebreakersSessionIdRoute = IcebreakersSessionIdRouteImport.update({
+  id: '/icebreakers/$sessionId',
+  path: '/icebreakers/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EstimateNewRoute = EstimateNewRouteImport.update({
@@ -313,6 +331,8 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/estimate/$sessionId': typeof EstimateSessionIdRoute
   '/estimate/new': typeof EstimateNewRoute
+  '/icebreakers/$sessionId': typeof IcebreakersSessionIdRoute
+  '/icebreakers/new': typeof IcebreakersNewRoute
   '/organizations/$orgId': typeof OrganizationsOrgIdRoute
   '/profile/security': typeof ProfileSecurityRoute
   '/profile/sessions': typeof ProfileSessionsRoute
@@ -323,6 +343,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/estimate/': typeof EstimateIndexRoute
+  '/icebreakers/': typeof IcebreakersIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/retros/': typeof RetrosIndexRoute
@@ -357,6 +378,8 @@ export interface FileRoutesByTo {
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/estimate/$sessionId': typeof EstimateSessionIdRoute
   '/estimate/new': typeof EstimateNewRoute
+  '/icebreakers/$sessionId': typeof IcebreakersSessionIdRoute
+  '/icebreakers/new': typeof IcebreakersNewRoute
   '/organizations/$orgId': typeof OrganizationsOrgIdRoute
   '/profile/security': typeof ProfileSecurityRoute
   '/profile/sessions': typeof ProfileSessionsRoute
@@ -367,6 +390,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/estimate': typeof EstimateIndexRoute
+  '/icebreakers': typeof IcebreakersIndexRoute
   '/organizations': typeof OrganizationsIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/retros': typeof RetrosIndexRoute
@@ -405,6 +429,8 @@ export interface FileRoutesById {
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/estimate/$sessionId': typeof EstimateSessionIdRoute
   '/estimate/new': typeof EstimateNewRoute
+  '/icebreakers/$sessionId': typeof IcebreakersSessionIdRoute
+  '/icebreakers/new': typeof IcebreakersNewRoute
   '/organizations/$orgId': typeof OrganizationsOrgIdRoute
   '/profile/security': typeof ProfileSecurityRoute
   '/profile/sessions': typeof ProfileSessionsRoute
@@ -415,6 +441,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/estimate/': typeof EstimateIndexRoute
+  '/icebreakers/': typeof IcebreakersIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/retros/': typeof RetrosIndexRoute
@@ -454,6 +481,8 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/estimate/$sessionId'
     | '/estimate/new'
+    | '/icebreakers/$sessionId'
+    | '/icebreakers/new'
     | '/organizations/$orgId'
     | '/profile/security'
     | '/profile/sessions'
@@ -464,6 +493,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/dashboard/'
     | '/estimate/'
+    | '/icebreakers/'
     | '/organizations/'
     | '/profile/'
     | '/retros/'
@@ -498,6 +528,8 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/estimate/$sessionId'
     | '/estimate/new'
+    | '/icebreakers/$sessionId'
+    | '/icebreakers/new'
     | '/organizations/$orgId'
     | '/profile/security'
     | '/profile/sessions'
@@ -508,6 +540,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/dashboard'
     | '/estimate'
+    | '/icebreakers'
     | '/organizations'
     | '/profile'
     | '/retros'
@@ -545,6 +578,8 @@ export interface FileRouteTypes {
     | '/dashboard/settings'
     | '/estimate/$sessionId'
     | '/estimate/new'
+    | '/icebreakers/$sessionId'
+    | '/icebreakers/new'
     | '/organizations/$orgId'
     | '/profile/security'
     | '/profile/sessions'
@@ -555,6 +590,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/dashboard/'
     | '/estimate/'
+    | '/icebreakers/'
     | '/organizations/'
     | '/profile/'
     | '/retros/'
@@ -575,11 +611,14 @@ export interface RootRouteChildren {
   TermsofserviceRoute: typeof TermsofserviceRoute
   EstimateSessionIdRoute: typeof EstimateSessionIdRoute
   EstimateNewRoute: typeof EstimateNewRoute
+  IcebreakersSessionIdRoute: typeof IcebreakersSessionIdRoute
+  IcebreakersNewRoute: typeof IcebreakersNewRoute
   OrganizationsOrgIdRoute: typeof OrganizationsOrgIdRoute
   RetrosRetroIdRoute: typeof RetrosRetroIdRoute
   RetrosNewRoute: typeof RetrosNewRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRoute
   EstimateIndexRoute: typeof EstimateIndexRoute
+  IcebreakersIndexRoute: typeof IcebreakersIndexRoute
   OrganizationsIndexRoute: typeof OrganizationsIndexRoute
   RetrosIndexRoute: typeof RetrosIndexRoute
   TeamsIndexRoute: typeof TeamsIndexRoute
@@ -692,6 +731,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizationsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/icebreakers/': {
+      id: '/icebreakers/'
+      path: '/icebreakers'
+      fullPath: '/icebreakers/'
+      preLoaderRoute: typeof IcebreakersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/estimate/': {
       id: '/estimate/'
       path: '/estimate'
@@ -760,6 +806,20 @@ declare module '@tanstack/react-router' {
       path: '/organizations/$orgId'
       fullPath: '/organizations/$orgId'
       preLoaderRoute: typeof OrganizationsOrgIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/icebreakers/new': {
+      id: '/icebreakers/new'
+      path: '/icebreakers/new'
+      fullPath: '/icebreakers/new'
+      preLoaderRoute: typeof IcebreakersNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/icebreakers/$sessionId': {
+      id: '/icebreakers/$sessionId'
+      path: '/icebreakers/$sessionId'
+      fullPath: '/icebreakers/$sessionId'
+      preLoaderRoute: typeof IcebreakersSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/estimate/new': {
@@ -1002,11 +1062,14 @@ const rootRouteChildren: RootRouteChildren = {
   TermsofserviceRoute: TermsofserviceRoute,
   EstimateSessionIdRoute: EstimateSessionIdRoute,
   EstimateNewRoute: EstimateNewRoute,
+  IcebreakersSessionIdRoute: IcebreakersSessionIdRoute,
+  IcebreakersNewRoute: IcebreakersNewRoute,
   OrganizationsOrgIdRoute: OrganizationsOrgIdRoute,
   RetrosRetroIdRoute: RetrosRetroIdRoute,
   RetrosNewRoute: RetrosNewRoute,
   TeamsTeamIdRoute: TeamsTeamIdRoute,
   EstimateIndexRoute: EstimateIndexRoute,
+  IcebreakersIndexRoute: IcebreakersIndexRoute,
   OrganizationsIndexRoute: OrganizationsIndexRoute,
   RetrosIndexRoute: RetrosIndexRoute,
   TeamsIndexRoute: TeamsIndexRoute,

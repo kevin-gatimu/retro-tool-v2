@@ -4,8 +4,10 @@ import { internalMutation } from './_generated/server'
 const CLEARABLE_TABLES = [
   'liveRetroSessions',
   'liveEstimateSessions',
+  'liveIcebreakerSessions',
   'liveRetroBoards',
   'liveEstimateBoards',
+  'liveIcebreakerBoards',
   'liveNotifications',
   'livePresence',
   'liveTyping',

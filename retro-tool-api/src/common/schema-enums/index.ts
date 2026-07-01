@@ -4,6 +4,9 @@ import {
   EMAIL_LOG_STATUSES,
   EMAIL_LOG_TYPES,
   ESTIMATE_SESSION_STATUSES,
+  ICEBREAKER_FLAVOURS,
+  ICEBREAKER_PROMPT_DECISIONS,
+  ICEBREAKER_SESSION_STATUSES,
   NOTIFICATION_TYPES,
   ORG_MEMBER_ROLES,
   RETRO_STATUSES,
@@ -96,6 +99,7 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   NOTIFICATION_TYPES.ActionItemAssigned,
   NOTIFICATION_TYPES.ActionItemDueSoon,
   NOTIFICATION_TYPES.EstimateSessionCreated,
+  NOTIFICATION_TYPES.IcebreakerSessionCreated,
   NOTIFICATION_TYPES.ConvexTableClear,
 ]);
 
@@ -106,6 +110,29 @@ export const estimateSessionStatusEnum = pgEnum('estimate_session_status', [
   ESTIMATE_SESSION_STATUSES.Revealed,
   ESTIMATE_SESSION_STATUSES.Completed,
 ]);
+
+// Icebreakers
+export const icebreakerSessionStatusEnum = pgEnum('icebreaker_session_status', [
+  ICEBREAKER_SESSION_STATUSES.Waiting,
+  ICEBREAKER_SESSION_STATUSES.Curating,
+  ICEBREAKER_SESSION_STATUSES.Presenting,
+  ICEBREAKER_SESSION_STATUSES.Completed,
+]);
+
+export const icebreakerFlavourEnum = pgEnum('icebreaker_flavour', [
+  ICEBREAKER_FLAVOURS.Fun,
+  ICEBREAKER_FLAVOURS.Professional,
+  ICEBREAKER_FLAVOURS.Creative,
+]);
+
+export const icebreakerPromptDecisionEnum = pgEnum(
+  'icebreaker_prompt_decision',
+  [
+    ICEBREAKER_PROMPT_DECISIONS.Pending,
+    ICEBREAKER_PROMPT_DECISIONS.Kept,
+    ICEBREAKER_PROMPT_DECISIONS.Skipped,
+  ],
+);
 
 // Email
 export const emailLogTypeEnum = pgEnum('email_log_type', [

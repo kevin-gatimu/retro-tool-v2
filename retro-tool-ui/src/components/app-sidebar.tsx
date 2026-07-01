@@ -12,6 +12,7 @@ import {
   Moon,
   Shield,
   Spade,
+  Sparkles,
   Sun,
   User,
   Users,
@@ -90,14 +91,22 @@ const retroNavItems: NavItem[] = [
     allowedRoles: ALL_ROLES,
   },
   {
+    title: 'Icebreakers',
+    url: '/icebreakers',
+    icon: Sparkles,
+    allowedRoles: ALL_ROLES,
+  },
+]
+
+// Templates + Reports form their own small group, visually separated from the
+// session tools above.
+const libraryNavItems: NavItem[] = [
+  {
     title: 'Templates',
     url: '/templates',
     icon: FileText,
     allowedRoles: ALL_ROLES,
   },
-]
-
-const reportsNavItems: NavItem[] = [
   {
     title: 'Reports',
     url: '/reports',
@@ -220,7 +229,7 @@ export function AppSidebar() {
   const visibleRetroNavItems = retroNavItems.filter((item) =>
     item.allowedRoles.includes(currentUserRole),
   )
-  const visibleReportsNavItems = reportsNavItems.filter((item) =>
+  const visibleLibraryNavItems = libraryNavItems.filter((item) =>
     item.allowedRoles.includes(currentUserRole),
   )
   const visibleUserNavItems = userNavItems.filter((item) =>
@@ -287,19 +296,28 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-              {visibleReportsNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {visibleLibraryNavItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleLibraryNavItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                      <Link to={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <Collapsible defaultOpen asChild className="group/account-section">
           <SidebarGroup>

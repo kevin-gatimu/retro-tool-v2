@@ -4,7 +4,7 @@
 
 ---
 
-## IceBreakers & Team Building
+## Icebreakers
 
 Enhance collaboration and boost team spirit before every retro session.
 
@@ -42,19 +42,19 @@ Simplify feedback collection through easy-to-use tools. Foster collaboration and
 
 ### Export Integrations
 
-| Target | Description |
-|---|---|
-| **Jira** | Export action items and feedback cards to Jira with a single click. Syncs directly into your project management workflow. |
-| **Azure DevOps** | Export action items directly into Azure DevOps work items. Track tasks and progress within your dev pipeline. |
-| **Confluence** | Export retrospectives in Confluence-friendly format. Easily store and share within your team or organisation. |
+| Target                 | Description                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Jira**         | Export action items and feedback cards to Jira with a single click. Syncs directly into your project management workflow. |
+| **Azure DevOps** | Export action items directly into Azure DevOps work items. Track tasks and progress within your dev pipeline.             |
+| **Confluence**   | Export retrospectives in Confluence-friendly format. Easily store and share within your team or organisation.             |
 
 ### Communication & Collaboration
 
-| Platform | Description |
-|---|---|
-| **Microsoft Teams** | Run retrospectives directly inside MS Teams. No context switching. |
-| **Slack** | Run retros, collect feedback, and automate action items without leaving Slack. |
-| **Outlook** | Schedule retro meetings, sync reminders, and follow-up actions to your Outlook calendar. |
+| Platform                  | Description                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------------------- |
+| **Microsoft Teams** | Run retrospectives directly inside MS Teams. No context switching.                       |
+| **Slack**           | Run retros, collect feedback, and automate action items without leaving Slack.           |
+| **Outlook**         | Schedule retro meetings, sync reminders, and follow-up actions to your Outlook calendar. |
 
 ### Project & Time Tracking
 
@@ -84,3 +84,4 @@ Spaces are a way to manage all sessions for your organisation or team in one pla
 - **Public API Access** — programmatic access to retro data and actions
 - Fine-grained permissions and audit logging
 - Org-wide policy controls and compliance exports
+

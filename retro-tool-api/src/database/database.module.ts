@@ -12,6 +12,7 @@ import * as userPreferencesSchema from '../user-preferences/schema';
 import * as retrosSchema from '../retros/schema';
 import * as notificationsSchema from '../notifications/schema';
 import * as estimatesSchema from '../estimates/schema';
+import * as icebreakersSchema from '../icebreakers/schema';
 import * as emailSchema from '../email/schema';
 
 @Module({
@@ -48,6 +49,7 @@ import * as emailSchema from '../email/schema';
             ...retrosSchema,
             ...notificationsSchema,
             ...estimatesSchema,
+            ...icebreakersSchema,
             ...emailSchema,
           },
         });
