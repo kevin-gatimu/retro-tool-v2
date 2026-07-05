@@ -11,6 +11,7 @@ import {
   ORG_MEMBER_ROLES,
   RETRO_STATUSES,
   RETRO_VOTE_TYPES,
+  STANDUP_CADENCES,
   TEAM_JOIN_REQUEST_STATUSES,
   TEAM_MEMBER_TAGS,
   USER_ROLES,
@@ -100,6 +101,8 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   NOTIFICATION_TYPES.ActionItemDueSoon,
   NOTIFICATION_TYPES.EstimateSessionCreated,
   NOTIFICATION_TYPES.IcebreakerSessionCreated,
+  NOTIFICATION_TYPES.StandupCreated,
+  NOTIFICATION_TYPES.StandupCommentAdded,
   NOTIFICATION_TYPES.ConvexTableClear,
 ]);
 
@@ -133,6 +136,13 @@ export const icebreakerPromptDecisionEnum = pgEnum(
     ICEBREAKER_PROMPT_DECISIONS.Skipped,
   ],
 );
+
+// Standups
+export const standupCadenceEnum = pgEnum('standup_cadence', [
+  STANDUP_CADENCES.Daily,
+  STANDUP_CADENCES.Weekly,
+  STANDUP_CADENCES.Fortnightly,
+]);
 
 // Email
 export const emailLogTypeEnum = pgEnum('email_log_type', [

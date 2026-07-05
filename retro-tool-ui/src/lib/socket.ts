@@ -7,6 +7,7 @@ let notificationSocket: Socket | null = null
 let retroSocket: Socket | null = null
 let estimateSocket: Socket | null = null
 let icebreakerSocket: Socket | null = null
+let standupSocket: Socket | null = null
 
 const SOCKET_OPTS = {
   // Bearer token (primary) — the API validates it via Better Auth's getSession.
@@ -49,4 +50,11 @@ export function getIcebreakerSocket(): Socket {
     icebreakerSocket = io(`${env.VITE_API_URL}/icebreakers`, SOCKET_OPTS)
   }
   return icebreakerSocket
+}
+
+export function getStandupSocket(): Socket {
+  if (!standupSocket) {
+    standupSocket = io(`${env.VITE_API_URL}/standups`, SOCKET_OPTS)
+  }
+  return standupSocket
 }

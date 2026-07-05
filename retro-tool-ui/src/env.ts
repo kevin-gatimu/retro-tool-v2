@@ -37,6 +37,9 @@ export const env = createEnv({
     VITE_ICEBREAKERS_REALTIME_BACKEND: z
       .enum(['socket-io', 'convex'])
       .default('socket-io'),
+    VITE_STANDUPS_REALTIME_BACKEND: z
+      .enum(['socket-io', 'convex'])
+      .default('socket-io'),
     VITE_NOTIFICATIONS_REALTIME_BACKEND: z
       .enum(['socket-io', 'convex'])
       .default('socket-io'),

@@ -4,6 +4,7 @@ export interface RealtimeFeatureFlags {
   estimatesRealtimeBackend: RealtimeBackend
   retrosRealtimeBackend: RealtimeBackend
   icebreakersRealtimeBackend: RealtimeBackend
+  standupsRealtimeBackend: RealtimeBackend
   notificationsRealtimeBackend: RealtimeBackend
 }
 
@@ -11,7 +12,7 @@ export interface ProjectionSyncEnvelope<TPayload> {
   eventId: string
   eventType: string
   aggregateId: string
-  aggregateType: 'estimate' | 'retro' | 'icebreaker'
+  aggregateType: 'estimate' | 'retro' | 'icebreaker' | 'standup'
   occurredAt: string
   payload: TPayload
 }
@@ -42,6 +43,13 @@ export interface IcebreakerProjectionPayload {
   sessionId: string
   currentPromptId?: string
   status: 'waiting' | 'curating' | 'presenting' | 'completed'
+  updatedAt: string
+}
+
+export interface StandupProjectionPayload {
+  standupId: string
+  entryDate: string
+  teamId: string
   updatedAt: string
 }
 

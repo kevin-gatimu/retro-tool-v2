@@ -181,6 +181,36 @@ export const ICEBREAKERS_ENDPOINTS = {
 } as const
 
 // ---------------------------------------------------------------------------
+// Standups (async daily standups)
+// ---------------------------------------------------------------------------
+export const STANDUPS_ENDPOINTS = {
+  LIST: '/api/standups',
+
+  BY_ID: (id: string) => `/api/standups/${id}`,
+  ENTRY: (id: string, date: string) => `/api/standups/${id}/entries/${date}`,
+  SUBMISSION: (id: string, date: string) =>
+    `/api/standups/${id}/entries/${date}/submission`,
+  COMMENTS: (submissionId: string) =>
+    `/api/standups/submissions/${submissionId}/comments`,
+  COMMENT_BY_ID: (commentId: string) => `/api/standups/comments/${commentId}`,
+  REACTIONS: (submissionId: string) =>
+    `/api/standups/submissions/${submissionId}/reactions`,
+  REACTION_BY_EMOJI: (submissionId: string, emoji: string) =>
+    `/api/standups/submissions/${submissionId}/reactions/${encodeURIComponent(emoji)}`,
+} as const
+
+// ---------------------------------------------------------------------------
+// Polls
+// ---------------------------------------------------------------------------
+export const POLLS_ENDPOINTS = {
+  LIST: '/api/polls',
+
+  BY_ID: (id: string) => `/api/polls/${id}`,
+  VOTE: (id: string) => `/api/polls/${id}/vote`,
+  CLOSED: (id: string) => `/api/polls/${id}/closed`,
+} as const
+
+// ---------------------------------------------------------------------------
 // Sessions (auth / user sessions)
 // ---------------------------------------------------------------------------
 export const SESSIONS_ENDPOINTS = {

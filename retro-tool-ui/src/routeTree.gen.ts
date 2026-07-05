@@ -21,14 +21,18 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TeamsIndexRouteImport } from './routes/teams/index'
+import { Route as StandupsIndexRouteImport } from './routes/standups/index'
 import { Route as RetrosIndexRouteImport } from './routes/retros/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
+import { Route as PollsIndexRouteImport } from './routes/polls/index'
 import { Route as OrganizationsIndexRouteImport } from './routes/organizations/index'
 import { Route as IcebreakersIndexRouteImport } from './routes/icebreakers/index'
 import { Route as EstimateIndexRouteImport } from './routes/estimate/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as TeamsTeamIdRouteImport } from './routes/teams/$teamId'
+import { Route as StandupsNewRouteImport } from './routes/standups/new'
+import { Route as StandupsStandupIdRouteImport } from './routes/standups/$standupId'
 import { Route as RetrosNewRouteImport } from './routes/retros/new'
 import { Route as RetrosRetroIdRouteImport } from './routes/retros/$retroId'
 import { Route as ProfileSettingsRouteImport } from './routes/profile/settings'
@@ -118,6 +122,11 @@ const TeamsIndexRoute = TeamsIndexRouteImport.update({
   path: '/teams/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StandupsIndexRoute = StandupsIndexRouteImport.update({
+  id: '/standups/',
+  path: '/standups/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RetrosIndexRoute = RetrosIndexRouteImport.update({
   id: '/retros/',
   path: '/retros/',
@@ -127,6 +136,11 @@ const ProfileIndexRoute = ProfileIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => ProfileRoute,
+} as any)
+const PollsIndexRoute = PollsIndexRouteImport.update({
+  id: '/polls/',
+  path: '/polls/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const OrganizationsIndexRoute = OrganizationsIndexRouteImport.update({
   id: '/organizations/',
@@ -156,6 +170,16 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const TeamsTeamIdRoute = TeamsTeamIdRouteImport.update({
   id: '/teams/$teamId',
   path: '/teams/$teamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StandupsNewRoute = StandupsNewRouteImport.update({
+  id: '/standups/new',
+  path: '/standups/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StandupsStandupIdRoute = StandupsStandupIdRouteImport.update({
+  id: '/standups/$standupId',
+  path: '/standups/$standupId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RetrosNewRoute = RetrosNewRouteImport.update({
@@ -339,14 +363,18 @@ export interface FileRoutesByFullPath {
   '/profile/settings': typeof ProfileSettingsRoute
   '/retros/$retroId': typeof RetrosRetroIdRoute
   '/retros/new': typeof RetrosNewRoute
+  '/standups/$standupId': typeof StandupsStandupIdRoute
+  '/standups/new': typeof StandupsNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/estimate/': typeof EstimateIndexRoute
   '/icebreakers/': typeof IcebreakersIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
+  '/polls/': typeof PollsIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/retros/': typeof RetrosIndexRoute
+  '/standups/': typeof StandupsIndexRoute
   '/teams/': typeof TeamsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -386,14 +414,18 @@ export interface FileRoutesByTo {
   '/profile/settings': typeof ProfileSettingsRoute
   '/retros/$retroId': typeof RetrosRetroIdRoute
   '/retros/new': typeof RetrosNewRoute
+  '/standups/$standupId': typeof StandupsStandupIdRoute
+  '/standups/new': typeof StandupsNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/estimate': typeof EstimateIndexRoute
   '/icebreakers': typeof IcebreakersIndexRoute
   '/organizations': typeof OrganizationsIndexRoute
+  '/polls': typeof PollsIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/retros': typeof RetrosIndexRoute
+  '/standups': typeof StandupsIndexRoute
   '/teams': typeof TeamsIndexRoute
 }
 export interface FileRoutesById {
@@ -437,14 +469,18 @@ export interface FileRoutesById {
   '/profile/settings': typeof ProfileSettingsRoute
   '/retros/$retroId': typeof RetrosRetroIdRoute
   '/retros/new': typeof RetrosNewRoute
+  '/standups/$standupId': typeof StandupsStandupIdRoute
+  '/standups/new': typeof StandupsNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/estimate/': typeof EstimateIndexRoute
   '/icebreakers/': typeof IcebreakersIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
+  '/polls/': typeof PollsIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/retros/': typeof RetrosIndexRoute
+  '/standups/': typeof StandupsIndexRoute
   '/teams/': typeof TeamsIndexRoute
 }
 export interface FileRouteTypes {
@@ -489,14 +525,18 @@ export interface FileRouteTypes {
     | '/profile/settings'
     | '/retros/$retroId'
     | '/retros/new'
+    | '/standups/$standupId'
+    | '/standups/new'
     | '/teams/$teamId'
     | '/admin/'
     | '/dashboard/'
     | '/estimate/'
     | '/icebreakers/'
     | '/organizations/'
+    | '/polls/'
     | '/profile/'
     | '/retros/'
+    | '/standups/'
     | '/teams/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -536,14 +576,18 @@ export interface FileRouteTypes {
     | '/profile/settings'
     | '/retros/$retroId'
     | '/retros/new'
+    | '/standups/$standupId'
+    | '/standups/new'
     | '/teams/$teamId'
     | '/admin'
     | '/dashboard'
     | '/estimate'
     | '/icebreakers'
     | '/organizations'
+    | '/polls'
     | '/profile'
     | '/retros'
+    | '/standups'
     | '/teams'
   id:
     | '__root__'
@@ -586,14 +630,18 @@ export interface FileRouteTypes {
     | '/profile/settings'
     | '/retros/$retroId'
     | '/retros/new'
+    | '/standups/$standupId'
+    | '/standups/new'
     | '/teams/$teamId'
     | '/admin/'
     | '/dashboard/'
     | '/estimate/'
     | '/icebreakers/'
     | '/organizations/'
+    | '/polls/'
     | '/profile/'
     | '/retros/'
+    | '/standups/'
     | '/teams/'
   fileRoutesById: FileRoutesById
 }
@@ -616,11 +664,15 @@ export interface RootRouteChildren {
   OrganizationsOrgIdRoute: typeof OrganizationsOrgIdRoute
   RetrosRetroIdRoute: typeof RetrosRetroIdRoute
   RetrosNewRoute: typeof RetrosNewRoute
+  StandupsStandupIdRoute: typeof StandupsStandupIdRoute
+  StandupsNewRoute: typeof StandupsNewRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRoute
   EstimateIndexRoute: typeof EstimateIndexRoute
   IcebreakersIndexRoute: typeof IcebreakersIndexRoute
   OrganizationsIndexRoute: typeof OrganizationsIndexRoute
+  PollsIndexRoute: typeof PollsIndexRoute
   RetrosIndexRoute: typeof RetrosIndexRoute
+  StandupsIndexRoute: typeof StandupsIndexRoute
   TeamsIndexRoute: typeof TeamsIndexRoute
 }
 
@@ -710,6 +762,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/standups/': {
+      id: '/standups/'
+      path: '/standups'
+      fullPath: '/standups/'
+      preLoaderRoute: typeof StandupsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/retros/': {
       id: '/retros/'
       path: '/retros'
@@ -723,6 +782,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/profile/'
       preLoaderRoute: typeof ProfileIndexRouteImport
       parentRoute: typeof ProfileRoute
+    }
+    '/polls/': {
+      id: '/polls/'
+      path: '/polls'
+      fullPath: '/polls/'
+      preLoaderRoute: typeof PollsIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/organizations/': {
       id: '/organizations/'
@@ -764,6 +830,20 @@ declare module '@tanstack/react-router' {
       path: '/teams/$teamId'
       fullPath: '/teams/$teamId'
       preLoaderRoute: typeof TeamsTeamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/standups/new': {
+      id: '/standups/new'
+      path: '/standups/new'
+      fullPath: '/standups/new'
+      preLoaderRoute: typeof StandupsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/standups/$standupId': {
+      id: '/standups/$standupId'
+      path: '/standups/$standupId'
+      fullPath: '/standups/$standupId'
+      preLoaderRoute: typeof StandupsStandupIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/retros/new': {
@@ -1067,11 +1147,15 @@ const rootRouteChildren: RootRouteChildren = {
   OrganizationsOrgIdRoute: OrganizationsOrgIdRoute,
   RetrosRetroIdRoute: RetrosRetroIdRoute,
   RetrosNewRoute: RetrosNewRoute,
+  StandupsStandupIdRoute: StandupsStandupIdRoute,
+  StandupsNewRoute: StandupsNewRoute,
   TeamsTeamIdRoute: TeamsTeamIdRoute,
   EstimateIndexRoute: EstimateIndexRoute,
   IcebreakersIndexRoute: IcebreakersIndexRoute,
   OrganizationsIndexRoute: OrganizationsIndexRoute,
+  PollsIndexRoute: PollsIndexRoute,
   RetrosIndexRoute: RetrosIndexRoute,
+  StandupsIndexRoute: StandupsIndexRoute,
   TeamsIndexRoute: TeamsIndexRoute,
 }
 export const routeTree = rootRouteImport

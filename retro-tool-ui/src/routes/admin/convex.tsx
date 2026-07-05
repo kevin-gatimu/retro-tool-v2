@@ -53,6 +53,8 @@ const CONVEX_TABLES = [
   { name: 'liveEstimateSessions', label: 'Live Estimate Sessions' },
   { name: 'liveRetroBoards', label: 'Live Retro Boards' },
   { name: 'liveEstimateBoards', label: 'Live Estimate Boards' },
+  { name: 'liveStandupEntries', label: 'Live Standup Entries' },
+  { name: 'liveStandupBoards', label: 'Live Standup Boards' },
   { name: 'liveNotifications', label: 'Live Notifications' },
   { name: 'livePresence', label: 'Live Presence' },
   { name: 'liveTyping', label: 'Live Typing' },

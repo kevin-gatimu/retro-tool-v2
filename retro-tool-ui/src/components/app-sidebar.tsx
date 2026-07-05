@@ -2,6 +2,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import {
   BarChart3,
   Building2,
+  CalendarCheck,
   ChevronsUpDown,
   ChevronDown,
   FileText,
@@ -16,6 +17,7 @@ import {
   Sun,
   User,
   Users,
+  Vote,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useSyncExternalStore } from 'react'
@@ -94,6 +96,18 @@ const retroNavItems: NavItem[] = [
     title: 'Icebreakers',
     url: '/icebreakers',
     icon: Sparkles,
+    allowedRoles: ALL_ROLES,
+  },
+  {
+    title: 'Standups',
+    url: '/standups',
+    icon: CalendarCheck,
+    allowedRoles: ALL_ROLES,
+  },
+  {
+    title: 'Polls',
+    url: '/polls',
+    icon: Vote,
     allowedRoles: ALL_ROLES,
   },
 ]

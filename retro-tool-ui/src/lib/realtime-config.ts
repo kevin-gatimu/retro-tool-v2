@@ -10,6 +10,9 @@ export const retrosRealtimeBackend: RealtimeBackend =
 export const icebreakersRealtimeBackend: RealtimeBackend =
   env.VITE_ICEBREAKERS_REALTIME_BACKEND
 
+export const standupsRealtimeBackend: RealtimeBackend =
+  env.VITE_STANDUPS_REALTIME_BACKEND
+
 export const notificationsRealtimeBackend: RealtimeBackend =
   env.VITE_NOTIFICATIONS_REALTIME_BACKEND
 
@@ -29,6 +32,10 @@ export function usesConvexForIcebreakers() {
   return icebreakersRealtimeBackend === 'convex' && isConvexConfigured()
 }
 
+export function usesConvexForStandups() {
+  return standupsRealtimeBackend === 'convex' && isConvexConfigured()
+}
+
 export function usesConvexForNotifications() {
   return notificationsRealtimeBackend === 'convex' && isConvexConfigured()
 }
@@ -44,6 +51,7 @@ export function usesConvexForAnything() {
     usesConvexForEstimates() ||
     usesConvexForRetros() ||
     usesConvexForIcebreakers() ||
+    usesConvexForStandups() ||
     usesConvexForNotifications()
   )
 }

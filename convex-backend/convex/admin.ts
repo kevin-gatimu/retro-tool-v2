@@ -8,6 +8,8 @@ const CLEARABLE_TABLES = [
   'liveRetroBoards',
   'liveEstimateBoards',
   'liveIcebreakerBoards',
+  'liveStandupEntries',
+  'liveStandupBoards',
   'liveNotifications',
   'livePresence',
   'liveTyping',

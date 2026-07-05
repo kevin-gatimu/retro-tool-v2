@@ -86,6 +86,29 @@ export default defineSchema({
     .index('by_session_id', ['sessionId'])
     .index('by_session_user', ['sessionId', 'userId']),
 
+  liveStandupEntries: defineTable({
+    standupId: v.string(),
+    entryDate: v.string(),
+    teamId: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_standup_id', ['standupId'])
+    .index('by_standup_date', ['standupId', 'entryDate'])
+    .index('by_team_id', ['teamId']),
+
+  // Full daily standup room snapshot pushed from NestJS after each mutation.
+  liveStandupBoards: defineTable({
+    standupId: v.string(),
+    entryDate: v.string(),
+    userId: v.string(),
+    // JSON-serialised StandupEntryDetail (submissions, comments, reactions, etc.)
+    snapshot: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_standup_id', ['standupId'])
+    .index('by_standup_date', ['standupId', 'entryDate'])
+    .index('by_standup_date_user', ['standupId', 'entryDate', 'userId']),
+
   liveNotifications: defineTable({
     notificationId: v.string(),
     userId: v.string(),

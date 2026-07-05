@@ -15,6 +15,7 @@ import type * as liveIcebreakers from "../liveIcebreakers.js";
 import type * as liveNotifications from "../liveNotifications.js";
 import type * as liveReports from "../liveReports.js";
 import type * as liveRetros from "../liveRetros.js";
+import type * as liveStandups from "../liveStandups.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as server from "../server.js";
 
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   liveNotifications: typeof liveNotifications;
   liveReports: typeof liveReports;
   liveRetros: typeof liveRetros;
+  liveStandups: typeof liveStandups;
   rateLimits: typeof rateLimits;
   server: typeof server;
 }>;

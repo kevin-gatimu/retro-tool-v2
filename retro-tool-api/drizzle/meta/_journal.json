@@ -127,6 +127,20 @@
       "when": 1782831576547,
       "tag": "0017_perpetual_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1783280967483,
+      "tag": "0018_fluffy_thunderbolt_ross",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1783282635602,
+      "tag": "0019_hot_veda",
+      "breakpoints": true
     }
   ]
 }
