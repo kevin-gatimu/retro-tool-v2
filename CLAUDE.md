@@ -311,9 +311,9 @@ Three environments mapped to branches:
 
 | Environment | Branch | Resource Group |
 |---|---|---|
-| Production | `main` | `retro-tool-prod-rg` |
-| Staging | `staging` | `retro-tool-staging-rg` |
-| Develop | `develop` | `retro-tool-dev-rg` |
+| Production | `main` | `retrotool-prod-rg` |
+| Staging | `staging` | `retrotool-staging-rg` |
+| Develop | `develop` | `retrotool-develop-rg` |
 
 Infrastructure is provisioned via Azure CLI + Bicep (`infra/` folder). See [infra/README.md](infra/README.md) for full commands.
 

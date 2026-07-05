@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Clock, Plus, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react'
+import {
+  ArrowRight,
+  Clock,
+  Plus,
+  RefreshCw,
+  Search,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -305,6 +313,12 @@ function IcebreakerIndexPage() {
                 Start an icebreaker to break the ice with your team before the
                 real work begins.
               </CardDescription>
+              <Button asChild className="mt-4">
+                <Link to="/icebreakers/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Start Icebreaker
+                </Link>
+              </Button>
             </CardContent>
           </Card>
         }
@@ -329,23 +343,41 @@ function IcebreakerIndexPage() {
 function ActiveSessionCard({ item }: { item: IcebreakerListItem }) {
   const status = item.ongoing?.status
   return (
-    <Card className="hover:border-primary/50 transition-colors h-full">
+    <Card className="h-full border-primary/20 transition-all hover:border-primary/50 hover:shadow-md">
       <CardHeader>
         <div className="flex min-w-0 items-start justify-between gap-3">
           <CardTitle className="min-w-0 flex-1 truncate text-lg">
             {item.name}
           </CardTitle>
-          <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
+          <Badge
+            variant="secondary"
+            className="shrink-0 gap-1.5 whitespace-nowrap bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+          >
+            <span
+              className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
+              aria-hidden="true"
+            />
             {status ? STATUS_LABELS[status] : 'Ongoing'}
           </Badge>
         </div>
-        <CardDescription className="truncate">{item.teamName}</CardDescription>
+        <CardDescription className="truncate">
+          {item.teamEmoji ? `${item.teamEmoji} ` : ''}
+          {item.teamName}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex justify-end">
-          <Button asChild size="sm">
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" aria-hidden="true" />
+            {new Date(item.timestamp).toLocaleString(undefined, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+          </span>
+          <Button asChild size="sm" className="gap-1">
             <Link to="/icebreakers/$sessionId" params={{ sessionId: item.id }}>
-              Join Session
+              Join session
+              <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>
         </div>
@@ -373,7 +405,7 @@ function SessionHistoryCard({ item }: { item: IcebreakerListItem }) {
 
   return (
     <>
-      <Card className="hover:border-primary/50 transition-colors">
+      <Card className="transition-all hover:border-primary/50 hover:shadow-sm">
         <CardHeader className="pb-2">
           <div className="flex min-w-0 items-start justify-between gap-4">
             <Link
@@ -383,11 +415,12 @@ function SessionHistoryCard({ item }: { item: IcebreakerListItem }) {
             >
               <CardTitle className="text-base truncate">{item.name}</CardTitle>
               <CardDescription className="truncate">
+                {item.teamEmoji ? `${item.teamEmoji} ` : ''}
                 {item.teamName}
               </CardDescription>
             </Link>
             <div className="flex items-center gap-2 shrink-0">
-              <Badge variant="secondary" className="whitespace-nowrap">
+              <Badge variant="outline" className="whitespace-nowrap">
                 Completed
               </Badge>
               {c?.canDelete && (

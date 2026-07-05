@@ -18,6 +18,16 @@ export function useSessionMutations(sessionId: string) {
     })
   }
 
+  // The list page caches ongoing/completed sessions (staleTime 30s), so any
+  // mutation that can complete a session must invalidate those keys or the
+  // session keeps showing as ongoing until a hard reload.
+  const invalidateSessionLists = () => {
+    void queryClient.invalidateQueries({
+      queryKey: ['active-icebreaker-sessions'],
+    })
+    void queryClient.invalidateQueries({ queryKey: ['icebreaker-history'] })
+  }
+
   const swipePromptMutation = useMutation({
     mutationFn: (input: {
       decision: TIcebreakerPromptDecision
@@ -45,6 +55,8 @@ export function useSessionMutations(sessionId: string) {
     mutationFn: () => api.post(ICEBREAKERS_ENDPOINTS.ADVANCE(sessionId)),
     onSuccess: () => {
       refetchSession()
+      // "Finish" (advance past the last prompt) completes the session.
+      invalidateSessionLists()
     },
     onError: (error: Error) => {
       refetchSession()
@@ -56,6 +68,10 @@ export function useSessionMutations(sessionId: string) {
     mutationFn: () => api.delete(ICEBREAKERS_ENDPOINTS.BY_ID(sessionId)),
     onSuccess: () => {
       toast.success('Icebreaker ended')
+      invalidateSessionLists()
+      void queryClient.invalidateQueries({
+        queryKey: ['icebreaker-session', sessionId],
+      })
       navigate({ to: '/icebreakers' })
     },
     onError: (error: Error) =>

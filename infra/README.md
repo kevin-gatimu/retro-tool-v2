@@ -1,6 +1,6 @@
 # Retro Tool — Azure Infrastructure (Bicep)
 
-Provisions all Azure resources for Retro Tool via CLI. Each environment (prod, staging, develop) gets an isolated set of resources.
+Provisions all Azure resources for Retro Tool via CLI. Each environment gets an isolated set of resources — the Bicep `environment` parameter takes `prod`, `staging`, or `develop`, while the corresponding GitHub environments are named `production`, `staging`, and `develop` (these names must match exactly for environment secrets/vars and OIDC federated credentials).
 
 ## Prerequisites
 

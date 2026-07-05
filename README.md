@@ -549,9 +549,9 @@ The project targets **Azure** with infrastructure provisioned via Bicep (CLI-onl
 
 | Branch | Environment | Resource Group |
 | --- | --- | --- |
-| `main` | Production | `retro-tool-prod-rg` |
-| `staging` | Staging | `retro-tool-staging-rg` |
-| `develop` | Develop | `retro-tool-dev-rg` |
+| `main` | Production | `retrotool-prod-rg` |
+| `staging` | Staging | `retrotool-staging-rg` |
+| `develop` | Develop | `retrotool-develop-rg` |
 
 Each environment has its own App Service, ACR, Static Web App, and Managed Identity. PostgreSQL Flexible Server is per-environment.
 
@@ -561,10 +561,10 @@ Infrastructure is provisioned manually via Azure CLI + Bicep templates in the `i
 
 ```powershell
 # Preview changes
-az deployment sub what-if --location southafricanorth --template-file infra/deploy.bicep --parameters environmentName=prod ...
+az deployment sub what-if --location southafricanorth --template-file infra/deploy.bicep --parameters environment=prod ...
 
 # Deploy
-az deployment sub create --location southafricanorth --template-file infra/deploy.bicep --parameters environmentName=prod ...
+az deployment sub create --location southafricanorth --template-file infra/deploy.bicep --parameters environment=prod ...
 ```
 
 ### CI/CD (GitHub Actions)
