@@ -7,21 +7,26 @@ import {
 } from '@nestjs/common';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, asc, desc, inArray } from 'drizzle-orm';
+import { eq, and, asc, desc, gte, inArray, lte, sql } from 'drizzle-orm';
 import * as standupsSchema from './schema';
 import * as pollsSchema from '../polls/schema';
+import * as icebreakersSchema from '../icebreakers/schema';
 import * as teamSchema from '../teams/schema';
 import * as authSchema from '../auth/schema';
 import * as orgSchema from '../organizations/schema';
 import { generateId } from '../lib/utils';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 import {
   CreateStandupDto,
   UpdateStandupDto,
   SubmitStandupDto,
   CreateStandupCommentDto,
+  SendStandupReportDto,
 } from './dtos';
 import {
+  EMAIL_LOG_TYPES,
+  ICEBREAKER_PROMPT_DECISIONS,
   NOTIFICATION_TYPES,
   ORG_MEMBER_ROLES,
   STANDUP_CADENCES,
@@ -33,6 +38,7 @@ import type { Standup, StandupSubmission } from './schema';
 import { assemblePollView, type PollVoterRow } from '../polls/helpers';
 import type { PollView } from '../polls/types';
 import type {
+  IcebreakerEntrySession,
   StandupDetail,
   StandupEntryDetail,
   StandupSummary,
@@ -41,6 +47,7 @@ import type {
 type Database = NodePgDatabase<
   typeof standupsSchema &
     typeof pollsSchema &
+    typeof icebreakersSchema &
     typeof teamSchema &
     typeof authSchema &
     typeof orgSchema
@@ -55,6 +62,7 @@ export class StandupsService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
   ) {}
 
   // ==========================================================================
@@ -176,6 +184,12 @@ export class StandupsService {
 
   private static isScheduledDay(standup: Standup, dateStr: string): boolean {
     const target = StandupsService.parseDate(dateStr);
+
+    // One-time standups occur only on the day they were created.
+    if (standup.cadence === STANDUP_CADENCES.Once) {
+      return dateStr === standup.createdAt.toISOString().slice(0, 10);
+    }
+
     const dayCode = DAY_CODES[target.getUTCDay()];
     const scheduledDays = standup.scheduleDays
       .split(',')
@@ -294,6 +308,14 @@ export class StandupsService {
             )
         : [];
 
+    const skippedDays = await this.database
+      .select({
+        standupId: standupsSchema.standupSkippedDay.standupId,
+        skipDate: standupsSchema.standupSkippedDay.skipDate,
+      })
+      .from(standupsSchema.standupSkippedDay)
+      .where(inArray(standupsSchema.standupSkippedDay.standupId, standupIds));
+
     return standups.map(({ standup, teamName, teamEmoji }) => {
       const todayEntry = todayEntries.find(
         (entry) => entry.standupId === standup.id,
@@ -318,8 +340,68 @@ export class StandupsService {
               (submission) => submission.entryId === todayEntry.id,
             ).length
           : 0,
+        skippedDays: skippedDays
+          .filter((row) => row.standupId === standup.id)
+          .map((row) => row.skipDate),
       };
     });
+  }
+
+  /**
+   * Entry dates that actually have submissions, for all standups on the
+   * user's teams within [from, to]. Drives the calendar's activity dots so
+   * past days are only marked when something happened.
+   */
+  async getActivity(
+    userId: string,
+    from: string,
+    to: string,
+  ): Promise<
+    { standupId: string; entryDate: string; submissionCount: number }[]
+  > {
+    if (!DATE_PATTERN.test(from) || !DATE_PATTERN.test(to)) {
+      throw new BadRequestException('from/to must be YYYY-MM-DD');
+    }
+
+    const memberships = await this.database
+      .select({ teamId: teamSchema.teamMember.teamId })
+      .from(teamSchema.teamMember)
+      .where(eq(teamSchema.teamMember.userId, userId));
+
+    const teamIds = memberships.map((m) => m.teamId);
+    if (teamIds.length === 0) return [];
+
+    const rows = await this.database
+      .select({
+        standupId: standupsSchema.standupEntry.standupId,
+        entryDate: standupsSchema.standupEntry.entryDate,
+        submissionCount: sql<number>`count(${standupsSchema.standupSubmission.id})::int`,
+      })
+      .from(standupsSchema.standupEntry)
+      .innerJoin(
+        standupsSchema.standup,
+        eq(standupsSchema.standupEntry.standupId, standupsSchema.standup.id),
+      )
+      .leftJoin(
+        standupsSchema.standupSubmission,
+        eq(
+          standupsSchema.standupSubmission.entryId,
+          standupsSchema.standupEntry.id,
+        ),
+      )
+      .where(
+        and(
+          inArray(standupsSchema.standup.teamId, teamIds),
+          gte(standupsSchema.standupEntry.entryDate, from),
+          lte(standupsSchema.standupEntry.entryDate, to),
+        ),
+      )
+      .groupBy(
+        standupsSchema.standupEntry.standupId,
+        standupsSchema.standupEntry.entryDate,
+      );
+
+    return rows.filter((row) => row.submissionCount > 0);
   }
 
   async createStandup(
@@ -336,6 +418,8 @@ export class StandupsService {
       teamId: data.teamId,
       cadence: data.cadence as TStandupCadence,
       scheduleDays: data.scheduleDays.join(','),
+      startTime: data.startTime ?? null,
+      endTime: data.endTime ?? null,
       createdById: userId,
     });
 
@@ -375,6 +459,11 @@ export class StandupsService {
 
     const canManage = await this.canManageStandup(standupId, userId);
 
+    const skippedRows = await this.database
+      .select({ skipDate: standupsSchema.standupSkippedDay.skipDate })
+      .from(standupsSchema.standupSkippedDay)
+      .where(eq(standupsSchema.standupSkippedDay.standupId, standupId));
+
     return {
       ...record,
       isCreator: record.createdById === userId,
@@ -388,6 +477,7 @@ export class StandupsService {
         order: question.order,
         isRequired: question.isRequired,
       })),
+      skippedDays: skippedRows.map((row) => row.skipDate),
     };
   }
 
@@ -415,6 +505,8 @@ export class StandupsService {
         ...(data.scheduleDays !== undefined
           ? { scheduleDays: data.scheduleDays.join(',') }
           : {}),
+        ...(data.startTime !== undefined ? { startTime: data.startTime } : {}),
+        ...(data.endTime !== undefined ? { endTime: data.endTime } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
         updatedAt: new Date(),
       })
@@ -568,6 +660,81 @@ export class StandupsService {
     );
   }
 
+  /**
+   * Icebreaker sessions attached to a standup day, shaped as compact cards for
+   * the feed. The full swipe/present runtime lives on the session page, so we
+   * only surface counts and a manage flag here. Oldest first, to match polls.
+   */
+  private async getEntryIcebreakers(
+    userId: string,
+    standupId: string,
+    dateStr: string,
+    context: { canManage: boolean },
+  ): Promise<IcebreakerEntrySession[]> {
+    const sessions = await this.database
+      .select({
+        id: icebreakersSchema.icebreakerSession.id,
+        name: icebreakersSchema.icebreakerSession.name,
+        status: icebreakersSchema.icebreakerSession.status,
+        createdById: icebreakersSchema.icebreakerSession.createdById,
+      })
+      .from(icebreakersSchema.icebreakerSession)
+      .where(
+        and(
+          eq(icebreakersSchema.icebreakerSession.standupId, standupId),
+          eq(icebreakersSchema.icebreakerSession.entryDate, dateStr),
+        ),
+      )
+      .orderBy(asc(icebreakersSchema.icebreakerSession.createdAt));
+
+    if (sessions.length === 0) return [];
+
+    const sessionIds = sessions.map((session) => session.id);
+
+    const [deckPrompts, participants] = await Promise.all([
+      this.database
+        .select({
+          sessionId: icebreakersSchema.icebreakerSessionPrompt.sessionId,
+          decision: icebreakersSchema.icebreakerSessionPrompt.decision,
+        })
+        .from(icebreakersSchema.icebreakerSessionPrompt)
+        .where(
+          inArray(
+            icebreakersSchema.icebreakerSessionPrompt.sessionId,
+            sessionIds,
+          ),
+        ),
+      this.database
+        .select({
+          sessionId: icebreakersSchema.icebreakerParticipant.sessionId,
+        })
+        .from(icebreakersSchema.icebreakerParticipant)
+        .where(
+          inArray(
+            icebreakersSchema.icebreakerParticipant.sessionId,
+            sessionIds,
+          ),
+        ),
+    ]);
+
+    return sessions.map((session) => {
+      const deck = deckPrompts.filter((row) => row.sessionId === session.id);
+      return {
+        id: session.id,
+        name: session.name,
+        status: session.status,
+        promptCount: deck.length,
+        keptCount: deck.filter(
+          (row) => row.decision === ICEBREAKER_PROMPT_DECISIONS.Kept,
+        ).length,
+        participantCount: participants.filter(
+          (row) => row.sessionId === session.id,
+        ).length,
+        canManage: context.canManage || session.createdById === userId,
+      };
+    });
+  }
+
   async getEntryDetail(
     userId: string,
     standupId: string,
@@ -581,6 +748,13 @@ export class StandupsService {
       canManage: standupDetail.canManage,
       team: standupDetail.team,
     });
+
+    const icebreakers = await this.getEntryIcebreakers(
+      userId,
+      standupId,
+      dateStr,
+      { canManage: standupDetail.canManage },
+    );
 
     const [entry] = await this.database
       .select()
@@ -616,7 +790,10 @@ export class StandupsService {
         standup: standupDetail,
         date: dateStr,
         entry: null,
-        isScheduledDay: StandupsService.isScheduledDay(standupDetail, dateStr),
+        isScheduledDay:
+          StandupsService.isScheduledDay(standupDetail, dateStr) &&
+          !standupDetail.skippedDays.includes(dateStr),
+        isSkipped: standupDetail.skippedDays.includes(dateStr),
         members: members.map((member) => ({
           userId: member.userId,
           name: member.name,
@@ -626,6 +803,7 @@ export class StandupsService {
         })),
         submissions: [],
         polls,
+        icebreakers,
       };
     }
 
@@ -702,7 +880,10 @@ export class StandupsService {
       standup: standupDetail,
       date: dateStr,
       entry: { id: entry.id, entryDate: entry.entryDate },
-      isScheduledDay: StandupsService.isScheduledDay(standupDetail, dateStr),
+      isScheduledDay:
+        StandupsService.isScheduledDay(standupDetail, dateStr) &&
+        !standupDetail.skippedDays.includes(dateStr),
+      isSkipped: standupDetail.skippedDays.includes(dateStr),
       members: members.map((member) => ({
         userId: member.userId,
         name: member.name,
@@ -740,6 +921,7 @@ export class StandupsService {
           })),
       })),
       polls,
+      icebreakers,
     };
   }
 
@@ -760,6 +942,20 @@ export class StandupsService {
 
     if (!record.isActive) {
       throw new BadRequestException('This standup is no longer active');
+    }
+
+    const [skipRow] = await this.database
+      .select({ id: standupsSchema.standupSkippedDay.id })
+      .from(standupsSchema.standupSkippedDay)
+      .where(
+        and(
+          eq(standupsSchema.standupSkippedDay.standupId, standupId),
+          eq(standupsSchema.standupSkippedDay.skipDate, dateStr),
+        ),
+      )
+      .limit(1);
+    if (skipRow) {
+      throw new BadRequestException('This standup day has been skipped');
     }
 
     const questions = await this.database
@@ -871,6 +1067,227 @@ export class StandupsService {
     }
 
     return { submissionId, entryId: entry.id };
+  }
+
+  async deleteSubmission(
+    userId: string,
+    standupId: string,
+    dateStr: string,
+  ): Promise<{ entryId: string }> {
+    StandupsService.parseDate(dateStr);
+
+    const record = await this.getStandupRecord(standupId);
+    await this.assertTeamMember(record.teamId, userId);
+
+    const [entry] = await this.database
+      .select()
+      .from(standupsSchema.standupEntry)
+      .where(
+        and(
+          eq(standupsSchema.standupEntry.standupId, standupId),
+          eq(standupsSchema.standupEntry.entryDate, dateStr),
+        ),
+      )
+      .limit(1);
+
+    if (!entry) {
+      throw new NotFoundException('No standup room exists for this date');
+    }
+
+    const [submission] = await this.database
+      .select()
+      .from(standupsSchema.standupSubmission)
+      .where(
+        and(
+          eq(standupsSchema.standupSubmission.entryId, entry.id),
+          eq(standupsSchema.standupSubmission.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (!submission) {
+      throw new NotFoundException('You have no submission to delete');
+    }
+
+    // Answers, comments, and reactions cascade-delete via FK on the submission.
+    await this.database
+      .delete(standupsSchema.standupSubmission)
+      .where(eq(standupsSchema.standupSubmission.id, submission.id));
+
+    return { entryId: entry.id };
+  }
+
+  // ==========================================================================
+  // Skipped days
+  // ==========================================================================
+
+  async skipDay(
+    userId: string,
+    standupId: string,
+    dateStr: string,
+  ): Promise<{ success: boolean }> {
+    StandupsService.parseDate(dateStr);
+    await this.getStandupRecord(standupId);
+
+    const canManage = await this.canManageStandup(standupId, userId);
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Only the creator, a team lead, or an admin can skip a standup day',
+      );
+    }
+
+    await this.database
+      .insert(standupsSchema.standupSkippedDay)
+      .values({
+        id: generateId(),
+        standupId,
+        skipDate: dateStr,
+        createdById: userId,
+      })
+      .onConflictDoNothing();
+
+    return { success: true };
+  }
+
+  async unskipDay(
+    userId: string,
+    standupId: string,
+    dateStr: string,
+  ): Promise<{ success: boolean }> {
+    StandupsService.parseDate(dateStr);
+    await this.getStandupRecord(standupId);
+
+    const canManage = await this.canManageStandup(standupId, userId);
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Only the creator, a team lead, or an admin can restore a skipped day',
+      );
+    }
+
+    await this.database
+      .delete(standupsSchema.standupSkippedDay)
+      .where(
+        and(
+          eq(standupsSchema.standupSkippedDay.standupId, standupId),
+          eq(standupsSchema.standupSkippedDay.skipDate, dateStr),
+        ),
+      );
+
+    return { success: true };
+  }
+
+  // ==========================================================================
+  // Reports (email)
+  // ==========================================================================
+
+  async sendStandupReport(
+    userId: string,
+    standupId: string,
+    data: SendStandupReportDto,
+  ): Promise<{ sent: number }> {
+    const record = await this.getStandupRecord(standupId);
+    await this.assertTeamMember(record.teamId, userId);
+
+    const dateStr = data.date ?? new Date().toISOString().slice(0, 10);
+    const entryDetail = await this.getEntryDetail(userId, standupId, dateStr);
+
+    // Resolve recipients: explicit list, or every team member's email.
+    let recipients: string[];
+    if (data.recipients && data.recipients.length > 0) {
+      recipients = data.recipients;
+    } else {
+      const teamMembers = await this.database
+        .select({ email: authSchema.user.email })
+        .from(teamSchema.teamMember)
+        .innerJoin(
+          authSchema.user,
+          eq(authSchema.user.id, teamSchema.teamMember.userId),
+        )
+        .where(eq(teamSchema.teamMember.teamId, record.teamId));
+      recipients = teamMembers
+        .map((member) => member.email)
+        .filter((email): email is string => Boolean(email));
+    }
+
+    if (recipients.length === 0) {
+      throw new BadRequestException('No recipients to send the report to');
+    }
+
+    const html = this.emailService.buildStandupReportHtml({
+      standupName: entryDetail.standup.name,
+      teamName: entryDetail.standup.team.name,
+      date: this.formatReportDate(dateStr),
+      submittedCount: entryDetail.members.filter(
+        (member) => member.hasSubmitted,
+      ).length,
+      memberCount: entryDetail.members.length,
+      submissions: entryDetail.submissions.map((submission) => ({
+        userName: submission.user.name,
+        submittedAt: new Date(submission.updatedAt).toLocaleString(),
+        answers: entryDetail.standup.questions
+          .map((question) => {
+            const answer = submission.answers.find(
+              (item) => item.questionId === question.id,
+            );
+            return answer && answer.content.trim().length > 0
+              ? {
+                  prompt: question.prompt,
+                  content: answer.content,
+                  color: question.color,
+                }
+              : null;
+          })
+          .filter(
+            (
+              item,
+            ): item is {
+              prompt: string;
+              content: string;
+              color: string | null;
+            } => item !== null,
+          ),
+      })),
+      polls: entryDetail.polls.map((poll) => ({
+        question: poll.question,
+        isAnonymous: poll.isAnonymous,
+        totalVotes: poll.totalVotes,
+        options: poll.options.map((option) => ({
+          label: option.label,
+          emoji: option.emoji,
+          voteCount: option.voteCount,
+          percent:
+            poll.totalVotes > 0
+              ? Math.round((option.voteCount / poll.totalVotes) * 100)
+              : 0,
+        })),
+      })),
+    });
+
+    const subject = `Standup Report: ${entryDetail.standup.name} — ${this.formatReportDate(dateStr)}`;
+
+    let sent = 0;
+    for (const email of recipients) {
+      const ok = await this.emailService.send({
+        to: email,
+        subject,
+        html,
+        userId,
+        type: EMAIL_LOG_TYPES.StandupReport,
+      });
+      if (ok) sent += 1;
+    }
+
+    return { sent };
+  }
+
+  private formatReportDate(dateStr: string): string {
+    return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
   }
 
   // ==========================================================================

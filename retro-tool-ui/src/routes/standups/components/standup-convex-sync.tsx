@@ -7,8 +7,11 @@ import type { StandupEntryDetail } from '@/common/types/standups'
 const standupBoardQuery =
   'liveStandups:getStandupBoard' as unknown as FunctionReference<'query'>
 
+// Snapshots are untrusted JSON: ones written before `icebreakers`/`polls`
+// existed may omit those keys, so treat them as optional at the boundary.
 type StandupBoardSnapshot = {
-  entryDetail: StandupEntryDetail
+  entryDetail: Omit<StandupEntryDetail, 'icebreakers' | 'polls'> &
+    Partial<Pick<StandupEntryDetail, 'icebreakers' | 'polls'>>
 }
 
 interface StandupConvexSyncProps {
@@ -57,10 +60,15 @@ export function StandupConvexSync({ standupId, date }: StandupConvexSyncProps) {
     try {
       const parsed = JSON.parse(board.snapshot) as StandupBoardSnapshot
 
-      queryClient.setQueryData(
-        ['standup-entry', standupId, date],
-        parsed.entryDetail,
-      )
+      // Normalize collections that may be absent in snapshots written before
+      // these fields existed, so the room never reads `.length` of undefined.
+      const entryDetail: StandupEntryDetail = {
+        ...parsed.entryDetail,
+        icebreakers: parsed.entryDetail.icebreakers ?? [],
+        polls: parsed.entryDetail.polls ?? [],
+      }
+
+      queryClient.setQueryData(['standup-entry', standupId, date], entryDetail)
 
       lastUpdatedAtRef.current = board.updatedAt
     } catch {

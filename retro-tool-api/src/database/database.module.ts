@@ -15,6 +15,7 @@ import * as estimatesSchema from '../estimates/schema';
 import * as icebreakersSchema from '../icebreakers/schema';
 import * as standupsSchema from '../standups/schema';
 import * as pollsSchema from '../polls/schema';
+import * as surveysSchema from '../surveys/schema';
 import * as emailSchema from '../email/schema';
 
 @Module({
@@ -54,6 +55,7 @@ import * as emailSchema from '../email/schema';
             ...icebreakersSchema,
             ...standupsSchema,
             ...pollsSchema,
+            ...surveysSchema,
             ...emailSchema,
           },
         });

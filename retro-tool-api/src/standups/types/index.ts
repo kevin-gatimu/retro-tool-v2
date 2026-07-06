@@ -1,5 +1,21 @@
 import type { Standup, StandupQuestion } from '../schema';
 import type { PollView } from '../../polls/types';
+import type { TIcebreakerSessionStatus } from '../../common/enums';
+
+/**
+ * Compact view of an icebreaker session attached to a standup day. The full
+ * swipe/present runtime lives on the dedicated session page; the standup feed
+ * only shows this summary card with a link to open it.
+ */
+export type IcebreakerEntrySession = {
+  id: string;
+  name: string;
+  status: TIcebreakerSessionStatus;
+  promptCount: number;
+  keptCount: number;
+  participantCount: number;
+  canManage: boolean;
+};
 
 export type StandupQuestionView = Pick<
   StandupQuestion,
@@ -11,6 +27,7 @@ export type StandupSummary = Standup & {
   questions: StandupQuestionView[];
   memberCount: number;
   todaySubmissionCount: number;
+  skippedDays: string[];
 };
 
 export type StandupDetail = Standup & {
@@ -19,6 +36,7 @@ export type StandupDetail = Standup & {
   currentUserId: string;
   team: { id: string; name: string };
   questions: StandupQuestionView[];
+  skippedDays: string[];
 };
 
 export type StandupMemberView = {
@@ -64,7 +82,9 @@ export type StandupEntryDetail = {
   date: string;
   entry: { id: string; entryDate: string } | null;
   isScheduledDay: boolean;
+  isSkipped: boolean;
   members: StandupMemberView[];
   submissions: StandupSubmissionView[];
   polls: PollView[];
+  icebreakers: IcebreakerEntrySession[];
 };

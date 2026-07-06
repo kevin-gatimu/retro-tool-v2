@@ -185,6 +185,8 @@ export const ICEBREAKERS_ENDPOINTS = {
 // ---------------------------------------------------------------------------
 export const STANDUPS_ENDPOINTS = {
   LIST: '/api/standups',
+  ACTIVITY: (from: string, to: string) =>
+    `/api/standups/activity?from=${from}&to=${to}`,
 
   BY_ID: (id: string) => `/api/standups/${id}`,
   ENTRY: (id: string, date: string) => `/api/standups/${id}/entries/${date}`,
@@ -197,6 +199,9 @@ export const STANDUPS_ENDPOINTS = {
     `/api/standups/submissions/${submissionId}/reactions`,
   REACTION_BY_EMOJI: (submissionId: string, emoji: string) =>
     `/api/standups/submissions/${submissionId}/reactions/${encodeURIComponent(emoji)}`,
+  SEND_REPORT: (id: string) => `/api/standups/${id}/send-report`,
+  SKIP_DAY: (id: string, date: string) =>
+    `/api/standups/${id}/skip-days/${date}`,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -204,10 +209,23 @@ export const STANDUPS_ENDPOINTS = {
 // ---------------------------------------------------------------------------
 export const POLLS_ENDPOINTS = {
   LIST: '/api/polls',
+  ACTIVE_COUNT: '/api/polls/active-count',
 
   BY_ID: (id: string) => `/api/polls/${id}`,
   VOTE: (id: string) => `/api/polls/${id}/vote`,
   CLOSED: (id: string) => `/api/polls/${id}/closed`,
+} as const
+
+// ---------------------------------------------------------------------------
+// Surveys (team-, org-, or system-scoped questionnaires)
+// ---------------------------------------------------------------------------
+export const SURVEYS_ENDPOINTS = {
+  LIST: '/api/surveys',
+  ACTIVE_COUNT: '/api/surveys/active-count',
+
+  BY_ID: (id: string) => `/api/surveys/${id}`,
+  RESPOND: (id: string) => `/api/surveys/${id}/respond`,
+  CLOSED: (id: string) => `/api/surveys/${id}/closed`,
 } as const
 
 // ---------------------------------------------------------------------------

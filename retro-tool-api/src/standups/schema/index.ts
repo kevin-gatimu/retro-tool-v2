@@ -33,6 +33,10 @@ export const standup = pgTable(
     scheduleDays: varchar('schedule_days', { length: 50 })
       .notNull()
       .default('MON,TUE,WED,THU,FRI'),
+    // Scheduled time-of-day as local 24h "HH:MM" strings (no timezone math).
+    // Nullable so pre-existing standups remain valid; new ones always set them.
+    startTime: varchar('start_time', { length: 5 }),
+    endTime: varchar('end_time', { length: 5 }),
     isActive: boolean('is_active').notNull().default(true),
     createdById: varchar('created_by_id', { length: 255 }).references(
       () => user.id,
@@ -69,6 +73,35 @@ export const standupQuestion = pgTable(
       .$defaultFn(() => new Date()),
   },
   (table) => [index('standup_question_standup_id_idx').on(table.standupId)],
+);
+
+// ============================================================================
+// Skipped days (per-date exceptions: holidays, no-capacity days)
+// ============================================================================
+
+export const standupSkippedDay = pgTable(
+  'standup_skipped_day',
+  {
+    id: varchar('id', { length: 255 }).primaryKey(),
+    standupId: varchar('standup_id', { length: 255 })
+      .notNull()
+      .references(() => standup.id, { onDelete: 'cascade' }),
+    skipDate: date('skip_date').notNull(),
+    createdById: varchar('created_by_id', { length: 255 }).references(
+      () => user.id,
+      { onDelete: 'set null' },
+    ),
+    createdAt: timestamp('created_at')
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    index('standup_skipped_day_standup_id_idx').on(table.standupId),
+    uniqueIndex('standup_skipped_day_standup_date_unique').on(
+      table.standupId,
+      table.skipDate,
+    ),
+  ],
 );
 
 // ============================================================================
@@ -214,6 +247,9 @@ export type NewStandupQuestion = typeof standupQuestion.$inferInsert;
 
 export type StandupEntry = typeof standupEntry.$inferSelect;
 export type NewStandupEntry = typeof standupEntry.$inferInsert;
+
+export type StandupSkippedDay = typeof standupSkippedDay.$inferSelect;
+export type NewStandupSkippedDay = typeof standupSkippedDay.$inferInsert;
 
 export type StandupSubmission = typeof standupSubmission.$inferSelect;
 export type NewStandupSubmission = typeof standupSubmission.$inferInsert;

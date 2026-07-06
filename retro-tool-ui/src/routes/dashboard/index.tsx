@@ -3,12 +3,14 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   ArrowRight,
   BarChart3,
+  ClipboardList,
   History as HistoryIcon,
   LayoutDashboard,
   Plus,
   Spade,
   ThumbsUp,
   Users,
+  Vote,
 } from 'lucide-react'
 
 import {
@@ -20,7 +22,12 @@ import {
 } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
-import { RETROS_ENDPOINTS } from '@/lib/api-endpoints'
+import {
+  POLLS_ENDPOINTS,
+  RETROS_ENDPOINTS,
+  SURVEYS_ENDPOINTS,
+} from '@/lib/api-endpoints'
+import { usesConvexForSurveys, usesConvexForPolls } from '@/lib/realtime-config'
 import { authClient } from '@/lib/auth-client'
 import type { Retro } from '@/common/types/retros'
 import type { DashboardStats } from './types'
@@ -70,6 +77,23 @@ function DashboardIndexPage() {
     dashboardRetrosQueryOptions,
   )
 
+  const { data: surveysActive } = useQuery({
+    queryKey: ['surveys-active-count'],
+    queryFn: () => api.get<{ count: number }>(SURVEYS_ENDPOINTS.ACTIVE_COUNT),
+    staleTime: 30_000,
+    refetchInterval: usesConvexForSurveys() ? false : 30_000,
+  })
+
+  const { data: pollsActive } = useQuery({
+    queryKey: ['polls-active-count'],
+    queryFn: () => api.get<{ count: number }>(POLLS_ENDPOINTS.ACTIVE_COUNT),
+    staleTime: 30_000,
+    refetchInterval: usesConvexForPolls() ? false : 30_000,
+  })
+
+  const activeSurveyCount = surveysActive?.count ?? 0
+  const activePollCount = pollsActive?.count ?? 0
+
   const firstName = session?.user.name.split(' ')[0] ?? 'there'
 
   const statCards = [
@@ -115,24 +139,85 @@ function DashboardIndexPage() {
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Active Surveys */}
+      {activeSurveyCount > 0 && (
+        <Card className="border-primary/40 bg-primary/5 animate-in fade-in">
+          <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                <ClipboardList className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">
+                  {activeSurveyCount === 1
+                    ? '1 active survey needs your response'
+                    : `${activeSurveyCount} active surveys need your response`}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Share your feedback before they close.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/surveys"
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            >
+              Respond now
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {activePollCount > 0 && (
+        <Card className="border-primary/40 bg-primary/5 animate-in fade-in">
+          <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                <Vote className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">
+                  {activePollCount === 1
+                    ? '1 active poll needs your vote'
+                    : `${activePollCount} active polls need your vote`}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Cast your vote before they close.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/polls"
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            >
+              Vote now
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Stats — compact row */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
           <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
+            <CardContent className="flex items-center gap-3 p-3">
               <div className={`rounded-lg p-2 ${stat.color}`}>
                 <stat.icon className="h-4 w-4" />
               </div>
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div className="text-3xl font-bold">{stat.value}</div>
-              )}
+              <div className="min-w-0">
+                {statsLoading ? (
+                  <Skeleton className="h-6 w-12" />
+                ) : (
+                  <div className="text-xl font-bold leading-none">
+                    {stat.value}
+                  </div>
+                )}
+                <p className="mt-1 truncate text-xs text-muted-foreground">
+                  {stat.title}
+                </p>
+              </div>
             </CardContent>
           </Card>
         ))}

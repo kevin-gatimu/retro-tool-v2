@@ -2,6 +2,7 @@ export const STANDUP_CADENCES = {
   Daily: 'daily',
   Weekly: 'weekly',
   Fortnightly: 'fortnightly',
+  Once: 'once',
 } as const;
 
 export type TStandupCadence =

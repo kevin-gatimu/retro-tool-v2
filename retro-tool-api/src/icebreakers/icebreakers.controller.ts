@@ -22,6 +22,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { IcebreakersService } from './icebreakers.service';
 import { IcebreakersGateway } from './icebreakers.gateway';
 import { IcebreakersProjectionSyncService } from './icebreakers-projection-sync.service';
+import { StandupsGateway } from '../standups/standups.gateway';
 import type { SessionUser } from '../common/types';
 import {
   CreateIcebreakerSessionSchema,
@@ -41,7 +42,19 @@ export class IcebreakersController {
     private readonly icebreakersService: IcebreakersService,
     private readonly icebreakersGateway: IcebreakersGateway,
     private readonly icebreakersProjectionSyncService: IcebreakersProjectionSyncService,
+    private readonly standupsGateway: StandupsGateway,
   ) {}
+
+  /**
+   * Sessions attached to a standup day appear in that room's feed, so any
+   * mutation must also refresh the standup entry for everyone in the room.
+   */
+  private async emitStandupIfAttached(sessionId: string): Promise<void> {
+    const link = await this.icebreakersService.getStandupLink(sessionId);
+    if (link) {
+      this.standupsGateway.emitEntryChanged(link.standupId, link.entryDate);
+    }
+  }
 
   @Get()
   @ApiOperation({
@@ -97,19 +110,17 @@ export class IcebreakersController {
   @ApiOperation({ summary: 'Create a new icebreaker session' })
   @ApiResponse({ status: 201, description: '{ id: string }' })
   @UsePipes(new ZodValidationPipe(CreateIcebreakerSessionSchema))
-  createSession(
+  async createSession(
     @Session() session: SessionUser,
     @Body() body: CreateIcebreakerSessionBody,
   ) {
-    return this.icebreakersService
-      .createSession(
-        session.user.id,
-        body as unknown as CreateIcebreakerSessionDto,
-      )
-      .then((result) => {
-        this.icebreakersGateway.emitSessionChanged(result.id);
-        return result;
-      });
+    const result = await this.icebreakersService.createSession(
+      session.user.id,
+      body as unknown as CreateIcebreakerSessionDto,
+    );
+    this.icebreakersGateway.emitSessionChanged(result.id);
+    await this.emitStandupIfAttached(result.id);
+    return result;
   }
 
   @Post(':id/join')
@@ -124,6 +135,7 @@ export class IcebreakersController {
       true,
     );
     this.icebreakersGateway.emitSessionChanged(id);
+    await this.emitStandupIfAttached(id);
     return result;
   }
 
@@ -145,6 +157,7 @@ export class IcebreakersController {
       dto.sessionPromptId,
     );
     this.icebreakersGateway.emitSessionChanged(id);
+    await this.emitStandupIfAttached(id);
     return result;
   }
 
@@ -161,6 +174,7 @@ export class IcebreakersController {
       session.user.id,
     );
     this.icebreakersGateway.emitSessionChanged(id);
+    await this.emitStandupIfAttached(id);
     return result;
   }
 
@@ -188,6 +202,7 @@ export class IcebreakersController {
   ) {
     const result = await this.icebreakersService.updateSessionName(id, name);
     this.icebreakersGateway.emitSessionChanged(id);
+    await this.emitStandupIfAttached(id);
     return result;
   }
 
@@ -202,6 +217,7 @@ export class IcebreakersController {
       session.user.id,
     );
     this.icebreakersGateway.emitSessionChanged(id);
+    await this.emitStandupIfAttached(id);
     return result;
   }
 
@@ -211,11 +227,17 @@ export class IcebreakersController {
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
+    // Capture the standup link before the row is gone so we can still refresh
+    // the room feed after deletion.
+    const link = await this.icebreakersService.getStandupLink(id);
     const result = await this.icebreakersService.deleteSession(
       id,
       session.user.id,
     );
     await this.icebreakersProjectionSyncService.deleteSessionProjection(id);
+    if (link) {
+      this.standupsGateway.emitEntryChanged(link.standupId, link.entryDate);
+    }
     return result;
   }
 }

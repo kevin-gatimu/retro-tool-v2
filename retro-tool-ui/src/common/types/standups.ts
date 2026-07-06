@@ -3,6 +3,7 @@ import type {
   TStandupScheduleDay,
 } from '@/common/enums/standup.enums'
 import type { PollView } from './polls'
+import type { IcebreakerEntrySession } from './icebreakers'
 
 // ============================================================================
 // Standup configuration
@@ -22,6 +23,8 @@ export interface StandupSummary {
   teamId: string
   cadence: TStandupCadence
   scheduleDays: string
+  startTime: string | null
+  endTime: string | null
   isActive: boolean
   createdById: string | null
   createdAt: string | Date
@@ -34,6 +37,7 @@ export interface StandupSummary {
   questions: StandupQuestion[]
   memberCount: number
   todaySubmissionCount: number
+  skippedDays: string[]
 }
 
 export interface StandupDetail {
@@ -42,6 +46,8 @@ export interface StandupDetail {
   teamId: string
   cadence: TStandupCadence
   scheduleDays: string
+  startTime: string | null
+  endTime: string | null
   isActive: boolean
   createdById: string | null
   createdAt: string | Date
@@ -54,6 +60,7 @@ export interface StandupDetail {
     name: string
   }
   questions: StandupQuestion[]
+  skippedDays: string[]
 }
 
 export interface CreateStandupInput {
@@ -61,6 +68,8 @@ export interface CreateStandupInput {
   teamId: string
   cadence?: TStandupCadence
   scheduleDays: TStandupScheduleDay[]
+  startTime: string
+  endTime: string
   questions: {
     prompt: string
     color?: string
@@ -72,6 +81,8 @@ export interface UpdateStandupInput {
   name?: string
   cadence?: TStandupCadence
   scheduleDays?: TStandupScheduleDay[]
+  startTime?: string
+  endTime?: string
   isActive?: boolean
   questions?: {
     id?: string
@@ -128,9 +139,11 @@ export interface StandupEntryDetail {
   date: string
   entry: { id: string; entryDate: string } | null
   isScheduledDay: boolean
+  isSkipped: boolean
   members: StandupMember[]
   submissions: StandupSubmission[]
   polls: PollView[]
+  icebreakers: IcebreakerEntrySession[]
 }
 
 export interface SubmitStandupInput {

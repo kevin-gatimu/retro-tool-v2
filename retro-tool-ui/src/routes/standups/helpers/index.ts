@@ -8,6 +8,7 @@ export const CADENCE_LABELS: Record<TStandupCadence, string> = {
   daily: 'Daily',
   weekly: 'Weekly',
   fortnightly: 'Fortnightly',
+  once: 'One-time',
 }
 
 export const DAY_OPTIONS: { value: TStandupScheduleDay; label: string }[] = [
@@ -77,6 +78,7 @@ export function formatShortDate(dateStr: string): string {
 
 export function scheduleDaysLabel(scheduleDays: string): string {
   const days = scheduleDays.split(',').filter(Boolean)
+  if (days.length === 0) return 'One day only'
   if (days.length === 7) return 'Every day'
   if (
     days.length === 5 &&
@@ -94,6 +96,141 @@ export function scheduleDaysLabel(scheduleDays: string): string {
     SUN: 'Sun',
   }
   return days.map((d) => labels[d] ?? d).join(', ')
+}
+
+/**
+ * Client-side mirror of the server's scheduled-day check: does this standup
+ * occur on the given local date? Fortnights anchor to the creation week
+ * (Monday-based), matching StandupsService.isScheduledDay.
+ */
+export function isStandupScheduledOn(
+  standup: {
+    scheduleDays: string
+    cadence: string
+    createdAt: string | Date
+  },
+  dateStr: string,
+): boolean {
+  // One-time standups occur only on the day they were created.
+  if (standup.cadence === 'once') {
+    return dateStr === toDateString(new Date(standup.createdAt))
+  }
+
+  const dayCodes = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+  const target = new Date(`${dateStr}T00:00:00`)
+  const dayCode = dayCodes[target.getDay()]
+  const days = standup.scheduleDays.split(',').filter(Boolean)
+  if (!days.includes(dayCode)) return false
+
+  if (standup.cadence === 'fortnightly') {
+    const startOfIsoWeek = (input: Date) => {
+      const d = new Date(input.getFullYear(), input.getMonth(), input.getDate())
+      const dow = d.getDay()
+      d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1))
+      return d
+    }
+    const anchor = startOfIsoWeek(new Date(standup.createdAt))
+    const targetWeek = startOfIsoWeek(target)
+    const weeks = Math.round(
+      (targetWeek.getTime() - anchor.getTime()) / (7 * 24 * 60 * 60 * 1000),
+    )
+    return weeks % 2 === 0
+  }
+
+  return true
+}
+
+/**
+ * Standups that "belong" to a given day, using the same rule as the calendar
+ * dots and the selected-day list: today/future shows scheduled standups (or any
+ * with submissions); past days only show rooms that actually have submissions.
+ * `activity` is the set of `${standupId}:${date}` keys that have submissions.
+ */
+export function standupsScheduledOn<
+  T extends {
+    id: string
+    createdAt: string | Date
+    isActive: boolean
+    scheduleDays: string
+    cadence: TStandupCadence
+    skippedDays: string[]
+  },
+>(standups: T[], date: string, activity: Set<string>, today: string): T[] {
+  return standups.filter((standup) => {
+    const created = toDateString(new Date(standup.createdAt))
+    if (date < created) return false
+    const hasActivity = activity.has(`${standup.id}:${date}`)
+    if (standup.skippedDays.includes(date)) return hasActivity
+    if (date >= today) {
+      return (
+        hasActivity || (standup.isActive && isStandupScheduledOn(standup, date))
+      )
+    }
+    return hasActivity
+  })
+}
+
+/** Local YYYY-MM-DD for an arbitrary Date. */
+export function toDateString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/** "HH:MM" for a given minutes-since-midnight value (clamped to a day). */
+function minutesToTime(total: number): string {
+  const clamped = Math.max(0, Math.min(23 * 60 + 59, total))
+  const h = Math.floor(clamped / 60)
+  const m = clamped % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+/**
+ * Sensible default start/end for the create form: the next round half-hour and
+ * 30 minutes after it, e.g. now 2:12pm → { start: '14:30', end: '15:00' }.
+ */
+export function defaultStandupTimes(now: Date = new Date()): {
+  start: string
+  end: string
+} {
+  const startMinutes =
+    Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30
+  return {
+    start: minutesToTime(startMinutes),
+    end: minutesToTime(startMinutes + 30),
+  }
+}
+
+/** Minutes since midnight for an "HH:MM" time string (0 if malformed). */
+export function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+
+/** "14:00" → "2:00pm". Returns '' for empty/malformed input. */
+export function formatTime(hhmm: string | null | undefined): string {
+  if (!hhmm) return ''
+  const [hStr, mStr] = hhmm.split(':')
+  const hours = Number(hStr)
+  const minutes = Number(mStr)
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return ''
+  const period = hours < 12 ? 'am' : 'pm'
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12
+  return minutes === 0
+    ? `${hour12}${period}`
+    : `${hour12}:${minutes.toString().padStart(2, '0')}${period}`
+}
+
+/** "14:00","14:30" → "2:00pm – 2:30pm". Returns '' when either is unset. */
+export function formatTimeRange(
+  start: string | null | undefined,
+  end: string | null | undefined,
+): string {
+  const from = formatTime(start)
+  const to = formatTime(end)
+  if (!from || !to) return ''
+  return `${from} – ${to}`
 }
 
 const ORDINAL_RULES = new Intl.PluralRules('en-GB', { type: 'ordinal' })

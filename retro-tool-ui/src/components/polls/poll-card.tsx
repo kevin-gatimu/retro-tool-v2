@@ -1,5 +1,14 @@
 import { useState } from 'react'
-import { Eye, EyeOff, Lock, LockOpen, MoreVertical, Trash2 } from 'lucide-react'
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  LockOpen,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Undo2,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,6 +42,7 @@ interface PollCardProps {
   onRetractVote: (pollId: string) => void
   onSetClosed: (pollId: string, isClosed: boolean) => void
   onDelete: (pollId: string) => void
+  onEdit?: (poll: PollView) => void
   /** Shows team name (useful on the standalone /polls list). */
   showTeam?: boolean
 }
@@ -43,6 +53,7 @@ export function PollCard({
   onRetractVote,
   onSetClosed,
   onDelete,
+  onEdit,
   showTeam = false,
 }: PollCardProps) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
@@ -96,6 +107,12 @@ export function PollCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {onEdit && (
+                    <DropdownMenuItem onClick={() => onEdit(poll)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit poll
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     onClick={() => onSetClosed(poll.id, !poll.isClosed)}
                   >
@@ -183,19 +200,22 @@ export function PollCard({
             })}
           </div>
 
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
               {poll.totalVotes} voted
               {poll.createdBy ? ` · by ${poll.createdBy.name}` : ''}
             </span>
             {poll.hasVoted && canVote && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 gap-1.5 text-xs"
                 onClick={() => onRetractVote(poll.id)}
-                className="transition-colors hover:text-foreground"
               >
+                <Undo2 className="h-3.5 w-3.5" />
                 Retract vote
-              </button>
+              </Button>
             )}
           </div>
         </CardContent>

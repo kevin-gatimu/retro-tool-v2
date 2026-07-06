@@ -6,6 +6,24 @@ export type SessionSummary = IcebreakerSession & {
   participants: { userId: string; isOnline: boolean }[];
 };
 
+/**
+ * Lightweight view of an icebreaker session attached to a standup day. Rendered
+ * as a compact card in the standup feed; the full runtime lives on the session
+ * page.
+ */
+export type IcebreakerEntrySession = {
+  id: string;
+  name: string;
+  status: IcebreakerSession['status'];
+  currentPromptId: string | null;
+  promptCount: number;
+  keptCount: number;
+  participantCount: number;
+  canManage: boolean;
+  createdById: string;
+  createdAt: Date;
+};
+
 export type IcebreakerPromptView = {
   id: string;
   text: string;

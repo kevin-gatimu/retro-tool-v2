@@ -12,6 +12,8 @@ import {
   RETRO_STATUSES,
   RETRO_VOTE_TYPES,
   STANDUP_CADENCES,
+  SURVEY_QUESTION_TYPES,
+  SURVEY_SCOPES,
   TEAM_JOIN_REQUEST_STATUSES,
   TEAM_MEMBER_TAGS,
   USER_ROLES,
@@ -142,6 +144,20 @@ export const standupCadenceEnum = pgEnum('standup_cadence', [
   STANDUP_CADENCES.Daily,
   STANDUP_CADENCES.Weekly,
   STANDUP_CADENCES.Fortnightly,
+  STANDUP_CADENCES.Once,
+]);
+
+// Surveys
+export const surveyScopeEnum = pgEnum('survey_scope', [
+  SURVEY_SCOPES.Team,
+  SURVEY_SCOPES.Org,
+  SURVEY_SCOPES.System,
+]);
+
+export const surveyQuestionTypeEnum = pgEnum('survey_question_type', [
+  SURVEY_QUESTION_TYPES.Text,
+  SURVEY_QUESTION_TYPES.Rating,
+  SURVEY_QUESTION_TYPES.Choice,
 ]);
 
 // Email
@@ -153,6 +169,7 @@ export const emailLogTypeEnum = pgEnum('email_log_type', [
   EMAIL_LOG_TYPES.TeamInvite,
   EMAIL_LOG_TYPES.TeamInviteExternal,
   EMAIL_LOG_TYPES.RetroReport,
+  EMAIL_LOG_TYPES.StandupReport,
 ]);
 
 export const emailLogStatusEnum = pgEnum('email_log_status', [

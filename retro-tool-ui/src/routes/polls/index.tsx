@@ -10,18 +10,13 @@ import {
   CardDescription,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { PollCard } from '@/components/polls/poll-card'
 import { CreatePollDialog } from '@/components/polls/create-poll-dialog'
 import { usePollMutations } from '@/hooks/use-poll-mutations'
+import { PollListConvexSync } from '@/routes/polls/components/poll-list-convex-sync'
+import { usesConvexForPolls } from '@/lib/realtime-config'
 import { api } from '@/lib/api'
 import { POLLS_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { PollView } from '@/common/types/polls'
@@ -34,13 +29,15 @@ export const Route = createFileRoute('/polls/')({
 function PollsIndexPage() {
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
-  const [createTeamId, setCreateTeamId] = useState<string | null>(null)
+  const [editingPoll, setEditingPoll] = useState<PollView | null>(null)
+
+  const convexRealtime = usesConvexForPolls()
 
   const { data: polls, isLoading } = useQuery({
     queryKey: ['polls'],
     queryFn: () => api.get<PollView[]>(POLLS_ENDPOINTS.LIST),
     staleTime: 15_000,
-    refetchInterval: 15_000,
+    refetchInterval: convexRealtime ? false : 15_000,
   })
 
   const { data: teamsData } = useQuery({
@@ -49,21 +46,34 @@ function PollsIndexPage() {
     staleTime: 60_000,
   })
 
+  // Optimistically patch a single poll in the ['polls'] list cache so votes
+  // feel instant. Returns a rollback used if the request fails.
+  const patchPoll = (pollId: string, updater: (poll: PollView) => PollView) => {
+    const key = ['polls']
+    const previous = queryClient.getQueryData<PollView[]>(key)
+    queryClient.setQueryData<PollView[]>(key, (current) =>
+      current?.map((poll) => (poll.id === pollId ? updater(poll) : poll)),
+    )
+    return () => queryClient.setQueryData(key, previous)
+  }
+
   const {
     createPollMutation,
+    updatePollMutation,
     voteMutation,
     retractVoteMutation,
     setClosedMutation,
     deletePollMutation,
   } = usePollMutations(() => {
-    void queryClient.refetchQueries({ queryKey: ['polls'] })
-  })
+    void queryClient.invalidateQueries({ queryKey: ['polls'] })
+  }, patchPoll)
 
   const teams = teamsData?.teams ?? []
 
   if (isLoading) {
     return (
       <div className="space-y-6">
+        {convexRealtime ? <PollListConvexSync /> : null}
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <Skeleton className="h-9 w-40" />
@@ -82,6 +92,7 @@ function PollsIndexPage() {
 
   return (
     <TooltipProvider>
+      {convexRealtime ? <PollListConvexSync /> : null}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -93,34 +104,13 @@ function PollsIndexPage() {
               Quick team pulse checks and decisions
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {teams.length > 1 && (
-              <Select
-                value={createTeamId ?? undefined}
-                onValueChange={setCreateTeamId}
-              >
-                <SelectTrigger className="w-44">
-                  <SelectValue placeholder="Select a team" />
-                </SelectTrigger>
-                <SelectContent>
-                  {teams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Button
-              onClick={() => setCreateOpen(true)}
-              disabled={
-                teams.length === 0 || (teams.length > 1 && !createTeamId)
-              }
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              New Poll
-            </Button>
-          </div>
+          <Button
+            onClick={() => setCreateOpen(true)}
+            disabled={teams.length === 0}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Poll
+          </Button>
         </div>
 
         {!polls || polls.length === 0 ? (
@@ -151,22 +141,41 @@ function PollsIndexPage() {
                   setClosedMutation.mutate({ pollId, isClosed })
                 }
                 onDelete={(pollId) => deletePollMutation.mutate(pollId)}
+                onEdit={(p) => setEditingPoll(p)}
               />
             ))}
           </div>
         )}
 
-        {(createTeamId ?? teams[0]?.id) && (
+        {teams.length > 0 && (
           <CreatePollDialog
             open={createOpen}
             onOpenChange={setCreateOpen}
-            teamId={createTeamId ?? teams[0].id}
+            teams={teams}
             onCreate={(data) =>
               createPollMutation.mutate(data, {
                 onSuccess: () => setCreateOpen(false),
               })
             }
             isCreating={createPollMutation.isPending}
+          />
+        )}
+
+        {editingPoll && (
+          <CreatePollDialog
+            open={!!editingPoll}
+            onOpenChange={(open) => {
+              if (!open) setEditingPoll(null)
+            }}
+            editingPoll={editingPoll}
+            onCreate={() => {}}
+            onUpdate={(data) =>
+              updatePollMutation.mutate(
+                { pollId: editingPoll.id, data },
+                { onSuccess: () => setEditingPoll(null) },
+              )
+            }
+            isCreating={updatePollMutation.isPending}
           />
         )}
       </div>

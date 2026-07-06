@@ -6,6 +6,7 @@ export interface RealtimeFeatureFlags {
   icebreakersRealtimeBackend: RealtimeBackend
   standupsRealtimeBackend: RealtimeBackend
   notificationsRealtimeBackend: RealtimeBackend
+  // Polls and surveys are Convex-only — no per-feature backend flag.
 }
 
 export interface ProjectionSyncEnvelope<TPayload> {

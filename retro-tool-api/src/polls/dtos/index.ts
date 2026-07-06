@@ -53,6 +53,43 @@ export class CreatePollDtoClass {
   options: Array<{ label: string; emoji?: string | null }>;
 }
 
+export const updatePollSchema = z.object({
+  question: z.string().min(1).max(500).optional(),
+  isAnonymous: z.boolean().optional(),
+  options: z
+    .array(
+      z.object({
+        // Present for existing options (preserves their votes); omitted for
+        // newly added ones.
+        id: z.string().optional(),
+        label: z.string().min(1).max(255),
+        emoji: z.string().max(50).optional().nullable(),
+      }),
+    )
+    .min(2)
+    .max(10)
+    .optional(),
+});
+export type UpdatePollDto = z.infer<typeof updatePollSchema>;
+
+export class UpdatePollDtoClass {
+  @ApiPropertyOptional({ description: 'Poll question', maxLength: 500 })
+  question?: string;
+
+  @ApiPropertyOptional({ description: 'Hide voter identities' })
+  isAnonymous?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Poll options (2–10). Include an option `id` to keep its votes; omit `id` for new options. Options no longer present are removed along with their votes.',
+    example: [
+      { id: 'opt-1', label: 'Fantastic', emoji: '😄' },
+      { label: 'Great', emoji: '🤩' },
+    ],
+  })
+  options?: Array<{ id?: string; label: string; emoji?: string | null }>;
+}
+
 export const votePollSchema = z.object({
   optionId: z.string().min(1),
 });

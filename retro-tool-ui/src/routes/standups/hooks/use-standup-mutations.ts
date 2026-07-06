@@ -53,6 +53,19 @@ export function useStandupEntryMutations(standupId: string, date: string) {
       toast.error(error.message || 'Failed to submit update'),
   })
 
+  const deleteSubmissionMutation = useMutation({
+    mutationFn: () =>
+      api.delete<{ entryId: string }>(
+        STANDUPS_ENDPOINTS.SUBMISSION(standupId, date),
+      ),
+    onSuccess: () => {
+      toast.success('Your update was deleted')
+      refetchEntry()
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || 'Failed to delete update'),
+  })
+
   const addCommentMutation = useMutation({
     mutationFn: ({
       submissionId,
@@ -112,6 +125,21 @@ export function useStandupEntryMutations(standupId: string, date: string) {
       toast.error(error.message || 'Failed to update standup'),
   })
 
+  const skipDayMutation = useMutation({
+    mutationFn: (skip: boolean) =>
+      skip
+        ? api.post(STANDUPS_ENDPOINTS.SKIP_DAY(standupId, date))
+        : api.delete(STANDUPS_ENDPOINTS.SKIP_DAY(standupId, date)),
+    onSuccess: (_data, skip) => {
+      toast.success(skip ? 'Day skipped' : 'Day restored')
+      void queryClient.invalidateQueries({ queryKey: ['standups'] })
+      void queryClient.invalidateQueries({ queryKey: ['standup-activity'] })
+      refetchEntry()
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || 'Failed to update skipped day'),
+  })
+
   const deleteStandupMutation = useMutation({
     mutationFn: () => api.delete(STANDUPS_ENDPOINTS.BY_ID(standupId)),
     onSuccess: () => {
@@ -124,11 +152,13 @@ export function useStandupEntryMutations(standupId: string, date: string) {
 
   return {
     submitMutation,
+    deleteSubmissionMutation,
     addCommentMutation,
     deleteCommentMutation,
     addReactionMutation,
     removeReactionMutation,
     updateStandupMutation,
+    skipDayMutation,
     deleteStandupMutation,
   }
 }

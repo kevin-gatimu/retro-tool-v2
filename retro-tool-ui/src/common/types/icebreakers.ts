@@ -61,7 +61,23 @@ export interface CreateIcebreakerSessionInput {
   templateId?: string
   selectionMode?: TIcebreakerSelectionMode
   flavourFilter?: TIcebreakerFlavour
+  /** One-off prompts authored at creation (Custom mode). */
+  customPrompts?: { text: string; color?: string }[]
+  /** Attach the session to a standup day (both required together). */
+  standupId?: string
+  entryDate?: string
   timerDuration?: number
+}
+
+/** Compact icebreaker card shown inside a standup day's feed. */
+export interface IcebreakerEntrySession {
+  id: string
+  name: string
+  status: TIcebreakerSessionStatus
+  promptCount: number
+  keptCount: number
+  participantCount: number
+  canManage: boolean
 }
 
 export interface IcebreakerDeckPrompt {

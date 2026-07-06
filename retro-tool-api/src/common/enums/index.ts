@@ -8,4 +8,5 @@ export * from './notification.enums';
 export * from './estimate.enums';
 export * from './icebreaker.enums';
 export * from './standup.enums';
+export * from './survey.enums';
 export * from './email.enums';

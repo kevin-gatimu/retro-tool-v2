@@ -42,3 +42,11 @@ export interface CreatePollInput {
   isAnonymous?: boolean
   options: { label: string; emoji?: string | null }[]
 }
+
+export interface UpdatePollInput {
+  question?: string
+  isAnonymous?: boolean
+  /** Include an option `id` to preserve its votes; omit `id` for new options.
+   *  Options no longer present are removed. */
+  options?: { id?: string; label: string; emoji?: string | null }[]
+}

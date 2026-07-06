@@ -40,6 +40,17 @@ export function usesConvexForNotifications() {
   return notificationsRealtimeBackend === 'convex' && isConvexConfigured()
 }
 
+// Polls and surveys are Convex-only (no Socket.IO path). They use Convex
+// realtime whenever a deployment is configured, and fall back to REST polling
+// only when Convex is entirely unconfigured (bare local dev).
+export function usesConvexForPolls() {
+  return isConvexConfigured()
+}
+
+export function usesConvexForSurveys() {
+  return isConvexConfigured()
+}
+
 /**
  * True only if at least one feature is configured to use Convex. When every
  * feature is on socket-io we must NOT open a Convex WebSocket — otherwise the
@@ -52,6 +63,8 @@ export function usesConvexForAnything() {
     usesConvexForRetros() ||
     usesConvexForIcebreakers() ||
     usesConvexForStandups() ||
-    usesConvexForNotifications()
+    usesConvexForNotifications() ||
+    usesConvexForPolls() ||
+    usesConvexForSurveys()
   )
 }

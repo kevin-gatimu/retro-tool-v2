@@ -11,10 +11,15 @@ import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
 import * as pollsSchema from './schema';
 import * as standupsSchema from '../standups/schema';
 import * as teamSchema from '../teams/schema';
+import * as orgSchema from '../organizations/schema';
 import * as authSchema from '../auth/schema';
 import { generateId } from '../lib/utils';
-import { CreatePollDto } from './dtos';
-import { TEAM_MEMBER_TAGS, USER_ROLES } from '../common/enums';
+import { CreatePollDto, UpdatePollDto } from './dtos';
+import {
+  ORG_MEMBER_ROLES,
+  TEAM_MEMBER_TAGS,
+  USER_ROLES,
+} from '../common/enums';
 import { assemblePollView, type PollVoterRow } from './helpers';
 import type { Poll } from './schema';
 import type { PollView } from './types';
@@ -23,6 +28,7 @@ type Database = NodePgDatabase<
   typeof pollsSchema &
     typeof standupsSchema &
     typeof teamSchema &
+    typeof orgSchema &
     typeof authSchema
 >;
 
@@ -85,6 +91,36 @@ export class PollsService {
       return true;
     }
 
+    // Org owners and admins can manage any poll on a team in their org.
+    const [team] = await this.database
+      .select({ organizationId: teamSchema.team.organizationId })
+      .from(teamSchema.team)
+      .where(eq(teamSchema.team.id, record.teamId))
+      .limit(1);
+
+    if (team?.organizationId) {
+      const [orgMembership] = await this.database
+        .select({ role: orgSchema.organizationMember.role })
+        .from(orgSchema.organizationMember)
+        .where(
+          and(
+            eq(
+              orgSchema.organizationMember.organizationId,
+              team.organizationId,
+            ),
+            eq(orgSchema.organizationMember.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (
+        orgMembership?.role === ORG_MEMBER_ROLES.Owner ||
+        orgMembership?.role === ORG_MEMBER_ROLES.Admin
+      ) {
+        return true;
+      }
+    }
+
     const [membership] = await this.database
       .select({ tag: teamSchema.teamMember.tag })
       .from(teamSchema.teamMember)
@@ -138,6 +174,7 @@ export class PollsService {
           id: teamSchema.team.id,
           name: teamSchema.team.name,
           emoji: teamSchema.team.emoji,
+          organizationId: teamSchema.team.organizationId,
         })
         .from(teamSchema.team)
         .where(inArray(teamSchema.team.id, teamIds)),
@@ -165,6 +202,39 @@ export class PollsService {
         ),
     ]);
 
+    // Org roles let owners/admins manage every poll on their org's teams.
+    const orgIds = [
+      ...new Set(
+        teams
+          .map((row) => row.organizationId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const orgMemberships =
+      orgIds.length > 0
+        ? await this.database
+            .select({
+              organizationId: orgSchema.organizationMember.organizationId,
+              role: orgSchema.organizationMember.role,
+            })
+            .from(orgSchema.organizationMember)
+            .where(
+              and(
+                inArray(orgSchema.organizationMember.organizationId, orgIds),
+                eq(orgSchema.organizationMember.userId, userId),
+              ),
+            )
+        : [];
+    const manageableOrgIds = new Set(
+      orgMemberships
+        .filter(
+          (row) =>
+            row.role === ORG_MEMBER_ROLES.Owner ||
+            row.role === ORG_MEMBER_ROLES.Admin,
+        )
+        .map((row) => row.organizationId),
+    );
+
     const [fullUser] = await this.database
       .select({ role: authSchema.user.role })
       .from(authSchema.user)
@@ -179,15 +249,20 @@ export class PollsService {
         id: record.teamId,
         name: 'Unknown team',
         emoji: null,
+        organizationId: null,
       };
       const createdBy =
         creators.find((row) => row.id === record.createdById) ?? null;
       const membership = memberships.find(
         (row) => row.teamId === record.teamId,
       );
+      const isOrgManager = Boolean(
+        team.organizationId && manageableOrgIds.has(team.organizationId),
+      );
       const canManage =
         isAdmin ||
         record.createdById === userId ||
+        isOrgManager ||
         membership?.tag === TEAM_MEMBER_TAGS.Lead;
 
       return assemblePollView(record, options, votes as PollVoterRow[], {
@@ -225,6 +300,14 @@ export class PollsService {
       .orderBy(desc(pollsSchema.poll.createdAt));
 
     return this.buildViews(userId, polls);
+  }
+
+  /** Count of open standalone polls the user hasn't voted on yet (nav badge). */
+  async getActiveCount(userId: string): Promise<{ count: number }> {
+    const polls = await this.getPolls(userId);
+    return {
+      count: polls.filter((poll) => !poll.isClosed && !poll.hasVoted).length,
+    };
   }
 
   async getPoll(userId: string, pollId: string): Promise<PollView> {
@@ -403,6 +486,82 @@ export class PollsService {
       .update(pollsSchema.poll)
       .set({ isClosed, updatedAt: new Date() })
       .where(eq(pollsSchema.poll.id, pollId));
+
+    return { standupId: record.standupId, entryDate: record.entryDate };
+  }
+
+  async updatePoll(
+    userId: string,
+    pollId: string,
+    data: UpdatePollDto,
+  ): Promise<{ standupId: string | null; entryDate: string | null }> {
+    const record = await this.getPollRecord(pollId);
+
+    const canManage = await this.canManagePoll(record, userId);
+    if (!canManage) {
+      throw new ForbiddenException(
+        'Only the creator, a team lead, or an admin can edit this poll',
+      );
+    }
+
+    // Question / anonymity are simple field updates.
+    const fields: Partial<typeof pollsSchema.poll.$inferInsert> = {};
+    if (data.question !== undefined) fields.question = data.question;
+    if (data.isAnonymous !== undefined) fields.isAnonymous = data.isAnonymous;
+
+    if (Object.keys(fields).length > 0) {
+      await this.database
+        .update(pollsSchema.poll)
+        .set({ ...fields, updatedAt: new Date() })
+        .where(eq(pollsSchema.poll.id, pollId));
+    }
+
+    // Options are reconciled so that votes on kept options survive: options
+    // carrying an existing `id` are updated in place, brand-new options are
+    // inserted, and any option no longer present is deleted (its votes cascade).
+    if (data.options !== undefined) {
+      const existing = await this.database
+        .select({ id: pollsSchema.pollOption.id })
+        .from(pollsSchema.pollOption)
+        .where(eq(pollsSchema.pollOption.pollId, pollId));
+      const existingIds = new Set(existing.map((row) => row.id));
+
+      const keptIds = new Set(
+        data.options
+          .map((option) => option.id)
+          .filter((id): id is string => Boolean(id) && existingIds.has(id!)),
+      );
+
+      const removedIds = existing
+        .map((row) => row.id)
+        .filter((id) => !keptIds.has(id));
+      if (removedIds.length > 0) {
+        await this.database
+          .delete(pollsSchema.pollOption)
+          .where(inArray(pollsSchema.pollOption.id, removedIds));
+      }
+
+      for (const [index, option] of data.options.entries()) {
+        if (option.id && existingIds.has(option.id)) {
+          await this.database
+            .update(pollsSchema.pollOption)
+            .set({
+              label: option.label,
+              emoji: option.emoji ?? null,
+              order: index,
+            })
+            .where(eq(pollsSchema.pollOption.id, option.id));
+        } else {
+          await this.database.insert(pollsSchema.pollOption).values({
+            id: generateId(),
+            pollId,
+            label: option.label,
+            emoji: option.emoji ?? null,
+            order: index,
+          });
+        }
+      }
+    }
 
     return { standupId: record.standupId, entryDate: record.entryDate };
   }

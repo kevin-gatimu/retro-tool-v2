@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowLeft, Shuffle, Sparkles } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ArrowLeft, PencilLine, Plus, Shuffle, Sparkles, X } from 'lucide-react'
+import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -44,6 +44,7 @@ import {
   ALL_FLAVOURS,
   FLAVOUR_ACCENTS,
   FLAVOUR_LABELS,
+  buildSessionSource,
   defaultSessionName,
 } from './helpers'
 
@@ -66,6 +67,8 @@ function NewIcebreakerPage() {
   const [flavourFilter, setFlavourFilter] = useState<TIcebreakerFlavour | null>(
     null,
   )
+  // Custom mode: host-authored one-off prompts (not saved as a template).
+  const [customPrompts, setCustomPrompts] = useState<string[]>(['', ''])
 
   const { createSessionMutation } = useIcebreakerMutations()
 
@@ -84,16 +87,30 @@ function NewIcebreakerPage() {
   })
 
   const isRandom = selectionMode === ICEBREAKER_SELECTION_MODES.Random
+  const isCustom = selectionMode === ICEBREAKER_SELECTION_MODES.Custom
 
-  const templates = useMemo(
-    () => templatesData?.templates ?? [],
-    [templatesData],
-  )
+  const templates = templatesData?.templates ?? []
+
+  const filledPrompts = customPrompts
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0)
+
+  const updatePrompt = (index: number, value: string) =>
+    setCustomPrompts((prev) =>
+      prev.map((prompt, i) => (i === index ? value : prompt)),
+    )
+  const addPrompt = () => setCustomPrompts((prev) => [...prev, ''])
+  const removePrompt = (index: number) =>
+    setCustomPrompts((prev) => prev.filter((_, i) => i !== index))
+
+  const hasSource =
+    isRandom ||
+    (isCustom ? filledPrompts.length > 0 : selectedTemplateId !== null)
 
   const canSubmit =
     name.trim().length > 0 &&
     selectedTeamId !== null &&
-    (isRandom || selectedTemplateId !== null) &&
+    hasSource &&
     !createSessionMutation.isPending
 
   const handleSubmit = () => {
@@ -102,9 +119,12 @@ function NewIcebreakerPage() {
       name: name.trim(),
       teamId: selectedTeamId,
       selectionMode,
-      ...(isRandom
-        ? { flavourFilter: flavourFilter ?? undefined }
-        : { templateId: selectedTemplateId ?? undefined }),
+      ...buildSessionSource({
+        selectionMode,
+        flavourFilter,
+        filledPrompts,
+        selectedTemplateId,
+      }),
     }
     createSessionMutation.mutate(payload)
   }
@@ -184,13 +204,13 @@ function NewIcebreakerPage() {
             onValueChange={(value) =>
               setSelectionMode(value as TIcebreakerSelectionMode)
             }
-            className="grid gap-3 sm:grid-cols-2"
+            className="grid gap-3 sm:grid-cols-3"
           >
             <Label
               htmlFor="mode-ordered"
               className={cn(
                 'flex cursor-pointer items-start gap-3 rounded-lg border p-4',
-                !isRandom && 'border-primary ring-1 ring-primary',
+                !isRandom && !isCustom && 'border-primary ring-1 ring-primary',
               )}
             >
               <RadioGroupItem
@@ -225,9 +245,30 @@ function NewIcebreakerPage() {
                 </p>
               </div>
             </Label>
+            <Label
+              htmlFor="mode-custom"
+              className={cn(
+                'flex cursor-pointer items-start gap-3 rounded-lg border p-4',
+                isCustom && 'border-primary ring-1 ring-primary',
+              )}
+            >
+              <RadioGroupItem
+                value={ICEBREAKER_SELECTION_MODES.Custom}
+                id="mode-custom"
+              />
+              <div className="space-y-1">
+                <p className="font-medium flex items-center gap-1.5">
+                  <PencilLine className="h-4 w-4" />
+                  Write your own
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Author one-off prompts just for this session.
+                </p>
+              </div>
+            </Label>
           </RadioGroup>
 
-          {isRandom ? (
+          {isRandom && (
             <div className="space-y-2">
               <Label>Flavour (optional)</Label>
               <div className="flex flex-wrap gap-2">
@@ -258,7 +299,51 @@ function NewIcebreakerPage() {
                 ))}
               </div>
             </div>
-          ) : (
+          )}
+
+          {isCustom && (
+            <div className="space-y-3">
+              <Label>Your prompts</Label>
+              <div className="space-y-2">
+                {customPrompts.map((prompt, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={prompt}
+                      onChange={(event) =>
+                        updatePrompt(index, event.target.value)
+                      }
+                      placeholder={`Prompt ${index + 1}`}
+                      maxLength={500}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-muted-foreground"
+                      disabled={customPrompts.length <= 1}
+                      onClick={() => removePrompt(index)}
+                    >
+                      <X className="h-4 w-4" />
+                      <span className="sr-only">Remove prompt</span>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={customPrompts.length >= 20}
+                onClick={addPrompt}
+              >
+                <Plus className="h-4 w-4" />
+                Add prompt
+              </Button>
+            </div>
+          )}
+
+          {!isRandom && !isCustom && (
             <div className="space-y-3">
               <Label>Choose a deck</Label>
               {templates.length === 0 ? (

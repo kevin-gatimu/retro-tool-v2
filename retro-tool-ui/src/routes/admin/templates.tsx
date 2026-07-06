@@ -17,6 +17,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   SquareStack,
   Trash2,
   X,
@@ -68,11 +69,17 @@ import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import {
   ESTIMATE_TEMPLATES_ENDPOINTS,
+  ICEBREAKER_TEMPLATES_ENDPOINTS,
   ORGANIZATIONS_ENDPOINTS,
   TEMPLATES_ENDPOINTS,
 } from '@/lib/api-endpoints'
 import { useAdminTemplateMutations } from './hooks/use-admin-template-mutations'
 import { createEmptyColumn } from './helpers'
+import {
+  ALL_FLAVOURS,
+  FLAVOUR_ACCENTS,
+  FLAVOUR_LABELS,
+} from '@/routes/icebreakers/helpers'
 import type {
   EditableColumn,
   OrganizationAdminRow,
@@ -85,6 +92,13 @@ import type {
   PaginatedEstimateTemplatesResponse,
   CreateEstimateTemplateInput,
 } from '@/common/types/estimates'
+import type {
+  IcebreakerTemplate,
+  PaginatedIcebreakerTemplatesResponse,
+  CreateIcebreakerTemplateInput,
+} from '@/common/types/icebreakers'
+import { ICEBREAKER_FLAVOURS } from '@/common/enums/icebreaker.enums'
+import type { TIcebreakerFlavour } from '@/common/enums/icebreaker.enums'
 
 const DEFAULT_PAGE_SIZE = 10
 
@@ -115,6 +129,10 @@ function AdminTemplatesPage() {
             <Layers className="h-4 w-4 mr-2" />
             Story Estimate Templates
           </TabsTrigger>
+          <TabsTrigger value="icebreaker">
+            <Sparkles className="h-4 w-4 mr-2" />
+            Icebreaker Templates
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="retro" className="mt-6">
@@ -123,6 +141,10 @@ function AdminTemplatesPage() {
 
         <TabsContent value="estimate" className="mt-6">
           <AdminEstimateTemplatesContent />
+        </TabsContent>
+
+        <TabsContent value="icebreaker" className="mt-6">
+          <AdminIcebreakerTemplatesContent />
         </TabsContent>
       </Tabs>
     </div>
@@ -1599,6 +1621,804 @@ function EstimateTemplateFormDialog({
                     className="h-7 w-7 mt-5 text-muted-foreground hover:text-destructive"
                     onClick={() =>
                       setValues((vals) => vals.filter((_, j) => j !== i))
+                    }
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isPending || !canSubmit}>
+            {isPending
+              ? isEdit
+                ? 'Saving...'
+                : 'Creating...'
+              : isEdit
+                ? 'Save Changes'
+                : 'Create Template'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================================================================
+// Admin Icebreaker Templates Content
+// ============================================================================
+
+type PromptDraft = {
+  text: string
+  color: string
+}
+
+function AdminIcebreakerTemplatesContent() {
+  const queryClient = useQueryClient()
+
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const sortParam = sorting[0]?.id
+  const sortOrderParam = sorting[0]
+    ? sorting[0].desc
+      ? 'desc'
+      : 'asc'
+    : undefined
+
+  const queryKey = [
+    'admin-icebreaker-templates',
+    page,
+    pageSize,
+    debouncedSearch,
+    typeFilter,
+    sortParam,
+    sortOrderParam,
+  ]
+
+  const {
+    data: templatesData,
+    isFetching,
+    isLoading,
+  } = useQuery({
+    queryKey,
+    queryFn: () => {
+      let url = `${ICEBREAKER_TEMPLATES_ENDPOINTS.LIST}?page=${page}&limit=${pageSize}`
+      if (debouncedSearch)
+        url += `&search=${encodeURIComponent(debouncedSearch)}`
+      if (typeFilter !== 'all') url += `&type=${typeFilter}`
+      if (sortParam) url += `&sort=${sortParam}`
+      if (sortOrderParam) url += `&sortOrder=${sortOrderParam}`
+      return api.get<PaginatedIcebreakerTemplatesResponse>(url)
+    },
+    placeholderData: keepPreviousData,
+  })
+
+  const { data: orgsData } = useQuery({
+    queryKey: ['admin-all-organizations'],
+    queryFn: () =>
+      api.get<PaginatedOrgsResponse>(
+        `${ORGANIZATIONS_ENDPOINTS.LIST}?all=true&page=1&limit=1000`,
+      ),
+    staleTime: 60_000,
+  })
+  const allOrgs = orgsData?.organizations ?? []
+
+  const templates = templatesData?.templates ?? []
+  const total = templatesData?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ['admin-icebreaker-templates'] })
+
+  const seedMutation = useMutation({
+    mutationFn: () => api.post(ICEBREAKER_TEMPLATES_ENDPOINTS.SEED),
+    onSuccess: () => {
+      toast.success('Built-in icebreaker templates seeded')
+      invalidate()
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to seed templates'),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (body: CreateIcebreakerTemplateInput) =>
+      api.post(ICEBREAKER_TEMPLATES_ENDPOINTS.LIST, body),
+    onSuccess: () => {
+      toast.success('Template created')
+      setIsCreateOpen(false)
+      invalidate()
+    },
+    onError: (e: Error) =>
+      toast.error(e.message || 'Failed to create template'),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string
+      body: Partial<CreateIcebreakerTemplateInput>
+    }) => api.patch(ICEBREAKER_TEMPLATES_ENDPOINTS.BY_ID(id), body),
+    onSuccess: () => {
+      toast.success('Template updated')
+      setEditingTemplate(null)
+      invalidate()
+    },
+    onError: (e: Error) =>
+      toast.error(e.message || 'Failed to update template'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.delete(ICEBREAKER_TEMPLATES_ENDPOINTS.BY_ID(id)),
+    onSuccess: () => {
+      toast.success('Template deleted')
+      setDeletingTemplate(null)
+      invalidate()
+    },
+    onError: (e: Error) =>
+      toast.error(e.message || 'Failed to delete template'),
+  })
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [editingTemplate, setEditingTemplate] =
+    useState<IcebreakerTemplate | null>(null)
+  const [deletingTemplate, setDeletingTemplate] =
+    useState<IcebreakerTemplate | null>(null)
+  const [viewingTemplate, setViewingTemplate] =
+    useState<IcebreakerTemplate | null>(null)
+
+  const columns = useMemo<ColumnDef<IcebreakerTemplate>[]>(
+    () => [
+      {
+        accessorKey: 'name',
+        header: ({ column }) => (
+          <SortableHeader column={column}>Name</SortableHeader>
+        ),
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.name}</span>
+        ),
+      },
+      {
+        id: 'type',
+        header: () => <span>Type</span>,
+        enableSorting: false,
+        cell: ({ row }) =>
+          row.original.isBuiltIn ? (
+            <Badge variant="secondary">Built-in</Badge>
+          ) : (
+            <Badge variant="outline">
+              {row.original.organizationName ?? 'Organization'}
+            </Badge>
+          ),
+      },
+      {
+        id: 'flavour',
+        header: () => <span>Flavour</span>,
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${FLAVOUR_ACCENTS[row.original.flavour]}`}
+          >
+            {FLAVOUR_LABELS[row.original.flavour]}
+          </span>
+        ),
+      },
+      {
+        id: 'prompts',
+        header: () => <span>Prompts</span>,
+        enableSorting: false,
+        cell: ({ row }) => (
+          <Badge variant="outline">{row.original.prompts.length}</Badge>
+        ),
+      },
+      {
+        id: 'createdAt',
+        accessorFn: (row) => new Date(row.createdAt).getTime(),
+        header: ({ column }) => (
+          <SortableHeader column={column}>Created</SortableHeader>
+        ),
+        cell: ({ row }) =>
+          new Date(row.original.createdAt).toLocaleDateString(),
+      },
+      {
+        id: 'actions',
+        header: () => <span>Actions</span>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const t = row.original
+          const actionsDisabled =
+            updateMutation.isPending || deleteMutation.isPending
+
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={actionsDisabled}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setViewingTemplate(t)}>
+                  <SquareStack className="mr-2 h-4 w-4" />
+                  View
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={actionsDisabled}
+                  onClick={() => setEditingTemplate(t)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive"
+                  disabled={actionsDisabled}
+                  onClick={() => setDeletingTemplate(t)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )
+        },
+      },
+    ],
+    [updateMutation.isPending, deleteMutation.isPending],
+  )
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">Icebreaker Templates</h3>
+          <p className="text-sm text-muted-foreground">
+            Manage built-in and organization icebreaker templates.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => seedMutation.mutate()}
+            disabled={seedMutation.isPending}
+          >
+            {seedMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Seed Built-in
+          </Button>
+          <Button onClick={() => setIsCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Template
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            All Icebreaker Templates
+          </CardTitle>
+          <CardDescription>
+            {total} template{total === 1 ? '' : 's'} in the system.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3 mb-4">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search templates..."
+                className="pl-9 h-8 w-64"
+              />
+            </div>
+            <Select
+              value={typeFilter}
+              onValueChange={(v) => {
+                setTypeFilter(v as TypeFilter)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="h-8 w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="built-in">Built-in</SelectItem>
+                <SelectItem value="organization">Organization</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DataTable
+            columns={columns}
+            data={templates}
+            pagination={false}
+            manualSorting
+            sorting={sorting}
+            onSortingChange={(nextSorting) => {
+              setSorting(nextSorting)
+              setPage(1)
+            }}
+            loading={isLoading}
+            isFetching={isFetching}
+          />
+
+          <div className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground">
+              Showing {templates.length} of {total} template
+              {total === 1 ? '' : 's'}
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Rows</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(value) => {
+                    setPageSize(Number(value))
+                    setPage(1)
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 20, 50, 100].map((size) => (
+                      <SelectItem key={size} value={String(size)}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={page <= 1 || isFetching}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() =>
+                  setPage((prev) => Math.min(totalPages, prev + 1))
+                }
+                disabled={page >= totalPages || isFetching}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1"
+                onClick={() =>
+                  queryClient.invalidateQueries({
+                    queryKey: ['admin-icebreaker-templates'],
+                  })
+                }
+                disabled={isFetching}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
+                />
+                Refresh
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* View Dialog */}
+      <Dialog
+        open={!!viewingTemplate}
+        onOpenChange={(o) => {
+          if (!o) setViewingTemplate(null)
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {viewingTemplate?.name}
+              {viewingTemplate?.isBuiltIn ? (
+                <Badge variant="secondary" className="text-xs">
+                  Built-in
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-xs">
+                  {viewingTemplate?.organizationName ?? 'Org'}
+                </Badge>
+              )}
+              {viewingTemplate && (
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${FLAVOUR_ACCENTS[viewingTemplate.flavour]}`}
+                >
+                  {FLAVOUR_LABELS[viewingTemplate.flavour]}
+                </span>
+              )}
+            </DialogTitle>
+            {viewingTemplate?.description && (
+              <DialogDescription>
+                {viewingTemplate.description}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {viewingTemplate?.color && (
+              <div className="flex items-center gap-2">
+                <div
+                  className="h-4 w-4 rounded-full border"
+                  style={{ backgroundColor: viewingTemplate.color }}
+                />
+                <span className="text-xs font-mono text-muted-foreground">
+                  {viewingTemplate.color}
+                </span>
+              </div>
+            )}
+            <div>
+              <Label className="text-muted-foreground text-xs mb-2 block">
+                PROMPTS ({viewingTemplate?.prompts.length ?? 0})
+              </Label>
+              <div className="grid gap-2">
+                {viewingTemplate?.prompts
+                  .slice()
+                  .sort((a, b) => a.order - b.order)
+                  .map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-start gap-3 rounded-lg border p-3"
+                    >
+                      {p.color && (
+                        <div
+                          className="mt-0.5 h-3 w-3 rounded-full border shrink-0"
+                          style={{ backgroundColor: p.color }}
+                        />
+                      )}
+                      <p className="flex-1 min-w-0 text-sm">{p.text}</p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Created:{' '}
+              {viewingTemplate?.createdAt
+                ? new Date(viewingTemplate.createdAt).toLocaleDateString(
+                    undefined,
+                    { year: 'numeric', month: 'long', day: 'numeric' },
+                  )
+                : '—'}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setViewingTemplate(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Dialog */}
+      {isCreateOpen && (
+        <IcebreakerTemplateFormDialog
+          open={isCreateOpen}
+          onClose={() => setIsCreateOpen(false)}
+          allOrgs={allOrgs}
+          onSubmit={(body) => createMutation.mutate(body)}
+          isPending={createMutation.isPending}
+        />
+      )}
+
+      {/* Edit Dialog */}
+      {editingTemplate && (
+        <IcebreakerTemplateFormDialog
+          open={!!editingTemplate}
+          onClose={() => setEditingTemplate(null)}
+          allOrgs={allOrgs}
+          template={editingTemplate}
+          onSubmit={(body) =>
+            updateMutation.mutate({ id: editingTemplate.id, body })
+          }
+          isPending={updateMutation.isPending}
+        />
+      )}
+
+      {/* Delete Dialog */}
+      <Dialog
+        open={!!deletingTemplate}
+        onOpenChange={(open) => {
+          if (!open) setDeletingTemplate(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Icebreaker Template</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete
+              <span className="font-semibold"> {deletingTemplate?.name}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingTemplate(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deletingTemplate) {
+                  deleteMutation.mutate(deletingTemplate.id)
+                }
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// ============================================================================
+// Icebreaker Template Form Dialog
+// ============================================================================
+
+function IcebreakerTemplateFormDialog({
+  open,
+  onClose,
+  allOrgs,
+  template,
+  onSubmit,
+  isPending,
+}: {
+  open: boolean
+  onClose: () => void
+  allOrgs: OrganizationAdminRow[]
+  template?: IcebreakerTemplate
+  onSubmit: (body: CreateIcebreakerTemplateInput) => void
+  isPending: boolean
+}) {
+  const isEdit = !!template
+
+  const [name, setName] = useState(template?.name ?? '')
+  const [desc, setDesc] = useState(template?.description ?? '')
+  const [orgId, setOrgId] = useState(template?.organizationId ?? '')
+  const [flavour, setFlavour] = useState<TIcebreakerFlavour>(
+    template?.flavour ?? ICEBREAKER_FLAVOURS.Fun,
+  )
+  const [color, setColor] = useState(template?.color ?? '#6366f1')
+  const [prompts, setPrompts] = useState<PromptDraft[]>(
+    template
+      ? template.prompts
+          .slice()
+          .sort((a, b) => a.order - b.order)
+          .map((p) => ({ text: p.text, color: p.color ?? '' }))
+      : [{ text: '', color: '' }],
+  )
+
+  const validPrompts = prompts.filter((p) => p.text.trim())
+  const canSubmit = name.trim().length > 0 && validPrompts.length > 0
+
+  const handleSubmit = () => {
+    onSubmit({
+      name: name.trim(),
+      description: desc.trim() || undefined,
+      flavour,
+      organizationId: orgId || undefined,
+      color: color || undefined,
+      prompts: validPrompts.map((p, i) => ({
+        text: p.text.trim(),
+        order: i,
+        color: p.color || undefined,
+      })),
+    })
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose()
+      }}
+    >
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {isEdit ? 'Edit Icebreaker Template' : 'New Icebreaker Template'}
+          </DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? 'Update the template prompts and settings.'
+              : 'Create a new set of prompts for icebreaker sessions.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Name *</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Team Warm-up"
+                maxCharacters={255}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Organization</Label>
+              <Select
+                value={orgId || 'none'}
+                onValueChange={(v) => setOrgId(v === 'none' ? '' : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Global (all users)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Global (all users)</SelectItem>
+                  {allOrgs.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Flavour</Label>
+              <Select
+                value={flavour}
+                onValueChange={(v) => setFlavour(v as TIcebreakerFlavour)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ALL_FLAVOURS.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {FLAVOUR_LABELS[f]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Theme Color</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="h-9 w-12 cursor-pointer rounded border border-input p-0.5"
+                />
+                <span className="text-xs text-muted-foreground font-mono">
+                  {color}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Textarea
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="When to use this template"
+              className="min-h-16 resize-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Prompts *</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={prompts.length >= 50}
+                onClick={() =>
+                  setPrompts((p) => [...p, { text: '', color: '' }])
+                }
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add Prompt
+              </Button>
+            </div>
+            {prompts.map((p, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-2 rounded-lg border p-3"
+              >
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <input
+                    type="color"
+                    value={p.color || '#6366f1'}
+                    onChange={(e) =>
+                      setPrompts((prev) =>
+                        prev.map((pp, j) =>
+                          j === i ? { ...pp, color: e.target.value } : pp,
+                        ),
+                      )
+                    }
+                    className="h-8 w-9 cursor-pointer rounded border border-input p-0.5"
+                  />
+                  {p.color && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-1.5 text-xs text-muted-foreground"
+                      onClick={() =>
+                        setPrompts((prev) =>
+                          prev.map((pp, j) =>
+                            j === i ? { ...pp, color: '' } : pp,
+                          ),
+                        )
+                      }
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <Textarea
+                  placeholder="Prompt text"
+                  value={p.text}
+                  maxLength={500}
+                  className="flex-1 min-h-9 resize-none"
+                  rows={2}
+                  onChange={(e) =>
+                    setPrompts((prev) =>
+                      prev.map((pp, j) =>
+                        j === i ? { ...pp, text: e.target.value } : pp,
+                      ),
+                    )
+                  }
+                />
+                {prompts.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() =>
+                      setPrompts((prev) => prev.filter((_, j) => j !== i))
                     }
                   >
                     <X className="h-3.5 w-3.5" />

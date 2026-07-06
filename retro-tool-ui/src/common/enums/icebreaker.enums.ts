@@ -29,6 +29,7 @@ export type TIcebreakerPromptDecision =
 export const ICEBREAKER_SELECTION_MODES = {
   Ordered: 'ordered',
   Random: 'random',
+  Custom: 'custom',
 } as const
 
 export type TIcebreakerSelectionMode =

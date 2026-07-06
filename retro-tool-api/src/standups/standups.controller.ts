@@ -8,6 +8,7 @@ import {
   Body,
   Param,
   ParseUUIDPipe,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -43,6 +44,9 @@ import {
   addStandupReactionSchema,
   AddStandupReactionDto,
   AddStandupReactionDtoClass,
+  sendStandupReportSchema,
+  SendStandupReportDto,
+  SendStandupReportDtoClass,
 } from './dtos';
 
 @ApiTags('standups')
@@ -65,6 +69,23 @@ export class StandupsController {
   @ApiResponse({ status: 200, description: 'Standup list' })
   getStandups(@Session() session: SessionUser) {
     return this.standupsService.getStandups(session.user.id);
+  }
+
+  @Get('activity')
+  @ApiOperation({
+    summary:
+      'Entry dates with submission counts for the user\u2019s standups in a date range',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '[{ standupId, entryDate, submissionCount }]',
+  })
+  getActivity(
+    @Session() session: SessionUser,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    return this.standupsService.getActivity(session.user.id, from, to);
   }
 
   @Post()
@@ -187,6 +208,85 @@ export class StandupsController {
     );
     this.standupsGateway.emitEntryChanged(id, date);
     return result;
+  }
+
+  @Delete(':id/entries/:date/submission')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Delete the current user's submission for a date" })
+  @ApiParam({ name: 'id', type: String, description: 'Standup ID' })
+  @ApiParam({ name: 'date', type: String, description: 'Date (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: '{ entryId: string }' })
+  async deleteSubmission(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('date') date: string,
+    @Session() session: SessionUser,
+  ) {
+    const result = await this.standupsService.deleteSubmission(
+      session.user.id,
+      id,
+      date,
+    );
+    this.standupsGateway.emitEntryChanged(id, date);
+    return result;
+  }
+
+  @Post(':id/skip-days/:date')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Skip a standup day (creator/lead/admin only)' })
+  @ApiParam({ name: 'id', type: String, description: 'Standup ID' })
+  @ApiParam({ name: 'date', type: String, description: 'Date (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: '{ success: true }' })
+  async skipDay(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('date') date: string,
+    @Session() session: SessionUser,
+  ) {
+    const result = await this.standupsService.skipDay(
+      session.user.id,
+      id,
+      date,
+    );
+    this.standupsGateway.emitEntryChanged(id, date);
+    this.standupsGateway.emitStandupListChanged();
+    return result;
+  }
+
+  @Delete(':id/skip-days/:date')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Restore a skipped standup day' })
+  @ApiParam({ name: 'id', type: String, description: 'Standup ID' })
+  @ApiParam({ name: 'date', type: String, description: 'Date (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: '{ success: true }' })
+  async unskipDay(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('date') date: string,
+    @Session() session: SessionUser,
+  ) {
+    const result = await this.standupsService.unskipDay(
+      session.user.id,
+      id,
+      date,
+    );
+    this.standupsGateway.emitEntryChanged(id, date);
+    this.standupsGateway.emitStandupListChanged();
+    return result;
+  }
+
+  @Post(':id/send-report')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Email a standup day report to team members or specific addresses',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Standup ID' })
+  @ApiBody({ type: SendStandupReportDtoClass })
+  @ApiResponse({ status: 200, description: '{ sent: number }' })
+  @UsePipes(new ZodValidationPipe(sendStandupReportSchema))
+  async sendReport(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: SendStandupReportDto,
+    @Session() session: SessionUser,
+  ) {
+    return this.standupsService.sendStandupReport(session.user.id, id, body);
   }
 
   // ============================================================================

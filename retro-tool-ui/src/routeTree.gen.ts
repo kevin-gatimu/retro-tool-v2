@@ -21,6 +21,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TeamsIndexRouteImport } from './routes/teams/index'
+import { Route as SurveysIndexRouteImport } from './routes/surveys/index'
 import { Route as StandupsIndexRouteImport } from './routes/standups/index'
 import { Route as RetrosIndexRouteImport } from './routes/retros/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
@@ -31,6 +32,7 @@ import { Route as EstimateIndexRouteImport } from './routes/estimate/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as TeamsTeamIdRouteImport } from './routes/teams/$teamId'
+import { Route as SurveysSurveyIdRouteImport } from './routes/surveys/$surveyId'
 import { Route as StandupsNewRouteImport } from './routes/standups/new'
 import { Route as StandupsStandupIdRouteImport } from './routes/standups/$standupId'
 import { Route as RetrosNewRouteImport } from './routes/retros/new'
@@ -122,6 +124,11 @@ const TeamsIndexRoute = TeamsIndexRouteImport.update({
   path: '/teams/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SurveysIndexRoute = SurveysIndexRouteImport.update({
+  id: '/surveys/',
+  path: '/surveys/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StandupsIndexRoute = StandupsIndexRouteImport.update({
   id: '/standups/',
   path: '/standups/',
@@ -170,6 +177,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const TeamsTeamIdRoute = TeamsTeamIdRouteImport.update({
   id: '/teams/$teamId',
   path: '/teams/$teamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SurveysSurveyIdRoute = SurveysSurveyIdRouteImport.update({
+  id: '/surveys/$surveyId',
+  path: '/surveys/$surveyId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StandupsNewRoute = StandupsNewRouteImport.update({
@@ -365,6 +377,7 @@ export interface FileRoutesByFullPath {
   '/retros/new': typeof RetrosNewRoute
   '/standups/$standupId': typeof StandupsStandupIdRoute
   '/standups/new': typeof StandupsNewRoute
+  '/surveys/$surveyId': typeof SurveysSurveyIdRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -375,6 +388,7 @@ export interface FileRoutesByFullPath {
   '/profile/': typeof ProfileIndexRoute
   '/retros/': typeof RetrosIndexRoute
   '/standups/': typeof StandupsIndexRoute
+  '/surveys/': typeof SurveysIndexRoute
   '/teams/': typeof TeamsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -416,6 +430,7 @@ export interface FileRoutesByTo {
   '/retros/new': typeof RetrosNewRoute
   '/standups/$standupId': typeof StandupsStandupIdRoute
   '/standups/new': typeof StandupsNewRoute
+  '/surveys/$surveyId': typeof SurveysSurveyIdRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -426,6 +441,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileIndexRoute
   '/retros': typeof RetrosIndexRoute
   '/standups': typeof StandupsIndexRoute
+  '/surveys': typeof SurveysIndexRoute
   '/teams': typeof TeamsIndexRoute
 }
 export interface FileRoutesById {
@@ -471,6 +487,7 @@ export interface FileRoutesById {
   '/retros/new': typeof RetrosNewRoute
   '/standups/$standupId': typeof StandupsStandupIdRoute
   '/standups/new': typeof StandupsNewRoute
+  '/surveys/$surveyId': typeof SurveysSurveyIdRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -481,6 +498,7 @@ export interface FileRoutesById {
   '/profile/': typeof ProfileIndexRoute
   '/retros/': typeof RetrosIndexRoute
   '/standups/': typeof StandupsIndexRoute
+  '/surveys/': typeof SurveysIndexRoute
   '/teams/': typeof TeamsIndexRoute
 }
 export interface FileRouteTypes {
@@ -527,6 +545,7 @@ export interface FileRouteTypes {
     | '/retros/new'
     | '/standups/$standupId'
     | '/standups/new'
+    | '/surveys/$surveyId'
     | '/teams/$teamId'
     | '/admin/'
     | '/dashboard/'
@@ -537,6 +556,7 @@ export interface FileRouteTypes {
     | '/profile/'
     | '/retros/'
     | '/standups/'
+    | '/surveys/'
     | '/teams/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -578,6 +598,7 @@ export interface FileRouteTypes {
     | '/retros/new'
     | '/standups/$standupId'
     | '/standups/new'
+    | '/surveys/$surveyId'
     | '/teams/$teamId'
     | '/admin'
     | '/dashboard'
@@ -588,6 +609,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/retros'
     | '/standups'
+    | '/surveys'
     | '/teams'
   id:
     | '__root__'
@@ -632,6 +654,7 @@ export interface FileRouteTypes {
     | '/retros/new'
     | '/standups/$standupId'
     | '/standups/new'
+    | '/surveys/$surveyId'
     | '/teams/$teamId'
     | '/admin/'
     | '/dashboard/'
@@ -642,6 +665,7 @@ export interface FileRouteTypes {
     | '/profile/'
     | '/retros/'
     | '/standups/'
+    | '/surveys/'
     | '/teams/'
   fileRoutesById: FileRoutesById
 }
@@ -666,6 +690,7 @@ export interface RootRouteChildren {
   RetrosNewRoute: typeof RetrosNewRoute
   StandupsStandupIdRoute: typeof StandupsStandupIdRoute
   StandupsNewRoute: typeof StandupsNewRoute
+  SurveysSurveyIdRoute: typeof SurveysSurveyIdRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRoute
   EstimateIndexRoute: typeof EstimateIndexRoute
   IcebreakersIndexRoute: typeof IcebreakersIndexRoute
@@ -673,6 +698,7 @@ export interface RootRouteChildren {
   PollsIndexRoute: typeof PollsIndexRoute
   RetrosIndexRoute: typeof RetrosIndexRoute
   StandupsIndexRoute: typeof StandupsIndexRoute
+  SurveysIndexRoute: typeof SurveysIndexRoute
   TeamsIndexRoute: typeof TeamsIndexRoute
 }
 
@@ -762,6 +788,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/surveys/': {
+      id: '/surveys/'
+      path: '/surveys'
+      fullPath: '/surveys/'
+      preLoaderRoute: typeof SurveysIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/standups/': {
       id: '/standups/'
       path: '/standups'
@@ -830,6 +863,13 @@ declare module '@tanstack/react-router' {
       path: '/teams/$teamId'
       fullPath: '/teams/$teamId'
       preLoaderRoute: typeof TeamsTeamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/surveys/$surveyId': {
+      id: '/surveys/$surveyId'
+      path: '/surveys/$surveyId'
+      fullPath: '/surveys/$surveyId'
+      preLoaderRoute: typeof SurveysSurveyIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/standups/new': {
@@ -1149,6 +1189,7 @@ const rootRouteChildren: RootRouteChildren = {
   RetrosNewRoute: RetrosNewRoute,
   StandupsStandupIdRoute: StandupsStandupIdRoute,
   StandupsNewRoute: StandupsNewRoute,
+  SurveysSurveyIdRoute: SurveysSurveyIdRoute,
   TeamsTeamIdRoute: TeamsTeamIdRoute,
   EstimateIndexRoute: EstimateIndexRoute,
   IcebreakersIndexRoute: IcebreakersIndexRoute,
@@ -1156,6 +1197,7 @@ const rootRouteChildren: RootRouteChildren = {
   PollsIndexRoute: PollsIndexRoute,
   RetrosIndexRoute: RetrosIndexRoute,
   StandupsIndexRoute: StandupsIndexRoute,
+  SurveysIndexRoute: SurveysIndexRoute,
   TeamsIndexRoute: TeamsIndexRoute,
 }
 export const routeTree = rootRouteImport

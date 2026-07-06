@@ -1,11 +1,14 @@
 import {
   ICEBREAKER_FLAVOURS,
+  ICEBREAKER_SELECTION_MODES,
   ICEBREAKER_SESSION_STATUSES,
 } from '@/common/enums/icebreaker.enums'
 import type {
   TIcebreakerFlavour,
+  TIcebreakerSelectionMode,
   TIcebreakerSessionStatus,
 } from '@/common/enums/icebreaker.enums'
+import type { CreateIcebreakerSessionInput } from '@/common/types/icebreakers'
 
 export const FLAVOUR_LABELS: Record<TIcebreakerFlavour, string> = {
   [ICEBREAKER_FLAVOURS.Fun]: 'Fun',
@@ -69,4 +72,31 @@ export function defaultSessionName(now: Date = new Date()): string {
       : `${hour12}:${minutes.toString().padStart(2, '0')}${period}`
 
   return `${weekday} ${day} ${month} - ${time}`
+}
+
+/**
+ * The three "where do prompts come from" fields of a create-session payload.
+ * The create page and the standup-room dialog build the same source block, so
+ * it lives here once. Only the fields relevant to `selectionMode` are set:
+ * a random flavour filter, custom one-off prompts, or a chosen template.
+ */
+export function buildSessionSource(input: {
+  selectionMode: TIcebreakerSelectionMode
+  flavourFilter: TIcebreakerFlavour | null
+  filledPrompts: string[]
+  selectedTemplateId: string | null
+}): Pick<
+  CreateIcebreakerSessionInput,
+  'flavourFilter' | 'customPrompts' | 'templateId'
+> {
+  switch (input.selectionMode) {
+    case ICEBREAKER_SELECTION_MODES.Random:
+      return { flavourFilter: input.flavourFilter ?? undefined }
+    case ICEBREAKER_SELECTION_MODES.Custom:
+      return {
+        customPrompts: input.filledPrompts.map((text) => ({ text })),
+      }
+    default:
+      return { templateId: input.selectedTemplateId ?? undefined }
+  }
 }

@@ -109,6 +109,33 @@ export default defineSchema({
     .index('by_standup_date', ['standupId', 'entryDate'])
     .index('by_standup_date_user', ['standupId', 'entryDate', 'userId']),
 
+  // Lightweight poll projection pushed from NestJS after each mutation.
+  // Drives the polls list; the UI invalidates and refetches the REST list
+  // (which applies per-viewer authorization) whenever this table changes.
+  livePolls: defineTable({
+    pollId: v.string(),
+    teamId: v.string(),
+    isClosed: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index('by_poll_id', ['pollId'])
+    .index('by_team_id', ['teamId']),
+
+  // Lightweight survey projection pushed from NestJS after each mutation.
+  // Drives the surveys list + active-count badge; the UI invalidates and
+  // refetches the REST endpoints (which apply per-viewer authorization).
+  liveSurveys: defineTable({
+    surveyId: v.string(),
+    scope: v.union(v.literal('team'), v.literal('org'), v.literal('system')),
+    teamId: v.optional(v.string()),
+    organizationId: v.optional(v.string()),
+    isClosed: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index('by_survey_id', ['surveyId'])
+    .index('by_team_id', ['teamId'])
+    .index('by_org_id', ['organizationId']),
+
   liveNotifications: defineTable({
     notificationId: v.string(),
     userId: v.string(),

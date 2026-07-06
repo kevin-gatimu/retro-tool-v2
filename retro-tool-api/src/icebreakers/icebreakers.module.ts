@@ -6,9 +6,10 @@ import { IcebreakersGateway } from './icebreakers.gateway';
 import { DatabaseModule } from '../database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { WsAuthModule } from '../auth/ws-auth.module';
+import { StandupsModule } from '../standups/standups.module';
 
 @Module({
-  imports: [DatabaseModule, NotificationsModule, WsAuthModule],
+  imports: [DatabaseModule, NotificationsModule, WsAuthModule, StandupsModule],
   controllers: [IcebreakersController],
   providers: [
     IcebreakersService,

@@ -23,12 +23,16 @@ import {
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { PollsService } from './polls.service';
+import { PollsProjectionSyncService } from './polls-projection-sync.service';
 import { StandupsGateway } from '../standups/standups.gateway';
 import type { SessionUser } from '../common/types';
 import {
   createPollSchema,
   CreatePollDto,
   CreatePollDtoClass,
+  updatePollSchema,
+  UpdatePollDto,
+  UpdatePollDtoClass,
   votePollSchema,
   VotePollDto,
   VotePollDtoClass,
@@ -41,6 +45,7 @@ import {
 export class PollsController {
   constructor(
     private readonly pollsService: PollsService,
+    private readonly pollsProjectionSync: PollsProjectionSyncService,
     private readonly standupsGateway: StandupsGateway,
   ) {}
 
@@ -63,6 +68,15 @@ export class PollsController {
     return this.pollsService.getPolls(session.user.id);
   }
 
+  @Get('active-count')
+  @ApiOperation({
+    summary: "Count of open polls the current user hasn't voted on yet",
+  })
+  @ApiResponse({ status: 200, description: '{ count: number }' })
+  getActiveCount(@Session() session: SessionUser) {
+    return this.pollsService.getActiveCount(session.user.id);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Create a poll (standalone or standup-attached)' })
   @ApiBody({ type: CreatePollDtoClass })
@@ -74,6 +88,7 @@ export class PollsController {
   ) {
     const result = await this.pollsService.createPoll(session.user.id, body);
     this.emitIfAttached(result);
+    void this.pollsProjectionSync.syncPollProjection(result.id);
     return { id: result.id };
   }
 
@@ -106,6 +121,7 @@ export class PollsController {
       body.optionId,
     );
     this.emitIfAttached(result);
+    void this.pollsProjectionSync.syncPollProjection(id);
     return { success: true };
   }
 
@@ -120,6 +136,31 @@ export class PollsController {
   ) {
     const result = await this.pollsService.retractVote(session.user.id, id);
     this.emitIfAttached(result);
+    void this.pollsProjectionSync.syncPollProjection(id);
+    return { success: true };
+  }
+
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Edit a poll — question, anonymity, and options (manager only)',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Poll ID' })
+  @ApiBody({ type: UpdatePollDtoClass })
+  @ApiResponse({ status: 200, description: '{ success: true }' })
+  @UsePipes(new ZodValidationPipe(updatePollSchema))
+  async updatePoll(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdatePollDto,
+    @Session() session: SessionUser,
+  ) {
+    const result = await this.pollsService.updatePoll(
+      session.user.id,
+      id,
+      body,
+    );
+    this.emitIfAttached(result);
+    void this.pollsProjectionSync.syncPollProjection(id);
     return { success: true };
   }
 
@@ -139,6 +180,7 @@ export class PollsController {
       isClosed === true,
     );
     this.emitIfAttached(result);
+    void this.pollsProjectionSync.syncPollProjection(id);
     return { success: true };
   }
 
@@ -153,6 +195,7 @@ export class PollsController {
   ) {
     const result = await this.pollsService.deletePoll(session.user.id, id);
     this.emitIfAttached(result);
+    void this.pollsProjectionSync.deletePollProjection(id);
     return { success: true };
   }
 }

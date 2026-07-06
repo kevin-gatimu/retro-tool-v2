@@ -22,6 +22,7 @@ import * as icebreakersSchema from './schema';
 import * as teamSchema from '../teams/schema';
 import * as authSchema from '../auth/schema';
 import * as orgSchema from '../organizations/schema';
+import * as standupsSchema from '../standups/schema';
 import { generateId } from '../lib/utils';
 import { generateSeed, seededShuffle } from '../lib/seeded-random';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -50,7 +51,8 @@ type Database = NodePgDatabase<
   typeof icebreakersSchema &
     typeof teamSchema &
     typeof authSchema &
-    typeof orgSchema
+    typeof orgSchema &
+    typeof standupsSchema
 >;
 
 @Injectable()
@@ -75,6 +77,26 @@ export class IcebreakersService {
 
     if (!session) throw new NotFoundException('Session not found');
     return session;
+  }
+
+  /**
+   * Returns the standup day a session is attached to, if any. Used by the
+   * controller to refresh the standup room feed after a session mutation.
+   */
+  async getStandupLink(
+    sessionId: string,
+  ): Promise<{ standupId: string; entryDate: string } | null> {
+    const [row] = await this.database
+      .select({
+        standupId: icebreakersSchema.icebreakerSession.standupId,
+        entryDate: icebreakersSchema.icebreakerSession.entryDate,
+      })
+      .from(icebreakersSchema.icebreakerSession)
+      .where(eq(icebreakersSchema.icebreakerSession.id, sessionId))
+      .limit(1);
+
+    if (!row?.standupId || !row.entryDate) return null;
+    return { standupId: row.standupId, entryDate: row.entryDate };
   }
 
   async canManageSession(sessionId: string, userId: string): Promise<boolean> {
@@ -432,31 +454,77 @@ export class IcebreakersService {
 
     if (!membership) throw new ForbiddenException('Access denied');
 
+    // When attaching to a standup day both parts are required, and the standup
+    // must belong to the same team (mirrors poll → standup attachment).
+    const standupId = data.standupId ?? null;
+    let entryDate = data.entryDate ?? null;
+    if (standupId) {
+      if (!entryDate) {
+        throw new BadRequestException(
+          'entryDate is required when attaching a session to a standup',
+        );
+      }
+      const [standupRecord] = await this.database
+        .select({ teamId: standupsSchema.standup.teamId })
+        .from(standupsSchema.standup)
+        .where(eq(standupsSchema.standup.id, standupId))
+        .limit(1);
+      if (!standupRecord) {
+        throw new NotFoundException('Standup not found');
+      }
+      if (standupRecord.teamId !== data.teamId) {
+        throw new BadRequestException(
+          'Session team must match the standup team',
+        );
+      }
+    } else {
+      entryDate = null;
+    }
+
     const id = generateId();
     const now = new Date();
     const seed = generateSeed();
-    const selectionMode =
-      data.selectionMode ?? ICEBREAKER_SELECTION_MODES.Ordered;
-    const templateId = data.templateId ?? null;
-    const flavourFilter = data.flavourFilter ?? null;
-
-    const candidates = await this.collectDeckCandidates({
-      templateId,
-      flavourFilter,
-    });
-
-    if (candidates.length === 0) {
-      throw new BadRequestException(
-        'No prompts available to build the icebreaker deck',
-      );
-    }
+    const customPrompts = data.customPrompts ?? null;
+    const isCustom =
+      data.selectionMode === ICEBREAKER_SELECTION_MODES.Custom ||
+      (customPrompts !== null && customPrompts.length > 0);
+    const selectionMode = isCustom
+      ? ICEBREAKER_SELECTION_MODES.Custom
+      : (data.selectionMode ?? ICEBREAKER_SELECTION_MODES.Ordered);
+    // Custom sessions carry no template and never flavour-filter.
+    const templateId = isCustom ? null : (data.templateId ?? null);
+    const flavourFilter = isCustom ? null : (data.flavourFilter ?? null);
 
     // Build the seed-ordered deck up front so the session opens straight into
-    // the Curating phase — no separate "start" step.
-    const isRandom =
-      selectionMode === ICEBREAKER_SELECTION_MODES.Random || !templateId;
-    const ordered = isRandom ? seededShuffle(candidates, seed) : candidates;
-    const deck = ordered.slice(0, MAX_DECK_SIZE);
+    // the Curating phase — no separate "start" step. Custom decks use the
+    // host-authored prompts verbatim (in order, no shuffle, no template link).
+    let deck: { promptId: string | null; text: string }[];
+    if (isCustom) {
+      if (!customPrompts || customPrompts.length === 0) {
+        throw new BadRequestException(
+          'At least one prompt is required for a custom icebreaker',
+        );
+      }
+      deck = customPrompts
+        .slice(0, MAX_DECK_SIZE)
+        .map((prompt) => ({ promptId: null, text: prompt.text }));
+    } else {
+      const candidates = await this.collectDeckCandidates({
+        templateId,
+        flavourFilter,
+      });
+
+      if (candidates.length === 0) {
+        throw new BadRequestException(
+          'No prompts available to build the icebreaker deck',
+        );
+      }
+
+      const isRandom =
+        selectionMode === ICEBREAKER_SELECTION_MODES.Random || !templateId;
+      const ordered = isRandom ? seededShuffle(candidates, seed) : candidates;
+      deck = ordered.slice(0, MAX_DECK_SIZE);
+    }
 
     await this.database.insert(icebreakersSchema.icebreakerSession).values({
       id,
@@ -465,6 +533,8 @@ export class IcebreakersService {
       createdById: userId,
       status: ICEBREAKER_SESSION_STATUSES.Curating,
       templateId,
+      standupId,
+      entryDate,
       selectionMode,
       seed,
       flavourFilter,

@@ -17,6 +17,7 @@ import { EstimateTemplatesModule } from './estimate-templates/estimate-templates
 import { IcebreakersModule } from './icebreakers/icebreakers.module';
 import { StandupsModule } from './standups/standups.module';
 import { PollsModule } from './polls/polls.module';
+import { SurveysModule } from './surveys/surveys.module';
 import { IcebreakerTemplatesModule } from './icebreaker-templates/icebreaker-templates.module';
 import { TeamsModule } from './teams/teams.module';
 import { SessionsModule } from './sessions/sessions.module';
@@ -58,6 +59,7 @@ import { join } from 'path';
     IcebreakersModule,
     StandupsModule,
     PollsModule,
+    SurveysModule,
     TeamsModule,
     SessionsModule,
     ActionItemsModule,

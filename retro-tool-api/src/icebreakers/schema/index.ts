@@ -1,6 +1,7 @@
 import {
   pgTable,
   boolean,
+  date,
   index,
   integer,
   text,
@@ -10,6 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { user } from '../../auth/schema';
 import { team } from '../../teams/schema';
+import { standup } from '../../standups/schema';
 import { organization } from '../../organizations/schema';
 import {
   ICEBREAKER_FLAVOURS,
@@ -97,6 +99,13 @@ export const icebreakerSession = pgTable(
       () => icebreakerTemplate.id,
       { onDelete: 'set null' },
     ),
+    // When set, the session appears inside that standup's daily room. Kept on
+    // standup deletion (set null) so it survives in icebreaker history.
+    standupId: varchar('standup_id', { length: 255 }).references(
+      () => standup.id,
+      { onDelete: 'set null' },
+    ),
+    entryDate: date('entry_date'),
     currentPromptId: varchar('current_prompt_id', { length: 255 }),
     selectionMode: varchar('selection_mode', { length: 20 })
       .notNull()
@@ -118,6 +127,10 @@ export const icebreakerSession = pgTable(
     index('icebreaker_session_status_idx').on(table.status),
     index('icebreaker_session_template_id_idx').on(table.templateId),
     index('icebreaker_session_team_status_idx').on(table.teamId, table.status),
+    index('icebreaker_session_standup_date_idx').on(
+      table.standupId,
+      table.entryDate,
+    ),
     index('icebreaker_session_updated_at_idx').on(table.updatedAt),
   ],
 );

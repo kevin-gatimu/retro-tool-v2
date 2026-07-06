@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { ICEBREAKERS_ENDPOINTS } from '@/lib/api-endpoints'
@@ -7,9 +6,15 @@ import type { TIcebreakerPromptDecision } from '@/common/enums/icebreaker.enums'
 import { getIcebreakerSocket } from '@/lib/socket'
 import { usesConvexForIcebreakers } from '@/lib/realtime-config'
 
-export function useSessionMutations(sessionId: string) {
+/**
+ * `onEnded` fires after the session is ended so the caller can leave the
+ * runtime — standalone navigates to the list, the standup modal just closes.
+ */
+export function useSessionMutations(
+  sessionId: string,
+  options?: { onEnded?: () => void },
+) {
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
   const usesConvexRealtime = usesConvexForIcebreakers()
 
   const refetchSession = () => {
@@ -72,7 +77,7 @@ export function useSessionMutations(sessionId: string) {
       void queryClient.invalidateQueries({
         queryKey: ['icebreaker-session', sessionId],
       })
-      navigate({ to: '/icebreakers' })
+      options?.onEnded?.()
     },
     onError: (error: Error) =>
       toast.error(error.message || 'Failed to end session'),
