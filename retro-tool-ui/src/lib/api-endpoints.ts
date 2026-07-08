@@ -32,6 +32,17 @@ export const INVITATIONS_ENDPOINTS = {
 } as const
 
 // ---------------------------------------------------------------------------
+// Email OTP (server-driven; proxies to Better Auth's emailOTP plugin)
+// ---------------------------------------------------------------------------
+export const OTP_ENDPOINTS = {
+  SEND: '/api/otp/send',
+  SIGN_IN: '/api/otp/sign-in',
+  VERIFY_EMAIL: '/api/otp/verify-email',
+  RESET_PASSWORD_SEND: '/api/otp/reset-password/send',
+  RESET_PASSWORD: '/api/otp/reset-password',
+} as const
+
+// ---------------------------------------------------------------------------
 // Organizations
 // ---------------------------------------------------------------------------
 export const ORGANIZATIONS_ENDPOINTS = {
@@ -154,6 +165,70 @@ export const ESTIMATES_ENDPOINTS = {
 } as const
 
 // ---------------------------------------------------------------------------
+// Icebreakers (icebreaker sessions)
+// ---------------------------------------------------------------------------
+export const ICEBREAKERS_ENDPOINTS = {
+  LIST: '/api/icebreakers',
+  ACTIVE: '/api/icebreakers/active',
+  HISTORY: '/api/icebreakers/history',
+
+  BY_ID: (id: string) => `/api/icebreakers/${id}`,
+  PERMANENT_DELETE: (id: string) => `/api/icebreakers/${id}/permanent`,
+  JOIN: (id: string) => `/api/icebreakers/${id}/join`,
+  SWIPE: (id: string) => `/api/icebreakers/${id}/swipe`,
+  ADVANCE: (id: string) => `/api/icebreakers/${id}/advance`,
+  TIMER: (id: string) => `/api/icebreakers/${id}/timer`,
+} as const
+
+// ---------------------------------------------------------------------------
+// Standups (async daily standups)
+// ---------------------------------------------------------------------------
+export const STANDUPS_ENDPOINTS = {
+  LIST: '/api/standups',
+  ACTIVITY: (from: string, to: string) =>
+    `/api/standups/activity?from=${from}&to=${to}`,
+
+  BY_ID: (id: string) => `/api/standups/${id}`,
+  ENTRY: (id: string, date: string) => `/api/standups/${id}/entries/${date}`,
+  SUBMISSION: (id: string, date: string) =>
+    `/api/standups/${id}/entries/${date}/submission`,
+  COMMENTS: (submissionId: string) =>
+    `/api/standups/submissions/${submissionId}/comments`,
+  COMMENT_BY_ID: (commentId: string) => `/api/standups/comments/${commentId}`,
+  REACTIONS: (submissionId: string) =>
+    `/api/standups/submissions/${submissionId}/reactions`,
+  REACTION_BY_EMOJI: (submissionId: string, emoji: string) =>
+    `/api/standups/submissions/${submissionId}/reactions/${encodeURIComponent(emoji)}`,
+  SEND_REPORT: (id: string) => `/api/standups/${id}/send-report`,
+  SKIP_DAY: (id: string, date: string) =>
+    `/api/standups/${id}/skip-days/${date}`,
+} as const
+
+// ---------------------------------------------------------------------------
+// Polls
+// ---------------------------------------------------------------------------
+export const POLLS_ENDPOINTS = {
+  LIST: '/api/polls',
+  ACTIVE_COUNT: '/api/polls/active-count',
+
+  BY_ID: (id: string) => `/api/polls/${id}`,
+  VOTE: (id: string) => `/api/polls/${id}/vote`,
+  CLOSED: (id: string) => `/api/polls/${id}/closed`,
+} as const
+
+// ---------------------------------------------------------------------------
+// Surveys (team-, org-, or system-scoped questionnaires)
+// ---------------------------------------------------------------------------
+export const SURVEYS_ENDPOINTS = {
+  LIST: '/api/surveys',
+  ACTIVE_COUNT: '/api/surveys/active-count',
+
+  BY_ID: (id: string) => `/api/surveys/${id}`,
+  RESPOND: (id: string) => `/api/surveys/${id}/respond`,
+  CLOSED: (id: string) => `/api/surveys/${id}/closed`,
+} as const
+
+// ---------------------------------------------------------------------------
 // Sessions (auth / user sessions)
 // ---------------------------------------------------------------------------
 export const SESSIONS_ENDPOINTS = {
@@ -237,6 +312,15 @@ export const ESTIMATE_TEMPLATES_ENDPOINTS = {
   LIST: '/api/estimates/templates',
   SEED: '/api/estimates/templates/seed',
   BY_ID: (id: string) => `/api/estimates/templates/${id}`,
+} as const
+
+// ---------------------------------------------------------------------------
+// Icebreaker Templates
+// ---------------------------------------------------------------------------
+export const ICEBREAKER_TEMPLATES_ENDPOINTS = {
+  LIST: '/api/icebreakers/templates',
+  SEED: '/api/icebreakers/templates/seed',
+  BY_ID: (id: string) => `/api/icebreakers/templates/${id}`,
 } as const
 
 // ---------------------------------------------------------------------------

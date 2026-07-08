@@ -1,7 +1,14 @@
 import { ConfigService } from '@nestjs/config';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { admin, bearer, multiSession } from 'better-auth/plugins';
+import {
+  admin,
+  bearer,
+  emailOTP,
+  jwt,
+  multiSession,
+} from 'better-auth/plugins';
+import { passkey } from '@better-auth/passkey';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
@@ -10,6 +17,13 @@ import { createEmailService } from '../lib/email';
 import { orgInvitation } from '../organizations/schema';
 import { teamInvitation } from '../teams/schema';
 import * as schema from './schema';
+
+/**
+ * Concrete type of our configured Better Auth instance (including plugins like
+ * emailOTP). Used to parametrize the library's `AuthService<Auth>` so the
+ * plugin's `api.*` methods are visible to TypeScript.
+ */
+export type Auth = ReturnType<typeof createAuth>;
 
 /**
  * Factory function to create Better Auth instance with configuration
@@ -37,6 +51,14 @@ export function createAuth(configService: ConfigService<Config>) {
   const microsoftClientId = authConfig?.microsoft?.clientId;
   const microsoftClientSecret = authConfig?.microsoft?.clientSecret;
 
+  // WebAuthn relying-party identity. rpID/origin must match the UI domain (UI
+  // and API deploy separately), so derive the origin from frontend.url and the
+  // rpID from config (defaulted from FRONTEND_URL's hostname in configuration.ts).
+  const passkeyRpId = authConfig?.rpId ?? 'localhost';
+  const passkeyRpName = authConfig?.rpName ?? 'Retro-Tool';
+  const passkeyOrigin =
+    frontendUrl?.replace(/\/$/, '') ?? 'http://localhost:3000';
+
   // Create database pool and drizzle instance using ConfigService
   // Check if this is an Azure PostgreSQL connection
   const isAzurePostgres =
@@ -60,6 +82,45 @@ export function createAuth(configService: ConfigService<Config>) {
   // Use BETTER_AUTH_URL if set (required for production); fall back to localhost for local dev
   const authUrl = authConfig?.url || `http://localhost:${port}`;
 
+  // JWT issuer/audience for Convex's customJwt verification. Issuer defaults to
+  // the API origin (where the JWKS lives) and must be byte-stable across deploys
+  // — pin explicitly rather than relying on the plugin's baseURL default.
+  const jwtIssuer = authConfig?.jwtIssuer || authUrl;
+  const jwtAudience = authConfig?.jwtAudience ?? 'convex';
+
+  // Whether an active (unaccepted, unexpired) org/team invitation exists for an
+  // email — used to suppress the standalone email-verification message, since
+  // accepting the invite verifies the email anyway.
+  const hasActiveInvitation = async (email: string): Promise<boolean> => {
+    const now = new Date();
+    const lowered = email.toLowerCase();
+    const [orgInv] = await db
+      .select({ id: orgInvitation.id })
+      .from(orgInvitation)
+      .where(
+        and(
+          eq(sql`lower(${orgInvitation.email})`, lowered),
+          isNull(orgInvitation.acceptedAt),
+          gt(orgInvitation.expiresAt, now),
+        ),
+      )
+      .limit(1);
+    if (orgInv) return true;
+
+    const [teamInv] = await db
+      .select({ id: teamInvitation.id })
+      .from(teamInvitation)
+      .where(
+        and(
+          eq(sql`lower(${teamInvitation.email})`, lowered),
+          isNull(teamInvitation.acceptedAt),
+          gt(teamInvitation.expiresAt, now),
+        ),
+      )
+      .limit(1);
+    return Boolean(teamInv);
+  };
+
   return betterAuth({
     // Per-IP rate limiting (in-memory, uses x-forwarded-for via advanced.ipAddress config)
     rateLimit: {
@@ -70,6 +131,12 @@ export function createAuth(configService: ConfigService<Config>) {
         '/sign-up/email': { window: 300, max: 5 }, // 5 signup attempts per 5 min
         '/sign-in/email': { window: 60, max: 10 }, // 10 login attempts per min
         '/forgot-password': { window: 300, max: 3 }, // 3 resets per 5 min
+        // Email-OTP routes (defense-in-depth on top of allowedAttempts:3)
+        '/email-otp/send-verification-otp': { window: 300, max: 5 }, // 5 code sends / 5 min
+        '/sign-in/email-otp': { window: 60, max: 10 }, // 10 OTP sign-in tries / min
+        '/email-otp/verify-email': { window: 60, max: 10 },
+        '/email-otp/request-password-reset': { window: 300, max: 3 },
+        '/email-otp/reset-password': { window: 300, max: 10 },
       },
     },
     database: drizzleAdapter(db, {
@@ -79,6 +146,8 @@ export function createAuth(configService: ConfigService<Config>) {
         session: schema.session,
         account: schema.account,
         verification: schema.verification,
+        passkey: schema.passkey,
+        jwks: schema.jwks,
       },
     }),
     // Allow configured origins for Swagger UI and frontend
@@ -124,32 +193,7 @@ export function createAuth(configService: ConfigService<Config>) {
         // (unaccepted, unexpired) invitation already exists for this address —
         // accepting that invite will mark the email as verified, so the
         // duplicate verification email would only confuse the recipient.
-        const now = new Date();
-        const [orgInv] = await db
-          .select({ id: orgInvitation.id })
-          .from(orgInvitation)
-          .where(
-            and(
-              eq(sql`lower(${orgInvitation.email})`, user.email.toLowerCase()),
-              isNull(orgInvitation.acceptedAt),
-              gt(orgInvitation.expiresAt, now),
-            ),
-          )
-          .limit(1);
-        if (orgInv) return;
-
-        const [teamInv] = await db
-          .select({ id: teamInvitation.id })
-          .from(teamInvitation)
-          .where(
-            and(
-              eq(sql`lower(${teamInvitation.email})`, user.email.toLowerCase()),
-              isNull(teamInvitation.acceptedAt),
-              gt(teamInvitation.expiresAt, now),
-            ),
-          )
-          .limit(1);
-        if (teamInv) return;
+        if (await hasActiveInvitation(user.email)) return;
 
         const verificationUrl = `${frontendUrl}/auth/verify-email?token=${token}`;
         await emailService.sendVerificationEmail({
@@ -168,6 +212,59 @@ export function createAuth(configService: ConfigService<Config>) {
       // Set defaultRole to 'member' so new OAuth users get our app role instead of BA's default 'user'
       admin({ defaultRole: 'member' }),
       multiSession(),
+      // Email OTP for passwordless sign-in, email verification, and password
+      // reset (6-digit code, 5-min expiry, 3 attempts). Sends are triggered
+      // server-side; the UI calls our /api/otp/* endpoints which proxy to the
+      // injected auth.api.* methods.
+      emailOTP({
+        otpLength: 6,
+        expiresIn: 300,
+        allowedAttempts: 3,
+        sendVerificationOnSignUp: true,
+        overrideDefaultEmailVerification: true,
+        async sendVerificationOTP({ email, otp, type }) {
+          // We don't use the change-email OTP flow; ignore that type.
+          if (type === 'change-email') return;
+          // Suppress the standalone verification code when an active org/team
+          // invitation already exists (accepting it verifies the email anyway).
+          if (
+            type === 'email-verification' &&
+            (await hasActiveInvitation(email))
+          ) {
+            return;
+          }
+          // Fire-and-forget (plugin guidance: don't await, avoid timing attacks).
+          void emailService
+            .sendOtpEmail({ to: email, name: email, otp, type })
+            .catch((err) => {
+              console.error(`[Auth] sendOtpEmail (${type}) failed:`, err);
+            });
+        },
+      }),
+      // WebAuthn passkeys for passwordless sign-in. rpID/origin are bound to the
+      // UI domain; the plugin auto-mounts /sign-in/passkey and /passkey/* under
+      // /api/auth and owns the `passkey` table.
+      passkey({
+        rpID: passkeyRpId,
+        rpName: passkeyRpName,
+        origin: passkeyOrigin,
+      }),
+      // RS256 JWTs for Convex's customJwt verification (Convex supports only
+      // RS256/ES256, not the EdDSA default). Serves GET /api/auth/jwks and
+      // GET /api/auth/token; owns the `jwks` table. `sub` defaults to user.id
+      // (matches the userId stored in Convex projections). `role` is injected so
+      // Convex role-gated reads (e.g. liveReports.getSystemStats) can authorize.
+      jwt({
+        jwt: {
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          expirationTime: '15m',
+          definePayload: (session) => ({
+            role: (session.user as { role?: string }).role,
+          }),
+        },
+        jwks: { keyPairConfig: { alg: 'RS256', modulusLength: 2048 } },
+      }),
     ],
     // Configure session settings
     session: {

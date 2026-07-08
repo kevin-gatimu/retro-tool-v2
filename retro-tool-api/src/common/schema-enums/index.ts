@@ -4,10 +4,16 @@ import {
   EMAIL_LOG_STATUSES,
   EMAIL_LOG_TYPES,
   ESTIMATE_SESSION_STATUSES,
+  ICEBREAKER_FLAVOURS,
+  ICEBREAKER_PROMPT_DECISIONS,
+  ICEBREAKER_SESSION_STATUSES,
   NOTIFICATION_TYPES,
   ORG_MEMBER_ROLES,
   RETRO_STATUSES,
   RETRO_VOTE_TYPES,
+  STANDUP_CADENCES,
+  SURVEY_QUESTION_TYPES,
+  SURVEY_SCOPES,
   TEAM_JOIN_REQUEST_STATUSES,
   TEAM_MEMBER_TAGS,
   USER_ROLES,
@@ -96,6 +102,9 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   NOTIFICATION_TYPES.ActionItemAssigned,
   NOTIFICATION_TYPES.ActionItemDueSoon,
   NOTIFICATION_TYPES.EstimateSessionCreated,
+  NOTIFICATION_TYPES.IcebreakerSessionCreated,
+  NOTIFICATION_TYPES.StandupCreated,
+  NOTIFICATION_TYPES.StandupCommentAdded,
   NOTIFICATION_TYPES.ConvexTableClear,
 ]);
 
@@ -107,6 +116,50 @@ export const estimateSessionStatusEnum = pgEnum('estimate_session_status', [
   ESTIMATE_SESSION_STATUSES.Completed,
 ]);
 
+// Icebreakers
+export const icebreakerSessionStatusEnum = pgEnum('icebreaker_session_status', [
+  ICEBREAKER_SESSION_STATUSES.Waiting,
+  ICEBREAKER_SESSION_STATUSES.Curating,
+  ICEBREAKER_SESSION_STATUSES.Presenting,
+  ICEBREAKER_SESSION_STATUSES.Completed,
+]);
+
+export const icebreakerFlavourEnum = pgEnum('icebreaker_flavour', [
+  ICEBREAKER_FLAVOURS.Fun,
+  ICEBREAKER_FLAVOURS.Professional,
+  ICEBREAKER_FLAVOURS.Creative,
+]);
+
+export const icebreakerPromptDecisionEnum = pgEnum(
+  'icebreaker_prompt_decision',
+  [
+    ICEBREAKER_PROMPT_DECISIONS.Pending,
+    ICEBREAKER_PROMPT_DECISIONS.Kept,
+    ICEBREAKER_PROMPT_DECISIONS.Skipped,
+  ],
+);
+
+// Standups
+export const standupCadenceEnum = pgEnum('standup_cadence', [
+  STANDUP_CADENCES.Daily,
+  STANDUP_CADENCES.Weekly,
+  STANDUP_CADENCES.Fortnightly,
+  STANDUP_CADENCES.Once,
+]);
+
+// Surveys
+export const surveyScopeEnum = pgEnum('survey_scope', [
+  SURVEY_SCOPES.Team,
+  SURVEY_SCOPES.Org,
+  SURVEY_SCOPES.System,
+]);
+
+export const surveyQuestionTypeEnum = pgEnum('survey_question_type', [
+  SURVEY_QUESTION_TYPES.Text,
+  SURVEY_QUESTION_TYPES.Rating,
+  SURVEY_QUESTION_TYPES.Choice,
+]);
+
 // Email
 export const emailLogTypeEnum = pgEnum('email_log_type', [
   EMAIL_LOG_TYPES.Verification,
@@ -116,6 +169,7 @@ export const emailLogTypeEnum = pgEnum('email_log_type', [
   EMAIL_LOG_TYPES.TeamInvite,
   EMAIL_LOG_TYPES.TeamInviteExternal,
   EMAIL_LOG_TYPES.RetroReport,
+  EMAIL_LOG_TYPES.StandupReport,
 ]);
 
 export const emailLogStatusEnum = pgEnum('email_log_status', [

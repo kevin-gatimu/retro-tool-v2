@@ -557,6 +557,105 @@ export class EmailService {
 </html>`;
   }
 
+  buildStandupReportHtml(params: {
+    standupName: string;
+    teamName: string;
+    date: string;
+    submittedCount: number;
+    memberCount: number;
+    submissions: Array<{
+      userName: string;
+      submittedAt: string;
+      answers: Array<{ prompt: string; content: string; color: string | null }>;
+    }>;
+    polls: Array<{
+      question: string;
+      isAnonymous: boolean;
+      totalVotes: number;
+      options: Array<{
+        label: string;
+        emoji: string | null;
+        voteCount: number;
+        percent: number;
+      }>;
+    }>;
+  }): string {
+    const pollsHtml =
+      params.polls.length === 0
+        ? ''
+        : `
+  <h3 style="margin:24px 0 12px;color:#1e40af">Polls</h3>
+  ${params.polls
+    .map(
+      (poll) => `
+  <div style="margin:0 0 16px">
+    <p style="margin:0 0 8px;font-weight:600">${this.esc(poll.question)}</p>
+    ${poll.options
+      .map(
+        (option) => `
+    <div style="margin:0 0 4px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:#334155">
+        <span>${option.emoji ? `${this.esc(option.emoji)} ` : ''}${this.esc(option.label)}</span>
+        <span>${option.percent}% (${option.voteCount})</span>
+      </div>
+      <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden">
+        <div style="height:6px;width:${option.percent}%;background:#8b5cf6"></div>
+      </div>
+    </div>`,
+      )
+      .join('')}
+    <p style="margin:6px 0 0;font-size:11px;color:#94a3b8">${poll.totalVotes} vote${
+      poll.totalVotes === 1 ? '' : 's'
+    }${poll.isAnonymous ? ' &middot; anonymous' : ''}</p>
+  </div>`,
+    )
+    .join('')}`;
+
+    const submissionsHtml =
+      params.submissions.length === 0
+        ? `<p style="color:#94a3b8;font-style:italic">No updates were submitted for this day.</p>`
+        : params.submissions
+            .map(
+              (submission) => `
+  <div style="margin:0 0 20px;padding:0 0 16px;border-bottom:1px solid #f1f5f9">
+    <p style="margin:0 0 2px;font-weight:600;font-size:15px">${this.esc(submission.userName)}</p>
+    <p style="margin:0 0 10px;font-size:11px;color:#94a3b8">${this.esc(submission.submittedAt)}</p>
+    ${submission.answers
+      .map(
+        (answer) => `
+    <div style="margin:0 0 10px;padding-left:10px;border-left:3px solid ${
+      answer.color && /^#[0-9a-fA-F]{6}$/.test(answer.color)
+        ? answer.color
+        : '#94a3b8'
+    }">
+      <p style="margin:0 0 2px;font-weight:600;font-size:13px">${this.esc(answer.prompt)}</p>
+      <p style="margin:0;font-size:13px;color:#475569;white-space:pre-wrap">${this.esc(answer.content)}</p>
+    </div>`,
+      )
+      .join('')}
+  </div>`,
+            )
+            .join('');
+
+    return `
+<!DOCTYPE html>
+<html>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+  ${this.previewHtml(`Standup report for ${params.standupName} (${params.teamName}) — ${params.date}.`)}
+  ${this.logoHtml()}
+  <h2 style="color:#1e40af;margin:0 0 4px">Standup Report</h2>
+  <p style="margin:0 0 4px"><strong>${this.esc(params.standupName)}</strong> &middot; ${this.esc(params.teamName)}</p>
+  <p style="margin:0 0 4px;color:#64748b">${this.esc(params.date)}</p>
+  <p style="margin:0 0 20px;color:#64748b;font-size:13px">${params.submittedCount}/${params.memberCount} submitted</p>
+  ${pollsHtml}
+  <h3 style="margin:24px 0 12px;color:#1e40af">Updates</h3>
+  ${submissionsHtml}
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
+  <p style="color:#6b7280;font-size:12px">Retro Tool &middot; Daily Standups</p>
+</body>
+</html>`;
+  }
+
   private esc(str: string): string {
     return str
       .replace(/&/g, '&amp;')

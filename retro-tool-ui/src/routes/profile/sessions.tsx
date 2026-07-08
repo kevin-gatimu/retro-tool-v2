@@ -13,52 +13,11 @@ import { useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { authClient } from '@/lib/auth-client'
-import { useSessionActions } from './hooks/useSessionActions'
+import { useSessionActions } from './hooks/use-session-actions'
 import type { SessionData } from './types'
 import { getDeviceIcon, getBrowserInfo, getOSInfo } from './helpers'
-
-function SessionsSkeleton() {
-  return (
-    <div className="max-w-3xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-40" />
-          <Skeleton className="h-4 w-72" />
-        </div>
-        <Skeleton className="h-10 w-40" />
-      </div>
-      <div className="space-y-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-card border rounded-xl p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <Skeleton className="h-12 w-12 rounded-lg" />
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="h-5 w-40" />
-                    <Skeleton className="h-4 w-20 rounded-full" />
-                  </div>
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-4 w-40" />
-                  </div>
-                </div>
-              </div>
-              <Skeleton className="h-8 w-20" />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-6 space-y-2">
-        <Skeleton className="h-5 w-32" />
-        <Skeleton className="h-4 w-full" />
-      </div>
-    </div>
-  )
-}
+import { SessionsSkeleton } from './skeleton'
 
 export const Route = createFileRoute('/profile/sessions')({
   pendingComponent: SessionsSkeleton,

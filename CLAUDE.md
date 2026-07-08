@@ -31,6 +31,20 @@ module-name/
 
 **Types must live in `types/index.ts`** — not in loose `*.types.ts` files.
 
+### UI file naming
+
+Frontend source files (`retro-tool-ui/src/`) use **`kebab-case`** file names — `notification-bell.tsx`,
+`use-current-user.ts`, `api-endpoints.ts`. The **file name is kebab; the export keeps its idiomatic
+case** — React components stay `PascalCase` (`export function NotificationBell()`), hooks stay
+`useCamelCase` (`export function useCurrentUser()`), prefixed `use-` on the file too. Module-specific
+types live in a colocated `types/index.ts`.
+
+**Exception:** files under `routes/` that define routes are named by TanStack Router (`index.tsx`,
+`$teamId.tsx`, `__root.tsx`, …) — leave those as the router expects. Skeletons follow
+`skeleton/index.tsx` (route group) or `<name>.skeleton.tsx` (single route).
+
+Full reference: [docs/file-naming-conventions.md](docs/file-naming-conventions.md).
+
 ---
 
 ## Quick-start commands
@@ -297,9 +311,9 @@ Three environments mapped to branches:
 
 | Environment | Branch | Resource Group |
 |---|---|---|
-| Production | `main` | `retro-tool-prod-rg` |
-| Staging | `staging` | `retro-tool-staging-rg` |
-| Develop | `develop` | `retro-tool-dev-rg` |
+| Production | `main` | `retrotool-prod-rg` |
+| Staging | `staging` | `retrotool-staging-rg` |
+| Develop | `develop` | `retrotool-develop-rg` |
 
 Infrastructure is provisioned via Azure CLI + Bicep (`infra/` folder). See [infra/README.md](infra/README.md) for full commands.
 
@@ -339,9 +353,14 @@ GitHub Actions handle app deployment (not infra):
 | Document | What it covers |
 |---|---|
 | [docs/RBAC.md](docs/RBAC.md) | Full permission matrices for system, org, team, and retro actions; helper function signatures; user status lifecycle |
+| [docs/api-security.md](docs/api-security.md) | API hardening: Helmet, rate limiting (throttler + Better Auth), CORS, and the CSRF posture / residual risk |
+| [docs/file-naming-conventions.md](docs/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
 | [docs/app-flows.md](docs/app-flows.md) | Step-by-step flows: auth, user approval, org/team management, retro phases, estimates, notifications |
+| [docs/auth-workflows.md](docs/auth-workflows.md) | Per-flow file traces (which UI/API/DB/Convex files get hit) for sign-up/in, OTP, passkey, OAuth, verification, reset, session validation, sockets, sign-out, RBAC |
 | [docs/infrastructure.md](docs/infrastructure.md) | Azure infrastructure overview |
 | [docs/invitations.md](docs/invitations.md) | Invitation system (org + team) |
+| [docs/convex-architecture.md](docs/convex-architecture.md) | How the app uses Convex: deployment topology, every key/secret, projection schema, NestJS→Convex sync layer, UI consumption, JWT auth, deploy workflow |
+| [docs/convex-nestjs-auth.md](docs/convex-nestjs-auth.md) | Deep dive on Convex ↔ NestJS auth: RS256 JWT issue/verify, JWKS exchange, the JWT_ISSUER/AUDIENCE/JWKS_URL config, request lifecycle, vs the admin-key sync path |
 | [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker (local + production) |
 | [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: IceBreakers, AI summaries, Jira/ADO export, SAML |
 | [infra/README.md](infra/README.md) | Azure Bicep deployment commands, outputs, post-provisioning checklist |

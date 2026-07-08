@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useQuery as useConvexQuery } from 'convex/react'
+import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
 import type { FunctionReference } from 'convex/server'
 import type { Notification } from '@/common/types/notifications'
 
@@ -27,11 +27,14 @@ export function NotificationConvexSync({
   userId,
 }: NotificationConvexSyncProps) {
   const queryClient = useQueryClient()
+  const { isAuthenticated } = useConvexAuth()
   const lastSnapshotRef = useRef<string | null>(null)
-  const projections = useConvexQuery(userNotificationsQuery, {
-    userId,
-    limit: 50,
-  }) as NotificationProjection[] | undefined
+  // Convex derives the user from the JWT; don't pass userId. Skip until both a
+  // signed-in user exists and the Convex client is authenticated.
+  const projections = useConvexQuery(
+    userNotificationsQuery,
+    isAuthenticated && userId ? { limit: 50 } : 'skip',
+  ) as NotificationProjection[] | undefined
 
   useEffect(() => {
     if (!projections) {

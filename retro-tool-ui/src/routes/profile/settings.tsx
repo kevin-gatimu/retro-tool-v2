@@ -11,64 +11,18 @@ import {
 } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { USER_PREFERENCES_ENDPOINTS } from '@/lib/api-endpoints'
 import type { UserNotificationPreferences } from '@/common/types/user-preferences'
-import { useUserPreferencesMutation } from './hooks/useUserPreferencesMutation'
+import { usePushNotifications } from '@/hooks/use-push-notifications'
+import { useUserPreferencesMutation } from './hooks/use-user-preferences-mutation'
+import { SettingsSkeleton } from './skeleton'
 
 const userPreferencesQueryOptions = {
   queryKey: ['user-preferences'] as const,
   queryFn: () =>
     api.get<UserNotificationPreferences>(USER_PREFERENCES_ENDPOINTS.BASE),
   staleTime: 60_000,
-}
-
-function SettingsSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-24" />
-        <Skeleton className="h-4 w-64" />
-      </div>
-      <div className="border rounded-lg p-6 space-y-6">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-5 w-5" />
-          <Skeleton className="h-6 w-32" />
-        </div>
-        <Skeleton className="h-4 w-56" />
-        <div className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-3 w-64" />
-              </div>
-              <Skeleton className="h-6 w-11 rounded-full" />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="border rounded-lg p-6 space-y-6">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-5 w-5" />
-          <Skeleton className="h-6 w-20" />
-        </div>
-        <Skeleton className="h-4 w-40" />
-        <div className="space-y-4">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-3 w-72" />
-              </div>
-              <Skeleton className="h-6 w-11 rounded-full" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export const Route = createFileRoute('/profile/settings')({
@@ -82,6 +36,24 @@ function SettingsPage() {
   const { data: preferences } = useSuspenseQuery(userPreferencesQueryOptions)
 
   const updateMutation = useUserPreferencesMutation()
+
+  const {
+    isSupported: pushSupported,
+    isSubscribed: pushSubscribed,
+    isLoading: pushLoading,
+    subscribe: subscribePush,
+    unsubscribe: unsubscribePush,
+  } = usePushNotifications()
+
+  const handlePushToggle = async (checked: boolean) => {
+    if (checked) {
+      await subscribePush()
+    } else {
+      await unsubscribePush()
+    }
+    // Remember the intent in the shared preferences record.
+    updateMutation.mutate({ uiPreferences: { pushNotifications: checked } })
+  }
 
   return (
     <div className="space-y-6">
@@ -119,6 +91,22 @@ function SettingsPage() {
               onCheckedChange={(checked) =>
                 updateMutation.mutate({ emailVerificationReminders: checked })
               }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Push notifications</Label>
+              <p className="text-sm text-muted-foreground">
+                {pushSupported
+                  ? 'Get browser push notifications on this device'
+                  : 'Not supported in this browser'}
+              </p>
+            </div>
+            <Switch
+              checked={pushSubscribed}
+              disabled={!pushSupported || pushLoading}
+              onCheckedChange={(checked) => void handlePushToggle(checked)}
             />
           </div>
         </CardContent>

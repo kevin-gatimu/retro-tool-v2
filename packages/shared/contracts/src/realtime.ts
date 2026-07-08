@@ -3,14 +3,17 @@ export type RealtimeBackend = 'socket-io' | 'convex'
 export interface RealtimeFeatureFlags {
   estimatesRealtimeBackend: RealtimeBackend
   retrosRealtimeBackend: RealtimeBackend
+  icebreakersRealtimeBackend: RealtimeBackend
+  standupsRealtimeBackend: RealtimeBackend
   notificationsRealtimeBackend: RealtimeBackend
+  // Polls and surveys are Convex-only — no per-feature backend flag.
 }
 
 export interface ProjectionSyncEnvelope<TPayload> {
   eventId: string
   eventType: string
   aggregateId: string
-  aggregateType: 'estimate' | 'retro'
+  aggregateType: 'estimate' | 'retro' | 'icebreaker' | 'standup'
   occurredAt: string
   payload: TPayload
 }
@@ -34,6 +37,20 @@ export interface RetroProjectionPayload {
     | 'completed'
   currentDiscussionCardId?: string
   currentDiscussionActionItemId?: string
+  updatedAt: string
+}
+
+export interface IcebreakerProjectionPayload {
+  sessionId: string
+  currentPromptId?: string
+  status: 'waiting' | 'curating' | 'presenting' | 'completed'
+  updatedAt: string
+}
+
+export interface StandupProjectionPayload {
+  standupId: string
+  entryDate: string
+  teamId: string
   updatedAt: string
 }
 

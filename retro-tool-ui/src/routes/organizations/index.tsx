@@ -47,10 +47,11 @@ import {
 import { api } from '@/lib/api'
 import { ORGANIZATIONS_ENDPOINTS } from '@/lib/api-endpoints'
 import { isSystemAdmin } from '@/lib/rbac'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { OrgLogo } from '@/components/OrgLogo'
-import { useOrganizationMutations } from './hooks/useOrganizationMutations'
+import { useCurrentUser } from '@/hooks/use-current-user'
+import { OrgLogo } from '@/components/org-logo'
+import { useOrganizationMutations } from './hooks/use-organization-mutations'
 import type { PaginatedOrgsResponse } from './types'
+import { OrganizationsListSkeleton } from './skeleton'
 
 const PAGE_SIZE_OPTIONS = [6, 12, 24, 48]
 const DEFAULT_PAGE_SIZE = 12
@@ -139,16 +140,7 @@ function OrganizationsPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="container py-8 space-y-4">
-        <div className="h-10 w-48 animate-pulse rounded bg-muted" />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-36 animate-pulse rounded-lg bg-muted" />
-          ))}
-        </div>
-      </div>
-    )
+    return <OrganizationsListSkeleton />
   }
 
   return (

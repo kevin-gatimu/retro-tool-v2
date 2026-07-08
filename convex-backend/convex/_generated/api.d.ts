@@ -9,10 +9,15 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as lib_authz from "../lib/authz.js";
 import type * as liveEstimates from "../liveEstimates.js";
+import type * as liveIcebreakers from "../liveIcebreakers.js";
 import type * as liveNotifications from "../liveNotifications.js";
+import type * as livePolls from "../livePolls.js";
 import type * as liveReports from "../liveReports.js";
 import type * as liveRetros from "../liveRetros.js";
+import type * as liveStandups from "../liveStandups.js";
+import type * as liveSurveys from "../liveSurveys.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as server from "../server.js";
 
@@ -24,10 +29,15 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  "lib/authz": typeof lib_authz;
   liveEstimates: typeof liveEstimates;
+  liveIcebreakers: typeof liveIcebreakers;
   liveNotifications: typeof liveNotifications;
+  livePolls: typeof livePolls;
   liveReports: typeof liveReports;
   liveRetros: typeof liveRetros;
+  liveStandups: typeof liveStandups;
+  liveSurveys: typeof liveSurveys;
   rateLimits: typeof rateLimits;
   server: typeof server;
 }>;

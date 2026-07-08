@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerBehindProxyGuard } from './common/guards/throttler-behind-proxy.guard';
 import { DatabaseModule } from './database/database.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -12,6 +14,11 @@ import { ReportsModule } from './reports/reports.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { EstimatesModule } from './estimates/estimates.module';
 import { EstimateTemplatesModule } from './estimate-templates/estimate-templates.module';
+import { IcebreakersModule } from './icebreakers/icebreakers.module';
+import { StandupsModule } from './standups/standups.module';
+import { PollsModule } from './polls/polls.module';
+import { SurveysModule } from './surveys/surveys.module';
+import { IcebreakerTemplatesModule } from './icebreaker-templates/icebreaker-templates.module';
 import { TeamsModule } from './teams/teams.module';
 import { SessionsModule } from './sessions/sessions.module';
 import { ActionItemsModule } from './action-items/action-items.module';
@@ -35,6 +42,9 @@ import { join } from 'path';
       ],
     }),
     ScheduleModule.forRoot(),
+    // Global per-IP rate limiting (~100 requests / minute). Better Auth applies
+    // its own stricter limits to /api/auth/* on top of this default tier.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     AuthModule,
     DatabaseModule,
     UsersModule,
@@ -45,6 +55,11 @@ import { join } from 'path';
     NotificationsModule,
     EstimateTemplatesModule,
     EstimatesModule,
+    IcebreakerTemplatesModule,
+    IcebreakersModule,
+    StandupsModule,
+    PollsModule,
+    SurveysModule,
     TeamsModule,
     SessionsModule,
     ActionItemsModule,
@@ -54,6 +69,10 @@ import { join } from 'path';
   ],
   controllers: [HealthController],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerBehindProxyGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: LastActiveInterceptor,

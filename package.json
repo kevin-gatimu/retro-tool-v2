@@ -13,6 +13,7 @@
         "local:down": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml down",
         "local:logs": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml logs -f",
         "dev:api": "pnpm --dir retro-tool-api start:dev",
+        "dev:staging": "pnpm --parallel --filter retro-tool-api --filter retro-tool-ui dev:staging",
         "dev:api:staging": "pnpm --dir retro-tool-api dev:staging",
         "dev:api:prod": "pnpm --dir retro-tool-api dev:prod",
         "dev:ui": "pnpm --dir retro-tool-ui dev",

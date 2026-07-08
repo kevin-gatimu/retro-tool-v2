@@ -43,8 +43,8 @@ import {
   useMutation as useConvexMutation,
 } from 'convex/react'
 import type { FunctionReference } from 'convex/server'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { useRetroMutations } from './hooks/useRetroMutations'
+import { useCurrentUser } from '@/hooks/use-current-user'
+import { useRetroMutations } from './hooks/use-retro-mutations'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -87,6 +87,7 @@ import { usesConvexForRetros } from '@/lib/realtime-config'
 import { RetroConvexSync } from './components/retro-convex-sync'
 import { RetroDiscussionView } from './components/retro-discussion-view'
 import type { CarriedForwardItem } from './types'
+import { RetroDetailSkeleton } from './skeleton'
 
 const startTypingMutationRef =
   'liveRetros:startTyping' as unknown as FunctionReference<'mutation'>
@@ -112,7 +113,7 @@ function RetroAccessError({ error }: { error: Error }) {
   const navigate = useNavigate()
   useEffect(() => {
     toast.error(error.message)
-    void navigate({ to: '/retros', search: { page: 1, limit: 6 } })
+    void navigate({ to: '/retros' })
   }, [error, navigate])
   return null
 }
@@ -125,6 +126,7 @@ export const Route = createFileRoute('/retros/$retroId')({
       staleTime: 5_000,
     }),
   errorComponent: RetroAccessError,
+  pendingComponent: RetroDetailSkeleton,
   component: RetroDetailPage,
 })
 
@@ -155,16 +157,16 @@ function RetroDetailPage() {
     // Only fire mutation on idle → typing transition
     if (!isTypingRef.current) {
       isTypingRef.current = true
+      // userId is derived server-side from the JWT; only displayName is sent.
       startTypingConvex({
         retroId,
-        userId: currentUser.id,
         displayName: currentUser.name,
       })
     }
     typingTimeoutRef.current = setTimeout(() => {
       isTypingRef.current = false
       typingTimeoutRef.current = null
-      stopTypingConvex({ retroId, userId: currentUser.id })
+      stopTypingConvex({ retroId })
     }, 3000)
   }, [
     usesConvexRealtime,
@@ -182,7 +184,7 @@ function RetroDetailPage() {
     }
     if (isTypingRef.current) {
       isTypingRef.current = false
-      stopTypingConvex({ retroId, userId: currentUser.id })
+      stopTypingConvex({ retroId })
     }
   }, [usesConvexRealtime, currentUser, retroId, stopTypingConvex])
 
@@ -215,9 +217,9 @@ function RetroDetailPage() {
     if (!usesConvexRealtime || !currentUser) return
     const next = !myReady
     if (next) setReadyAnimating(true)
+    // userId is derived server-side from the JWT; only displayName is sent.
     setReadyStatusConvex({
       retroId,
-      userId: currentUser.id,
       displayName: currentUser.name,
       isReady: next,
     })
@@ -264,7 +266,7 @@ function RetroDetailPage() {
     const prev = prevRetroStatusRef.current
     if (prev === 'active' && retro?.status !== 'active' && usesConvexRealtime) {
       if (currentUser) {
-        stopTypingConvex({ retroId, userId: currentUser.id })
+        stopTypingConvex({ retroId })
       }
       clearAllReadyConvex({ retroId })
     }
@@ -1046,7 +1048,7 @@ function RetroDetailPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['retros'] })
       toast.success('Retrospective deleted')
-      void navigate({ to: '/retros', search: { page: 1, limit: 6 } })
+      void navigate({ to: '/retros' })
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to delete retro'),
   })
@@ -1423,11 +1425,7 @@ function RetroDetailPage() {
         <p className="text-muted-foreground">
           This retrospective does not exist or you do not have access.
         </p>
-        <Button
-          onClick={() =>
-            navigate({ to: '/retros', search: { page: 1, limit: 6 } })
-          }
-        >
+        <Button onClick={() => navigate({ to: '/retros' })}>
           Back to Retrospectives
         </Button>
       </div>

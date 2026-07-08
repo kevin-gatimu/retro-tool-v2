@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
 import {
-  ChevronRight,
   Clock,
   Eye,
   EyeOff,
@@ -14,15 +13,34 @@ import {
   Trophy,
   Users,
   TrendingUp,
+  KeyRound,
+  Loader2,
+  ArrowLeft,
+  Fingerprint,
+  LogIn,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from '@/components/ui/input-otp'
 import { authClient } from '@/lib/auth-client'
-import { useSignIn } from './hooks'
+import {
+  useSendSignInOtp,
+  useSignIn,
+  useSignInOtp,
+  useSignInPasskey,
+} from './hooks'
 import type { SignInSearch } from './types'
+
+/** WebAuthn is available only in secure contexts with the credentials API. */
+const passkeysSupported =
+  typeof window !== 'undefined' && !!window.PublicKeyCredential
 
 export const Route = createFileRoute('/auth/sign-in')({
   validateSearch: (search: Record<string, unknown>): SignInSearch => ({
@@ -248,22 +266,82 @@ function SignInPage() {
   const [rejected, setRejected] = useState(status === 'rejected')
   const [suspended, setSuspended] = useState(false)
 
-  const signInMutation = useSignIn({
+  // Sign-in mode:
+  //  'password' — default email + password form
+  //  'request'  — passwordless: enter email to request a one-time code
+  //  'code'     — enter the one-time code that was emailed
+  const [mode, setMode] = useState<'password' | 'request' | 'code'>('password')
+  const [otp, setOtp] = useState('')
+
+  const statusCallbacks = {
     onPendingApproval: () => setPendingApproval(true),
     onRejected: () => setRejected(true),
     onSuspended: () => setSuspended(true),
     redirect: resolvedRedirect,
-  })
+  }
 
-  const error = signInMutation.error?.message ?? ''
+  const signInMutation = useSignIn(statusCallbacks)
+  const signInOtpMutation = useSignInOtp(statusCallbacks)
+  const sendOtpMutation = useSendSignInOtp()
+  const signInPasskeyMutation = useSignInPasskey(statusCallbacks)
+
+  // Conditional-UI autofill: on supporting browsers, surface saved passkeys in
+  // the email field's autocomplete dropdown. Runs once on mount; failures
+  // (including user dismissal) are non-fatal — the explicit button still works.
+  useEffect(() => {
+    if (!passkeysSupported) return
+    if (
+      typeof PublicKeyCredential.isConditionalMediationAvailable !== 'function'
+    ) {
+      return
+    }
+    void PublicKeyCredential.isConditionalMediationAvailable().then(
+      (available) => {
+        if (available) {
+          void authClient.signIn.passkey({ autoFill: true })
+        }
+      },
+    )
+    // Intentionally run only once on mount.
+  }, [])
+
+  const error =
+    signInMutation.error?.message ??
+    signInOtpMutation.error?.message ??
+    sendOtpMutation.error?.message ??
+    signInPasskeyMutation.error?.message ??
+    ''
   const loading = signInMutation.isPending
+  const otpComplete = otp.length === 6
 
-  const handleSubmit = (e: React.SyntheticEvent) => {
-    e.preventDefault()
+  const resetStatuses = () => {
     setPendingApproval(false)
     setRejected(false)
     setSuspended(false)
+  }
+
+  const handleSubmit = (e: React.SyntheticEvent) => {
+    e.preventDefault()
+    resetStatuses()
     signInMutation.mutate({ email, password })
+  }
+
+  const handleSendCode = () => {
+    if (!email) return
+    resetStatuses()
+    sendOtpMutation.mutate(email, { onSuccess: () => setMode('code') })
+  }
+
+  const handleRequestCode = (e: React.SyntheticEvent) => {
+    e.preventDefault()
+    handleSendCode()
+  }
+
+  const handleVerifyCode = (e: React.SyntheticEvent) => {
+    e.preventDefault()
+    if (!email || !otpComplete) return
+    resetStatuses()
+    signInOtpMutation.mutate({ email, otp })
   }
 
   if (pendingApproval) {
@@ -393,141 +471,304 @@ function SignInPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-400">
-            <p>{error}</p>
-            {inviteToken && emailFromInvite && (
-              <p className="mt-2 text-xs text-gray-400">
-                Don't have an account yet?{' '}
-                <Link
-                  to="/auth/sign-up"
-                  search={{ inviteToken, email: emailFromInvite }}
-                  className="text-emerald-400 hover:text-emerald-300 font-medium"
-                >
-                  Create one with {emailFromInvite}
-                </Link>{' '}
-                or{' '}
-                <Link
-                  to="/auth/forgot-password"
-                  className="text-emerald-400 hover:text-emerald-300 font-medium"
-                >
-                  reset your password
-                </Link>
-                .
-              </p>
-            )}
+      {mode === 'request' ? (
+        <form onSubmit={handleRequestCode} className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setMode('password')}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-emerald-400 transition-colors group"
+          >
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+            Back to sign in
+          </button>
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold text-white">
+              Passwordless sign-in
+            </h3>
+            <p className="text-sm text-gray-400 leading-relaxed">
+              Enter your email and we'll send you a one-time code to sign in —
+              no password needed.
+            </p>
           </div>
-        )}
-
-        <div className="space-y-1.5">
-          <Label htmlFor="email" className="text-gray-300 text-sm">
-            Email
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            readOnly={!!emailFromInvite}
-            className={`h-11 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300${emailFromInvite ? ' opacity-75 cursor-default' : ''}`}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password" className="text-gray-300 text-sm">
-              Password
+          {error && (
+            <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="otp-email" className="text-gray-300 text-sm">
+              Email
             </Label>
-            <Link
-              to="/auth/forgot-password"
-              className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-            >
-              Forgot password?
-            </Link>
-          </div>
-          <div className="relative">
             <Input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              id="otp-email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
-              className="h-11 pr-10 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300"
+              readOnly={!!emailFromInvite}
+              className={`h-11 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300${emailFromInvite ? ' opacity-75 cursor-default' : ''}`}
             />
+          </div>
+          <Button
+            type="submit"
+            disabled={!email || sendOtpMutation.isPending}
+            className="w-full h-11 text-black font-semibold transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_15px_30px_-10px_rgba(255,187,0,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0 mt-2 hover:brightness-95"
+            style={{ backgroundColor: 'rgb(255, 187, 0)' }}
+          >
+            {sendOtpMutation.isPending ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Sending code…
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                Email me a sign-in code
+              </span>
+            )}
+          </Button>
+        </form>
+      ) : mode === 'code' ? (
+        <form onSubmit={handleVerifyCode} className="space-y-4">
+          <button
+            type="button"
+            onClick={() => {
+              setOtp('')
+              setMode('request')
+            }}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-emerald-400 transition-colors group"
+          >
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+            Back
+          </button>
+          {error && (
+            <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label className="text-gray-300 text-sm">
+              Enter the code sent to{' '}
+              <span className="text-emerald-400">{email}</span>
+            </Label>
+            <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+              <InputOTPGroup>
+                <InputOTPSlot index={0} />
+                <InputOTPSlot index={1} />
+                <InputOTPSlot index={2} />
+                <InputOTPSlot index={3} />
+                <InputOTPSlot index={4} />
+                <InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+          <Button
+            type="submit"
+            disabled={signInOtpMutation.isPending || !otpComplete}
+            className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition-all duration-300 disabled:opacity-50 mt-2"
+          >
+            {signInOtpMutation.isPending ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Verifying...
+              </span>
+            ) : (
+              'Sign in'
+            )}
+          </Button>
+          <div className="flex items-center justify-center text-xs text-gray-400">
+            <span>Didn't get it?</span>
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              tabIndex={-1}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-emerald-400 transition-colors"
+              onClick={handleSendCode}
+              disabled={sendOtpMutation.isPending}
+              className="ml-1.5 text-emerald-400 hover:text-emerald-300 transition-colors disabled:opacity-50"
             >
-              {showPassword ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
+              {sendOtpMutation.isPending ? 'Sending…' : 'Resend code'}
             </button>
           </div>
-        </div>
+        </form>
+      ) : (
+        <>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-400">
+                <p>{error}</p>
+                {inviteToken && emailFromInvite && (
+                  <p className="mt-2 text-xs text-gray-400">
+                    Don't have an account yet?{' '}
+                    <Link
+                      to="/auth/sign-up"
+                      search={{ inviteToken, email: emailFromInvite }}
+                      className="text-emerald-400 hover:text-emerald-300 font-medium"
+                    >
+                      Create one with {emailFromInvite}
+                    </Link>{' '}
+                    or{' '}
+                    <Link
+                      to="/auth/forgot-password"
+                      className="text-emerald-400 hover:text-emerald-300 font-medium"
+                    >
+                      reset your password
+                    </Link>
+                    .
+                  </p>
+                )}
+              </div>
+            )}
 
-        <Button
-          type="submit"
-          disabled={loading}
-          className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_15px_30px_-10px_rgba(16,185,129,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0 mt-2"
-        >
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 animate-spin" />
-              Signing in...
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <ChevronRight className="h-4 w-4" strokeWidth={3} />
-              Sign in
-            </span>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-gray-300 text-sm">
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                readOnly={!!emailFromInvite}
+                autoComplete={emailFromInvite ? 'email' : 'email webauthn'}
+                className={`h-11 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300${emailFromInvite ? ' opacity-75 cursor-default' : ''}`}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-gray-300 text-sm">
+                  Password
+                </Label>
+                <Link
+                  to="/auth/forgot-password"
+                  className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-11 pr-10 bg-[#0d1117] border-[#21262d] text-white placeholder:text-gray-600 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-emerald-400 transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_15px_30px_-10px_rgba(16,185,129,0.4)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0 mt-2"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 animate-spin" />
+                  Signing in...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <LogIn className="h-4 w-4" strokeWidth={3} />
+                  Sign in
+                </span>
+              )}
+            </Button>
+          </form>
+
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-[#21262d]" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-[#161b22] px-2 text-gray-600">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-11 border-[#21262d] bg-white dark:bg-white text-gray-900 dark:text-gray-900 hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-gray-100 dark:hover:text-gray-900 font-medium transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(0,0,0,0.4)]"
+            onClick={() =>
+              authClient.signIn.social({
+                provider: 'microsoft',
+                callbackURL: inviteToken
+                  ? `${window.location.origin}/auth/social-callback?inviteToken=${encodeURIComponent(inviteToken)}`
+                  : `${window.location.origin}/auth/social-callback`,
+              })
+            }
+          >
+            <svg
+              className="mr-2 h-4 w-4"
+              viewBox="0 0 21 21"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect x="1" y="1" width="9" height="9" fill="#F25022" />
+              <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
+              <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
+              <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+            </svg>
+            Sign in with Microsoft
+          </Button>
+
+          {passkeysSupported && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={signInPasskeyMutation.isPending}
+              onClick={() => {
+                resetStatuses()
+                signInPasskeyMutation.mutate()
+              }}
+              className="w-full h-11 mt-3 border-[#4a525c] dark:border-[#4a525c] bg-[#3d444d] dark:bg-[#3d444d] text-white hover:bg-[#4a525c] dark:hover:bg-[#4a525c] hover:text-emerald-400 dark:hover:text-emerald-400 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 font-medium transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:translate-y-0"
+            >
+              {signInPasskeyMutation.isPending ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Waiting for passkey…
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Fingerprint className="h-4 w-4" />
+                  Sign in with a passkey
+                </span>
+              )}
+            </Button>
           )}
-        </Button>
-      </form>
 
-      <div className="relative my-5">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-[#21262d]" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-[#161b22] px-2 text-gray-600">
-            Or continue with
-          </span>
-        </div>
-      </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full h-11 border-[#21262d] bg-white dark:bg-white text-gray-900 dark:text-gray-900 hover:bg-gray-50 hover:text-gray-900 dark:hover:bg-gray-100 dark:hover:text-gray-900 font-medium transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(0,0,0,0.4)]"
-        onClick={() =>
-          authClient.signIn.social({
-            provider: 'microsoft',
-            callbackURL: inviteToken
-              ? `${window.location.origin}/auth/social-callback?inviteToken=${encodeURIComponent(inviteToken)}`
-              : `${window.location.origin}/auth/social-callback`,
-          })
-        }
-      >
-        <svg
-          className="mr-2 h-4 w-4"
-          viewBox="0 0 21 21"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <rect x="1" y="1" width="9" height="9" fill="#F25022" />
-          <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
-          <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
-          <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
-        </svg>
-        Sign in with Microsoft
-      </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              resetStatuses()
+              setMode('request')
+            }}
+            className="w-full h-11 mt-3 text-black font-semibold transition-all duration-300 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_-8px_rgba(255,187,0,0.4)] hover:brightness-95"
+            style={{ backgroundColor: 'rgb(255, 187, 0)' }}
+          >
+            <span className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4" />
+              Email me a sign-in code
+            </span>
+          </Button>
+        </>
+      )}
 
       <div className="mt-6 space-y-3">
         <p className="text-center text-sm text-gray-400">

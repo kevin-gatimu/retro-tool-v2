@@ -7,6 +7,7 @@ export type HistorySession = {
   name: string
   teamId: string
   teamName: string | null
+  teamEmoji: string | null
   orgId: string | null
   orgName: string | null
   currentStory: string | null

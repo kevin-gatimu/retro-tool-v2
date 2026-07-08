@@ -6,6 +6,7 @@ export const EMAIL_LOG_TYPES = {
   TeamInvite: 'team_invite',
   TeamInviteExternal: 'team_invite_external',
   RetroReport: 'retro_report',
+  StandupReport: 'standup_report',
 } as const;
 
 export type TEmailLogType =

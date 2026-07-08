@@ -2,8 +2,10 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import {
   BarChart3,
   Building2,
+  CalendarCheck,
   ChevronsUpDown,
   ChevronDown,
+  ClipboardList,
   FileText,
   History,
   Laptop,
@@ -12,13 +14,16 @@ import {
   Moon,
   Shield,
   Spade,
+  Sparkles,
   Sun,
   User,
   Users,
+  Vote,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useSyncExternalStore } from 'react'
-import { UserAvatar } from '@/components/UserAvatar'
+import { UserAvatar } from '@/components/user-avatar'
+import { Badge } from '@/components/ui/badge'
 import {
   Collapsible,
   CollapsibleContent,
@@ -42,12 +47,19 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { AccountSwitcher } from '@/components/AccountSwitcher'
+import { AccountSwitcher } from '@/components/account-switcher'
 import { useTheme } from '@/hooks/use-theme'
 import { api } from '@/lib/api'
-import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
+import {
+  POLLS_ENDPOINTS,
+  SURVEYS_ENDPOINTS,
+  USERS_ENDPOINTS,
+} from '@/lib/api-endpoints'
 import { authClient } from '@/lib/auth-client'
 import { canAccessAdminPanel } from '@/lib/rbac'
+import { usesConvexForSurveys, usesConvexForPolls } from '@/lib/realtime-config'
+import { SurveyListConvexSync } from '@/routes/surveys/components/survey-list-convex-sync'
+import { PollListConvexSync } from '@/routes/polls/components/poll-list-convex-sync'
 import { USER_ROLES } from '@/common/enums/user.enums'
 import type { TUserRole } from '@/common/enums/user.enums'
 import type { User as AppUser } from '@/common/types/users'
@@ -90,14 +102,40 @@ const retroNavItems: NavItem[] = [
     allowedRoles: ALL_ROLES,
   },
   {
+    title: 'Icebreakers',
+    url: '/icebreakers',
+    icon: Sparkles,
+    allowedRoles: ALL_ROLES,
+  },
+  {
+    title: 'Standups',
+    url: '/standups',
+    icon: CalendarCheck,
+    allowedRoles: ALL_ROLES,
+  },
+  {
+    title: 'Polls',
+    url: '/polls',
+    icon: Vote,
+    allowedRoles: ALL_ROLES,
+  },
+  {
+    title: 'Surveys',
+    url: '/surveys',
+    icon: ClipboardList,
+    allowedRoles: ALL_ROLES,
+  },
+]
+
+// Templates + Reports form their own small group, visually separated from the
+// session tools above.
+const libraryNavItems: NavItem[] = [
+  {
     title: 'Templates',
     url: '/templates',
     icon: FileText,
     allowedRoles: ALL_ROLES,
   },
-]
-
-const reportsNavItems: NavItem[] = [
   {
     title: 'Reports',
     url: '/reports',
@@ -211,6 +249,28 @@ export function AppSidebar() {
     enabled,
   })
 
+  const surveysConvexRealtime = usesConvexForSurveys()
+  const pollsConvexRealtime = usesConvexForPolls()
+
+  const { data: surveysActive } = useQuery({
+    queryKey: ['surveys-active-count'],
+    queryFn: () => api.get<{ count: number }>(SURVEYS_ENDPOINTS.ACTIVE_COUNT),
+    enabled,
+    staleTime: 30_000,
+    refetchInterval: surveysConvexRealtime ? false : 30_000,
+  })
+
+  const { data: pollsActive } = useQuery({
+    queryKey: ['polls-active-count'],
+    queryFn: () => api.get<{ count: number }>(POLLS_ENDPOINTS.ACTIVE_COUNT),
+    enabled,
+    staleTime: 30_000,
+    refetchInterval: pollsConvexRealtime ? false : 30_000,
+  })
+
+  const activeSurveyCount = surveysActive?.count ?? 0
+  const activePollCount = pollsActive?.count ?? 0
+
   const currentUserRole: TUserRole = user?.role ?? USER_ROLES.Member
   const isAdmin = canAccessAdminPanel(currentUserRole)
 
@@ -220,7 +280,7 @@ export function AppSidebar() {
   const visibleRetroNavItems = retroNavItems.filter((item) =>
     item.allowedRoles.includes(currentUserRole),
   )
-  const visibleReportsNavItems = reportsNavItems.filter((item) =>
+  const visibleLibraryNavItems = libraryNavItems.filter((item) =>
     item.allowedRoles.includes(currentUserRole),
   )
   const visibleUserNavItems = userNavItems.filter((item) =>
@@ -245,6 +305,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r border-border">
+      {enabled && surveysConvexRealtime ? <SurveyListConvexSync /> : null}
+      {enabled && pollsConvexRealtime ? <PollListConvexSync /> : null}
       <SidebarHeader className="border-b border-border px-6 py-4">
         <Link to="/dashboard" className="flex items-center gap-2 group">
           <img
@@ -283,16 +345,22 @@ export function AppSidebar() {
                     <Link to={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              {visibleReportsNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
+                      {item.url === '/surveys' && activeSurveyCount > 0 && (
+                        <Badge
+                          variant="default"
+                          className="ml-auto h-5 min-w-5 rounded-full px-1.5 text-xs flex items-center justify-center animate-in zoom-in animate-pulse"
+                        >
+                          {activeSurveyCount > 9 ? '9+' : activeSurveyCount}
+                        </Badge>
+                      )}
+                      {item.url === '/polls' && activePollCount > 0 && (
+                        <Badge
+                          variant="default"
+                          className="ml-auto h-5 min-w-5 rounded-full px-1.5 text-xs flex items-center justify-center animate-in zoom-in animate-pulse"
+                        >
+                          {activePollCount > 9 ? '9+' : activePollCount}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -300,6 +368,25 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {visibleLibraryNavItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleLibraryNavItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                      <Link to={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <Collapsible defaultOpen asChild className="group/account-section">
           <SidebarGroup>

@@ -9,6 +9,7 @@ import {
   Shield,
   Zap,
   Users,
+  UserPlus,
   BarChart3,
   CheckCircle2,
 } from 'lucide-react'
@@ -497,7 +498,11 @@ function SignUpPage() {
                         </span>
                       ) : (
                         <span className="flex items-center gap-2">
-                          <ChevronRight className="h-4 w-4" strokeWidth={3} />
+                          {hasAnyUser ? (
+                            <UserPlus className="h-4 w-4" strokeWidth={3} />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" strokeWidth={3} />
+                          )}
                           {hasAnyUser
                             ? 'Request Access'
                             : 'Create Admin Account'}

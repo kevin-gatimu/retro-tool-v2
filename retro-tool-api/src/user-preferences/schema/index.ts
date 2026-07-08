@@ -1,6 +1,16 @@
-import { pgTable, varchar, boolean, timestamp } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  varchar,
+  boolean,
+  timestamp,
+  jsonb,
+} from 'drizzle-orm/pg-core';
 import { user } from '../../auth/schema';
+import type { UiPreferences } from '../types';
 
+// NOTE: Despite the table name, this row also stores per-user UI preferences
+// (the `ui_preferences` jsonb blob) in addition to notification settings.
+// A clean rename is a separate refactor — not part of the Team Spaces feature.
 export const userNotificationPreference = pgTable(
   'user_notification_preference',
   {
@@ -12,6 +22,12 @@ export const userNotificationPreference = pgTable(
     emailVerificationReminders: boolean('email_verification_reminders')
       .notNull()
       .default(true),
+    // Flexible blob for remembered UI settings (Team Spaces views, etc.).
+    // Adding new UI preferences never requires a migration.
+    uiPreferences: jsonb('ui_preferences')
+      .$type<UiPreferences>()
+      .notNull()
+      .default({}),
     createdAt: timestamp('created_at')
       .notNull()
       .$defaultFn(() => new Date()),

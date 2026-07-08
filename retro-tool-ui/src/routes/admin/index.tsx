@@ -8,6 +8,7 @@ import {
   Clock,
   FileText,
   Shield,
+  Sparkles,
   TrendingUp,
   UserCheck,
   Users,
@@ -23,7 +24,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { AdminDashboardSkeleton } from '@/components/skeletons'
+import { AdminDashboardSkeleton } from './skeleton'
 import { api } from '@/lib/api'
 import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
 
@@ -234,6 +235,19 @@ function AdminDashboardPage() {
                 <span className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Manage Retro Templates
+                </span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              className="w-full justify-between"
+              variant="outline"
+            >
+              <Link to="/admin/templates">
+                <span className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Manage Icebreaker Templates
                 </span>
                 <ArrowRight className="h-4 w-4" />
               </Link>

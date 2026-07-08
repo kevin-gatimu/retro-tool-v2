@@ -1,11 +1,15 @@
 import { v } from 'convex/values'
-import { mutation } from './_generated/server'
+import { internalMutation } from './_generated/server'
 
 const CLEARABLE_TABLES = [
   'liveRetroSessions',
   'liveEstimateSessions',
+  'liveIcebreakerSessions',
   'liveRetroBoards',
   'liveEstimateBoards',
+  'liveIcebreakerBoards',
+  'liveStandupEntries',
+  'liveStandupBoards',
   'liveNotifications',
   'livePresence',
   'liveTyping',
@@ -21,7 +25,7 @@ type ClearableTable = (typeof CLEARABLE_TABLES)[number]
  * NOTE: For very large tables this may hit Convex mutation execution time limits.
  * In that case, split the clear operation across multiple calls (one table at a time).
  */
-export const clearTables = mutation({
+export const clearTables = internalMutation({
   args: {
     tableNames: v.array(v.string()),
   },

@@ -4,10 +4,10 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query'
-import { useOrgDetailMutations } from './hooks/useOrganizationMutations'
-import { useOrgTeamRoleMutations } from './hooks/useOrgTeamRoleMutations'
+import { useOrgDetailMutations } from './hooks/use-organization-mutations'
+import { useOrgTeamRoleMutations } from './hooks/use-org-team-role-mutations'
 import { toSlug } from './helpers'
-import { OrgLogo } from '@/components/OrgLogo'
+import { OrgLogo } from '@/components/org-logo'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
   ArrowLeft,
@@ -32,7 +32,7 @@ import { getOrgMemberColumns } from '@/components/tables/member-columns'
 import type { OrgMemberRow } from '@/components/tables/member-columns'
 import { getOrgInvitationColumns } from '@/components/tables/invitation-columns'
 import type { OrgInvitationRow } from '@/components/tables/invitation-columns'
-import { getOrgRoleBadge } from '@/components/UserRoleBadges'
+import { getOrgRoleBadge } from '@/components/user-role-badges'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -79,9 +79,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { FilterPills } from '@/components/ui/filter-pills'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { Skeleton } from '@/components/ui/skeleton'
+import { OrgDetailSkeleton } from './skeleton'
 import { api } from '@/lib/api'
 import {
   ESTIMATE_TEMPLATES_ENDPOINTS,
@@ -98,61 +99,9 @@ import type {
   CreateEstimateTemplateInput,
 } from '@/common/types/estimates'
 import { isSystemAdmin } from '@/lib/rbac'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 import type { OrganizationDetail } from '@/common/types/organizations'
 import type { Team } from '@/common/types/teams'
-
-function OrgDetailSkeleton() {
-  return (
-    <div className="container py-8 space-y-8">
-      <Skeleton className="h-5 w-40" />
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-16 w-16 rounded-xl" />
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-          <Skeleton className="h-5 w-16 rounded-full" />
-        </div>
-        <Skeleton className="h-10 w-10" />
-      </div>
-      <div className="flex gap-2">
-        <Skeleton className="h-10 w-20 rounded-md" />
-        <Skeleton className="h-10 w-24 rounded-md" />
-      </div>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-6 w-16" />
-          <Skeleton className="h-10 w-28" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="border rounded-lg p-6 space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-8 w-8" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-5 w-32" />
-                    <Skeleton className="h-4 w-48" />
-                  </div>
-                </div>
-                <Skeleton className="h-8 w-8" />
-              </div>
-              <div className="flex items-center justify-between pt-2">
-                <div className="flex items-center gap-1">
-                  <Skeleton className="h-4 w-4" />
-                  <Skeleton className="h-4 w-24" />
-                </div>
-                <Skeleton className="h-5 w-16 rounded-full" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export const Route = createFileRoute('/organizations/$orgId')({
   loader: ({ context: { queryClient }, params: { orgId } }) =>
@@ -852,20 +801,23 @@ function OrganizationDetailPage() {
               <h2 className="text-xl font-semibold">
                 Members ({filteredOrgMembers.length})
               </h2>
-              <Select
+              <FilterPills
+                ariaLabel="Filter members"
                 value={memberFilter}
-                onValueChange={(v) =>
-                  setMemberFilter(v as 'all' | 'unassigned')
-                }
-              >
-                <SelectTrigger className="h-8 w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All members</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(v) => setMemberFilter(v)}
+                options={[
+                  {
+                    value: 'all',
+                    label: 'All members',
+                    description: 'Everyone in this organization',
+                  },
+                  {
+                    value: 'unassigned',
+                    label: 'Unassigned',
+                    description: 'Members not assigned to any team',
+                  },
+                ]}
+              />
             </div>
             <div className="flex items-center gap-2">
               {isAdmin && (

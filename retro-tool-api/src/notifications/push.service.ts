@@ -15,11 +15,20 @@ type Database = NodePgDatabase<typeof notificationSchema & typeof authSchema>;
 export class PushService {
   private readonly logger = new Logger(PushService.name);
   private readonly enabled: boolean;
+  // Origin of this environment's UI, used to turn relative notification links
+  // (e.g. `/estimate/123`) into absolute deep links. Without this the service
+  // worker resolves the relative path against whichever origin owns the push
+  // subscription, which can send users to the wrong environment.
+  private readonly frontendUrl: string;
 
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly configService: ConfigService,
   ) {
+    this.frontendUrl = (
+      this.configService.get<string>('FRONTEND_URL') ?? ''
+    ).replace(/\/+$/, '');
+
     const vapidPublicKey = this.configService.get<string>('VAPID_PUBLIC_KEY');
     const vapidPrivateKey = this.configService.get<string>('VAPID_PRIVATE_KEY');
     const vapidSubject = this.configService.get<string>('VAPID_SUBJECT');
@@ -83,6 +92,16 @@ export class PushService {
     return { success: true };
   }
 
+  // Resolve a notification link to an absolute URL for this environment's UI so
+  // the service worker opens the correct origin. Relative links (`/estimate/1`)
+  // are joined onto FRONTEND_URL; absolute links are passed through unchanged.
+  private resolveDeepLink(url?: string): string | undefined {
+    if (!url) return undefined;
+    if (/^https?:\/\//i.test(url)) return url;
+    if (!this.frontendUrl) return url;
+    return `${this.frontendUrl}/${url.replace(/^\/+/, '')}`;
+  }
+
   async sendPush(
     userId: string,
     payload: { title: string; body: string; url?: string },
@@ -95,6 +114,11 @@ export class PushService {
         .from(pushSubscriptionTable)
         .where(eq(pushSubscriptionTable.userId, userId));
 
+    const deliveredPayload = JSON.stringify({
+      ...payload,
+      url: this.resolveDeepLink(payload.url),
+    });
+
     await Promise.all(
       subscriptions.map(async (sub) => {
         const endpoint: string = sub.endpoint;
@@ -103,7 +127,7 @@ export class PushService {
         try {
           await webpush.sendNotification(
             { endpoint, keys: { p256dh, auth } },
-            JSON.stringify(payload),
+            deliveredPayload,
             { urgency: 'high', TTL: 60 },
           );
         } catch (err: unknown) {

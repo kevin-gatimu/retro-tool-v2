@@ -16,11 +16,6 @@ export type SessionUserWithSession = {
 };
 
 /**
- * WebSocket session data cached for connection validation
- */
-export type WsSessionData = { userId: string; expiresAt: string };
-
-/**
  * WebSocket client data attached to socket instances
  */
 export type ClientData = { userId?: string };

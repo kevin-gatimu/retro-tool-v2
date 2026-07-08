@@ -1,6 +1,39 @@
 /**
  * Estimate route helper functions
  */
+import type { EstimateSession } from '@/common/types/estimates'
+
+/**
+ * Format a raw stored point value into a display string, mapping it to its
+ * template label when one exists (e.g. `"5"` → `"M (5)"`).
+ */
+export function formatTemplatePoint(
+  value: string | number | null,
+  template: EstimateSession['template'],
+): string {
+  if (value === null) return '—'
+  const strValue = String(value)
+  if (!template) return strValue
+  const found = template.values.find((v) => v.value === strValue)
+  if (!found || found.label === strValue) return strValue
+  return `${found.label} (${strValue})`
+}
+
+/**
+ * Find the template label whose numeric value sits closest to `avg` — used to
+ * annotate a computed average with the nearest scale point.
+ */
+export function closestTemplateLabel(
+  avg: number,
+  template: EstimateSession['template'],
+): string | null {
+  if (!template) return null
+  const numeric = template.values
+    .map((v) => ({ label: v.label, n: parseFloat(v.value) }))
+    .filter((v) => !isNaN(v.n))
+    .sort((a, b) => Math.abs(a.n - avg) - Math.abs(b.n - avg))
+  return numeric[0]?.label ?? null
+}
 
 /**
  * Format seconds to mm:ss format

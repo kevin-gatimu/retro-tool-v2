@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   BarChart3,
   CheckCircle2,
@@ -7,7 +7,6 @@ import {
   Clock,
   Forward,
   History as HistoryIcon,
-  Mail,
   MessageSquare,
   ThumbsUp,
   Users,
@@ -16,25 +15,13 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { ReportMenu } from '@/components/report-menu'
 import { api } from '@/lib/api'
-import { RETROS_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
+import { RETROS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { RetroDetail } from '@/common/types/retros'
-import type { TeamMember } from '@/common/types/teams'
 import { cn } from '@/lib/utils'
-import { useSendRetroReport } from '@/routes/retros/hooks/useSendRetroReport'
+import { useSendRetroReport } from '@/routes/retros/hooks/use-send-retro-report'
+import { exportRetroPdf } from '@/routes/retros/helpers/export-retro-pdf'
 import type { CarriedForwardItem } from '@/routes/retros/types'
 
 interface RetroReportProps {
@@ -48,29 +35,11 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
   const [selectedCarryForward, setSelectedCarryForward] = useState<
     Record<string, boolean>
   >({})
-  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(
-    new Set(),
-  )
   const [discussedOpen, setDiscussedOpen] = useState(false)
   const [undiscussedOpen, setUndiscussedOpen] = useState(false)
   const [carriedForwardOpen, setCarriedForwardOpen] = useState(false)
   const [carriedFromPreviousOpen, setCarriedFromPreviousOpen] = useState(false)
-  const sendRetroReportMutation = useSendRetroReport(retro.id, {
-    onSuccess: () => setSelectedRecipients(new Set()),
-  })
-
-  const { data: membersData } = useQuery({
-    queryKey: ['team-members', retro.team.id],
-    queryFn: () =>
-      api.get<{
-        members: TeamMember[]
-        total: number
-        page: number
-        totalPages: number
-        data?: TeamMember[]
-      }>(`${TEAMS_ENDPOINTS.MEMBERS(retro.team.id)}?limit=100`),
-    staleTime: 60_000,
-  })
+  const sendRetroReportMutation = useSendRetroReport(retro.id)
 
   const columns = retro.template.columns
   const allCards = retro.cards
@@ -153,92 +122,31 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           )}
         </button>
-        <div className="flex items-center">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-r-none border-r-0"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const recipients =
-                    selectedRecipients.size > 0
-                      ? Array.from(selectedRecipients)
-                      : undefined
-                  sendRetroReportMutation.mutate({ recipients })
-                }}
-                disabled={sendRetroReportMutation.isPending}
-              >
-                <Mail className="h-4 w-4 mr-1.5" />
-                {sendRetroReportMutation.isPending
-                  ? 'Sending...'
-                  : selectedRecipients.size > 0
-                    ? `Email (${selectedRecipients.size} selected)`
-                    : 'Email Report'}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent sideOffset={8}>
-              {selectedRecipients.size > 0
-                ? `Send report to ${selectedRecipients.size} selected recipient${selectedRecipients.size !== 1 ? 's' : ''}`
-                : 'Send report to all team members'}
-            </TooltipContent>
-          </Tooltip>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-l-none px-2"
-                onClick={(e) => e.stopPropagation()}
-                disabled={sendRetroReportMutation.isPending}
-              >
-                <ChevronDown className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Recipients</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {(membersData?.members ?? membersData?.data ?? []).map(
-                (member) => (
-                  <DropdownMenuCheckboxItem
-                    key={member.userId}
-                    checked={selectedRecipients.has(member.user.email)}
-                    onCheckedChange={(checked) => {
-                      setSelectedRecipients((prev) => {
-                        const next = new Set(prev)
-                        if (checked) next.add(member.user.email)
-                        else next.delete(member.user.email)
-                        return next
-                      })
-                    }}
-                    onSelect={(e) => e.preventDefault()}
-                  >
-                    {member.user.name ?? member.user.email}
-                  </DropdownMenuCheckboxItem>
-                ),
-              )}
-              {(membersData?.members ?? membersData?.data ?? []).length ===
-                0 && (
-                <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                  No members found
-                </div>
-              )}
-              {selectedRecipients.size > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    checked={false}
-                    onCheckedChange={() => setSelectedRecipients(new Set())}
-                    onSelect={(e) => e.preventDefault()}
-                    className="text-muted-foreground"
-                  >
-                    Clear selection
-                  </DropdownMenuCheckboxItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div onClick={(e) => e.stopPropagation()}>
+          <ReportMenu
+            teamId={retro.team.id}
+            onExportPdf={async () => {
+              try {
+                const filename = await exportRetroPdf(
+                  retro,
+                  previousCarriedItems,
+                )
+                if (filename) toast.success(`Report saved — ${filename}`)
+              } catch (e) {
+                toast.error(
+                  e instanceof Error
+                    ? e.message
+                    : 'Failed to export the report',
+                )
+              }
+            }}
+            onSendEmail={(recipients) =>
+              sendRetroReportMutation.mutate({ recipients })
+            }
+            isSending={sendRetroReportMutation.isPending}
+            dialogTitle="Email retro report"
+            dialogDescription="Send this retro's report to the whole team, or pick specific people."
+          />
         </div>
       </div>
 

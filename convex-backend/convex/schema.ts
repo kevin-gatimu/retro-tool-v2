@@ -60,6 +60,82 @@ export default defineSchema({
     .index('by_session_id', ['sessionId'])
     .index('by_session_user', ['sessionId', 'userId']),
 
+  liveIcebreakerSessions: defineTable({
+    sessionId: v.string(),
+    teamId: v.string(),
+    status: v.union(
+      v.literal('waiting'),
+      v.literal('curating'),
+      v.literal('presenting'),
+      v.literal('completed'),
+    ),
+    currentPromptId: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index('by_session_id', ['sessionId'])
+    .index('by_team_id', ['teamId']),
+
+  // Full icebreaker session snapshot pushed from NestJS after each mutation.
+  liveIcebreakerBoards: defineTable({
+    sessionId: v.string(),
+    userId: v.string(),
+    // JSON-serialised icebreaker SessionDetail (deck, prompts, responses, etc.)
+    snapshot: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_session_id', ['sessionId'])
+    .index('by_session_user', ['sessionId', 'userId']),
+
+  liveStandupEntries: defineTable({
+    standupId: v.string(),
+    entryDate: v.string(),
+    teamId: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_standup_id', ['standupId'])
+    .index('by_standup_date', ['standupId', 'entryDate'])
+    .index('by_team_id', ['teamId']),
+
+  // Full daily standup room snapshot pushed from NestJS after each mutation.
+  liveStandupBoards: defineTable({
+    standupId: v.string(),
+    entryDate: v.string(),
+    userId: v.string(),
+    // JSON-serialised StandupEntryDetail (submissions, comments, reactions, etc.)
+    snapshot: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_standup_id', ['standupId'])
+    .index('by_standup_date', ['standupId', 'entryDate'])
+    .index('by_standup_date_user', ['standupId', 'entryDate', 'userId']),
+
+  // Lightweight poll projection pushed from NestJS after each mutation.
+  // Drives the polls list; the UI invalidates and refetches the REST list
+  // (which applies per-viewer authorization) whenever this table changes.
+  livePolls: defineTable({
+    pollId: v.string(),
+    teamId: v.string(),
+    isClosed: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index('by_poll_id', ['pollId'])
+    .index('by_team_id', ['teamId']),
+
+  // Lightweight survey projection pushed from NestJS after each mutation.
+  // Drives the surveys list + active-count badge; the UI invalidates and
+  // refetches the REST endpoints (which apply per-viewer authorization).
+  liveSurveys: defineTable({
+    surveyId: v.string(),
+    scope: v.union(v.literal('team'), v.literal('org'), v.literal('system')),
+    teamId: v.optional(v.string()),
+    organizationId: v.optional(v.string()),
+    isClosed: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index('by_survey_id', ['surveyId'])
+    .index('by_team_id', ['teamId'])
+    .index('by_org_id', ['organizationId']),
+
   liveNotifications: defineTable({
     notificationId: v.string(),
     userId: v.string(),

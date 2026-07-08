@@ -1,10 +1,13 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
+import { SkipThrottle } from '@nestjs/throttler';
 import { DATABASE_CONNECTION } from './database/database-connection';
 import { sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+// Liveness/readiness probes must never be rate-limited.
+@SkipThrottle()
 @ApiTags('health')
 @AllowAnonymous()
 @Controller('health')

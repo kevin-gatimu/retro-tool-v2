@@ -131,6 +131,8 @@ VITE_NOTIFICATIONS_REALTIME_BACKEND=convex
 
 Convex-sync components sit alongside their route and are named `*-convex-sync.tsx`. They are responsible only for subscribing to Convex queries and calling the NestJS API to trigger syncs.
 
+**File naming:** UI source files use **`kebab-case`** (`notification-bell.tsx`, `use-current-user.ts`). The file name is kebab; the export keeps idiomatic case — components `PascalCase`, hooks `useCamelCase` (file prefixed `use-`). Route files under `src/routes/` are the exception — TanStack Router names them (`index.tsx`, `$teamId.tsx`, `__root.tsx`). Skeletons use `skeleton/index.tsx` (route group) or `<name>.skeleton.tsx` (single route). Full reference: [docs/file-naming-conventions.md](docs/file-naming-conventions.md).
+
 **RBAC in the UI:**
 
 The frontend mirrors all backend RBAC types and helpers in `src/lib/rbac.ts`. Use those helpers to show/hide UI elements — do not re-implement permission logic inline.
@@ -262,6 +264,8 @@ pnpm --dir retro-tool-api db:seed
 | Document | What it covers |
 |---|---|
 | [docs/RBAC.md](docs/RBAC.md) | Full permission matrices, helper functions, user status lifecycle |
+| [docs/api-security.md](docs/api-security.md) | API hardening: Helmet, rate limiting, CORS, CSRF posture/residual risk |
+| [docs/file-naming-conventions.md](docs/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
 | [docs/app-flows.md](docs/app-flows.md) | Every major user-facing flow end-to-end |
 | [docs/deployment-guide.md](docs/deployment-guide.md) | Azure deployment step-by-step |
 | [docs/azure-cloud-resources.md](docs/azure-cloud-resources.md) | Azure resource inventory |

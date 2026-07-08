@@ -68,6 +68,33 @@ For local Docker, the postgres init script (`docker/postgres/init/001-create-dat
 | --- | --- |
 | `VITE_CONVEX_URL` | Public URL the browser connects to (same as `CONVEX_SELF_HOSTED_URL` for local) |
 
+### Function-runtime variables (read by `process.env` inside Convex functions)
+
+These are a **distinct category** from the container/CLI/API vars above. Convex code
+(`convex/auth.config.ts`, etc.) reads them via `process.env` **at deploy time inside the
+deployment**, so they are **not** loaded from any `.env` file and **not** the same as the
+container env. Set them on the deployment with the CLI (which targets the backend via
+`CONVEX_SELF_HOSTED_URL` + `CONVEX_SELF_HOSTED_ADMIN_KEY`, or `CONVEX_DEPLOY_KEY` for Cloud):
+
+```bash
+pnpm --filter convex-backend exec convex env set NAME value
+pnpm --filter convex-backend exec convex env list      # inspect
+```
+
+The auth integration (Convex verifies the RS256 JWTs the NestJS API issues) needs:
+
+| Variable | Value | Notes |
+| --- | --- | --- |
+| `JWT_ISSUER` | the API's `BETTER_AUTH_URL` (e.g. `http://localhost:8000`) | **Byte-for-byte** match to the token `iss`. A scheme/port/trailing-slash mismatch silently breaks all Convex auth. This is a string identity check, never fetched. |
+| `JWT_AUDIENCE` | `convex` (the API's `BETTER_AUTH_JWT_AUDIENCE`) | Matched against the token `aud`. |
+| `JWT_JWKS_URL` | the API's `/api/auth/jwks` endpoint | **Fetched over the network** by the Convex backend. From inside the container, `localhost` is the container itself — point at the **host**: `http://host.docker.internal:8000/api/auth/jwks` (Docker Desktop), or the compose service name `http://nest-api:8000/api/auth/jwks` when the API runs in the same network. |
+
+> `JWT_ISSUER` (an identity string) and `JWT_JWKS_URL` (a fetched URL) legitimately differ
+> for local Docker: the issuer is `http://localhost:8000` (what the API stamps into the
+> token) while the JWKS URL is `http://host.docker.internal:8000/...` (how the container
+> reaches that same API). For deployed environments both use the public API host. See
+> [infra/README.md](../infra/README.md) step 7 and the `convex-backend/.env*.example` files.
+
 ---
 
 ## Generating the Admin Key

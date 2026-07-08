@@ -1,21 +1,17 @@
 import {
   useQuery as useTanStackQuery,
-  useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { useSessionMutations } from './hooks/useSessionMutations'
+import { useSessionMutations } from './hooks/use-session-mutations'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import {
   ArrowLeft,
   CalendarClock,
   Check,
-  ChevronDown,
   Clock,
-  Download,
   Eye,
   Hash,
-  Mail,
   Plus,
   RefreshCw,
   Spade,
@@ -29,7 +25,7 @@ import {
   TShirtIcon,
   getShirtScale,
   isTShirtTemplateName,
-} from '@/components/TShirtIcon'
+} from '@/components/t-shirt-icon'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   AlertDialog,
@@ -77,23 +73,21 @@ import {
 } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { getEstimateSocket } from '@/lib/socket'
-import { ESTIMATES_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
+import { ESTIMATES_ENDPOINTS } from '@/lib/api-endpoints'
 import type { EstimateSession } from '@/common/types/estimates'
 import { cn } from '@/lib/utils'
 import { MusicPlayer } from '@/components/music-player'
 import { usesConvexForEstimates } from '@/lib/realtime-config'
 import { EstimateConvexSync } from './components/estimate-convex-sync'
-import { getRoundDurationLabel } from './helpers'
-import { useSendEstimateReport } from './hooks/useSendEstimateReport'
-import type { TeamMember } from '@/common/types/teams'
+import { EstimateSessionDetailSkeleton } from './skeleton'
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  closestTemplateLabel,
+  formatTemplatePoint,
+  getRoundDurationLabel,
+} from './helpers'
+import { exportEstimatePdf } from './helpers/export-estimate-pdf'
+import { ReportMenu } from '@/components/report-menu'
+import { useSendEstimateReport } from './hooks/use-send-estimate-report'
 
 const DEFAULT_POINT_VALUES = [
   { label: '0', value: '0', color: null },
@@ -117,30 +111,6 @@ export const Route = createFileRoute('/estimate/$sessionId')({
 
 // ─── Completed Session Report ─────────────────────────────────────────────────
 
-function formatTemplatePoint(
-  value: string | number | null,
-  template: EstimateSession['template'],
-): string {
-  if (value === null) return '—'
-  const strValue = String(value)
-  if (!template) return strValue
-  const found = template.values.find((v) => v.value === strValue)
-  if (!found || found.label === strValue) return strValue
-  return `${found.label} (${strValue})`
-}
-
-function closestTemplateLabel(
-  avg: number,
-  template: EstimateSession['template'],
-): string | null {
-  if (!template) return null
-  const numeric = template.values
-    .map((v) => ({ label: v.label, n: parseFloat(v.value) }))
-    .filter((v) => !isNaN(v.n))
-    .sort((a, b) => Math.abs(a.n - avg) - Math.abs(b.n - avg))
-  return numeric[0]?.label ?? null
-}
-
 function CompletedSessionReport({ session }: { session: EstimateSession }) {
   const PAGE_SIZE = 5
 
@@ -149,27 +119,8 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
   )
 
   const [roundPageMap, setRoundPageMap] = useState<Record<string, number>>({})
-  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(
-    new Set(),
-  )
 
-  const sendReportMutation = useSendEstimateReport(session.id, {
-    onSuccess: () => setSelectedRecipients(new Set()),
-  })
-
-  const { data: membersData } = useQuery({
-    queryKey: ['team-members', session.team.id],
-    queryFn: () =>
-      api.get<{
-        members: TeamMember[]
-        total: number
-        page: number
-        totalPages: number
-        data?: TeamMember[]
-      }>(`${TEAMS_ENDPOINTS.MEMBERS(session.team.id)}?limit=100`),
-    staleTime: 60_000,
-  })
-  const teamMembers = membersData?.members ?? membersData?.data ?? []
+  const sendReportMutation = useSendEstimateReport(session.id)
 
   const totalVotes = session.rounds.reduce(
     (sum, round) => sum + round.votes.length,
@@ -184,24 +135,11 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
 
   return (
     <>
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          #estimate-report, #estimate-report * { visibility: visible; }
-          #estimate-report { position: absolute; left: 0; top: 0; width: 100%; }
-        }
-      `}</style>
-
-      <div id="estimate-report" className="mx-auto max-w-5xl space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         {/* Report Header */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              asChild
-              className="print:hidden"
-            >
+            <Button variant="ghost" size="icon" asChild>
               <Link to="/estimate">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
@@ -219,102 +157,36 @@ function CompletedSessionReport({ session }: { session: EstimateSession }) {
                   href={session.sprintLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs text-primary underline underline-offset-2 print:hidden"
+                  className="text-xs text-primary underline underline-offset-2"
                 >
                   Open sprint board
                 </a>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2 print:hidden">
+          <div className="flex items-center gap-2">
             <Badge variant="secondary">Completed</Badge>
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
-              <Download className="mr-2 h-4 w-4" />
-              Export PDF
-            </Button>
-            <div className="flex items-center">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-r-none border-r-0"
-                    onClick={() =>
-                      sendReportMutation.mutate({
-                        recipients:
-                          selectedRecipients.size > 0
-                            ? Array.from(selectedRecipients)
-                            : undefined,
-                      })
-                    }
-                    disabled={sendReportMutation.isPending}
-                  >
-                    <Mail className="mr-1.5 h-4 w-4" />
-                    {sendReportMutation.isPending
-                      ? 'Sending...'
-                      : selectedRecipients.size > 0
-                        ? `Email (${selectedRecipients.size})`
-                        : 'Email Report'}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent sideOffset={8}>
-                  {selectedRecipients.size > 0
-                    ? `Send report to ${selectedRecipients.size} selected recipient${selectedRecipients.size !== 1 ? 's' : ''}`
-                    : 'Send report to all team members'}
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-l-none px-2"
-                    disabled={sendReportMutation.isPending}
-                  >
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Recipients</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {teamMembers.map((member) => (
-                    <DropdownMenuCheckboxItem
-                      key={member.userId}
-                      checked={selectedRecipients.has(member.user.email)}
-                      onCheckedChange={(checked) => {
-                        setSelectedRecipients((prev) => {
-                          const next = new Set(prev)
-                          if (checked) next.add(member.user.email)
-                          else next.delete(member.user.email)
-                          return next
-                        })
-                      }}
-                      onSelect={(e) => e.preventDefault()}
-                    >
-                      {member.user.name ?? member.user.email}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                  {teamMembers.length === 0 && (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                      No members found
-                    </div>
-                  )}
-                  {selectedRecipients.size > 0 && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuCheckboxItem
-                        checked={false}
-                        onCheckedChange={() => setSelectedRecipients(new Set())}
-                        onSelect={(e) => e.preventDefault()}
-                        className="text-muted-foreground"
-                      >
-                        Clear selection
-                      </DropdownMenuCheckboxItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            <ReportMenu
+              teamId={session.team.id}
+              onExportPdf={async () => {
+                try {
+                  const filename = await exportEstimatePdf(session)
+                  if (filename) toast.success(`Report saved — ${filename}`)
+                } catch (e) {
+                  toast.error(
+                    e instanceof Error
+                      ? e.message
+                      : 'Failed to export the report',
+                  )
+                }
+              }}
+              onSendEmail={(recipients) =>
+                sendReportMutation.mutate({ recipients })
+              }
+              isSending={sendReportMutation.isPending}
+              dialogTitle="Email estimate report"
+              dialogDescription="Send this session's report to the whole team, or pick specific people."
+            />
           </div>
         </div>
 
@@ -874,18 +746,7 @@ function EstimateSessionPage() {
         {usesConvexRealtime ? (
           <EstimateConvexSync sessionId={sessionId} />
         ) : null}
-        <div className="space-y-6">
-          <div className="h-12 animate-pulse rounded-lg bg-muted" />
-          <div className="h-24 animate-pulse rounded-lg bg-muted" />
-          <div className="flex flex-wrap gap-3">
-            {[...Array(13)].map((_, i) => (
-              <div
-                key={i}
-                className="h-20 w-14 animate-pulse rounded-lg bg-muted"
-              />
-            ))}
-          </div>
-        </div>
+        <EstimateSessionDetailSkeleton />
       </>
     )
   }

@@ -12,6 +12,9 @@ export const NOTIFICATION_TYPES = {
   ActionItemAssigned: 'action_item_assigned',
   ActionItemDueSoon: 'action_item_due_soon',
   EstimateSessionCreated: 'estimate_session_created',
+  IcebreakerSessionCreated: 'icebreaker_session_created',
+  StandupCreated: 'standup_created',
+  StandupCommentAdded: 'standup_comment_added',
   ConvexTableClear: 'convex_table_clear',
 } as const;
 

@@ -10,11 +10,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  FileText,
-  Layers,
+  History,
   Plus,
   RefreshCw,
   Search,
+  Spade,
   Trash2,
   X,
 } from 'lucide-react'
@@ -48,7 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
+import { TemplatesListSkeleton } from './templates.skeleton'
 import type { Template } from '@/common/types/templates'
 import type { Organization } from '@/common/types/organizations'
 import type { Team } from '@/common/types/teams'
@@ -61,7 +61,7 @@ import {
   TShirtIcon,
   getShirtScale,
   isTShirtTemplateName,
-} from '@/components/TShirtIcon'
+} from '@/components/t-shirt-icon'
 import { api } from '@/lib/api'
 import {
   ESTIMATE_TEMPLATES_ENDPOINTS,
@@ -71,7 +71,7 @@ import {
   TEAMS_ENDPOINTS,
 } from '@/lib/api-endpoints'
 import { isSystemAdmin } from '@/lib/rbac'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 
 type TemplateWithColumns = Template & {
   columns: Array<{
@@ -162,34 +162,6 @@ function fetchEstimateTemplates(
   )
 }
 
-function TemplatesListSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-9 w-32" />
-        <Skeleton className="h-5 w-64" />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="border rounded-lg p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-5 w-16 rounded-full" />
-            </div>
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-2/3" />
-            <div className="flex flex-wrap gap-2 pt-2">
-              {Array.from({ length: 3 }).map((__, j) => (
-                <Skeleton key={j} className="h-6 w-20 rounded-full" />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export const Route = createFileRoute('/templates')({
   loader: ({ context: { queryClient } }) =>
     Promise.all([
@@ -247,11 +219,11 @@ function TemplatesPage() {
       <Tabs defaultValue="retro">
         <TabsList>
           <TabsTrigger value="retro">
-            <FileText className="h-4 w-4 mr-2" />
+            <History className="h-4 w-4 mr-2" />
             Retro Templates
           </TabsTrigger>
           <TabsTrigger value="estimate">
-            <Layers className="h-4 w-4 mr-2" />
+            <Spade className="h-4 w-4 mr-2" />
             Story Estimate Templates
           </TabsTrigger>
         </TabsList>
@@ -427,7 +399,7 @@ function RetroTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
       {isEmpty ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
+            <History className="mb-4 h-12 w-12 text-muted-foreground" />
             <CardTitle className="mb-2">No templates available</CardTitle>
             <CardDescription className="text-center">
               Templates will appear here once they are created.
@@ -476,7 +448,7 @@ function RetroTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
           {builtInTotal > 0 && (
             <section className="space-y-4">
               <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-muted-foreground" />
+                <History className="h-5 w-5 text-muted-foreground" />
                 <h2 className="text-lg font-semibold">Global Templates</h2>
                 <Badge variant="secondary">{builtInTotal}</Badge>
               </div>
@@ -831,7 +803,7 @@ function EstimateTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
       {isEmpty ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Layers className="mb-4 h-12 w-12 text-muted-foreground" />
+            <Spade className="mb-4 h-12 w-12 text-muted-foreground" />
             <CardTitle className="mb-2">
               No estimate templates available
             </CardTitle>
@@ -883,7 +855,7 @@ function EstimateTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
           {builtInTotal > 0 && (
             <section className="space-y-4">
               <div className="flex items-center gap-2">
-                <Layers className="h-5 w-5 text-muted-foreground" />
+                <Spade className="h-5 w-5 text-muted-foreground" />
                 <h2 className="text-lg font-semibold">Global Templates</h2>
                 <Badge variant="secondary">{builtInTotal}</Badge>
               </div>

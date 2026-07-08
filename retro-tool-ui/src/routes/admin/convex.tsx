@@ -25,9 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useCurrentUser } from '@/hooks/use-current-user'
 import { isSuperAdmin } from '@/lib/rbac'
-import { Skeleton } from '@/components/ui/skeleton'
 
 import {
   useConvexOperationalMetrics,
@@ -36,36 +35,7 @@ import {
   useUpdateCronConfig,
   useClearConvexTables,
 } from './hooks'
-
-function ConvexAdminSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Skeleton className="h-6 w-6" />
-        <div className="space-y-1">
-          <Skeleton className="h-7 w-40" />
-          <Skeleton className="h-4 w-64" />
-        </div>
-      </div>
-      {/* Tabs */}
-      <div className="flex gap-2">
-        <Skeleton className="h-9 w-28 rounded-md" />
-        <Skeleton className="h-9 w-24 rounded-md" />
-        <Skeleton className="h-9 w-20 rounded-md" />
-      </div>
-      {/* Content cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="border rounded-lg p-4 space-y-3">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-8 w-24" />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+import { ConvexAdminSkeleton } from './skeleton'
 
 export const Route = createFileRoute('/admin/convex')({
   beforeLoad: ({ context }) => {
@@ -83,6 +53,8 @@ const CONVEX_TABLES = [
   { name: 'liveEstimateSessions', label: 'Live Estimate Sessions' },
   { name: 'liveRetroBoards', label: 'Live Retro Boards' },
   { name: 'liveEstimateBoards', label: 'Live Estimate Boards' },
+  { name: 'liveStandupEntries', label: 'Live Standup Entries' },
+  { name: 'liveStandupBoards', label: 'Live Standup Boards' },
   { name: 'liveNotifications', label: 'Live Notifications' },
   { name: 'livePresence', label: 'Live Presence' },
   { name: 'liveTyping', label: 'Live Typing' },

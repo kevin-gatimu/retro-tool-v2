@@ -4,7 +4,8 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
 import * as schema from './schema';
 import { UserPreferencesDto, UpdateUserPreferencesDto } from './dto';
-import { generateId } from '../lib/utils';
+import type { UiPreferences } from './types';
+import { generateId, deepMerge } from '../lib/utils';
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -28,6 +29,8 @@ export class UserPreferencesService {
 
     return {
       emailVerificationReminders: prefs.emailVerificationReminders,
+      uiPreferences: (prefs.uiPreferences ??
+        {}) as UserPreferencesDto['uiPreferences'],
     };
   }
 
@@ -37,6 +40,7 @@ export class UserPreferencesService {
         id: generateId(),
         userId,
         emailVerificationReminders: true,
+        uiPreferences: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -63,10 +67,26 @@ export class UserPreferencesService {
       await this.createDefaultPreferences(userId);
     }
 
+    const { uiPreferences, ...rest } = updates;
+
+    // Deep-merge uiPreferences into the stored blob so partial view updates
+    // (e.g. just `sessionViews.retros.sort`) don't clobber sibling settings.
+    const mergedUiPreferences: UiPreferences | undefined =
+      uiPreferences !== undefined
+        ? (deepMerge(
+            (existing?.uiPreferences as Record<string, unknown> | undefined) ??
+              {},
+            uiPreferences as Record<string, unknown>,
+          ) as UiPreferences)
+        : undefined;
+
     await this.database
       .update(schema.userNotificationPreference)
       .set({
-        ...updates,
+        ...rest,
+        ...(mergedUiPreferences !== undefined
+          ? { uiPreferences: mergedUiPreferences }
+          : {}),
         updatedAt: new Date(),
       })
       .where(eq(schema.userNotificationPreference.userId, userId));

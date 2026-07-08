@@ -1,4 +1,0 @@
-pnpm type-check
-pnpm lint
-pnpm test
-pnpm build

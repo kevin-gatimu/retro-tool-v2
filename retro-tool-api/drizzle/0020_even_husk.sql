@@ -1,0 +1,1 @@
+ALTER TYPE "public"."email_log_type" ADD VALUE 'standup_report';
