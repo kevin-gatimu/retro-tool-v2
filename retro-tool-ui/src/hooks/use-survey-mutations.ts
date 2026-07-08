@@ -46,10 +46,14 @@ export function useSurveyMutations(onChanged: () => void) {
       answers,
     }: {
       surveyId: string
+      /** True when editing an existing response (affects the toast only). */
+      isEdit?: boolean
     } & RespondSurveyInput) =>
       api.post(SURVEYS_ENDPOINTS.RESPOND(surveyId), { answers }),
-    onSuccess: () => {
-      toast.success('Response submitted')
+    onSuccess: (_data, variables) => {
+      toast.success(
+        variables.isEdit ? 'Response updated' : 'Response submitted',
+      )
       onChanged()
     },
     onError: (error: Error) =>

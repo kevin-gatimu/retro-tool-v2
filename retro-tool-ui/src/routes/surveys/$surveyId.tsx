@@ -19,6 +19,7 @@ import { SURVEY_QUESTION_TYPES } from '@/common/enums/survey.enums'
 import { cn } from '@/lib/utils'
 import type {
   SurveyAnswerInput,
+  SurveyAnswerView,
   SurveyDetail,
   SurveyQuestionResults,
   SurveyQuestionView,
@@ -40,6 +41,21 @@ function emptyDraft(): DraftAnswer {
   return { textValue: '', ratingValue: null, choiceValue: '' }
 }
 
+/** Seed the draft state from the caller's saved answers, for the edit form. */
+function draftsFromAnswers(
+  myAnswers: SurveyAnswerView[],
+): Record<string, DraftAnswer> {
+  const drafts: Record<string, DraftAnswer> = {}
+  for (const answer of myAnswers) {
+    drafts[answer.questionId] = {
+      textValue: answer.textValue ?? '',
+      ratingValue: answer.ratingValue,
+      choiceValue: answer.choiceValue ?? '',
+    }
+  }
+  return drafts
+}
+
 function SurveyDetailPage() {
   const { surveyId } = Route.useParams()
   const queryClient = useQueryClient()
@@ -55,13 +71,18 @@ function SurveyDetailPage() {
     staleTime: 10_000,
   })
 
+  const [answers, setAnswers] = useState<Record<string, DraftAnswer>>({})
+  const [showErrors, setShowErrors] = useState(false)
+  const [viewResults, setViewResults] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+
   const { respondMutation } = useSurveyMutations(() => {
     void queryClient.invalidateQueries({ queryKey: ['survey', surveyId] })
     void queryClient.invalidateQueries({ queryKey: ['surveys'] })
+    // Leave edit mode so the refreshed results/answers show.
+    setIsEditing(false)
+    setShowErrors(false)
   })
-
-  const [answers, setAnswers] = useState<Record<string, DraftAnswer>>({})
-  const [showErrors, setShowErrors] = useState(false)
 
   const getDraft = (questionId: string): DraftAnswer =>
     answers[questionId] ?? emptyDraft()
@@ -119,8 +140,31 @@ function SurveyDetailPage() {
     )
   }
 
-  const showResults = detail.results != null
-  const canRespond = !detail.isClosed && !detail.hasResponded && !showResults
+  // A user may respond while the survey is open and they haven't answered yet,
+  // and may edit an existing response while it's still open. Managers also
+  // receive `results` for preview. The form shows for a fresh response or while
+  // editing; otherwise results are shown (forced when there's nothing to answer
+  // or the user opts into the preview).
+  const hasResults = detail.results != null
+  const canRespondFresh = !detail.isClosed && !detail.hasResponded
+  const canEditResponse =
+    !detail.isClosed && detail.hasResponded && detail.myAnswers != null
+  // Editing always wins; a fresh responder sees the form unless they opt into
+  // the results preview (`viewResults`).
+  const showForm = isEditing || (canRespondFresh && !viewResults)
+  const showResults = !showForm && hasResults
+
+  const startEditing = () => {
+    if (detail.myAnswers) setAnswers(draftsFromAnswers(detail.myAnswers))
+    setShowErrors(false)
+    setViewResults(false)
+    setIsEditing(true)
+  }
+
+  const cancelEditing = () => {
+    setShowErrors(false)
+    setIsEditing(false)
+  }
 
   const handleSubmit = () => {
     if (missingRequired.length > 0) {
@@ -145,7 +189,7 @@ function SurveyDetailPage() {
       })
       .filter((a): a is SurveyAnswerInput => a !== null)
 
-    respondMutation.mutate({ surveyId, answers: payload })
+    respondMutation.mutate({ surveyId, answers: payload, isEdit: isEditing })
   }
 
   return (
@@ -182,11 +226,29 @@ function SurveyDetailPage() {
           {detail.responseCount === 1 ? '' : 's'}
           {detail.createdBy ? ` · by ${detail.createdBy.name}` : ''}
         </p>
+        {canEditResponse && !isEditing && (
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-sm"
+            onClick={startEditing}
+          >
+            Edit my response
+          </Button>
+        )}
+        {hasResults && canRespondFresh && !isEditing && (
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-sm"
+            onClick={() => setViewResults((prev) => !prev)}
+          >
+            {viewResults ? 'Back to survey' : 'View results instead'}
+          </Button>
+        )}
       </div>
 
-      {showResults ? (
-        <SurveyResults results={detail.results ?? []} />
-      ) : canRespond ? (
+      {showForm ? (
         <div className="space-y-4">
           {questions.map((question, index) => (
             <ResponseQuestion
@@ -205,15 +267,31 @@ function SurveyDetailPage() {
                 Please answer all required questions.
               </p>
             )}
-            <Button
-              className="ml-auto"
-              onClick={handleSubmit}
-              disabled={respondMutation.isPending}
-            >
-              {respondMutation.isPending ? 'Submitting…' : 'Submit response'}
-            </Button>
+            <div className="ml-auto flex items-center gap-2">
+              {isEditing && (
+                <Button
+                  variant="outline"
+                  onClick={cancelEditing}
+                  disabled={respondMutation.isPending}
+                >
+                  Cancel
+                </Button>
+              )}
+              <Button
+                onClick={handleSubmit}
+                disabled={respondMutation.isPending}
+              >
+                {respondMutation.isPending
+                  ? 'Saving…'
+                  : isEditing
+                    ? 'Save changes'
+                    : 'Submit response'}
+              </Button>
+            </div>
           </div>
         </div>
+      ) : showResults ? (
+        <SurveyResults results={detail.results ?? []} />
       ) : (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">

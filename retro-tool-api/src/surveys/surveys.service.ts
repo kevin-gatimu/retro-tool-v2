@@ -25,6 +25,7 @@ import {
 } from '../common/enums';
 import type { Survey, SurveyQuestion } from './schema';
 import type {
+  SurveyAnswerView,
   SurveyDetail,
   SurveyQuestionResults,
   SurveySummary,
@@ -314,7 +315,44 @@ export class SurveysService {
       ? await this.buildResults(surveyId, questionRows)
       : null;
 
-    return { ...summary, questions, results };
+    // The caller's own answers, for pre-filling the edit form. Scoped strictly
+    // to this user — never expose one user's answers to another, so this stays
+    // safe even for anonymous surveys.
+    const myAnswers = summary.hasResponded
+      ? await this.getUserAnswers(surveyId, userId)
+      : null;
+
+    return { ...summary, questions, results, myAnswers };
+  }
+
+  /** The requesting user's own answers for a survey (edit-form pre-fill). */
+  private async getUserAnswers(
+    surveyId: string,
+    userId: string,
+  ): Promise<SurveyAnswerView[]> {
+    const [response] = await this.database
+      .select({ id: surveysSchema.surveyResponse.id })
+      .from(surveysSchema.surveyResponse)
+      .where(
+        and(
+          eq(surveysSchema.surveyResponse.surveyId, surveyId),
+          eq(surveysSchema.surveyResponse.userId, userId),
+        ),
+      )
+      .limit(1);
+    if (!response) return [];
+
+    const answers = await this.database
+      .select({
+        questionId: surveysSchema.surveyAnswer.questionId,
+        textValue: surveysSchema.surveyAnswer.textValue,
+        ratingValue: surveysSchema.surveyAnswer.ratingValue,
+        choiceValue: surveysSchema.surveyAnswer.choiceValue,
+      })
+      .from(surveysSchema.surveyAnswer)
+      .where(eq(surveysSchema.surveyAnswer.responseId, response.id));
+
+    return answers;
   }
 
   private async buildResults(
@@ -565,20 +603,6 @@ export class SurveysService {
       throw new BadRequestException('This survey is closed');
     }
 
-    const [existing] = await this.database
-      .select({ id: surveysSchema.surveyResponse.id })
-      .from(surveysSchema.surveyResponse)
-      .where(
-        and(
-          eq(surveysSchema.surveyResponse.surveyId, surveyId),
-          eq(surveysSchema.surveyResponse.userId, userId),
-        ),
-      )
-      .limit(1);
-    if (existing) {
-      throw new BadRequestException('You already responded to this survey');
-    }
-
     const questionRows = await this.database
       .select()
       .from(surveysSchema.surveyQuestion)
@@ -621,26 +645,51 @@ export class SurveysService {
       throw new BadRequestException(`"${missing.prompt}" requires an answer`);
     }
 
-    const responseId = generateId();
-    await this.database.insert(surveysSchema.surveyResponse).values({
-      id: responseId,
-      surveyId,
-      userId,
-    });
-
     const answersToInsert = data.answers.filter(isAnswered);
-    if (answersToInsert.length > 0) {
-      await this.database.insert(surveysSchema.surveyAnswer).values(
-        answersToInsert.map((answer) => ({
-          id: generateId(),
-          responseId,
-          questionId: answer.questionId,
-          textValue: answer.textValue?.trim() || null,
-          ratingValue: answer.ratingValue ?? null,
-          choiceValue: answer.choiceValue ?? null,
-        })),
-      );
-    }
+
+    // Upsert: a user may edit their response while the survey is open. Reuse the
+    // existing response row (preserving its id and createdAt) and replace its
+    // answers atomically, so a failure can never leave a response with none.
+    await this.database.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: surveysSchema.surveyResponse.id })
+        .from(surveysSchema.surveyResponse)
+        .where(
+          and(
+            eq(surveysSchema.surveyResponse.surveyId, surveyId),
+            eq(surveysSchema.surveyResponse.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      let responseId: string;
+      if (existing) {
+        responseId = existing.id;
+        await tx
+          .delete(surveysSchema.surveyAnswer)
+          .where(eq(surveysSchema.surveyAnswer.responseId, responseId));
+      } else {
+        responseId = generateId();
+        await tx.insert(surveysSchema.surveyResponse).values({
+          id: responseId,
+          surveyId,
+          userId,
+        });
+      }
+
+      if (answersToInsert.length > 0) {
+        await tx.insert(surveysSchema.surveyAnswer).values(
+          answersToInsert.map((answer) => ({
+            id: generateId(),
+            responseId,
+            questionId: answer.questionId,
+            textValue: answer.textValue?.trim() || null,
+            ratingValue: answer.ratingValue ?? null,
+            choiceValue: answer.choiceValue ?? null,
+          })),
+        );
+      }
+    });
 
     return { success: true };
   }

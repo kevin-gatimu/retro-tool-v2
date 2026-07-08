@@ -58,10 +58,20 @@ export interface SurveyQuestionResults {
   answerCount: number
 }
 
+/** A single answer belonging to the requesting user (edit-form pre-fill). */
+export interface SurveyAnswerView {
+  questionId: string
+  textValue: string | null
+  ratingValue: number | null
+  choiceValue: string | null
+}
+
 export interface SurveyDetail extends SurveySummary {
   questions: SurveyQuestionView[]
   /** Aggregate results — only for managers or after the caller responded. */
   results: SurveyQuestionResults[] | null
+  /** The caller's own answers (null until they respond); never another user's. */
+  myAnswers: SurveyAnswerView[] | null
 }
 
 // ---------------------------------------------------------------------------
