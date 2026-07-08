@@ -203,7 +203,7 @@ export function PollCard({
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
               {poll.totalVotes} voted
-              {poll.createdBy ? ` · by ${poll.createdBy.name}` : ''}
+              {poll.createdBy ? ` · Creator: ${poll.createdBy.name}` : ''}
             </span>
             {poll.hasVoted && canVote && (
               <Button
