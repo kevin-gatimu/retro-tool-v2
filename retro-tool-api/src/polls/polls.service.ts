@@ -14,8 +14,10 @@ import * as teamSchema from '../teams/schema';
 import * as orgSchema from '../organizations/schema';
 import * as authSchema from '../auth/schema';
 import { generateId } from '../lib/utils';
+import { EmailService } from '../email/email.service';
 import { CreatePollDto, UpdatePollDto } from './dtos';
 import {
+  EMAIL_LOG_TYPES,
   ORG_MEMBER_ROLES,
   TEAM_MEMBER_TAGS,
   USER_ROLES,
@@ -36,6 +38,7 @@ type Database = NodePgDatabase<
 export class PollsService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
+    private readonly emailService: EmailService,
   ) {}
 
   // ==========================================================================
@@ -466,6 +469,78 @@ export class PollsService {
       );
 
     return { standupId: record.standupId, entryDate: record.entryDate };
+  }
+
+  /**
+   * Email the poll results to its team. Only a manager may send. Polls are
+   * always team-scoped, so recipients (when provided) are restricted to the
+   * poll's team members; when omitted, the whole team receives it.
+   */
+  async emailResults(
+    userId: string,
+    pollId: string,
+    recipients?: string[],
+  ): Promise<{ sent: number }> {
+    const record = await this.getPollRecord(pollId);
+    if (!(await this.canManagePoll(record, userId))) {
+      throw new ForbiddenException('You cannot email results for this poll');
+    }
+
+    const teamMembers = await this.database
+      .select({ email: authSchema.user.email })
+      .from(teamSchema.teamMember)
+      .innerJoin(
+        authSchema.user,
+        eq(authSchema.user.id, teamSchema.teamMember.userId),
+      )
+      .where(eq(teamSchema.teamMember.teamId, record.teamId));
+
+    const allowed = new Set(
+      teamMembers.map((member) => member.email.toLowerCase()),
+    );
+
+    let targets: string[];
+    if (recipients && recipients.length > 0) {
+      // Never email outside the poll's team, even if the client asks.
+      targets = recipients.filter((email) => allowed.has(email.toLowerCase()));
+    } else {
+      targets = teamMembers.map((member) => member.email);
+    }
+
+    if (targets.length === 0) {
+      throw new BadRequestException('No valid recipients for this poll');
+    }
+
+    const poll = await this.getPoll(userId, pollId);
+    const html = this.emailService.buildPollResultsHtml({
+      question: poll.question,
+      teamName: poll.team.name,
+      isAnonymous: poll.isAnonymous,
+      totalVotes: poll.totalVotes,
+      options: poll.options.map((option) => ({
+        label: option.label,
+        emoji: option.emoji,
+        voteCount: option.voteCount,
+        percent:
+          poll.totalVotes > 0
+            ? Math.round((option.voteCount / poll.totalVotes) * 100)
+            : 0,
+      })),
+    });
+
+    let sent = 0;
+    for (const email of targets) {
+      const ok = await this.emailService.send({
+        to: email,
+        subject: `Poll Results: ${poll.question}`,
+        html,
+        userId,
+        type: EMAIL_LOG_TYPES.PollResults,
+      });
+      if (ok) sent++;
+    }
+
+    return { sent };
   }
 
   async setClosed(

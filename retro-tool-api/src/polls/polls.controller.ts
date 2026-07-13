@@ -164,6 +164,22 @@ export class PollsController {
     return { success: true };
   }
 
+  @Post(':id/email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Email the poll results to its team (manager only). Recipients, if given, are restricted to team members.',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Poll ID' })
+  @ApiResponse({ status: 200, description: '{ sent: number }' })
+  emailResults(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('recipients') recipients: string[] | undefined,
+    @Session() session: SessionUser,
+  ) {
+    return this.pollsService.emailResults(session.user.id, id, recipients);
+  }
+
   @Patch(':id/closed')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Close or reopen a poll (manager only)' })

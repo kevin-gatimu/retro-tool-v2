@@ -137,6 +137,22 @@ export class SurveysController {
     return result;
   }
 
+  @Post(':id/email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Email the survey results to its audience (manager only). Recipients, if given, are restricted to the survey scope.',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Survey ID' })
+  @ApiResponse({ status: 200, description: '{ sent: number }' })
+  emailResults(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('recipients') recipients: string[] | undefined,
+    @Session() session: SessionUser,
+  ) {
+    return this.surveysService.emailResults(session.user.id, id, recipients);
+  }
+
   @Patch(':id/closed')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Close or reopen a survey (manager only)' })

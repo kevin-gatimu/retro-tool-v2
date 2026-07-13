@@ -214,6 +214,7 @@ export const POLLS_ENDPOINTS = {
   BY_ID: (id: string) => `/api/polls/${id}`,
   VOTE: (id: string) => `/api/polls/${id}/vote`,
   CLOSED: (id: string) => `/api/polls/${id}/closed`,
+  EMAIL: (id: string) => `/api/polls/${id}/email`,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -226,6 +227,7 @@ export const SURVEYS_ENDPOINTS = {
   BY_ID: (id: string) => `/api/surveys/${id}`,
   RESPOND: (id: string) => `/api/surveys/${id}/respond`,
   CLOSED: (id: string) => `/api/surveys/${id}/closed`,
+  EMAIL: (id: string) => `/api/surveys/${id}/email`,
 } as const
 
 // ---------------------------------------------------------------------------

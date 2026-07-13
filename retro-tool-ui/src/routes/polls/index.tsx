@@ -64,6 +64,7 @@ function PollsIndexPage() {
     retractVoteMutation,
     setClosedMutation,
     deletePollMutation,
+    emailResultsMutation,
   } = usePollMutations(() => {
     void queryClient.invalidateQueries({ queryKey: ['polls'] })
   }, patchPoll)
@@ -142,6 +143,10 @@ function PollsIndexPage() {
                 }
                 onDelete={(pollId) => deletePollMutation.mutate(pollId)}
                 onEdit={(p) => setEditingPoll(p)}
+                onEmail={(pollId, recipients) =>
+                  emailResultsMutation.mutate({ pollId, recipients })
+                }
+                isEmailing={emailResultsMutation.isPending}
               />
             ))}
           </div>

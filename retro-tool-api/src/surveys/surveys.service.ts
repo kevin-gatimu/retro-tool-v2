@@ -13,13 +13,16 @@ import * as teamSchema from '../teams/schema';
 import * as authSchema from '../auth/schema';
 import * as orgSchema from '../organizations/schema';
 import { generateId } from '../lib/utils';
+import { EmailService } from '../email/email.service';
 import { CreateSurveyDto, RespondSurveyDto, UpdateSurveyDto } from './dtos';
 import {
+  EMAIL_LOG_TYPES,
   ORG_MEMBER_ROLES,
   SURVEY_QUESTION_TYPES,
   SURVEY_SCOPES,
   TEAM_MEMBER_TAGS,
   USER_ROLES,
+  USER_STATUSES,
   type TSurveyQuestionType,
   type TSurveyScope,
 } from '../common/enums';
@@ -28,6 +31,7 @@ import type {
   SurveyAnswerView,
   SurveyDetail,
   SurveyQuestionResults,
+  SurveyRespondentView,
   SurveySummary,
 } from './types';
 
@@ -42,6 +46,7 @@ type Database = NodePgDatabase<
 export class SurveysService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
+    private readonly emailService: EmailService,
   ) {}
 
   // ==========================================================================
@@ -315,6 +320,21 @@ export class SurveysService {
       ? await this.buildResults(surveyId, questionRows)
       : null;
 
+    // Per-respondent submissions:
+    // - Non-anonymous: shown to everyone who can see results, with names.
+    // - Anonymous: shown to managers only (creator/admins), with identity
+    //   stripped — each respondent surfaces as "Anonymous" and no real userId
+    //   leaves the server, so answers can't be tied back to a person.
+    // Other viewers of an anonymous survey get respondents: null (aggregate only).
+    const canSeeRespondents = record.isAnonymous
+      ? summary.canManage
+      : canSeeResults;
+    const respondents = canSeeRespondents
+      ? await this.buildRespondents(surveyId, {
+          includeIdentity: !record.isAnonymous,
+        })
+      : null;
+
     // The caller's own answers, for pre-filling the edit form. Scoped strictly
     // to this user — never expose one user's answers to another, so this stays
     // safe even for anonymous surveys.
@@ -322,7 +342,7 @@ export class SurveysService {
       ? await this.getUserAnswers(surveyId, userId)
       : null;
 
-    return { ...summary, questions, results, myAnswers };
+    return { ...summary, questions, results, respondents, myAnswers };
   }
 
   /** The requesting user's own answers for a survey (edit-form pre-fill). */
@@ -422,6 +442,196 @@ export class SurveysService {
         answerCount: questionAnswers.length,
       };
     });
+  }
+
+  /**
+   * Per-respondent submissions: each responder's answers grouped together.
+   * With `includeIdentity: true` (non-anonymous surveys) the responder's real
+   * userId/name/image are attached. With `includeIdentity: false` (anonymous
+   * surveys, managers-only) identity is stripped server-side — name/image are
+   * null and the real userId is replaced with a synthetic per-response key — so
+   * answers can be perused but never tied back to a person.
+   */
+  private async buildRespondents(
+    surveyId: string,
+    { includeIdentity }: { includeIdentity: boolean },
+  ): Promise<SurveyRespondentView[]> {
+    const responses = await this.database
+      .select({
+        responseId: surveysSchema.surveyResponse.id,
+        userId: surveysSchema.surveyResponse.userId,
+        name: authSchema.user.name,
+        image: authSchema.user.image,
+      })
+      .from(surveysSchema.surveyResponse)
+      .innerJoin(
+        authSchema.user,
+        eq(surveysSchema.surveyResponse.userId, authSchema.user.id),
+      )
+      .where(eq(surveysSchema.surveyResponse.surveyId, surveyId))
+      .orderBy(asc(surveysSchema.surveyResponse.createdAt));
+
+    const responseIds = responses.map((response) => response.responseId);
+    if (responseIds.length === 0) return [];
+
+    const answers = await this.database
+      .select({
+        responseId: surveysSchema.surveyAnswer.responseId,
+        questionId: surveysSchema.surveyAnswer.questionId,
+        textValue: surveysSchema.surveyAnswer.textValue,
+        ratingValue: surveysSchema.surveyAnswer.ratingValue,
+        choiceValue: surveysSchema.surveyAnswer.choiceValue,
+      })
+      .from(surveysSchema.surveyAnswer)
+      .where(inArray(surveysSchema.surveyAnswer.responseId, responseIds));
+
+    return responses.map((response, order) => ({
+      // For anonymous surveys strip identity server-side so the response is the
+      // same for any API consumer: no real userId leaves the server (a stable
+      // synthetic key keeps React lists happy), name is the literal "Anonymous",
+      // and image is null.
+      userId: includeIdentity ? response.userId : `anon-${order}`,
+      name: includeIdentity ? response.name : 'Anonymous',
+      image: includeIdentity ? response.image : null,
+      answers: answers
+        .filter((answer) => answer.responseId === response.responseId)
+        .map((answer) => ({
+          questionId: answer.questionId,
+          textValue: answer.textValue,
+          ratingValue: answer.ratingValue,
+          choiceValue: answer.choiceValue,
+        })),
+    }));
+  }
+
+  /**
+   * The set of email addresses a survey's results may be sent to, scoped to its
+   * audience: team members for team surveys, org members for org surveys, and
+   * all approved users for system ("Everyone") surveys. Returns `{email,name}`.
+   */
+  private async resolveAudience(
+    record: Survey,
+  ): Promise<{ email: string; name: string }[]> {
+    if (record.scope === SURVEY_SCOPES.System) {
+      return this.database
+        .select({ email: authSchema.user.email, name: authSchema.user.name })
+        .from(authSchema.user)
+        .where(eq(authSchema.user.status, USER_STATUSES.Approved));
+    }
+
+    if (record.scope === SURVEY_SCOPES.Org && record.organizationId) {
+      return this.database
+        .select({ email: authSchema.user.email, name: authSchema.user.name })
+        .from(orgSchema.organizationMember)
+        .innerJoin(
+          authSchema.user,
+          eq(authSchema.user.id, orgSchema.organizationMember.userId),
+        )
+        .where(
+          eq(
+            orgSchema.organizationMember.organizationId,
+            record.organizationId,
+          ),
+        );
+    }
+
+    if (record.scope === SURVEY_SCOPES.Team && record.teamId) {
+      return this.database
+        .select({ email: authSchema.user.email, name: authSchema.user.name })
+        .from(teamSchema.teamMember)
+        .innerJoin(
+          authSchema.user,
+          eq(authSchema.user.id, teamSchema.teamMember.userId),
+        )
+        .where(eq(teamSchema.teamMember.teamId, record.teamId));
+    }
+
+    return [];
+  }
+
+  /**
+   * Email the survey results to its audience. Only a manager may send. When
+   * `recipients` is provided the list is restricted to the survey's audience
+   * (so a system survey can be sent to a hand-picked subset, but an org/team
+   * survey can never leak outside its members); when omitted, the whole
+   * audience receives it.
+   */
+  async emailResults(
+    userId: string,
+    surveyId: string,
+    recipients?: string[],
+  ): Promise<{ sent: number }> {
+    const [record] = await this.database
+      .select()
+      .from(surveysSchema.survey)
+      .where(eq(surveysSchema.survey.id, surveyId))
+      .limit(1);
+    if (!record) throw new NotFoundException('Survey not found');
+
+    const ctx = await this.getUserContext(userId);
+    if (!this.canManage(record, userId, ctx)) {
+      throw new ForbiddenException('You cannot email results for this survey');
+    }
+
+    const audience = await this.resolveAudience(record);
+    const allowed = new Map(
+      audience.map((member) => [member.email.toLowerCase(), member]),
+    );
+
+    let targets: { email: string; name: string }[];
+    if (recipients && recipients.length > 0) {
+      // Keep only addresses inside the survey's audience — never email outside
+      // the team/org/system scope, even if the client asks.
+      targets = recipients
+        .map((email) => allowed.get(email.toLowerCase()))
+        .filter((member): member is { email: string; name: string } =>
+          Boolean(member),
+        );
+    } else {
+      targets = audience;
+    }
+
+    if (targets.length === 0) {
+      throw new BadRequestException('No valid recipients for this survey');
+    }
+
+    const questionRows = await this.database
+      .select()
+      .from(surveysSchema.surveyQuestion)
+      .where(eq(surveysSchema.surveyQuestion.surveyId, surveyId))
+      .orderBy(asc(surveysSchema.surveyQuestion.order));
+
+    const results = await this.buildResults(surveyId, questionRows);
+    const [summary] = await this.toSummaries(userId, ctx, [record]);
+
+    const html = this.emailService.buildSurveyResultsHtml({
+      surveyTitle: record.title,
+      scopeLabel: SurveysService.scopeLabel(record),
+      isAnonymous: record.isAnonymous,
+      responseCount: summary.responseCount,
+      questions: results.map((result) => ({
+        prompt: result.prompt,
+        type: result.type,
+        answerCount: result.answerCount,
+        averageRating: result.averageRating,
+        optionCounts: result.optionCounts,
+        textAnswers: result.textAnswers,
+      })),
+    });
+
+    let sent = 0;
+    for (const target of targets) {
+      const ok = await this.emailService.send({
+        to: target.email,
+        subject: `Survey Results: ${record.title}`,
+        html,
+        userId,
+        type: EMAIL_LOG_TYPES.SurveyResults,
+      });
+      if (ok) sent++;
+    }
+
+    return { sent };
   }
 
   // ==========================================================================

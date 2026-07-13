@@ -156,6 +156,27 @@ export function usePollMutations(onChanged: () => void, patchPoll?: PatchPoll) {
       toast.error(error.message || 'Failed to delete poll'),
   })
 
+  const emailResultsMutation = useMutation({
+    mutationFn: ({
+      pollId,
+      recipients,
+    }: {
+      pollId: string
+      /** Omitted = whole team; otherwise restricted to team members server-side. */
+      recipients?: string[]
+    }) =>
+      api.post<{ sent: number }>(POLLS_ENDPOINTS.EMAIL(pollId), { recipients }),
+    onSuccess: (data) => {
+      toast.success(
+        data.sent > 0
+          ? `Results emailed to ${data.sent} recipient${data.sent === 1 ? '' : 's'}`
+          : 'No emails were sent',
+      )
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || 'Failed to email results'),
+  })
+
   return {
     createPollMutation,
     updatePollMutation,
@@ -163,5 +184,6 @@ export function usePollMutations(onChanged: () => void, patchPoll?: PatchPoll) {
     retractVoteMutation,
     setClosedMutation,
     deletePollMutation,
+    emailResultsMutation,
   }
 }

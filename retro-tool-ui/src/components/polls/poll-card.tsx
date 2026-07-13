@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import {
+  FileDown,
   Eye,
   EyeOff,
   Lock,
   LockOpen,
+  Mail,
   MoreVertical,
   Pencil,
   Trash2,
@@ -34,6 +36,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { exportPollPdf } from '@/routes/polls/helpers/export-poll-pdf'
+import { PollEmailDialog } from '@/components/polls/poll-email-dialog'
 import type { PollView } from '@/common/types/polls'
 
 interface PollCardProps {
@@ -43,6 +47,9 @@ interface PollCardProps {
   onSetClosed: (pollId: string, isClosed: boolean) => void
   onDelete: (pollId: string) => void
   onEdit?: (poll: PollView) => void
+  /** Emails results; `recipients` undefined = whole team. Enables the menu item. */
+  onEmail?: (pollId: string, recipients?: string[]) => void
+  isEmailing?: boolean
   /** Shows team name (useful on the standalone /polls list). */
   showTeam?: boolean
 }
@@ -54,9 +61,12 @@ export function PollCard({
   onSetClosed,
   onDelete,
   onEdit,
+  onEmail,
+  isEmailing = false,
   showTeam = false,
 }: PollCardProps) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false)
 
   const canVote = !poll.isClosed
 
@@ -128,6 +138,20 @@ export function PollCard({
                       </>
                     )}
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void exportPollPdf(poll)
+                    }}
+                  >
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Export as PDF
+                  </DropdownMenuItem>
+                  {onEmail && (
+                    <DropdownMenuItem onClick={() => setEmailDialogOpen(true)}>
+                      <Mail className="mr-2 h-4 w-4" />
+                      Email results…
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onClick={() => setConfirmDeleteOpen(true)}
@@ -241,6 +265,16 @@ export function PollCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {onEmail && (
+        <PollEmailDialog
+          open={emailDialogOpen}
+          onOpenChange={setEmailDialogOpen}
+          teamId={poll.teamId}
+          isSending={isEmailing}
+          onSend={(recipients) => onEmail(poll.id, recipients)}
+        />
+      )}
     </>
   )
 }

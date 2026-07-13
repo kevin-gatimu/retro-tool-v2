@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import {
   CheckCircle2,
+  EyeOff,
   Lock,
   LockOpen,
   MoreVertical,
@@ -74,6 +75,12 @@ export function SurveyCard({
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary">{survey.scopeLabel}</Badge>
+                {survey.isAnonymous && (
+                  <Badge className="gap-1 border-transparent bg-violet-500/15 text-violet-600 hover:bg-violet-500/20 dark:text-violet-300">
+                    <EyeOff className="h-3 w-3 animate-pulse" />
+                    Anonymous
+                  </Badge>
+                )}
                 {survey.isClosed ? (
                   <Badge variant="outline" className="gap-1">
                     <Lock className="h-3 w-3" />
