@@ -39,6 +39,7 @@ import React, {
   useMemo,
 } from 'react'
 import {
+  useConvexAuth,
   useQuery as useConvexQuery,
   useMutation as useConvexMutation,
 } from 'convex/react'
@@ -135,6 +136,11 @@ function RetroDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const usesConvexRealtime = usesConvexForRetros()
+  // Convex queries below call requireIdentity server-side; skip them until the
+  // Convex client is authenticated so they don't throw Unauthenticated during
+  // the connect → token-ready window.
+  const { isAuthenticated: convexAuthed } = useConvexAuth()
+  const convexReady = usesConvexRealtime && convexAuthed
 
   const { data: currentUser } = useCurrentUser()
 
@@ -143,7 +149,7 @@ function RetroDetailPage() {
   const stopTypingConvex = useConvexMutation(stopTypingMutationRef)
   const rawTypingUsers = useConvexQuery(
     getTypingUsersQueryRef,
-    usesConvexRealtime ? { retroId } : 'skip',
+    convexReady ? { retroId } : 'skip',
   )
   const typingUsers = (rawTypingUsers ?? []).filter(
     (u: { userId: string }) => u.userId !== currentUser?.id,
@@ -193,7 +199,7 @@ function RetroDetailPage() {
   const clearAllReadyConvex = useConvexMutation(clearAllReadyMutationRef)
   const rawReadyStatuses = useConvexQuery(
     getReadyStatusQueryRef,
-    usesConvexRealtime ? { retroId } : 'skip',
+    convexReady ? { retroId } : 'skip',
   )
   const readyStatuses = rawReadyStatuses ?? []
   const myReady = Boolean(
