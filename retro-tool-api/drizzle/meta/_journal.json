@@ -176,6 +176,13 @@
       "when": 1783341923886,
       "tag": "0024_dry_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1783970455890,
+      "tag": "0025_chubby_roughhouse",
+      "breakpoints": true
     }
   ]
 }

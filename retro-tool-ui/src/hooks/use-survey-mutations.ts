@@ -84,11 +84,35 @@ export function useSurveyMutations(onChanged: () => void) {
       toast.error(error.message || 'Failed to delete survey'),
   })
 
+  const emailResultsMutation = useMutation({
+    mutationFn: ({
+      surveyId,
+      recipients,
+    }: {
+      surveyId: string
+      /** Omitted = whole audience; system surveys always pass an explicit set. */
+      recipients?: string[]
+    }) =>
+      api.post<{ sent: number }>(SURVEYS_ENDPOINTS.EMAIL(surveyId), {
+        recipients,
+      }),
+    onSuccess: (data) => {
+      toast.success(
+        data.sent > 0
+          ? `Results emailed to ${data.sent} recipient${data.sent === 1 ? '' : 's'}`
+          : 'No emails were sent',
+      )
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || 'Failed to email results'),
+  })
+
   return {
     createSurveyMutation,
     updateSurveyMutation,
     respondMutation,
     setClosedMutation,
     deleteSurveyMutation,
+    emailResultsMutation,
   }
 }

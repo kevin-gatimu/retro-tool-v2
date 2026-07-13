@@ -7,6 +7,8 @@ export const EMAIL_LOG_TYPES = {
   TeamInviteExternal: 'team_invite_external',
   RetroReport: 'retro_report',
   StandupReport: 'standup_report',
+  SurveyResults: 'survey_results',
+  PollResults: 'poll_results',
 } as const;
 
 export type TEmailLogType =

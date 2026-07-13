@@ -170,6 +170,8 @@ export const emailLogTypeEnum = pgEnum('email_log_type', [
   EMAIL_LOG_TYPES.TeamInviteExternal,
   EMAIL_LOG_TYPES.RetroReport,
   EMAIL_LOG_TYPES.StandupReport,
+  EMAIL_LOG_TYPES.SurveyResults,
+  EMAIL_LOG_TYPES.PollResults,
 ]);
 
 export const emailLogStatusEnum = pgEnum('email_log_status', [

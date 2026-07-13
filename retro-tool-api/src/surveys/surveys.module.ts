@@ -3,9 +3,10 @@ import { SurveysService } from './surveys.service';
 import { SurveysController } from './surveys.controller';
 import { SurveysProjectionSyncService } from './surveys-projection-sync.service';
 import { DatabaseModule } from '../database/database.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, EmailModule],
   controllers: [SurveysController],
   providers: [SurveysService, SurveysProjectionSyncService],
   exports: [SurveysService],

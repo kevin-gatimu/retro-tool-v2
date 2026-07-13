@@ -1,7 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowLeft, CheckCircle2, Lock, Star } from 'lucide-react'
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  EyeOff,
+  Lock,
+  Star,
+} from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,8 +17,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { UserAvatar } from '@/components/user-avatar'
 import { useSurveyMutations } from '@/hooks/use-survey-mutations'
+import { SurveyReportMenu } from '@/components/surveys/survey-report-menu'
+import { exportSurveyPdf } from '@/routes/surveys/helpers/export-survey-pdf'
 import { SurveyListConvexSync } from '@/routes/surveys/components/survey-list-convex-sync'
 import { usesConvexForSurveys } from '@/lib/realtime-config'
 import { api } from '@/lib/api'
@@ -23,6 +35,7 @@ import type {
   SurveyDetail,
   SurveyQuestionResults,
   SurveyQuestionView,
+  SurveyRespondentView,
 } from '@/common/types/surveys'
 
 export const Route = createFileRoute('/surveys/$surveyId')({
@@ -76,7 +89,7 @@ function SurveyDetailPage() {
   const [viewResults, setViewResults] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
 
-  const { respondMutation } = useSurveyMutations(() => {
+  const { respondMutation, emailResultsMutation } = useSurveyMutations(() => {
     void queryClient.invalidateQueries({ queryKey: ['survey', surveyId] })
     void queryClient.invalidateQueries({ queryKey: ['surveys'] })
     // Leave edit mode so the refreshed results/answers show.
@@ -153,6 +166,11 @@ function SurveyDetailPage() {
   // the results preview (`viewResults`).
   const showForm = isEditing || (canRespondFresh && !viewResults)
   const showResults = !showForm && hasResults
+  // The server decides who may see per-respondent submissions: everyone (with
+  // names) for non-anonymous surveys, managers only (with identity stripped to
+  // "Anonymous") for anonymous ones. If it sent any, show the Responses tab.
+  const respondents = detail.respondents ?? []
+  const showRespondentTabs = respondents.length > 0
 
   const startEditing = () => {
     if (detail.myAnswers) setAnswers(draftsFromAnswers(detail.myAnswers))
@@ -200,6 +218,12 @@ function SurveyDetailPage() {
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{detail.scopeLabel}</Badge>
+          {detail.isAnonymous && (
+            <Badge className="gap-1 border-transparent bg-violet-500/15 text-violet-600 hover:bg-violet-500/20 dark:text-violet-300">
+              <EyeOff className="h-3 w-3 animate-pulse" />
+              Anonymous
+            </Badge>
+          )}
           {detail.isClosed ? (
             <Badge variant="outline" className="gap-1">
               <Lock className="h-3 w-3" />
@@ -217,7 +241,23 @@ function SurveyDetailPage() {
             </span>
           )}
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">{detail.title}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-3xl font-bold tracking-tight">{detail.title}</h1>
+          {detail.canManage && hasResults && (
+            <SurveyReportMenu
+              scope={detail.scope}
+              teamId={detail.teamId}
+              organizationId={detail.organizationId}
+              onExportPdf={() => {
+                void exportSurveyPdf(detail)
+              }}
+              onSendEmail={(recipients) =>
+                emailResultsMutation.mutate({ surveyId, recipients })
+              }
+              isSending={emailResultsMutation.isPending}
+            />
+          )}
+        </div>
         {detail.description && (
           <p className="text-muted-foreground">{detail.description}</p>
         )}
@@ -291,7 +331,27 @@ function SurveyDetailPage() {
           </div>
         </div>
       ) : showResults ? (
-        <SurveyResults results={detail.results ?? []} />
+        showRespondentTabs ? (
+          <Tabs defaultValue="summary" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="summary">Summary</TabsTrigger>
+              <TabsTrigger value="responses">
+                Responses ({respondents.length})
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="summary">
+              <SurveyResults results={detail.results ?? []} />
+            </TabsContent>
+            <TabsContent value="responses">
+              <SurveyRespondents
+                respondents={respondents}
+                questions={questions}
+              />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <SurveyResults results={detail.results ?? []} />
+        )
       ) : (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
@@ -414,6 +474,124 @@ function ResponseQuestion({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function formatAnswerValue(
+  answer: SurveyAnswerView | undefined,
+  type: SurveyQuestionView['type'],
+): string | null {
+  if (!answer) return null
+  if (type === SURVEY_QUESTION_TYPES.Text) {
+    const text = answer.textValue?.trim()
+    return text && text.length > 0 ? text : null
+  }
+  if (type === SURVEY_QUESTION_TYPES.Rating) {
+    return answer.ratingValue != null ? `${answer.ratingValue} / 5` : null
+  }
+  return answer.choiceValue && answer.choiceValue.length > 0
+    ? answer.choiceValue
+    : null
+}
+
+function SurveyRespondents({
+  respondents,
+  questions,
+}: {
+  respondents: SurveyRespondentView[]
+  questions: SurveyQuestionView[]
+}) {
+  // Show one respondent at a time to avoid an unbounded scroll for surveys with
+  // many questions and many responses; navigate with Prev/Next.
+  const [index, setIndex] = useState(0)
+
+  if (respondents.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-muted-foreground">
+          No responses yet.
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Guard against an out-of-range index if the respondent list shrinks (e.g. a
+  // realtime refetch drops a response while a later page is open).
+  const current = Math.min(index, respondents.length - 1)
+  const respondent = respondents[current]
+  const answerByQuestion = new Map(
+    respondent.answers.map((answer) => [answer.questionId, answer]),
+  )
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIndex((prev) => Math.max(0, prev - 1))}
+          disabled={current === 0}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </Button>
+        <span className="text-sm text-muted-foreground">
+          Response {current + 1} of {respondents.length}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            setIndex((prev) => Math.min(respondents.length - 1, prev + 1))
+          }
+          disabled={current >= respondents.length - 1}
+        >
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <Card key={respondent.userId}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base font-medium">
+            <UserAvatar
+              image={respondent.image}
+              name={respondent.name}
+              userId={respondent.userId}
+              size="sm"
+            />
+            {respondent.name ?? 'Anonymous'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {questions.map((question, questionIndex) => {
+            const value = formatAnswerValue(
+              answerByQuestion.get(question.id),
+              question.type,
+            )
+            return (
+              <div key={question.id} className="space-y-1">
+                <p className="text-sm font-medium">
+                  <span className="mr-1 text-muted-foreground">
+                    Q{questionIndex + 1}.
+                  </span>
+                  {question.prompt}
+                </p>
+                {value != null ? (
+                  <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                    {value}
+                  </p>
+                ) : (
+                  <p className="px-1 text-sm italic text-muted-foreground">
+                    No answer
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 

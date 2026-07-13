@@ -66,10 +66,21 @@ export interface SurveyAnswerView {
   choiceValue: string | null
 }
 
+/** One respondent's full submission — only sent for non-anonymous surveys. */
+export interface SurveyRespondentView {
+  userId: string
+  /** null => render "Anonymous" (defensive; only populated for non-anon surveys). */
+  name: string | null
+  image: string | null
+  answers: SurveyAnswerView[]
+}
+
 export interface SurveyDetail extends SurveySummary {
   questions: SurveyQuestionView[]
   /** Aggregate results — only for managers or after the caller responded. */
   results: SurveyQuestionResults[] | null
+  /** Per-respondent submissions; null for anonymous surveys or when hidden. */
+  respondents: SurveyRespondentView[] | null
   /** The caller's own answers (null until they respond); never another user's. */
   myAnswers: SurveyAnswerView[] | null
 }
