@@ -56,6 +56,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { EmojiPicker } from '@/components/ui/emoji-picker'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -2543,11 +2544,10 @@ function TemplateForm({
         <div className="space-y-2">
           {formColumns.map((col, i) => (
             <div key={i} className="flex items-center gap-2">
-              <Input
+              <EmojiPicker
                 value={col.emoji}
-                onChange={(e) => updateColumn(i, 'emoji', e.target.value)}
-                placeholder="😀"
-                className="w-16 text-center shrink-0"
+                onSelect={(emoji) => updateColumn(i, 'emoji', emoji)}
+                ariaLabel={`Emoji for column ${i + 1}`}
               />
               <Input
                 value={col.name}

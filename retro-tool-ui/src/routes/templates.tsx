@@ -38,6 +38,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { EmojiPicker } from '@/components/ui/emoji-picker'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
@@ -586,18 +587,14 @@ function RetroTemplatesSection({ sysAdmin }: { sysAdmin: boolean }) {
                 >
                   <div className="flex-1 space-y-2">
                     <div className="flex gap-2">
-                      <Input
-                        className="w-14 text-center text-lg px-1"
-                        placeholder="😀"
+                      <EmojiPicker
                         value={col.emoji}
-                        maxLength={2}
-                        onChange={(e) =>
+                        onSelect={(emoji) =>
                           setCreateColumns((c) =>
-                            c.map((cc, j) =>
-                              j === i ? { ...cc, emoji: e.target.value } : cc,
-                            ),
+                            c.map((cc, j) => (j === i ? { ...cc, emoji } : cc)),
                           )
                         }
+                        ariaLabel={`Emoji for column ${i + 1}`}
                       />
                       <Input
                         placeholder="Column name *"

@@ -57,6 +57,7 @@ import { CommentsPanel } from './components/comments-panel'
 import { ReactionBar } from './components/reaction-bar'
 import { StandupReportMenu } from './components/standup-report-menu'
 import { EditStandupDialog } from './components/edit-standup-dialog'
+import { SkipDaysDialog } from './components/skip-days-dialog'
 import { PollCard } from '@/components/polls/poll-card'
 import { CreatePollDialog } from '@/components/polls/create-poll-dialog'
 import { usePollMutations } from '@/hooks/use-poll-mutations'
@@ -228,6 +229,7 @@ function RoomView({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteSubmissionOpen, setDeleteSubmissionOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [skipManagerOpen, setSkipManagerOpen] = useState(false)
   const [editingPoll, setEditingPoll] = useState<PollView | null>(null)
 
   const queryClient = useQueryClient()
@@ -482,6 +484,10 @@ function RoomView({
                     Skip this day
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem onClick={() => setSkipManagerOpen(true)}>
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  Manage skipped days…
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {!isActive && (
                   <>
@@ -780,6 +786,13 @@ function RoomView({
           })
         }
         isSaving={updateStandupMutation.isPending}
+      />
+
+      <SkipDaysDialog
+        open={skipManagerOpen}
+        onOpenChange={setSkipManagerOpen}
+        standup={standup}
+        standupId={standupId}
       />
 
       {/* Delete own submission confirmation */}

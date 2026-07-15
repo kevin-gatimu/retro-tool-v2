@@ -346,6 +346,9 @@ importers:
       convex:
         specifier: ^1.18.0
         version: 1.35.1(react@19.2.5)
+      frimousse:
+        specifier: ^0.3.0
+        version: 0.3.0(react@19.2.5)(typescript@6.0.2)
       input-otp:
         specifier: ^1.4.2
         version: 1.4.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -5183,6 +5186,15 @@ packages:
   fresh@2.0.0:
     resolution: {integrity: sha512-Rx/WycZ60HOaqLKAi6cHRKKI7zxWbJ31MhntmtwMoaTeF7XFH9hhBp8vITaMidfljRQ6eYWCKkaTK+ykVJHP2A==}
     engines: {node: '>= 0.8'}
+
+  frimousse@0.3.0:
+    resolution: {integrity: sha512-kO6LMoKY/cLAYEhXXtqLRaLIE6L/DagpFPrUZaLv3LsUa1/8Iza3HhwZcgN8eZ+weXnhv69eoclNUPohcCa/IQ==}
+    peerDependencies:
+      react: ^18 || ^19
+      typescript: '>=5.1.0'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   fs-extra@10.1.0:
     resolution: {integrity: sha512-oRXApq54ETRj4eMiFzGnHWGy+zo5raudjuxN0b8H7s/RU2oW0Wvsx9O0ACRN/kRq9E8Vu/ReskGB5o3ji+FzHQ==}
@@ -12145,6 +12157,12 @@ snapshots:
   forwarded@0.2.0: {}
 
   fresh@2.0.0: {}
+
+  frimousse@0.3.0(react@19.2.5)(typescript@6.0.2):
+    dependencies:
+      react: 19.2.5
+    optionalDependencies:
+      typescript: 6.0.2
 
   fs-extra@10.1.0:
     dependencies:

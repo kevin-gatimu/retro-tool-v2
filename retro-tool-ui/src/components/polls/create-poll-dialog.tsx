@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { EmojiPicker } from '@/components/ui/emoji-picker'
 import {
   Select,
   SelectContent,
@@ -187,14 +188,11 @@ export function CreatePollDialog({
             <Label>Options</Label>
             {options.map((option, index) => (
               <div key={index} className="flex items-center gap-2">
-                <Input
+                <EmojiPicker
                   value={option.emoji}
-                  onChange={(event) =>
-                    updateOption(index, { emoji: event.target.value })
-                  }
-                  placeholder="😄"
-                  maxLength={4}
-                  className="w-14 text-center bg-background"
+                  onSelect={(emoji) => updateOption(index, { emoji })}
+                  onClear={() => updateOption(index, { emoji: '' })}
+                  ariaLabel={`Emoji for option ${index + 1}`}
                 />
                 <Input
                   value={option.label}

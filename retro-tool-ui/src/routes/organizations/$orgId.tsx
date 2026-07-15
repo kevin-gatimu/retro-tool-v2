@@ -70,6 +70,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { EmojiPicker } from '@/components/ui/emoji-picker'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -1579,16 +1580,16 @@ function OrganizationDetailPage() {
                     <div className="grid gap-3 md:grid-cols-[90px_1fr]">
                       <div className="space-y-1">
                         <Label>Emoji</Label>
-                        <Input
+                        <EmojiPicker
                           value={column.emoji}
-                          onChange={(e) =>
+                          onSelect={(emoji) =>
                             setTplColumns((c) => {
                               const n = [...c]
-                              n[index] = { ...n[index], emoji: e.target.value }
+                              n[index] = { ...n[index], emoji }
                               return n
                             })
                           }
-                          placeholder="😀"
+                          ariaLabel={`Emoji for column ${index + 1}`}
                         />
                       </div>
                       <div className="space-y-1">

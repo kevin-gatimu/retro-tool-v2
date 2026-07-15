@@ -67,6 +67,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { EmojiPicker } from '@/components/ui/emoji-picker'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -1151,11 +1152,10 @@ function TeamDetailPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="editEmoji">Emoji</Label>
-                <Input
-                  id="editEmoji"
+                <EmojiPicker
                   value={editEmoji}
-                  onChange={(e) => setEditEmoji(e.target.value)}
-                  className="w-20"
+                  onSelect={(emoji) => setEditEmoji(emoji)}
+                  ariaLabel="Team emoji"
                 />
               </div>
               <div className="grid gap-2">
