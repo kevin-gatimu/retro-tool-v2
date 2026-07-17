@@ -10,6 +10,12 @@ This is a **pnpm monorepo** containing three applications and one shared package
 
 ---
 
+## Git commit rules
+
+- **Never add a `Co-Authored-By: Claude` trailer** (or any Claude/Anthropic co-author line) to commit messages. Commits are authored solely under the repo owner's git identity, with no AI attribution in the body.
+
+---
+
 ## Code conventions
 
 ### API module structure

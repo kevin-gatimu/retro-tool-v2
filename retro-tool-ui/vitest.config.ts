@@ -13,5 +13,12 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // src/env.ts validates required client vars (e.g. VITE_API_URL) at import
+    // time via @t3-oss/env-core. Tests that transitively import lib/api need a
+    // valid value; CI has no .env, so supply a dummy here (populates
+    // import.meta.env). Other client vars have defaults/are optional.
+    env: {
+      VITE_API_URL: 'http://localhost:8000',
+    },
   },
 })
