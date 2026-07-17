@@ -1,6 +1,8 @@
 import { mutation, query, internalMutation } from './server'
 import { v } from 'convex/values'
-import { requireIdentity } from './lib/authz'
+import { getCallerTeamIds, isAdminRole, requireIdentity } from './lib/authz'
+import { LIST_PROJECTION_CAP } from './lib/limits'
+import { rateLimiter } from './rateLimits'
 
 const retroStatus = v.union(
   v.literal('draft'),
@@ -114,11 +116,19 @@ export const getRetroProjection = query({
 export const listRecentRetroProjections = query({
   args: {},
   handler: async (ctx) => {
-    await requireIdentity(ctx)
+    const identity = await requireIdentity(ctx)
     const projections = await ctx.db.query('liveRetroSessions').collect()
 
+    // Scope to the caller's teams (`null` = admin, pass all) — invalidation
+    // signal only, but stops cross-tenant retro enumeration.
+    const teamIds = isAdminRole(identity.role)
+      ? null
+      : await getCallerTeamIds(ctx, identity.subject)
+
     return projections
+      .filter((projection) => !teamIds || teamIds.has(projection.teamId))
       .sort((left, right) => left.retroId.localeCompare(right.retroId))
+      .slice(0, LIST_PROJECTION_CAP)
       .map((projection) => ({
         retroId: projection.retroId,
         status: projection.status,
@@ -205,6 +215,10 @@ export const startTyping = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
+    await rateLimiter.limit(ctx, 'liveInteraction', {
+      key: identity.subject,
+      throws: true,
+    })
     const existing = (
       await ctx.db
         .query('liveTyping')
@@ -236,6 +250,10 @@ export const stopTyping = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
+    await rateLimiter.limit(ctx, 'liveInteraction', {
+      key: identity.subject,
+      throws: true,
+    })
     const existing = (
       await ctx.db
         .query('liveTyping')
@@ -274,6 +292,10 @@ export const setReadyStatus = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
+    await rateLimiter.limit(ctx, 'liveInteraction', {
+      key: identity.subject,
+      throws: true,
+    })
     const existing = (
       await ctx.db
         .query('liveReadyStatus')

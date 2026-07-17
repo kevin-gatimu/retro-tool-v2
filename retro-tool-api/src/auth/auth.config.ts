@@ -253,7 +253,7 @@ export function createAuth(configService: ConfigService<Config>) {
       // RS256/ES256, not the EdDSA default). Serves GET /api/auth/jwks and
       // GET /api/auth/token; owns the `jwks` table. `sub` defaults to user.id
       // (matches the userId stored in Convex projections). `role` is injected so
-      // Convex role-gated reads (e.g. liveReports.getSystemStats) can authorize.
+      // Convex role-gated reads (lib/authz isAdminRole checks) can authorize.
       jwt({
         jwt: {
           issuer: jwtIssuer,

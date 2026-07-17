@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 11.0.0-rc.0
+          version: 11.13.0
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -111,15 +111,21 @@ jobs:
           IMAGE_TAG="${TARGET_ENV}-${GITHUB_SHA::8}"
           IMAGE_NAME="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${IMAGE_TAG}"
           IMAGE_LATEST="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${TARGET_ENV}-latest"
+          # Human-readable release tag (from release-please) so prod rollbacks
+          # are "v1.1.0 -> v1.0.3" instead of SHA archaeology.
+          APP_VERSION="$(node -p "require('./retro-tool-api/package.json').version")"
+          IMAGE_VERSION="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${TARGET_ENV}-v${APP_VERSION}"
 
           docker build \
             --file retro-tool-api/Dockerfile \
             --tag "${IMAGE_NAME}" \
             --tag "${IMAGE_LATEST}" \
+            --tag "${IMAGE_VERSION}" \
             .
 
           docker push "${IMAGE_NAME}"
           docker push "${IMAGE_LATEST}"
+          docker push "${IMAGE_VERSION}"
 
           echo "image-tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
           echo "image-name=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
@@ -134,7 +140,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11.0.0-rc.0
+          version: 11.13.0
 
       - uses: actions/setup-node@v4
         with:
@@ -188,7 +194,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11.0.0-rc.0
+          version: 11.13.0
 
       - uses: actions/setup-node@v4
         with:

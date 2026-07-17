@@ -5,6 +5,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { DATABASE_CONNECTION } from './database/database-connection';
 import { sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { APP_VERSION } from './lib/app-version';
 
 // Liveness/readiness probes must never be rate-limited.
 @SkipThrottle()
@@ -29,6 +30,7 @@ export class HealthController {
     return {
       status,
       service: 'retro-tool-api',
+      version: APP_VERSION,
       timestamp: new Date().toISOString(),
       checks: {
         database: dbOk ? 'connected' : 'unreachable',
@@ -45,6 +47,7 @@ export class HealthController {
     return {
       status: 'alive',
       service: 'retro-tool-api',
+      version: APP_VERSION,
       timestamp: new Date().toISOString(),
     };
   }
@@ -60,6 +63,7 @@ export class HealthController {
     return {
       status: dbOk ? 'ready' : 'not_ready',
       service: 'retro-tool-api',
+      version: APP_VERSION,
       timestamp: new Date().toISOString(),
       checks: {
         database: dbOk ? 'connected' : 'unreachable',

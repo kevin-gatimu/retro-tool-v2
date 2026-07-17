@@ -33,15 +33,24 @@ importers:
         specifier: ^1.18.0
         version: 1.35.1(react@19.2.5)
     devDependencies:
+      '@eslint/js':
+        specifier: ^9.18.0
+        version: 9.39.4
       '@types/node':
         specifier: ^22.10.7
         version: 22.19.17
       dotenv-cli:
         specifier: ^8.0.0
         version: 8.0.0
+      eslint:
+        specifier: ^9.18.0
+        version: 9.39.4(jiti@2.6.1)
       typescript:
         specifier: ^6.0.2
         version: 6.0.2
+      typescript-eslint:
+        specifier: ^8.20.0
+        version: 8.58.1(eslint@9.39.4(jiti@2.6.1))(typescript@6.0.2)
 
   packages/shared/contracts:
     devDependencies:

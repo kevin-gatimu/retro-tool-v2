@@ -7,18 +7,27 @@ import {
   Post,
   Put,
   UseGuards,
+  UsePipes,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
+  ApiBody,
 } from '@nestjs/swagger';
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ConvexAdminService } from './convex-admin.service';
 import type { SessionUser } from '../common/types';
-import { UpdateCronConfigDto } from './dto/update-cron-config.dto';
-import { ClearTablesDto } from './dto/clear-tables.dto';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import {
+  updateCronConfigSchema,
+  UpdateCronConfigDto,
+  UpdateCronConfigDtoClass,
+  clearTablesSchema,
+  ClearTablesDto,
+  ClearTablesDtoClass,
+} from './dto';
 
 @ApiTags('convex-admin')
 @Controller('convex-admin')
@@ -64,6 +73,8 @@ export class ConvexAdminController {
   @ApiOperation({
     summary: 'Update Convex table-clear cron configuration (super-admin only)',
   })
+  @ApiBody({ type: UpdateCronConfigDtoClass })
+  @UsePipes(new ZodValidationPipe(updateCronConfigSchema))
   updateCronConfig(
     @Session() session: SessionUser,
     @Body() dto: UpdateCronConfigDto,
@@ -76,7 +87,23 @@ export class ConvexAdminController {
   @ApiOperation({
     summary: 'Manually clear Convex tables immediately (super-admin only)',
   })
+  @ApiBody({ type: ClearTablesDtoClass })
+  @UsePipes(new ZodValidationPipe(clearTablesSchema))
   clearTables(@Session() session: SessionUser, @Body() dto: ClearTablesDto) {
     return this.convexAdminService.clearTables(session.user.id, dto.tableNames);
+  }
+
+  @Post('reconcile-memberships')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Rebuild the Convex team-membership projection from PostgreSQL (super-admin only)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Membership projection reconciled; returns the row count',
+  })
+  reconcileMemberships(@Session() session: SessionUser) {
+    return this.convexAdminService.reconcileMemberships(session.user.id);
   }
 }

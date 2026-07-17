@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
-import type { FunctionReference } from 'convex/server'
 import type { IcebreakerSession } from '@/common/types/icebreakers'
+import { convexApi } from '@/lib/convex-api'
 
-const icebreakerBoardQuery =
-  'liveIcebreakers:getIcebreakerBoard' as unknown as FunctionReference<'query'>
+const icebreakerBoardQuery = convexApi.liveIcebreakers.getIcebreakerBoard
 
 type IcebreakerBoardSnapshot = {
   session: IcebreakerSession

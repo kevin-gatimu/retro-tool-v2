@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export const CreateEstimateSessionSchema = z.object({
   name: z.string().min(1).max(255),
   teamId: z.string().min(1),
-  sprintLink: z.string().url().max(2048).optional(),
+  sprintLink: z.url().max(2048).optional(),
   timerDuration: z.number().int().positive().max(3600).optional(),
   templateId: z.string().optional(),
 });
@@ -34,7 +34,7 @@ export const NewEstimateRoundSchema = z.object({
   ticketNumber: z.string().min(1).max(100),
   storyName: z.string().min(1).max(255).optional(),
   storyDescription: z.string().max(5000).optional(),
-  storyLink: z.string().url().max(2048).optional(),
+  storyLink: z.url().max(2048).optional(),
 });
 
 export type NewEstimateRoundDto = z.infer<typeof NewEstimateRoundSchema>;
@@ -71,7 +71,7 @@ export const UpdateEstimateStorySchema = z.object({
   storyName: z.string().min(1).max(255),
   ticketNumber: z.string().min(1).max(100),
   storyDescription: z.string().max(5000).optional(),
-  storyLink: z.string().url().max(2048).optional(),
+  storyLink: z.url().max(2048).optional(),
 });
 
 export type UpdateEstimateStoryDto = z.infer<typeof UpdateEstimateStorySchema>;

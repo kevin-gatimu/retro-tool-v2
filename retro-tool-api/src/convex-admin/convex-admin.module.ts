@@ -5,9 +5,10 @@ import { ConvexAdminCronService } from './convex-admin-cron.service';
 import { DatabaseModule } from '../database/database.module';
 import { CommonModule } from '../common/common.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { TeamsModule } from '../teams/teams.module';
 
 @Module({
-  imports: [DatabaseModule, CommonModule, NotificationsModule],
+  imports: [DatabaseModule, CommonModule, NotificationsModule, TeamsModule],
   controllers: [ConvexAdminController],
   providers: [ConvexAdminService, ConvexAdminCronService],
 })

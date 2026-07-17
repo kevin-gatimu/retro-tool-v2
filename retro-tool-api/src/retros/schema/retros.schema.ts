@@ -119,6 +119,12 @@ export const retrospective = pgTable(
       table.createdAt,
     ),
     index('retrospective_created_at_idx').on(table.createdAt),
+    // Reports v2: range scans over completed retros per team.
+    index('retrospective_team_status_completed_idx').on(
+      table.teamId,
+      table.status,
+      table.completedAt,
+    ),
   ],
 );
 

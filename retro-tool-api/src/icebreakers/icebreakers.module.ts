@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { IcebreakersService } from './icebreakers.service';
+import { IcebreakersQueryService } from './icebreakers-query.service';
+import { IcebreakersCreationService } from './icebreakers-creation.service';
 import { IcebreakersProjectionSyncService } from './icebreakers-projection-sync.service';
 import { IcebreakersController } from './icebreakers.controller';
 import { IcebreakersGateway } from './icebreakers.gateway';
@@ -13,6 +15,8 @@ import { StandupsModule } from '../standups/standups.module';
   controllers: [IcebreakersController],
   providers: [
     IcebreakersService,
+    IcebreakersQueryService,
+    IcebreakersCreationService,
     IcebreakersProjectionSyncService,
     IcebreakersGateway,
   ],

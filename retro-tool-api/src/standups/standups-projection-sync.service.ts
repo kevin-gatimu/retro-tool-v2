@@ -7,7 +7,7 @@ import type { Config } from '../config/configuration';
 import type { ConvexFunctionResponse } from '../common/types';
 import * as standupsSchema from './schema';
 import * as teamSchema from '../teams/schema';
-import { StandupsService } from './standups.service';
+import { StandupsEntriesService } from './standups-entries.service';
 
 type Database = NodePgDatabase<typeof standupsSchema & typeof teamSchema>;
 
@@ -18,7 +18,7 @@ export class StandupsProjectionSyncService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly configService: ConfigService<Config, true>,
-    private readonly standupsService: StandupsService,
+    private readonly standupsEntriesService: StandupsEntriesService,
   ) {}
 
   async syncEntryProjection(standupId: string, date: string): Promise<void> {
@@ -86,7 +86,7 @@ export class StandupsProjectionSyncService {
     await Promise.all(
       members.map(async ({ userId }) => {
         try {
-          const entryDetail = await this.standupsService.getEntryDetail(
+          const entryDetail = await this.standupsEntriesService.getEntryDetail(
             userId,
             standupId,
             date,

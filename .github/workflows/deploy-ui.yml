@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 11.0.0-rc.0
+          version: 11.13.0
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -73,7 +73,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11.0.0-rc.0
+          version: 11.13.0
 
       - uses: actions/setup-node@v4
         with:
@@ -154,8 +154,13 @@ jobs:
             console.log('UI env URLs look valid');
           "
 
+      - name: Resolve app version
+        id: version
+        run: echo "version=$(node -p "require('./retro-tool-ui/package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Build UI
         env:
+          VITE_APP_VERSION: v${{ steps.version.outputs.version }}
           VITE_APP_TITLE: ${{ vars.VITE_APP_TITLE }}
           VITE_APP_ENV: ${{ vars.VITE_APP_ENV }}
           VITE_API_URL: ${{ vars.VITE_API_URL }}

@@ -565,14 +565,14 @@ function SignUpPage() {
                     <p className="text-center text-xs text-gray-600">
                       By signing up you agree to our{' '}
                       <Link
-                        to="/termsofservice"
+                        to="/terms-of-service"
                         className="text-gray-500 hover:text-emerald-400 underline underline-offset-2 transition-colors"
                       >
                         Terms
                       </Link>{' '}
                       and{' '}
                       <Link
-                        to="/privacystatement"
+                        to="/privacy-statement"
                         className="text-gray-500 hover:text-emerald-400 underline underline-offset-2 transition-colors"
                       >
                         Privacy Statement

@@ -27,3 +27,13 @@ export type HistoryResponse = {
   limit: number
   totalPages: number
 }
+
+/**
+ * A single selectable point card in a live estimate session — sourced either
+ * from the session template values or from the default fallback scale.
+ */
+export type VoteOption = {
+  label: string
+  value: string
+  color: string | null
+}

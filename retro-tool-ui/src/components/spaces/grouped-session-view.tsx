@@ -16,7 +16,11 @@ import {
 export interface GroupedSessionViewProps<T> {
   items: T[]
   view: SessionView
-  spaces: Space[]
+  /**
+   * Optional team metadata for group headers (name/emoji) and ordering. When
+   * omitted, headers fall back to the team name/emoji carried on each item.
+   */
+  spaces?: Space[]
   /** Accessors so the component stays generic over retros/estimates. */
   getId: (item: T) => string
   getTeamId: (item: T) => string
@@ -47,7 +51,7 @@ const STATUS_ICONS: Record<StatusBucket, string> = {
 export function GroupedSessionView<T>({
   items,
   view,
-  spaces,
+  spaces = [],
   getId,
   getTeamId,
   getTeamName,

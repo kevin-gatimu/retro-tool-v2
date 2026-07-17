@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
-import type { FunctionReference } from 'convex/server'
+import { convexApi } from '@/lib/convex-api'
 
 interface ActiveIcebreakerProjection {
   sessionId: string
@@ -10,7 +10,7 @@ interface ActiveIcebreakerProjection {
 }
 
 const activeIcebreakerProjectionQuery =
-  'liveIcebreakers:listActiveSessionProjections' as unknown as FunctionReference<'query'>
+  convexApi.liveIcebreakers.listActiveSessionProjections
 
 export function IcebreakerListConvexSync() {
   const queryClient = useQueryClient()

@@ -142,6 +142,39 @@ export const updateSurveySchema = z.object({
 });
 export type UpdateSurveyDto = z.infer<typeof updateSurveySchema>;
 
+// ============================================================================
+// Email survey results. Recipients are optional; when omitted the service
+// sends to the survey's audience.
+// ============================================================================
+
+export const sendSurveyEmailSchema = z.object({
+  recipients: z.array(z.email()).max(50).optional(),
+});
+export type SendSurveyEmailDto = z.infer<typeof sendSurveyEmailSchema>;
+
+export class SendSurveyEmailDtoClass {
+  @ApiPropertyOptional({
+    description: 'Email addresses to send to. Omit to send to the audience.',
+    type: [String],
+    example: ['user@example.com'],
+  })
+  recipients?: string[];
+}
+
+// ============================================================================
+// Close or reopen a survey.
+// ============================================================================
+
+export const setSurveyClosedSchema = z.object({
+  isClosed: z.boolean(),
+});
+export type SetSurveyClosedDto = z.infer<typeof setSurveyClosedSchema>;
+
+export class SetSurveyClosedDtoClass {
+  @ApiProperty({ description: 'Close (true) or reopen (false) the survey' })
+  isClosed: boolean;
+}
+
 export class UpdateSurveyDtoClass {
   @ApiProperty({ description: 'Survey title', maxLength: 255 })
   title: string;

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
-import type { FunctionReference } from 'convex/server'
+import { convexApi } from '@/lib/convex-api'
 
 interface ActiveEstimateProjection {
   sessionId: string
@@ -10,7 +10,7 @@ interface ActiveEstimateProjection {
 }
 
 const activeEstimateProjectionQuery =
-  'liveEstimates:listActiveSessionProjections' as unknown as FunctionReference<'query'>
+  convexApi.liveEstimates.listActiveSessionProjections
 
 export function EstimateListConvexSync() {
   const queryClient = useQueryClient()

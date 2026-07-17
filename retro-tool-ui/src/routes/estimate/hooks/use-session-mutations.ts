@@ -134,34 +134,6 @@ export function useSessionMutations(sessionId: string) {
       toast.error(error.message || 'Failed to start round'),
   })
 
-  const startTimerMutation = useMutation({
-    mutationFn: (seconds: number) =>
-      api.post(ESTIMATES_ENDPOINTS.TIMER(sessionId), { duration: seconds }),
-    onMutate: (seconds: number) => {
-      // Optimistic update so the creator sees the countdown start immediately
-      queryClient.setQueryData<EstimateSession>(
-        ['estimate-session', sessionId],
-        (prev) =>
-          prev
-            ? {
-                ...prev,
-                timerDuration: seconds,
-                timerEndsAt: new Date(Date.now() + seconds * 1000),
-              }
-            : prev,
-      )
-    },
-    onSuccess: (_, seconds) => {
-      // Always refetch to get the accurate server-side timerEndsAt (bypasses Convex lag)
-      refetchSession()
-      toast.success(`Timer started — ${seconds / 60} min`)
-    },
-    onError: (error: Error) => {
-      refetchSession()
-      toast.error(error.message || 'Failed to start timer')
-    },
-  })
-
   const endSessionMutation = useMutation({
     mutationFn: () => api.delete(ESTIMATES_ENDPOINTS.BY_ID(sessionId)),
     onSuccess: () => {
@@ -198,7 +170,6 @@ export function useSessionMutations(sessionId: string) {
     removeVoteMutation,
     revealVotesMutation,
     startRoundMutation,
-    startTimerMutation,
     endSessionMutation,
     setConsensusMutation,
     revoteMutation,

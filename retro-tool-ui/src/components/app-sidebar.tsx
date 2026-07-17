@@ -55,7 +55,7 @@ import {
   SURVEYS_ENDPOINTS,
   USERS_ENDPOINTS,
 } from '@/lib/api-endpoints'
-import { authClient } from '@/lib/auth-client'
+import { authClient, signOutWithCleanup } from '@/lib/auth-client'
 import { canAccessAdminPanel } from '@/lib/rbac'
 import { usesConvexForSurveys, usesConvexForPolls } from '@/lib/realtime-config'
 import { SurveyListConvexSync } from '@/routes/surveys/components/survey-list-convex-sync'
@@ -298,7 +298,6 @@ export function AppSidebar() {
   }
 
   const handleSignOut = async () => {
-    const { signOutWithCleanup } = await import('@/lib/auth-client')
     await signOutWithCleanup()
     window.location.href = '/auth/sign-in'
   }
@@ -482,6 +481,9 @@ export function AppSidebar() {
                 <SidebarMenuButton onClick={handleSignOut}>
                   <LogOut className="h-4 w-4" />
                   <span>Sign out</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {__APP_VERSION__}
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

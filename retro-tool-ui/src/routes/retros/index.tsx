@@ -1,16 +1,18 @@
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
+import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   History as HistoryIcon,
   MoreHorizontal,
   Plus,
   RefreshCw,
+  Search,
   Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,14 +38,12 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { api } from '@/lib/api'
-import { RETROS_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
+import { RETROS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { Retro } from '@/common/types/retros'
-import type { Team } from '@/common/types/teams'
 import { authClient } from '@/lib/auth-client'
 import { usesConvexForRetros } from '@/lib/realtime-config'
 import { getRetroSocket } from '@/lib/socket'
 import { RetroListConvexSync } from './components/retro-list-convex-sync'
-import { SpaceSwitcher } from '@/components/spaces/space-switcher'
 import { ViewConfigToolbar } from '@/components/spaces/view-config-toolbar'
 import { GroupedSessionView } from '@/components/spaces/grouped-session-view'
 import { LoadMoreFooter } from '@/components/spaces/load-more-footer'
@@ -51,10 +51,8 @@ import type { CompletedPage } from '@/components/spaces/use-session-list'
 import { useSessionList } from '@/components/spaces/use-session-list'
 import {
   SPACE_ALL,
-  deriveSpaces,
   nextCollapsedGroups,
   retroStatusBucket,
-  toggleFavorite,
 } from '@/components/spaces/utils'
 import { useSessionViewPreferences } from '@/hooks/use-session-view-preferences'
 
@@ -76,13 +74,18 @@ function normalizeRetroResponse(
   return raw
 }
 
-async function fetchOngoingRetros(teamId?: string): Promise<Retro[]> {
+async function fetchOngoingRetros(
+  teamId?: string,
+  search?: string,
+): Promise<Retro[]> {
   const params = new URLSearchParams({
     status: 'ongoing',
     page: '1',
     limit: String(ONGOING_LIMIT),
   })
   if (teamId) params.set('teamId', teamId)
+  const trimmed = search?.trim()
+  if (trimmed) params.set('search', trimmed)
   const raw = await api.get<RetroListResponse>(
     `${RETROS_ENDPOINTS.LIST}?${params.toString()}`,
   )
@@ -92,6 +95,7 @@ async function fetchOngoingRetros(teamId?: string): Promise<Retro[]> {
 async function fetchCompletedRetros(
   page: number,
   teamId?: string,
+  search?: string,
 ): Promise<CompletedPage<Retro>> {
   const params = new URLSearchParams({
     status: 'completed',
@@ -99,6 +103,8 @@ async function fetchCompletedRetros(
     limit: String(COMPLETED_PAGE_SIZE),
   })
   if (teamId) params.set('teamId', teamId)
+  const trimmed = search?.trim()
+  if (trimmed) params.set('search', trimmed)
   const raw = await api.get<RetroListResponse>(
     `${RETROS_ENDPOINTS.LIST}?${params.toString()}`,
   )
@@ -108,14 +114,6 @@ async function fetchCompletedRetros(
     total: norm.total,
     page: norm.page,
     limit: norm.limit,
-  }
-}
-
-function teamsQueryOptions() {
-  return {
-    queryKey: ['teams'] as const,
-    queryFn: () => api.get<{ teams: Team[] }>(TEAMS_ENDPOINTS.LIST),
-    staleTime: 60_000,
   }
 }
 
@@ -137,8 +135,23 @@ function RetrosPage() {
     ? (session.user as { role?: string }).role
     : undefined
 
-  const { view, setView } = useSessionViewPreferences('retros')
-  const { data: teamsData } = useQuery(teamsQueryOptions())
+  const { view: storedView, setView } = useSessionViewPreferences('retros')
+  // The space switcher was removed, so `space` is no longer selectable. Force
+  // "All Spaces" so a previously-persisted team filter can't permanently strand
+  // the list (it's still read by teamScope + GroupedSessionView below).
+  const view =
+    storedView.space === SPACE_ALL
+      ? storedView
+      : { ...storedView, space: SPACE_ALL }
+
+  // Debounced search — applied server-side to BOTH ongoing and completed so it
+  // spans the full history, not just the loaded pages.
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 350)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
   // When a specific space is selected, scope completed pagination server-side.
   const teamScope = view.space !== SPACE_ALL ? view.space : undefined
@@ -155,16 +168,15 @@ function RetrosPage() {
     loadMore,
     refetch,
   } = useSessionList<Retro, Retro>({
-    ongoingKey: ['retros', 'ongoing', teamScope ?? null],
-    fetchOngoing: () => fetchOngoingRetros(teamScope),
-    completedKey: ['retros', 'completed', teamScope ?? null],
-    fetchCompleted: (page) => fetchCompletedRetros(page, teamScope),
+    ongoingKey: ['retros', 'ongoing', teamScope ?? null, search],
+    fetchOngoing: () => fetchOngoingRetros(teamScope, search),
+    completedKey: ['retros', 'completed', teamScope ?? null, search],
+    fetchCompleted: (page) => fetchCompletedRetros(page, teamScope, search),
     completedEnabled: view.showCompleted,
   })
 
   const retros = [...ongoing, ...completed]
-  const totalCount = ongoing.length + completedTotal
-  const spaces = deriveSpaces(teamsData?.teams ?? [], retros)
+  const listTotal = ongoing.length + completedTotal
 
   // Only system/super admins can delete from the list (endpoint lacks
   // per-retro permission info; see backend TODO for `canDelete`).
@@ -238,7 +250,7 @@ function RetrosPage() {
               className="text-destructive"
               onClick={(e) => {
                 e.preventDefault()
-                handleDeleteClick(e as unknown as React.MouseEvent, retro)
+                handleDeleteClick(e, retro)
               }}
             >
               <Trash2 className="mr-2 h-4 w-4" />
@@ -301,7 +313,7 @@ function RetrosPage() {
         </Button>
       </div>
 
-      {totalCount === 0 && !isLoading ? (
+      {listTotal === 0 && !isLoading ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <HistoryIcon className="h-12 w-12 text-muted-foreground mb-4" />
@@ -319,37 +331,36 @@ function RetrosPage() {
         </Card>
       ) : (
         <>
-          <SpaceSwitcher
-            spaces={spaces}
-            value={view.space}
-            onChange={(space) => setView({ space })}
-            favorites={view.favorites}
-            onToggleFavorite={(teamId) =>
-              setView({ favorites: toggleFavorite(view.favorites, teamId) })
-            }
-            totalCount={totalCount}
-          />
-
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <ViewConfigToolbar view={view} setView={setView} />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 shrink-0"
-              onClick={refetch}
-              disabled={isFetching}
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`}
-              />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="relative w-56">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Search retrospectives…"
+                  className="pl-9 h-8"
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 shrink-0"
+                onClick={refetch}
+                disabled={isFetching}
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`}
+                />
+                Refresh
+              </Button>
+            </div>
           </div>
 
           <GroupedSessionView
             items={retros}
             view={view}
-            spaces={spaces}
             getId={(r) => r.id}
             getTeamId={(r) => r.teamId}
             getTeamName={(r) => r.teamName ?? 'Unknown team'}

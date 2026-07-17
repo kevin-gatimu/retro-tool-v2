@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ApiProperty } from '@nestjs/swagger';
 
 export const sendEstimateReportSchema = z.object({
-  recipients: z.array(z.string().email()).max(50).optional(),
+  recipients: z.array(z.email()).max(50).optional(),
 });
 
 export type SendEstimateReportDto = z.infer<typeof sendEstimateReportSchema>;

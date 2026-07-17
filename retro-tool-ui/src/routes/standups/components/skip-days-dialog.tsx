@@ -191,7 +191,7 @@ export function SkipDaysDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="gap-3 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Manage skipped days</DialogTitle>
             <DialogDescription>
@@ -330,32 +330,39 @@ export function SkipDaysDialog({
             </span>
           </div>
 
-          {/* Upcoming skipped summary */}
-          {upcomingSkipped.length > 0 && (
-            <div className="space-y-1.5 border-t pt-3">
-              <p className="text-xs font-medium text-muted-foreground">
-                Upcoming skipped days
-              </p>
-              <ul className="flex flex-wrap gap-2">
-                {upcomingSkipped.map((date) => (
-                  <li key={date}>
-                    <button
-                      type="button"
-                      disabled={setSkipMutation.isPending}
-                      onClick={() =>
-                        setSkipMutation.mutate({ date, skip: false })
-                      }
-                      className="flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-600 hover:bg-amber-500/20 dark:text-amber-400"
-                    >
-                      {formatEntryDate(date)}
-                      <span aria-hidden>×</span>
-                      <span className="sr-only">Restore {date}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+          {/* Upcoming skipped summary — always mounted with a fixed footprint so
+              adding/removing skips never resizes or shifts the dialog. */}
+          <div className="space-y-1.5 border-t pt-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              Upcoming skipped days
+            </p>
+            <div className="h-16 overflow-y-auto">
+              {upcomingSkipped.length === 0 ? (
+                <p className="text-xs text-muted-foreground/70">
+                  No upcoming skipped days.
+                </p>
+              ) : (
+                <ul className="flex flex-wrap gap-2">
+                  {upcomingSkipped.map((date) => (
+                    <li key={date}>
+                      <button
+                        type="button"
+                        disabled={setSkipMutation.isPending}
+                        onClick={() =>
+                          setSkipMutation.mutate({ date, skip: false })
+                        }
+                        className="flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-600 hover:bg-amber-500/20 dark:text-amber-400"
+                      >
+                        {formatEntryDate(date)}
+                        <span aria-hidden>×</span>
+                        <span className="sr-only">Restore {date}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          )}
+          </div>
         </DialogContent>
       </Dialog>
 

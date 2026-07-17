@@ -84,7 +84,11 @@ export const session = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
   },
-  (table) => [index('session_user_id_idx').on(table.userId)],
+  (table) => [
+    index('session_user_id_idx').on(table.userId),
+    // Reports v2: active-user counts scan sessions by recency per user.
+    index('session_user_updated_at_idx').on(table.userId, table.updatedAt),
+  ],
 );
 
 export const account = pgTable(

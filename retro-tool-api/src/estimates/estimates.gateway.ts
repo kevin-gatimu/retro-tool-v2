@@ -62,6 +62,15 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
+    // Authorize per event: handshake auth proves identity, not membership. Without
+    // this a socket could join any session by ID and register as a participant
+    // (SECURITY-ASSESSMENT F2). The REST getSession path checks the same.
+    const isMember = await this.estimatesService.isSessionMember(
+      data.sessionId,
+      userId,
+    );
+    if (!isMember) return;
+
     await this.estimatesService.upsertParticipant(data.sessionId, userId, true);
     await client.join(`session:${data.sessionId}`);
 
@@ -103,6 +112,14 @@ export class EstimatesGateway
   ): Promise<void> {
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId || !data?.points) return;
+
+    // Authorize per event: a non-member socket must not be able to cast votes in
+    // a session it doesn't belong to (SECURITY-ASSESSMENT F2).
+    const isMember = await this.estimatesService.isSessionMember(
+      data.sessionId,
+      userId,
+    );
+    if (!isMember) return;
 
     await this.estimatesService.upsertVote(data.sessionId, userId, data.points);
 

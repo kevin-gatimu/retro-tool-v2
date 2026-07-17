@@ -3,6 +3,16 @@ import { getBearerToken } from './auth-client'
 
 const API_BASE_URL = env.VITE_API_URL
 
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 async function apiFetch<T = {}>(
   method: string,
   url: string,
@@ -29,7 +39,8 @@ async function apiFetch<T = {}>(
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}))
-    throw new Error(
+    throw new ApiError(
+      response.status,
       (err as { message?: string }).message ||
         `HTTP ${response.status}: ${response.statusText}`,
     )

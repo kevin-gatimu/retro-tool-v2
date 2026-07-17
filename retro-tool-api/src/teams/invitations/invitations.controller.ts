@@ -9,6 +9,7 @@ import {
   Body,
   Query,
   UseGuards,
+  UsePipes,
 } from '@nestjs/common';
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import {
@@ -18,9 +19,16 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
+  ApiBody,
 } from '@nestjs/swagger';
 import { TeamInvitationsService } from './invitations.service';
 import type { SessionUser } from '../../common/types';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import {
+  inviteTeamMemberSchema,
+  InviteTeamMemberDto,
+  InviteTeamMemberDtoClass,
+} from './dto';
 
 @ApiTags('teams')
 @Controller('teams')
@@ -154,19 +162,20 @@ export class TeamInvitationsController {
     format: 'uuid',
     description: 'Team ID',
   })
+  @ApiBody({ type: InviteTeamMemberDtoClass })
   @ApiResponse({ status: 201, description: 'Invitation sent' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @UsePipes(new ZodValidationPipe(inviteTeamMemberSchema))
   async inviteTeamMember(
     @Param('id') id: string,
-    @Body('email') email: string,
-    @Body('tag') tag: 'member' | 'team-lead' = 'member',
+    @Body() body: InviteTeamMemberDto,
     @Session() session: SessionUser,
   ) {
     return this.teamInvitationsService.inviteTeamMember(
       session.user.id,
       id,
-      email,
-      tag,
+      body.email,
+      body.tag,
     );
   }
 }

@@ -16,6 +16,16 @@ import type {
 } from './dto';
 
 /**
+ * Better Auth's `APIError` carries a runtime `body` ({ code, message }) that its
+ * exported type doesn't surface. Narrow to read it without an unsafe cast.
+ */
+function hasErrorBody(
+  err: unknown,
+): err is { body?: { code?: string; message?: string } } {
+  return typeof err === 'object' && err !== null && 'body' in err;
+}
+
+/**
  * Thin server-side wrapper around Better Auth's emailOTP endpoints. The UI
  * never calls the Better Auth plugin routes directly — it calls our /api/otp/*
  * controller, which delegates to the injected auth instance (`auth.api.*`).
@@ -33,10 +43,8 @@ export class OtpService {
   private rethrow(err: unknown): never {
     if (err instanceof APIError) {
       // APIError carries `body` ({ code, message }) at runtime; the exported
-      // type doesn't surface it, so read it through a narrow cast.
-      const body = (
-        err as unknown as { body?: { code?: string; message?: string } }
-      ).body;
+      // type doesn't surface it, so read it through a type guard.
+      const body = hasErrorBody(err) ? err.body : undefined;
       const code = body?.code;
       const message = body?.message || 'OTP request failed';
       if (code === 'TOO_MANY_ATTEMPTS') {

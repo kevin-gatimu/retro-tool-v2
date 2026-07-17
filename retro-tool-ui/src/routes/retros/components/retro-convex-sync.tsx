@@ -1,12 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
-import type { FunctionReference } from 'convex/server'
 import type { RetroDetail } from '@/common/types/retros'
+import { convexApi } from '@/lib/convex-api'
 import type { CarriedForwardItem } from '../types'
 
-const retroBoardQuery =
-  'liveRetros:getRetroBoard' as unknown as FunctionReference<'query'>
+const retroBoardQuery = convexApi.liveRetros.getRetroBoard
 
 type RetroBoardSnapshot = {
   retro: RetroDetail

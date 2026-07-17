@@ -43,6 +43,8 @@ export const card = pgTable(
     index('card_author_id_idx').on(table.authorId),
     index('card_retro_column_idx').on(table.retroId, table.columnId),
     index('card_created_at_idx').on(table.createdAt),
+    // Reports v2: per-member contribution counts within a set of retros.
+    index('card_retro_author_idx').on(table.retroId, table.authorId),
   ],
 );
 

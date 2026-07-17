@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf'
 import type { RetroDetail } from '@/common/types/retros'
 import { savePdf } from '@/lib/save-pdf'
 import type { CarriedForwardItem } from '../types'
@@ -37,10 +36,13 @@ function stripUnsupportedGlyphs(text: string): string {
  * discussion notes, and carried-forward items from the previous retro. Pure
  * client-side via jsPDF — no server round-trip.
  */
-export function exportRetroPdf(
+export async function exportRetroPdf(
   retro: RetroDetail,
   previousCarriedItems: CarriedForwardItem[],
 ): Promise<string | null> {
+  // Load jsPDF on demand so the ~380 kB library stays out of the route chunk
+  // and only downloads when the user actually exports.
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
 
   const pageWidth = doc.internal.pageSize.getWidth()

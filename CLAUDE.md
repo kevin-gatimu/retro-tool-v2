@@ -66,7 +66,7 @@ pnpm dev:convex    # Convex function watcher
 ### Per-package commands (run from repo root)
 
 ```bash
-pnpm --filter retro-tool-api  start:dev       # API watch mode
+pnpm --filter retro-tool-api  dev             # API watch mode
 pnpm --filter retro-tool-api  test            # Jest unit tests
 pnpm --filter retro-tool-api  test:ci         # Jest (serial, for CI)
 pnpm --filter retro-tool-api  type-check

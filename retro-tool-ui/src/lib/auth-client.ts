@@ -1,6 +1,6 @@
 import { createAuthClient } from 'better-auth/react'
 import { passkeyClient } from '@better-auth/passkey/client'
-import { jwtClient } from 'better-auth/client/plugins'
+import { jwtClient, multiSessionClient } from 'better-auth/client/plugins'
 import { env } from '#/env'
 
 // Storage key for the session bearer token. The bearer is the primary API
@@ -60,7 +60,9 @@ export const authClient = createAuthClient({
   // authClient.passkey.{addPasskey,listUserPasskeys,updatePasskey,deletePasskey}.
   // jwtClient adds authClient.token() — used to fetch the RS256 JWT that
   // authenticates the Convex client (see realtime-providers.tsx).
-  plugins: [passkeyClient(), jwtClient()],
+  // multiSessionClient types authClient.multiSession.{listDeviceSessions,setActive}
+  // (server has multiSession() enabled) — consumed by account-switcher.tsx.
+  plugins: [passkeyClient(), jwtClient(), multiSessionClient()],
   fetchOptions: {
     // Cookie kept as a fallback during the cookie→bearer rollout; the bearer
     // (below) is the primary credential when present.

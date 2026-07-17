@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
-import type { FunctionReference } from 'convex/server'
 import type { StandupEntryDetail } from '@/common/types/standups'
+import { convexApi } from '@/lib/convex-api'
 
-const standupBoardQuery =
-  'liveStandups:getStandupBoard' as unknown as FunctionReference<'query'>
+const standupBoardQuery = convexApi.liveStandups.getStandupBoard
 
 // Snapshots are untrusted JSON: ones written before `icebreakers`/`polls`
 // existed may omit those keys, so treat them as optional at the boundary.

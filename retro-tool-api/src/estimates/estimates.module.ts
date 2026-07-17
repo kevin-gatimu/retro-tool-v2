@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EstimatesService } from './estimates.service';
+import { EstimatesReportService } from './estimates-report.service';
 import { EstimatesProjectionSyncService } from './estimates-projection-sync.service';
 import { EstimatesController } from './estimates.controller';
 import { EstimatesGateway } from './estimates.gateway';
@@ -13,6 +14,7 @@ import { WsAuthModule } from '../auth/ws-auth.module';
   controllers: [EstimatesController],
   providers: [
     EstimatesService,
+    EstimatesReportService,
     EstimatesProjectionSyncService,
     EstimatesGateway,
   ],

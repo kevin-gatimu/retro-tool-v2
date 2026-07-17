@@ -23,6 +23,8 @@ import {
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { SurveysService } from './surveys.service';
+import { SurveysQueryService } from './surveys-query.service';
+import { SurveysEmailService } from './surveys-email.service';
 import { SurveysProjectionSyncService } from './surveys-projection-sync.service';
 import type { SessionUser } from '../common/types';
 import {
@@ -35,6 +37,12 @@ import {
   updateSurveySchema,
   UpdateSurveyDto,
   UpdateSurveyDtoClass,
+  sendSurveyEmailSchema,
+  SendSurveyEmailDto,
+  SendSurveyEmailDtoClass,
+  setSurveyClosedSchema,
+  SetSurveyClosedDto,
+  SetSurveyClosedDtoClass,
 } from './dtos';
 
 @ApiTags('surveys')
@@ -44,6 +52,8 @@ import {
 export class SurveysController {
   constructor(
     private readonly surveysService: SurveysService,
+    private readonly surveysQueryService: SurveysQueryService,
+    private readonly surveysEmailService: SurveysEmailService,
     private readonly surveysProjectionSync: SurveysProjectionSyncService,
   ) {}
 
@@ -51,7 +61,7 @@ export class SurveysController {
   @ApiOperation({ summary: 'List surveys visible to the current user' })
   @ApiResponse({ status: 200, description: 'Survey list' })
   getSurveys(@Session() session: SessionUser) {
-    return this.surveysService.getSurveys(session.user.id);
+    return this.surveysQueryService.getSurveys(session.user.id);
   }
 
   @Get('active-count')
@@ -60,7 +70,7 @@ export class SurveysController {
   })
   @ApiResponse({ status: 200, description: '{ count: number }' })
   getActiveCount(@Session() session: SessionUser) {
-    return this.surveysService.getActiveCount(session.user.id);
+    return this.surveysQueryService.getActiveCount(session.user.id);
   }
 
   @Post()
@@ -93,7 +103,7 @@ export class SurveysController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.surveysService.getSurvey(session.user.id, id);
+    return this.surveysQueryService.getSurvey(session.user.id, id);
   }
 
   @Patch(':id')
@@ -144,29 +154,37 @@ export class SurveysController {
       'Email the survey results to its audience (manager only). Recipients, if given, are restricted to the survey scope.',
   })
   @ApiParam({ name: 'id', type: String, description: 'Survey ID' })
+  @ApiBody({ type: SendSurveyEmailDtoClass })
   @ApiResponse({ status: 200, description: '{ sent: number }' })
+  @UsePipes(new ZodValidationPipe(sendSurveyEmailSchema))
   emailResults(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('recipients') recipients: string[] | undefined,
+    @Body() dto: SendSurveyEmailDto,
     @Session() session: SessionUser,
   ) {
-    return this.surveysService.emailResults(session.user.id, id, recipients);
+    return this.surveysEmailService.emailResults(
+      session.user.id,
+      id,
+      dto.recipients,
+    );
   }
 
   @Patch(':id/closed')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Close or reopen a survey (manager only)' })
   @ApiParam({ name: 'id', type: String, description: 'Survey ID' })
+  @ApiBody({ type: SetSurveyClosedDtoClass })
   @ApiResponse({ status: 200, description: '{ success: true }' })
+  @UsePipes(new ZodValidationPipe(setSurveyClosedSchema))
   async setClosed(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('isClosed') isClosed: boolean,
+    @Body() dto: SetSurveyClosedDto,
     @Session() session: SessionUser,
   ) {
     const result = await this.surveysService.setClosed(
       session.user.id,
       id,
-      isClosed === true,
+      dto.isClosed,
     );
     void this.surveysProjectionSync.syncSurveyProjection(id);
     return result;

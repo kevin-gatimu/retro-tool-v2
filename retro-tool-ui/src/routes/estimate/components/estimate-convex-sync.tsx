@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
-import type { FunctionReference } from 'convex/server'
 import type { EstimateSession } from '@/common/types/estimates'
+import { convexApi } from '@/lib/convex-api'
 
-const estimateBoardQuery =
-  'liveEstimates:getEstimateBoard' as unknown as FunctionReference<'query'>
+const estimateBoardQuery = convexApi.liveEstimates.getEstimateBoard
 
 type EstimateBoardSnapshot = {
   session: EstimateSession

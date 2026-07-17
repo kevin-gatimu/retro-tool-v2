@@ -22,10 +22,15 @@ type ShowSaveFilePicker = (
   options?: SaveFilePickerOptions,
 ) => Promise<FileSystemFileHandleLike>
 
+// Augment the DOM lib so `window.showSaveFilePicker` is typed without a cast.
+declare global {
+  interface Window {
+    showSaveFilePicker?: ShowSaveFilePicker
+  }
+}
+
 function getSaveFilePicker(): ShowSaveFilePicker | null {
-  const picker = (
-    window as unknown as { showSaveFilePicker?: ShowSaveFilePicker }
-  ).showSaveFilePicker
+  const picker = window.showSaveFilePicker
   return typeof picker === 'function' ? picker : null
 }
 

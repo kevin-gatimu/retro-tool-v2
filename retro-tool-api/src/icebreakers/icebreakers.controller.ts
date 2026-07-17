@@ -16,10 +16,13 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
+  ApiBody,
 } from '@nestjs/swagger';
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { IcebreakersService } from './icebreakers.service';
+import { IcebreakersQueryService } from './icebreakers-query.service';
+import { IcebreakersCreationService } from './icebreakers-creation.service';
 import { IcebreakersGateway } from './icebreakers.gateway';
 import { IcebreakersProjectionSyncService } from './icebreakers-projection-sync.service';
 import { StandupsGateway } from '../standups/standups.gateway';
@@ -31,7 +34,18 @@ import {
   SwipePromptSchema,
   SwipePromptBody,
   SwipePromptDto,
+  StartTimerSchema,
+  StartTimerBody,
+  StartTimerDto,
+  UpdateSessionSchema,
+  UpdateSessionBody,
+  UpdateSessionDto,
 } from './dtos';
+
+// The `*Body` classes exist only for Swagger (@ApiBody) — their fields are
+// widened (e.g. `selectionMode: string`). The ZodValidationPipe parses the
+// request into the narrow `*Dto` (z.infer) shape at runtime, so the handler
+// receives a validated DTO; document with @ApiBody and type @Body as the DTO.
 
 @ApiTags('icebreakers')
 @Controller('icebreakers')
@@ -40,6 +54,8 @@ import {
 export class IcebreakersController {
   constructor(
     private readonly icebreakersService: IcebreakersService,
+    private readonly icebreakersQueryService: IcebreakersQueryService,
+    private readonly icebreakersCreationService: IcebreakersCreationService,
     private readonly icebreakersGateway: IcebreakersGateway,
     private readonly icebreakersProjectionSyncService: IcebreakersProjectionSyncService,
     private readonly standupsGateway: StandupsGateway,
@@ -62,14 +78,14 @@ export class IcebreakersController {
   })
   @ApiResponse({ status: 200, description: 'Session list' })
   getSessions(@Session() session: SessionUser) {
-    return this.icebreakersService.getSessions(session.user.id);
+    return this.icebreakersQueryService.getSessions(session.user.id);
   }
 
   @Get('active')
   @ApiOperation({ summary: 'List active (non-completed) icebreaker sessions' })
   @ApiResponse({ status: 200, description: 'Active session list' })
   getActiveSessions(@Session() session: SessionUser) {
-    return this.icebreakersService.getActiveSessions(session.user.id);
+    return this.icebreakersQueryService.getActiveSessions(session.user.id);
   }
 
   @Get('history')
@@ -84,7 +100,7 @@ export class IcebreakersController {
     @Query('teamId') teamId?: string,
     @Query('search') search?: string,
   ) {
-    return this.icebreakersService.getHistory(
+    return this.icebreakersQueryService.getHistory(
       session.user.id,
       page ? Math.max(1, parseInt(page, 10)) : 1,
       limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 15,
@@ -103,20 +119,21 @@ export class IcebreakersController {
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.icebreakersService.getSession(session.user.id, id);
+    return this.icebreakersQueryService.getSession(session.user.id, id);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a new icebreaker session' })
+  @ApiBody({ type: CreateIcebreakerSessionBody })
   @ApiResponse({ status: 201, description: '{ id: string }' })
   @UsePipes(new ZodValidationPipe(CreateIcebreakerSessionSchema))
   async createSession(
     @Session() session: SessionUser,
-    @Body() body: CreateIcebreakerSessionBody,
+    @Body() body: CreateIcebreakerSessionDto,
   ) {
-    const result = await this.icebreakersService.createSession(
+    const result = await this.icebreakersCreationService.createSession(
       session.user.id,
-      body as unknown as CreateIcebreakerSessionDto,
+      body,
     );
     this.icebreakersGateway.emitSessionChanged(result.id);
     await this.emitStandupIfAttached(result.id);
@@ -143,18 +160,18 @@ export class IcebreakersController {
   @ApiOperation({
     summary: 'Facilitator keeps or skips a specific prompt card',
   })
+  @ApiBody({ type: SwipePromptBody })
   @UsePipes(new ZodValidationPipe(SwipePromptSchema))
   async swipePrompt(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: SwipePromptBody,
+    @Body() body: SwipePromptDto,
   ) {
-    const dto = body as unknown as SwipePromptDto;
     const result = await this.icebreakersService.swipePrompt(
       id,
       session.user.id,
-      dto.decision,
-      dto.sessionPromptId,
+      body.decision,
+      body.sessionPromptId,
     );
     this.icebreakersGateway.emitSessionChanged(id);
     await this.emitStandupIfAttached(id);
@@ -180,15 +197,17 @@ export class IcebreakersController {
 
   @Post(':id/timer')
   @ApiOperation({ summary: 'Start a countdown timer for the current prompt' })
+  @ApiBody({ type: StartTimerBody })
+  @UsePipes(new ZodValidationPipe(StartTimerSchema))
   async startTimer(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('duration') duration: number,
+    @Body() body: StartTimerDto,
   ) {
     const result = await this.icebreakersService.startTimer(
       id,
       session.user.id,
-      duration,
+      body.duration,
     );
     this.icebreakersGateway.emitSessionChanged(id);
     return result;
@@ -196,11 +215,16 @@ export class IcebreakersController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update session name' })
+  @ApiBody({ type: UpdateSessionBody })
+  @UsePipes(new ZodValidationPipe(UpdateSessionSchema))
   async updateSession(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('name') name: string,
+    @Body() body: UpdateSessionDto,
   ) {
-    const result = await this.icebreakersService.updateSessionName(id, name);
+    const result = await this.icebreakersService.updateSessionName(
+      id,
+      body.name,
+    );
     this.icebreakersGateway.emitSessionChanged(id);
     await this.emitStandupIfAttached(id);
     return result;

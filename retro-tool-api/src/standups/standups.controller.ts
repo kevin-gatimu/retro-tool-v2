@@ -25,6 +25,10 @@ import {
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { StandupsService } from './standups.service';
+import { StandupsQueryService } from './standups-query.service';
+import { StandupsEntriesService } from './standups-entries.service';
+import { StandupsSubmissionsService } from './standups-submissions.service';
+import { StandupsReportService } from './standups-report.service';
 import { StandupsGateway } from './standups.gateway';
 import { StandupsProjectionSyncService } from './standups-projection-sync.service';
 import type { SessionUser } from '../common/types';
@@ -56,6 +60,10 @@ import {
 export class StandupsController {
   constructor(
     private readonly standupsService: StandupsService,
+    private readonly standupsQueryService: StandupsQueryService,
+    private readonly standupsEntriesService: StandupsEntriesService,
+    private readonly standupsSubmissionsService: StandupsSubmissionsService,
+    private readonly standupsReportService: StandupsReportService,
     private readonly standupsGateway: StandupsGateway,
     private readonly standupsProjectionSyncService: StandupsProjectionSyncService,
   ) {}
@@ -68,7 +76,7 @@ export class StandupsController {
   @ApiOperation({ summary: "List standups for the current user's teams" })
   @ApiResponse({ status: 200, description: 'Standup list' })
   getStandups(@Session() session: SessionUser) {
-    return this.standupsService.getStandups(session.user.id);
+    return this.standupsQueryService.getStandups(session.user.id);
   }
 
   @Get('activity')
@@ -85,7 +93,7 @@ export class StandupsController {
     @Query('from') from: string,
     @Query('to') to: string,
   ) {
-    return this.standupsService.getActivity(session.user.id, from, to);
+    return this.standupsQueryService.getActivity(session.user.id, from, to);
   }
 
   @Post()
@@ -180,7 +188,11 @@ export class StandupsController {
     @Param('date') date: string,
     @Session() session: SessionUser,
   ) {
-    return this.standupsService.getEntryDetail(session.user.id, id, date);
+    return this.standupsEntriesService.getEntryDetail(
+      session.user.id,
+      id,
+      date,
+    );
   }
 
   @Put(':id/entries/:date/submission')
@@ -200,7 +212,7 @@ export class StandupsController {
     @Body() body: SubmitStandupDto,
     @Session() session: SessionUser,
   ) {
-    const result = await this.standupsService.upsertSubmission(
+    const result = await this.standupsSubmissionsService.upsertSubmission(
       session.user.id,
       id,
       date,
@@ -221,7 +233,7 @@ export class StandupsController {
     @Param('date') date: string,
     @Session() session: SessionUser,
   ) {
-    const result = await this.standupsService.deleteSubmission(
+    const result = await this.standupsSubmissionsService.deleteSubmission(
       session.user.id,
       id,
       date,
@@ -286,7 +298,11 @@ export class StandupsController {
     @Body() body: SendStandupReportDto,
     @Session() session: SessionUser,
   ) {
-    return this.standupsService.sendStandupReport(session.user.id, id, body);
+    return this.standupsReportService.sendStandupReport(
+      session.user.id,
+      id,
+      body,
+    );
   }
 
   // ============================================================================
@@ -304,7 +320,7 @@ export class StandupsController {
     @Body() body: CreateStandupCommentDto,
     @Session() session: SessionUser,
   ) {
-    const result = await this.standupsService.addComment(
+    const result = await this.standupsSubmissionsService.addComment(
       session.user.id,
       submissionId,
       body,
@@ -322,7 +338,7 @@ export class StandupsController {
     @Param('commentId', ParseUUIDPipe) commentId: string,
     @Session() session: SessionUser,
   ) {
-    const result = await this.standupsService.deleteComment(
+    const result = await this.standupsSubmissionsService.deleteComment(
       session.user.id,
       commentId,
     );
@@ -346,7 +362,7 @@ export class StandupsController {
     @Body() body: AddStandupReactionDto,
     @Session() session: SessionUser,
   ) {
-    const result = await this.standupsService.addReaction(
+    const result = await this.standupsSubmissionsService.addReaction(
       session.user.id,
       submissionId,
       body.emoji,
@@ -366,7 +382,7 @@ export class StandupsController {
     @Param('emoji') emoji: string,
     @Session() session: SessionUser,
   ) {
-    const result = await this.standupsService.removeReaction(
+    const result = await this.standupsSubmissionsService.removeReaction(
       session.user.id,
       submissionId,
       decodeURIComponent(emoji),

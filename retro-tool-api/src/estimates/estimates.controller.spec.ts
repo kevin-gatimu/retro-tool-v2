@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EstimatesController } from './estimates.controller';
 import { EstimatesService } from './estimates.service';
+import { EstimatesReportService } from './estimates-report.service';
 import { EstimatesGateway } from './estimates.gateway';
 
 describe('EstimatesController', () => {
@@ -11,6 +12,7 @@ describe('EstimatesController', () => {
       controllers: [EstimatesController],
       providers: [
         { provide: EstimatesService, useValue: {} },
+        { provide: EstimatesReportService, useValue: {} },
         {
           provide: EstimatesGateway,
           useValue: { emitSessionChanged: jest.fn() },

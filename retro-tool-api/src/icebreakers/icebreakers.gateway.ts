@@ -65,6 +65,14 @@ export class IcebreakersGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
+    // Authorize per event: handshake auth proves identity, not membership. Without
+    // this a non-member socket could join any session by ID (SECURITY-ASSESSMENT F2).
+    const isMember = await this.icebreakersService.isSessionMember(
+      data.sessionId,
+      userId,
+    );
+    if (!isMember) return;
+
     await this.icebreakersService.upsertParticipant(
       data.sessionId,
       userId,

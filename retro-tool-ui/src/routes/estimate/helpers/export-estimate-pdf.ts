@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf'
 import type { EstimateSession } from '@/common/types/estimates'
 import { savePdf } from '@/lib/save-pdf'
 import {
@@ -41,9 +40,12 @@ function stripUnsupportedGlyphs(text: string): string {
  * votes. Pure client-side via jsPDF — no server round-trip. Prompts for a save
  * location when supported; returns the filename, or `null` if cancelled.
  */
-export function exportEstimatePdf(
+export async function exportEstimatePdf(
   session: EstimateSession,
 ): Promise<string | null> {
+  // Load jsPDF on demand so the ~380 kB library stays out of the route chunk
+  // and only downloads when the user actually exports.
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
 
   const pageWidth = doc.internal.pageSize.getWidth()

@@ -167,8 +167,9 @@ export function useStandupEntryMutations(standupId: string, date: string) {
 /**
  * Skip/unskip mutation that targets an arbitrary date (not bound to a single
  * viewed day), for the multi-day skip manager. Optimistically patches the
- * viewed entry's nested `standup.skippedDays` so any open calendar reflects the
- * toggle instantly, and rolls back on error.
+ * `['standup', standupId]` cache the calendar reads from so the toggle shows
+ * instantly, then reconciles to authoritative server state via invalidation in
+ * onSettled (no snapshot rollback, to avoid clobbering a concurrent toggle).
  */
 export function useStandupSkipMutations(standupId: string) {
   const queryClient = useQueryClient()

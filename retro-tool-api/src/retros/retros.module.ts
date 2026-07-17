@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { RetrosService } from './retros.service';
+import { RetrosTemplatesService } from './retros-templates.service';
 import { RetrosController } from './retros.controller';
 import { RetrosGateway } from './retros.gateway';
 import { RetrosProjectionSyncService } from './retros-projection-sync.service';
@@ -11,7 +12,12 @@ import { WsAuthModule } from '../auth/ws-auth.module';
 @Module({
   imports: [DatabaseModule, NotificationsModule, EmailModule, WsAuthModule],
   controllers: [RetrosController],
-  providers: [RetrosService, RetrosGateway, RetrosProjectionSyncService],
+  providers: [
+    RetrosService,
+    RetrosTemplatesService,
+    RetrosGateway,
+    RetrosProjectionSyncService,
+  ],
   exports: [RetrosGateway],
 })
 export class RetrosModule {}

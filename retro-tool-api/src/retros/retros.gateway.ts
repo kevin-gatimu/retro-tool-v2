@@ -11,6 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import type { ClientData } from '../common/types';
 import { type TRetroStatus } from '../common/enums';
+import { RetrosService } from './retros.service';
 import { RetrosProjectionSyncService } from './retros-projection-sync.service';
 import { WsAuthService } from '../auth/ws-auth';
 
@@ -24,6 +25,7 @@ export class RetrosGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(RetrosGateway.name);
 
   constructor(
+    private readonly retrosService: RetrosService,
     private readonly retrosProjectionSyncService: RetrosProjectionSyncService,
     private readonly wsAuth: WsAuthService,
   ) {}
@@ -51,7 +53,19 @@ export class RetrosGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { retroId: string },
   ): Promise<void> {
-    if (!data?.retroId) return;
+    const { userId } = client.data as ClientData;
+    if (!userId || !data?.retroId) return;
+
+    // Authorize per event: handshake auth proves identity, not membership. Without
+    // this a non-member socket could join any retro by ID and receive its realtime
+    // board/card updates (SECURITY-ASSESSMENT F2). The REST getRetro path checks
+    // the same membership.
+    const isMember = await this.retrosService.isRetroMember(
+      data.retroId,
+      userId,
+    );
+    if (!isMember) return;
+
     await client.join(`retro:${data.retroId}`);
   }
 

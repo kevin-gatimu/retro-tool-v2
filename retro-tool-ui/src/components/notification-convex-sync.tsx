@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
-import type { FunctionReference } from 'convex/server'
 import type { Notification } from '@/common/types/notifications'
+import { convexApi } from '@/lib/convex-api'
 
 interface NotificationProjection {
   notificationId: string
@@ -20,8 +20,7 @@ interface NotificationConvexSyncProps {
   userId: string
 }
 
-const userNotificationsQuery =
-  'liveNotifications:listUserNotifications' as unknown as FunctionReference<'query'>
+const userNotificationsQuery = convexApi.liveNotifications.listUserNotifications
 
 export function NotificationConvexSync({
   userId,

@@ -7,7 +7,7 @@ import type { Config } from '../config/configuration';
 import type { ConvexFunctionResponse } from '../common/types';
 import * as icebreakersSchema from './schema';
 import * as teamSchema from '../teams/schema';
-import { IcebreakersService } from './icebreakers.service';
+import { IcebreakersQueryService } from './icebreakers-query.service';
 
 type Database = NodePgDatabase<typeof icebreakersSchema & typeof teamSchema>;
 
@@ -18,7 +18,7 @@ export class IcebreakersProjectionSyncService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly configService: ConfigService<Config, true>,
-    private readonly icebreakersService: IcebreakersService,
+    private readonly icebreakersQueryService: IcebreakersQueryService,
   ) {}
 
   async syncSessionProjection(sessionId: string): Promise<void> {
@@ -83,7 +83,7 @@ export class IcebreakersProjectionSyncService {
     await Promise.all(
       members.map(async ({ userId }) => {
         try {
-          const session = await this.icebreakersService.getSession(
+          const session = await this.icebreakersQueryService.getSession(
             userId,
             sessionId,
           );

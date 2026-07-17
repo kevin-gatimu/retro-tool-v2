@@ -17,6 +17,9 @@ import {
 } from '@nestjs/common';
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { TeamsService } from './teams.service';
+import { TeamsQueryService } from './teams-query.service';
+import { TeamsMembersService } from './teams-members.service';
+import { TeamsJoinRequestsService } from './teams-join-requests.service';
 import type { SessionUser } from '../common/types';
 import {
   createTeamSchema,
@@ -27,6 +30,18 @@ import {
   AddTeamMemberDto,
   updateTeamMemberSchema,
   UpdateTeamMemberDto,
+  updateMemberJobRoleSchema,
+  UpdateMemberJobRoleDto,
+  UpdateMemberJobRoleDtoClass,
+  createJoinRequestSchema,
+  CreateJoinRequestDto,
+  CreateJoinRequestDtoClass,
+  rejectJoinRequestSchema,
+  RejectJoinRequestDto,
+  RejectJoinRequestDtoClass,
+  bulkApproveJoinRequestsSchema,
+  BulkApproveJoinRequestsDto,
+  BulkApproveJoinRequestsDtoClass,
 } from './dto';
 import {
   ApiTags,
@@ -35,6 +50,7 @@ import {
   ApiBearerAuth,
   ApiQuery,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
@@ -43,7 +59,12 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 @UseGuards(AuthGuard)
 @ApiBearerAuth('session')
 export class TeamsController {
-  constructor(private readonly teamsService: TeamsService) {}
+  constructor(
+    private readonly teamsService: TeamsService,
+    private readonly teamsQueryService: TeamsQueryService,
+    private readonly teamsMembersService: TeamsMembersService,
+    private readonly teamsJoinRequestsService: TeamsJoinRequestsService,
+  ) {}
 
   // Permission enforced in service (system admins + org admins allowed)
   @Post()
@@ -88,7 +109,7 @@ export class TeamsController {
     @Query('search') search?: string,
   ) {
     if (organizationId) {
-      return this.teamsService.getOrganizationTeams(
+      return this.teamsQueryService.getOrganizationTeams(
         session.user.id,
         organizationId,
         page,
@@ -97,7 +118,12 @@ export class TeamsController {
       );
     }
 
-    return this.teamsService.getUserTeams(session.user.id, page, limit, search);
+    return this.teamsQueryService.getUserTeams(
+      session.user.id,
+      page,
+      limit,
+      search,
+    );
   }
 
   // Team membership validated in service
@@ -115,7 +141,7 @@ export class TeamsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.getTeamById(session.user.id, id);
+    return this.teamsQueryService.getTeamById(session.user.id, id);
   }
 
   // Org admin + team lead logic handled in service
@@ -185,7 +211,12 @@ export class TeamsController {
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.getTeamMembers(session.user.id, id, page, limit);
+    return this.teamsMembersService.getTeamMembers(
+      session.user.id,
+      id,
+      page,
+      limit,
+    );
   }
 
   // Org admin + team lead logic handled in service
@@ -210,7 +241,7 @@ export class TeamsController {
     @Body() body: AddTeamMemberDto,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.addTeamMember(session.user.id, id, body);
+    return this.teamsMembersService.addTeamMember(session.user.id, id, body);
   }
 
   // Org admin + team lead logic handled in service
@@ -239,7 +270,7 @@ export class TeamsController {
     @Param('memberId', ParseUUIDPipe) memberId: string,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.removeTeamMember(
+    return this.teamsMembersService.removeTeamMember(
       session.user.id,
       teamId,
       memberId,
@@ -274,7 +305,7 @@ export class TeamsController {
     @Body() body: UpdateTeamMemberDto,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.updateTeamMemberRole(
+    return this.teamsMembersService.updateTeamMemberRole(
       session.user.id,
       teamId,
       memberId,
@@ -297,17 +328,19 @@ export class TeamsController {
     description: 'Member ID',
   })
   @ApiResponse({ status: 200, description: 'Job role updated' })
+  @ApiBody({ type: UpdateMemberJobRoleDtoClass })
+  @UsePipes(new ZodValidationPipe(updateMemberJobRoleSchema))
   async updateMemberJobRole(
     @Param('teamId', ParseUUIDPipe) teamId: string,
     @Param('memberId', ParseUUIDPipe) memberId: string,
-    @Body('roleId') teamRoleId: string | null,
+    @Body() body: UpdateMemberJobRoleDto,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.updateTeamMemberJobRole(
+    return this.teamsMembersService.updateTeamMemberJobRole(
       session.user.id,
       teamId,
       memberId,
-      teamRoleId ?? null,
+      body.roleId ?? null,
     );
   }
 
@@ -329,7 +362,7 @@ export class TeamsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.joinTeam(session.user.id, id);
+    return this.teamsMembersService.joinTeam(session.user.id, id);
   }
 
   @Post(':id/leave')
@@ -346,7 +379,7 @@ export class TeamsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.leaveTeam(session.user.id, id);
+    return this.teamsMembersService.leaveTeam(session.user.id, id);
   }
 
   // ===========================================================================
@@ -362,12 +395,18 @@ export class TeamsController {
     description: 'Team ID',
   })
   @ApiResponse({ status: 201, description: 'Join request created' })
+  @ApiBody({ type: CreateJoinRequestDtoClass })
+  @UsePipes(new ZodValidationPipe(createJoinRequestSchema))
   async createJoinRequest(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('message') message: string | undefined,
+    @Body() body: CreateJoinRequestDto,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.createJoinRequest(session.user.id, id, message);
+    return this.teamsJoinRequestsService.createJoinRequest(
+      session.user.id,
+      id,
+      body.message,
+    );
   }
 
   @Get(':id/join-requests')
@@ -383,7 +422,7 @@ export class TeamsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.getJoinRequests(session.user.id, id);
+    return this.teamsJoinRequestsService.getJoinRequests(session.user.id, id);
   }
 
   @Get(':id/join-requests/:requestId')
@@ -406,7 +445,11 @@ export class TeamsController {
     @Param('requestId', ParseUUIDPipe) requestId: string,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.getJoinRequest(session.user.id, id, requestId);
+    return this.teamsJoinRequestsService.getJoinRequest(
+      session.user.id,
+      id,
+      requestId,
+    );
   }
 
   @Delete(':id/join-requests/:requestId')
@@ -430,7 +473,11 @@ export class TeamsController {
     @Param('requestId', ParseUUIDPipe) requestId: string,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.cancelJoinRequest(session.user.id, id, requestId);
+    return this.teamsJoinRequestsService.cancelJoinRequest(
+      session.user.id,
+      id,
+      requestId,
+    );
   }
 
   @Post(':id/join-requests/:requestId/approve')
@@ -454,7 +501,11 @@ export class TeamsController {
     @Param('requestId', ParseUUIDPipe) requestId: string,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.approveJoinRequest(session.user.id, id, requestId);
+    return this.teamsJoinRequestsService.approveJoinRequest(
+      session.user.id,
+      id,
+      requestId,
+    );
   }
 
   @Post(':id/join-requests/:requestId/reject')
@@ -473,17 +524,19 @@ export class TeamsController {
     description: 'Request ID',
   })
   @ApiResponse({ status: 200, description: 'Join request rejected' })
+  @ApiBody({ type: RejectJoinRequestDtoClass })
+  @UsePipes(new ZodValidationPipe(rejectJoinRequestSchema))
   async rejectJoinRequest(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('requestId', ParseUUIDPipe) requestId: string,
-    @Body('reviewNote') reviewNote: string | undefined,
+    @Body() body: RejectJoinRequestDto,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.rejectJoinRequest(
+    return this.teamsJoinRequestsService.rejectJoinRequest(
       session.user.id,
       id,
       requestId,
-      reviewNote,
+      body.reviewNote,
     );
   }
 
@@ -497,15 +550,17 @@ export class TeamsController {
     description: 'Team ID',
   })
   @ApiResponse({ status: 200, description: 'Requests approved' })
+  @ApiBody({ type: BulkApproveJoinRequestsDtoClass })
+  @UsePipes(new ZodValidationPipe(bulkApproveJoinRequestsSchema))
   async bulkApproveJoinRequests(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('requestIds') requestIds: string[],
+    @Body() body: BulkApproveJoinRequestsDto,
     @Session() session: SessionUser,
   ) {
-    return this.teamsService.bulkApproveJoinRequests(
+    return this.teamsJoinRequestsService.bulkApproveJoinRequests(
       session.user.id,
       id,
-      requestIds,
+      body.requestIds,
     );
   }
 
@@ -513,6 +568,8 @@ export class TeamsController {
   @ApiOperation({ summary: 'Get all pending join requests (system admin)' })
   @ApiResponse({ status: 200, description: 'All pending join requests' })
   async getAllPendingJoinRequests(@Session() session: SessionUser) {
-    return this.teamsService.getAllPendingJoinRequests(session.user.id);
+    return this.teamsJoinRequestsService.getAllPendingJoinRequests(
+      session.user.id,
+    );
   }
 }

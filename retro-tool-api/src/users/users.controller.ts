@@ -21,6 +21,8 @@ import {
   Session,
 } from '@thallesp/nestjs-better-auth';
 import { UsersService } from './users.service';
+import { UsersQueryService } from './users-query.service';
+import { UsersAdminService } from './users-admin.service';
 import {
   updateStatusSchema,
   UpdateStatusDto,
@@ -53,6 +55,8 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
+    private readonly usersQueryService: UsersQueryService,
+    private readonly usersAdminService: UsersAdminService,
     private readonly commonService: CommonService,
   ) {}
 
@@ -161,7 +165,7 @@ export class UsersController {
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
-    return this.usersService.findAll(session.user.id, {
+    return this.usersQueryService.findAll(session.user.id, {
       search,
       status,
       role,
@@ -190,7 +194,7 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.usersService.findOne(session.user.id, id);
+    return this.usersQueryService.findOne(session.user.id, id);
   }
 
   /**
@@ -212,7 +216,7 @@ export class UsersController {
     @Body() body: UpdateStatusDto,
     @Session() session: SessionUser,
   ) {
-    return this.usersService.updateStatus(session.user.id, id, body);
+    return this.usersAdminService.updateStatus(session.user.id, id, body);
   }
 
   /**
@@ -234,7 +238,7 @@ export class UsersController {
     @Body() body: UpdateRoleDto,
     @Session() session: SessionUser,
   ) {
-    return this.usersService.updateRole(session.user.id, id, body);
+    return this.usersAdminService.updateRole(session.user.id, id, body);
   }
 
   /**
@@ -251,7 +255,7 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.usersService.promoteToSystemAdmin(session.user.id, id);
+    return this.usersAdminService.promoteToSystemAdmin(session.user.id, id);
   }
 
   /**
@@ -268,7 +272,10 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.usersService.demoteSystemAdminToMember(session.user.id, id);
+    return this.usersAdminService.demoteSystemAdminToMember(
+      session.user.id,
+      id,
+    );
   }
 
   /**
@@ -310,7 +317,7 @@ export class UsersController {
     @Body() body: SuspendUserDto,
     @Session() session: SessionUser,
   ) {
-    return this.usersService.suspendUser(session.user.id, id, body);
+    return this.usersAdminService.suspendUser(session.user.id, id, body);
   }
 
   /**
@@ -330,7 +337,7 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.usersService.reactivateUser(session.user.id, id);
+    return this.usersAdminService.reactivateUser(session.user.id, id);
   }
 
   /**
@@ -349,7 +356,7 @@ export class UsersController {
     @Body() body: BulkUpdateStatusDto,
     @Session() session: SessionUser,
   ) {
-    return this.usersService.bulkUpdateStatus(session.user.id, body);
+    return this.usersAdminService.bulkUpdateStatus(session.user.id, body);
   }
 
   /**
@@ -361,7 +368,7 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.usersService.getUserDetails(session.user.id, id);
+    return this.usersQueryService.getUserDetails(session.user.id, id);
   }
 
   /**
@@ -378,7 +385,7 @@ export class UsersController {
     dateRange?: 'today' | 'week' | 'month' | 'year',
     @Query('adminRole') adminRole?: string,
   ) {
-    return this.usersService.getAdminActionLog(session.user.id, {
+    return this.usersQueryService.getAdminActionLog(session.user.id, {
       page,
       limit,
       userId,
@@ -405,6 +412,6 @@ export class UsersController {
   @Post('admin/bootstrap')
   @UseGuards(AuthGuard)
   async bootstrapFirstAdmin(@Session() session: SessionUser) {
-    return this.usersService.bootstrapFirstAdmin(session.user.id);
+    return this.usersAdminService.bootstrapFirstAdmin(session.user.id);
   }
 }

@@ -121,6 +121,27 @@ Any authenticated team member can create and participate in retros. Control acti
 
 ---
 
+## Reports Access (v2 dashboards)
+
+Enforced by dedicated guards in `retro-tool-api/src/reports/guards/` (not service asserts).
+Lead status comes from `teamMember.tag === 'team-lead'` with the standard admin cascade
+(`isTeamLead()` is also true for org-owner/org-admin/system-admin/super-admin). The `user.role`
+legacy values are never consulted.
+
+| Endpoint | member | team-lead | org-owner / org-admin | system-admin / super-admin |
+|----------|:------:|:---------:|:---------------------:|:--------------------------:|
+| `GET /reports/v2/me` (always self-scoped) | ✓ | ✓ | ✓ | ✓ |
+| `GET /reports/v2/teams/:teamId` (aggregate) | ✓ (own team) | ✓ | ✓ (own org) | ✓ |
+| — `memberBreakdown` field in the payload | | ✓ | ✓ (own org) | ✓ |
+| `GET /reports/v2/teams/:teamId/members` | | ✓ | ✓ (own org) | ✓ |
+| `GET /reports/v2/organizations/:orgId` (+`/teams`) | | | ✓ (own org) | ✓ |
+| `GET /reports/v2/platform` (+`/organizations`) | | | | ✓ |
+
+Response shaping is server-side: a plain member calling the team endpoint receives the aggregate
+`TeamReport` without `memberBreakdown` — the client never has to hide fields.
+
+---
+
 ## Type Definitions
 
 ### Backend (`src/lib/rbac.ts`)

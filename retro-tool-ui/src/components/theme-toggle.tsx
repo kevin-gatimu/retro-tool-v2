@@ -9,6 +9,14 @@ import {
 import { useTheme } from '@/hooks/use-theme'
 import type { Theme } from '@/hooks/use-theme'
 
+function currentThemeIcon(
+  theme: Theme,
+  resolvedTheme: 'light' | 'dark',
+): typeof Sun {
+  if (theme === 'system') return Monitor
+  return resolvedTheme === 'dark' ? Moon : Sun
+}
+
 export function ThemeToggle() {
   const { theme, setTheme, resolvedTheme } = useTheme()
 
@@ -18,8 +26,7 @@ export function ThemeToggle() {
     { value: 'system', label: 'System', icon: Monitor },
   ]
 
-  const CurrentIcon =
-    theme === 'system' ? Monitor : resolvedTheme === 'dark' ? Moon : Sun
+  const CurrentIcon = currentThemeIcon(theme, resolvedTheme)
 
   return (
     <DropdownMenu>

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   ArrowRight,
@@ -33,14 +33,12 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
-import { ICEBREAKERS_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
+import { ICEBREAKERS_ENDPOINTS } from '@/lib/api-endpoints'
 import type {
   IcebreakerHistoryResponse,
   IcebreakerSessionSummary,
 } from '@/common/types/icebreakers'
-import type { Team } from '@/common/types/teams'
 import { usesConvexForIcebreakers } from '@/lib/realtime-config'
-import { SpaceSwitcher } from '@/components/spaces/space-switcher'
 import { ViewConfigToolbar } from '@/components/spaces/view-config-toolbar'
 import { GroupedSessionView } from '@/components/spaces/grouped-session-view'
 import { LoadMoreFooter } from '@/components/spaces/load-more-footer'
@@ -49,10 +47,8 @@ import { useSessionList } from '@/components/spaces/use-session-list'
 import type { StatusBucket } from '@/components/spaces/utils'
 import {
   SPACE_ALL,
-  deriveSpaces,
   icebreakerStatusBucket,
   nextCollapsedGroups,
-  toggleFavorite,
 } from '@/components/spaces/utils'
 import { useSessionViewPreferences } from '@/hooks/use-session-view-preferences'
 import { IcebreakerListConvexSync } from './components/icebreaker-list-convex-sync'
@@ -149,14 +145,6 @@ async function fetchCompletedIcebreakers(
   }
 }
 
-function teamsQueryOptions() {
-  return {
-    queryKey: ['teams'] as const,
-    queryFn: () => api.get<{ teams: Team[] }>(TEAMS_ENDPOINTS.LIST),
-    staleTime: 60_000,
-  }
-}
-
 // ─── Route ───────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute('/icebreakers/')({
@@ -165,10 +153,18 @@ export const Route = createFileRoute('/icebreakers/')({
 
 function IcebreakerIndexPage() {
   const usesConvexRealtime = usesConvexForIcebreakers()
-  const { view, setView } = useSessionViewPreferences('icebreakers')
-  const { data: teamsData } = useQuery(teamsQueryOptions())
+  const { view: storedView, setView } = useSessionViewPreferences('icebreakers')
+  // The space switcher was removed, so `space` is no longer selectable. Force
+  // "All Spaces" so a previously-persisted team filter can't permanently strand
+  // the list (it's still read by teamScope + GroupedSessionView below).
+  const view =
+    storedView.space === SPACE_ALL
+      ? storedView
+      : { ...storedView, space: SPACE_ALL }
 
-  // Debounced search (scoped to completed/history server-side).
+  // Debounced search. Completed/history is searched server-side (in the
+  // fetcher); ongoing is searched client-side below (it's always a small,
+  // fully-loaded list), so a single box covers both buckets.
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   useEffect(() => {
@@ -199,9 +195,17 @@ function IcebreakerIndexPage() {
     completedEnabled: view.showCompleted,
   })
 
-  const items = [...ongoing, ...completed]
-  const totalCount = ongoing.length + completedTotal
-  const spaces = deriveSpaces(teamsData?.teams ?? [], items)
+  // Ongoing sessions are fully loaded client-side, so filter them here by the
+  // same term the history fetcher applies server-side — one box, both buckets.
+  const q = search.trim().toLowerCase()
+  const filteredOngoing = q
+    ? ongoing.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.teamName.toLowerCase().includes(q),
+      )
+    : ongoing
+  const items = [...filteredOngoing, ...completed]
 
   const renderItem = (item: IcebreakerListItem) =>
     item.kind === 'ongoing' ? (
@@ -241,17 +245,6 @@ function IcebreakerIndexPage() {
         </Button>
       </div>
 
-      <SpaceSwitcher
-        spaces={spaces}
-        value={view.space}
-        onChange={(space) => setView({ space })}
-        favorites={view.favorites}
-        onToggleFavorite={(teamId) =>
-          setView({ favorites: toggleFavorite(view.favorites, teamId) })
-        }
-        totalCount={totalCount}
-      />
-
       <div className="flex flex-wrap items-center justify-between gap-4">
         <ViewConfigToolbar view={view} setView={setView} />
         <div className="flex items-center gap-2">
@@ -260,7 +253,7 @@ function IcebreakerIndexPage() {
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search completed…"
+              placeholder="Search sessions…"
               className="pl-9 h-8"
             />
           </div>
@@ -282,7 +275,6 @@ function IcebreakerIndexPage() {
       <GroupedSessionView
         items={items}
         view={view}
-        spaces={spaces}
         getId={(s) => s.id}
         getTeamId={(s) => s.teamId}
         getTeamName={(s) => s.teamName}

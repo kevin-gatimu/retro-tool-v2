@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard, Roles, Session } from '@thallesp/nestjs-better-auth';
 import { RetrosService } from './retros.service';
+import { RetrosTemplatesService } from './retros-templates.service';
 import { RetrosGateway } from './retros.gateway';
 import { RetrosProjectionSyncService } from './retros-projection-sync.service';
 import {
@@ -65,6 +66,7 @@ import type { SessionUser } from '../common/types';
 export class RetrosController {
   constructor(
     private readonly retrosService: RetrosService,
+    private readonly retrosTemplatesService: RetrosTemplatesService,
     private readonly retrosGateway: RetrosGateway,
     private readonly retrosProjectionSyncService: RetrosProjectionSyncService,
   ) {}
@@ -95,7 +97,7 @@ export class RetrosController {
     const validSortOrder =
       sortOrder === 'asc' || sortOrder === 'desc' ? sortOrder : 'asc';
 
-    return this.retrosService.getTemplatesPaginated(
+    return this.retrosTemplatesService.getTemplatesPaginated(
       session.user.id,
       page ? Math.max(1, parseInt(page, 10)) : 1,
       limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 12,
@@ -112,7 +114,7 @@ export class RetrosController {
   @ApiResponse({ status: 200, description: 'Returns template with columns' })
   @ApiResponse({ status: 404, description: 'Template not found' })
   async getTemplateById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.retrosService.getTemplateById(id);
+    return this.retrosTemplatesService.getTemplateById(id);
   }
 
   @Post('templates')
@@ -130,7 +132,7 @@ export class RetrosController {
     @Body() body: CreateTemplateDto,
     @Session() session: SessionUser,
   ) {
-    return this.retrosService.createTemplate(session.user.id, body);
+    return this.retrosTemplatesService.createTemplate(session.user.id, body);
   }
 
   @Patch('templates/:id')
@@ -149,7 +151,11 @@ export class RetrosController {
     @Body() body: UpdateTemplateDto,
     @Session() session: SessionUser,
   ) {
-    return this.retrosService.updateTemplate(session.user.id, id, body);
+    return this.retrosTemplatesService.updateTemplate(
+      session.user.id,
+      id,
+      body,
+    );
   }
 
   @Delete('templates/:id')
@@ -165,7 +171,7 @@ export class RetrosController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.retrosService.deleteTemplate(session.user.id, id);
+    return this.retrosTemplatesService.deleteTemplate(session.user.id, id);
   }
 
   @Post('templates/seed')
@@ -178,7 +184,7 @@ export class RetrosController {
     description: 'Forbidden - Admin access required',
   })
   async seedBuiltInTemplates() {
-    return this.retrosService.seedBuiltInTemplates();
+    return this.retrosTemplatesService.seedBuiltInTemplates();
   }
 
   // ============================================================================
@@ -205,6 +211,7 @@ export class RetrosController {
     @Query('limit') limit?: string,
     @Query('status') status?: string,
     @Query('teamId') teamId?: string,
+    @Query('search') search?: string,
   ) {
     const normalizedStatus =
       status === 'ongoing' || status === 'completed' ? status : undefined;
@@ -214,6 +221,7 @@ export class RetrosController {
       limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 12,
       normalizedStatus,
       teamId,
+      search,
     );
   }
 

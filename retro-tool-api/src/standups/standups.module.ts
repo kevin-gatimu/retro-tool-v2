@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
 import { StandupsService } from './standups.service';
+import { StandupsQueryService } from './standups-query.service';
+import { StandupsEntriesService } from './standups-entries.service';
+import { StandupsSubmissionsService } from './standups-submissions.service';
+import { StandupsReportService } from './standups-report.service';
 import { StandupsController } from './standups.controller';
 import { StandupsGateway } from './standups.gateway';
 import { StandupsProjectionSyncService } from './standups-projection-sync.service';
@@ -11,7 +15,15 @@ import { WsAuthModule } from '../auth/ws-auth.module';
 @Module({
   imports: [DatabaseModule, NotificationsModule, EmailModule, WsAuthModule],
   controllers: [StandupsController],
-  providers: [StandupsService, StandupsGateway, StandupsProjectionSyncService],
+  providers: [
+    StandupsService,
+    StandupsQueryService,
+    StandupsEntriesService,
+    StandupsSubmissionsService,
+    StandupsReportService,
+    StandupsGateway,
+    StandupsProjectionSyncService,
+  ],
   exports: [StandupsGateway],
 })
 export class StandupsModule {}

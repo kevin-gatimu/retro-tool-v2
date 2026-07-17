@@ -14,7 +14,7 @@ export const createActionItemSchema = z.object({
   status: z
     .enum(Object.values(ACTION_ITEM_STATUSES) as [string, ...string[]])
     .default(ACTION_ITEM_STATUSES.Pending),
-  dueDate: z.string().datetime().optional(),
+  dueDate: z.iso.datetime().optional(),
 });
 
 export type CreateActionItemDto = z.infer<typeof createActionItemSchema>;

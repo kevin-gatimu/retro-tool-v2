@@ -24,6 +24,7 @@ import {
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { EstimatesService } from './estimates.service';
+import { EstimatesReportService } from './estimates-report.service';
 import { EstimatesGateway } from './estimates.gateway';
 import type { SessionUser } from '../common/types';
 import {
@@ -51,6 +52,7 @@ import {
 export class EstimatesController {
   constructor(
     private readonly estimatesService: EstimatesService,
+    private readonly estimatesReportService: EstimatesReportService,
     private readonly estimatesGateway: EstimatesGateway,
   ) {}
 
@@ -82,7 +84,7 @@ export class EstimatesController {
     @Query('teamId') teamId?: string,
     @Query('search') search?: string,
   ) {
-    return this.estimatesService.getHistory(
+    return this.estimatesReportService.getHistory(
       session.user.id,
       page ? Math.max(1, parseInt(page, 10)) : 1,
       limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 15,
@@ -316,11 +318,15 @@ export class EstimatesController {
   @ApiParam({ name: 'id', description: 'Estimate session ID' })
   @ApiBody({ type: SendEstimateReportDtoClass })
   @UsePipes(new ZodValidationPipe(sendEstimateReportSchema))
-  async sendReport(
+  sendReport(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: SendEstimateReportDto,
   ) {
-    return this.estimatesService.sendEstimateReport(session.user.id, id, body);
+    return this.estimatesReportService.sendEstimateReport(
+      session.user.id,
+      id,
+      body,
+    );
   }
 }

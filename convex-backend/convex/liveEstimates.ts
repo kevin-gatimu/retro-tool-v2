@@ -1,6 +1,7 @@
-import { mutation, query, internalMutation } from './server'
+import { query, internalMutation } from './server'
 import { v } from 'convex/values'
-import { requireIdentity } from './lib/authz'
+import { getCallerTeamIds, isAdminRole, requireIdentity } from './lib/authz'
+import { LIST_PROJECTION_CAP } from './lib/limits'
 
 const estimateSessionStatus = v.union(
   v.literal('waiting'),
@@ -105,12 +106,23 @@ export const getSessionProjection = query({
 export const listActiveSessionProjections = query({
   args: {},
   handler: async (ctx) => {
-    await requireIdentity(ctx)
+    const identity = await requireIdentity(ctx)
     const projections = await ctx.db.query('liveEstimateSessions').collect()
 
+    // Scope to the caller's teams (`null` = admin, pass all) — invalidation
+    // signal only, but stops cross-tenant session enumeration.
+    const teamIds = isAdminRole(identity.role)
+      ? null
+      : await getCallerTeamIds(ctx, identity.subject)
+
     return projections
-      .filter((projection) => projection.status !== 'completed')
+      .filter(
+        (projection) =>
+          projection.status !== 'completed' &&
+          (!teamIds || teamIds.has(projection.teamId)),
+      )
       .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
+      .slice(0, LIST_PROJECTION_CAP)
       .map((projection) => ({
         sessionId: projection.sessionId,
         status: projection.status,
@@ -166,9 +178,9 @@ export const getEstimateBoard = query({
     const identity = await requireIdentity(ctx)
     const board = (
       await ctx.db
-      .query('liveEstimateBoards')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
-      .collect()
+        .query('liveEstimateBoards')
+        .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
+        .collect()
     ).find((item) => item.userId === identity.subject)
 
     if (!board) {

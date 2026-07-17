@@ -86,6 +86,51 @@ export function NewRetroSkeleton() {
   )
 }
 
+/**
+ * Fallback for the lazy-loaded retro board (`components/retro-board.tsx`).
+ * Mirrors the column grid so the layout doesn't shift while dnd-kit loads.
+ */
+export function RetroBoardSkeleton() {
+  return (
+    <div className="grid gap-3 sm:gap-4 pb-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex flex-col rounded-xl border-2 p-3 sm:p-4 space-y-4 min-h-0 max-h-[28rem] sm:max-h-[32rem] lg:h-[calc(100vh-17rem)] lg:max-h-none"
+        >
+          {/* Column Header */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Skeleton className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 sm:h-5 w-24" />
+                <Skeleton className="h-4 w-8 rounded-full" />
+              </div>
+              <Skeleton className="h-3 w-32 hidden sm:block" />
+            </div>
+          </div>
+
+          {/* Cards List */}
+          <div className="flex-1 space-y-2 sm:space-y-3 overflow-hidden">
+            {Array.from({ length: 4 }).map((__, j) => (
+              <div key={j} className="bg-muted/50 rounded-lg p-3 space-y-3">
+                <Skeleton className="h-16 w-full" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4 rounded-full" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <Skeleton className="h-6 w-12 rounded-md" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function RetroDetailSkeleton() {
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col space-y-3 sm:space-y-4 p-4">

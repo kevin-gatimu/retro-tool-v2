@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ApiProperty } from '@nestjs/swagger';
 
 export const sendRetroReportSchema = z.object({
-  recipients: z.array(z.string().email()).max(50).optional(),
+  recipients: z.array(z.email()).max(50).optional(),
 });
 
 export type SendRetroReportDto = z.infer<typeof sendRetroReportSchema>;

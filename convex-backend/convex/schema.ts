@@ -182,4 +182,17 @@ export default defineSchema({
   })
     .index('by_retro', ['retroId'])
     .index('by_retro_user', ['retroId', 'userId']),
+
+  // Team-membership projection (userId → teamId) pushed from NestJS after each
+  // membership mutation. Convex has no team data of its own, so team-scoped
+  // read queries (list projections, team stats) use this table to filter results
+  // to teams the authenticated caller actually belongs to — closing the
+  // cross-tenant read gap. PostgreSQL remains the source of truth.
+  liveTeamMembers: defineTable({
+    userId: v.string(),
+    teamId: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_user_id', ['userId'])
+    .index('by_team_user', ['teamId', 'userId']),
 })

@@ -3,3 +3,4 @@
  */
 
 export * from './functions'
+export * from './invite-email-check'
