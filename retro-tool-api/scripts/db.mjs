@@ -76,10 +76,11 @@ const run = (command) => {
 };
 
 if (envName === 'local') {
+  // Always compile against tsconfig.build.json: it sets rootDir=./src, which
+  // ts-node needs when a step lives in a subdirectory (e.g. src/seed/*) —
+  // otherwise TS infers the common source dir as that subdir and errors (TS5011).
   for (const step of task.steps) {
-    const projectFlag =
-      step === 'migrate' ? '--project tsconfig.build.json ' : '';
-    run(`ts-node ${projectFlag}--transpile-only src/${step}.ts`);
+    run(`ts-node --project tsconfig.build.json --transpile-only src/${step}.ts`);
   }
 } else {
   const envFile = ENV_FILES[envName];

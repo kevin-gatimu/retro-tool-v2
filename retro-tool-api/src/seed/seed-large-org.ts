@@ -15,7 +15,10 @@
  *
  * NOTE: This script will take 15–30 minutes to complete.
  */
-import 'dotenv/config';
+import { config as loadDotenv } from 'dotenv';
+import { join } from 'path';
+loadDotenv({ path: join(__dirname, '../../.env'), override: true });
+loadDotenv({ path: join(__dirname, '../../.env.local'), override: true });
 import { randomUUID } from 'crypto';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';

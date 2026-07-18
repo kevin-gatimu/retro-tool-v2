@@ -1,4 +1,9 @@
-import { Controller, Get, Inject } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -57,10 +62,11 @@ export class HealthController {
     summary: 'Readiness probe (checks DB connectivity)',
   })
   @ApiResponse({ status: 200, description: 'Readiness status with DB check' })
+  @ApiResponse({ status: 503, description: 'Database dependency is not ready' })
   async getReadiness() {
     const dbOk = await this.checkDatabase();
 
-    return {
+    const result = {
       status: dbOk ? 'ready' : 'not_ready',
       service: 'retro-tool-api',
       version: APP_VERSION,
@@ -69,6 +75,12 @@ export class HealthController {
         database: dbOk ? 'connected' : 'unreachable',
       },
     };
+
+    if (!dbOk) {
+      throw new ServiceUnavailableException(result);
+    }
+
+    return result;
   }
 
   private async checkDatabase(): Promise<boolean> {

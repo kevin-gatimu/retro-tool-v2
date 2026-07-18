@@ -61,6 +61,10 @@ lerna-debug.log*
 !**/.env.example
 !**/.env.*.example
 
+# Local Convex dashboard login (contains the admin key — DO NOT COMMIT).
+# Auto-generated/refreshed by `pnpm local:bootstrap`.
+convex-dashboard-login.local.txt
+
 # SSL certificates (DO NOT COMMIT)
 infra/ssl-certs/
 *.pfx

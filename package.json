@@ -1,36 +1,39 @@
 {
-    "name": "retro-tool",
-    "version": "1.0.0",
-    "private": true,
-    "packageManager": "pnpm@11.13.0",
-    "engines": {
-        "node": ">=22"
-    },
-    "scripts": {
-        "prepare": "husky",
-        "build": "pnpm -r --filter @retro-tool/contracts --filter retro-tool-api --filter retro-tool-ui build",
-        "lint": "pnpm -r --filter retro-tool-api --filter retro-tool-ui --filter convex-backend lint",
-        "type-check": "pnpm -r --filter @retro-tool/contracts --filter retro-tool-api --filter retro-tool-ui --filter convex-backend type-check",
-        "test": "pnpm -r --filter retro-tool-api --filter retro-tool-ui test",
-        "local:up": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml up --build",
-        "local:infra": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml up -d postgres redis convex-backend convex-dashboard",
-        "local:down": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml down",
-        "local:logs": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml logs -f",
-        "dev:api": "pnpm --dir retro-tool-api dev",
-        "dev:staging": "pnpm --parallel --filter retro-tool-api --filter retro-tool-ui dev:staging",
-        "dev:api:staging": "pnpm --dir retro-tool-api dev:staging",
-        "dev:api:prod": "pnpm --dir retro-tool-api dev:prod",
-        "dev:ui": "pnpm --dir retro-tool-ui dev",
-        "dev:ui:staging": "pnpm --dir retro-tool-ui dev:staging",
-        "dev:ui:prod": "pnpm --dir retro-tool-ui dev:prod",
-        "dev:convex": "pnpm --dir convex-backend dev",
-        "dev:convex:staging": "pnpm --dir convex-backend dev:staging",
-        "dev:convex:prod": "pnpm --dir convex-backend dev:prod"
-    },
-    "devDependencies": {
-        "@commitlint/cli": "^20.5.0",
-        "@commitlint/config-conventional": "^20.5.0",
-        "husky": "^9.1.7",
-        "lint-staged": "^16.3.3"
-    }
+  "name": "retro-tool",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.13.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "build": "pnpm -r --filter @retro-tool/contracts --filter retro-tool-api --filter retro-tool-ui build",
+    "lint": "pnpm -r --filter retro-tool-api --filter retro-tool-ui --filter convex-backend lint",
+    "type-check": "pnpm -r --filter @retro-tool/contracts --filter retro-tool-api --filter retro-tool-ui --filter convex-backend type-check",
+    "test": "pnpm -r --filter retro-tool-api --filter retro-tool-ui test",
+    "local:up": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml up --build",
+    "local:infra": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml up -d postgres convex-backend convex-dashboard",
+    "local:down": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml down",
+    "local:logs": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml logs -f",
+    "local:bootstrap": "node scripts/local-dev.mjs",
+    "local:reset": "node scripts/local-dev.mjs --reset",
+    "local:dev": "pnpm --parallel --filter retro-tool-api --filter retro-tool-ui --filter convex-backend dev",
+    "dev:api": "pnpm --dir retro-tool-api dev",
+    "dev:staging": "pnpm --parallel --filter retro-tool-api --filter retro-tool-ui dev:staging",
+    "dev:api:staging": "pnpm --dir retro-tool-api dev:staging",
+    "dev:api:prod": "pnpm --dir retro-tool-api dev:prod",
+    "dev:ui": "pnpm --dir retro-tool-ui dev",
+    "dev:ui:staging": "pnpm --dir retro-tool-ui dev:staging",
+    "dev:ui:prod": "pnpm --dir retro-tool-ui dev:prod",
+    "dev:convex": "pnpm --dir convex-backend dev",
+    "dev:convex:staging": "pnpm --dir convex-backend dev:staging",
+    "dev:convex:prod": "pnpm --dir convex-backend dev:prod"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.3"
+  }
 }

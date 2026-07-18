@@ -46,7 +46,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Fail the PR on known High/Critical advisories in production dependencies
-      # (SECURITY-ASSESSMENT F11). Scoped to --prod so devDependency-only
-      # advisories don't block merges; bump the threshold deliberately, not by
-      # muting find
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type-check
+        run: pnpm type-check
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
