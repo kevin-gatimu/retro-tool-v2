@@ -178,5 +178,5 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: retro-tool-ui/dist
+          api_location: ""
           skip_app_build: true
-          skip_api_build: true
