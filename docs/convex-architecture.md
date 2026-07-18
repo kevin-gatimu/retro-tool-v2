@@ -116,7 +116,12 @@ services gate on them. Convex reads `process.env.JWT_*` in
 | `liveRetroBoards` | `retroId`, `userId`, `snapshot` (JSON RetroDetail) | `by_retro_id`, `by_retro_user` | `upsertRetroBoard` (per team member) | retro detail sync |
 | `liveEstimateSessions` | `sessionId`, `teamId`, `status`, `currentRoundId` | `by_session_id`, `by_team_id` | `upsertSessionProjection` | estimate list sync |
 | `liveEstimateBoards` | `sessionId`, `userId`, `snapshot` (JSON session) | `by_session_id`, `by_session_user` | `upsertEstimateBoard` (per member) | estimate detail sync |
+| `liveIcebreakerSessions` / `liveIcebreakerBoards` | `sessionId`, `teamId`/`userId`, `snapshot` | `by_session_id`, `by_team_id` / `by_session_user` | `upsertIcebreaker*` (per member) | icebreaker list/detail sync |
+| `liveStandupEntries` / `liveStandupBoards` | `standupId`, `entryDate`, `userId`, `snapshot` | `by_standup_id`, `by_standup_date` / `by_standup_date_user` | `upsertStandup*` (per member) | standup list/detail sync |
+| `livePolls` | `pollId`, `teamId`, `isClosed` (lightweight signal) | `by_poll_id`, `by_team_id` | `upsertPollProjection`/`deletePollProjection` | UI invalidate + REST refetch |
+| `liveSurveys` | `surveyId`, `teamId`/`organizationId`, `isClosed` (lightweight signal) | `by_survey_id`, `by_team_id`, `by_org_id` | `upsertSurveyProjection`/`deleteSurveyProjection` | UI invalidate + REST refetch |
 | `liveNotifications` | `notificationId`, `userId`, `read`, body fields | `by_notification_id`, `by_user_id`, `by_user_read` | `upsert*`/`mark*ReadProjection` | notification bell/list |
+| `liveTeamMembers` | `teamId`, `userId`, `role` (security projection) | `by_user_id`, `by_team_user` | `upsertMembership`/`pruneStaleMemberships` | authz for every projection query |
 | `liveTyping` | `retroId`, `userId`, `displayName` | `by_retro`, `by_retro_user` | `startTyping`/`stopTyping` (client) | retro detail |
 | `liveReadyStatus` | `retroId`, `userId`, `isReady` | `by_retro`, `by_retro_user` | `setReadyStatus`/`clearAllReady` (client) | retro detail |
 | `livePresence` | `scopeType`, `scopeId`, `userId`, heartbeat | `by_scope`, `by_scope_user` | (schema only — no functions yet) | — |
@@ -175,7 +180,28 @@ can differ (carried-forward items, permissions baked into the snapshot).
 entity lifecycle events. **`clearTables`** (admin-only) is invoked by the
 super-admin endpoint and a scheduled cron
 ([convex-admin-cron.service.ts](../retro-tool-api/src/convex-admin/convex-admin-cron.service.ts))
-to purge stale projection rows.
+to purge stale projection rows, surfaced in the admin UI at `/admin/convex`
+(immediate "Clear Tables Now" + a recurring "Scheduled Cleanup").
+
+`clearTables` enforces an allowlist — the `CLEARABLE_TABLES` constant in
+[admin.ts](../convex-backend/convex/admin.ts) — and the UI's table list in
+[convex.tsx](../retro-tool-ui/src/routes/admin/convex.tsx) mirrors it exactly.
+Clearable set: `liveRetroSessions`, `liveEstimateSessions`,
+`liveIcebreakerSessions`, `liveRetroBoards`, `liveEstimateBoards`,
+`liveIcebreakerBoards`, `liveStandupEntries`, `liveStandupBoards`,
+`liveNotifications`, `livePolls`, `liveSurveys`, `livePresence`, `liveTyping`,
+`liveReadyStatus`. Each is either reconcilable from PostgreSQL or ephemeral, so
+clearing it is recoverable.
+
+> **`liveTeamMembers` is deliberately NOT clearable.** It is the membership
+> projection every projection query authorizes against; a one-click or weekly
+> wipe would drop all Convex authz until a reconcile/self-heal runs. It is kept
+> fresh by `syncAllMemberships` reconciliation plus a nightly self-heal instead.
+> The scheduled cron's `tablesToClear` defaults to empty and only ever contains
+> what an admin explicitly saves, so adding a table to the allowlist never
+> auto-schedules it.
+
+---
 
 > **Why admin key can call internal functions:** the `/api/mutation` endpoint with
 > `Authorization: Convex <key>` is exactly how Convex's own admin client invokes
