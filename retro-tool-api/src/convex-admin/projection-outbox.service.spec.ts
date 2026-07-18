@@ -1,0 +1,173 @@
+import type { ConfigService } from '@nestjs/config';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type { Config } from '../config/configuration';
+import { ProjectionOutboxService } from './projection-outbox.service';
+import type { ProjectionOutboxRow } from './schema';
+
+/**
+ * Unit tests for the transactional projection outbox dispatch logic:
+ * dedupe/supersede, pause gating, and retry-vs-exhaust. The Drizzle query
+ * builder and `fetch` are stubbed so the tests exercise the service's own
+ * decision-making without a database or network.
+ */
+describe('ProjectionOutboxService', () => {
+  const convex = { url: 'https://convex.example', adminKey: 'k' };
+
+  const makeRow = (
+    over: Partial<ProjectionOutboxRow>,
+  ): ProjectionOutboxRow => ({
+    id: 'id',
+    projection: 'retros',
+    operation: 'sync',
+    entityKey: 'r1',
+    payload: null,
+    dedupeKey: 'retros:sync:r1',
+    status: 'pending',
+    attempts: 0,
+    lastError: null,
+    createdAt: new Date(),
+    dispatchedAt: null,
+    ...over,
+  });
+
+  /**
+   * Build a service whose DB `select ... limit` resolves to `pendingBatch`,
+   * whose `count` reads resolve to 0, and whose update/insert are captured.
+   */
+  const createService = (params: {
+    pendingBatch: ProjectionOutboxRow[];
+    paused?: boolean;
+  }) => {
+    const updates: Array<{ status?: string }> = [];
+
+    // A select chain that dispatches based on which table/columns are queried.
+    const database = {
+      select: jest.fn((columns?: Record<string, unknown>) => {
+        const isPausedRead = columns && 'paused' in columns;
+        const isCountRead = columns && 'count' in columns;
+        // The global newest-per-key query selects dedupeKey+id+createdAt and is
+        // awaited directly on .where() (no .limit) — resolve it to the batch's
+        // (id, dedupeKey, createdAt) so newest-per-key resolves to the batch.
+        const isNewestRead =
+          columns && 'dedupeKey' in columns && 'id' in columns;
+        const newestRows = params.pendingBatch.map((r) => ({
+          dedupeKey: r.dedupeKey,
+          id: r.id,
+          createdAt: r.createdAt,
+        }));
+        const chain = {
+          from: () => chain,
+          where: () => chain,
+          orderBy: () => chain,
+          limit: (n: number) => {
+            if (isPausedRead) {
+              return Promise.resolve([{ paused: params.paused ?? false }]);
+            }
+            if (n === 1) {
+              // oldestPending / control single-row reads
+              return Promise.resolve([]);
+            }
+            return Promise.resolve(params.pendingBatch);
+          },
+          // Reads awaited directly on .where(): count, and newest-per-key.
+          then: (resolve: (rows: unknown[]) => void) =>
+            resolve(
+              isCountRead ? [{ count: 0 }] : isNewestRead ? newestRows : [],
+            ),
+        };
+        return chain;
+      }),
+      update: jest.fn(() => ({
+        set: (patch: { status?: string }) => ({
+          where: () => {
+            updates.push(patch);
+            return Promise.resolve();
+          },
+        }),
+      })),
+    } as unknown as NodePgDatabase<never>;
+
+    const configService = {
+      get: jest.fn().mockReturnValue(convex),
+    } as unknown as ConfigService<Config, true>;
+
+    const service = new ProjectionOutboxService(
+      database as never,
+      configService,
+    );
+    return { service, updates };
+  };
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('does not dispatch when the dispatcher is paused', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const { service } = createService({ pendingBatch: [], paused: true });
+    service.registerHandler('retros', jest.fn());
+
+    const result = await service.dispatchPending();
+
+    expect(result.dispatched).toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('delivers the newest row per dedupeKey and supersedes older ones', async () => {
+    const older = makeRow({ id: 'a', createdAt: new Date(1) });
+    const newer = makeRow({ id: 'b', createdAt: new Date(2) });
+    const { service, updates } = createService({
+      pendingBatch: [older, newer],
+    });
+
+    const handler = jest.fn().mockResolvedValue(undefined);
+    service.registerHandler('retros', handler);
+
+    const result = await service.dispatchPending();
+
+    // Only one real delivery (the newest); the older is closed as superseded.
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith('sync', 'r1', null);
+    expect(result.dispatched).toBe(1);
+    expect(result.skippedSuperseded).toBe(1);
+    // Both rows get marked dispatched.
+    expect(updates.filter((u) => u.status === 'dispatched')).toHaveLength(2);
+  });
+
+  it('retries a failed delivery (stays pending) until attempts are exhausted', async () => {
+    const row = makeRow({ id: 'a', attempts: 0 });
+    const { service, updates } = createService({ pendingBatch: [row] });
+    service.registerHandler(
+      'retros',
+      jest.fn().mockRejectedValue(new Error('convex down')),
+    );
+
+    const result = await service.dispatchPending();
+
+    expect(result.failed).toBe(1);
+    // Not exhausted yet → remains pending for the next dispatch tick.
+    expect(updates.at(-1)?.status).toBe('pending');
+  });
+
+  it('marks a delivery failed once attempts are exhausted', async () => {
+    const row = makeRow({ id: 'a', attempts: 9 }); // 9 + 1 === MAX_ATTEMPTS (10)
+    const { service, updates } = createService({ pendingBatch: [row] });
+    service.registerHandler(
+      'retros',
+      jest.fn().mockRejectedValue(new Error('convex down')),
+    );
+
+    const result = await service.dispatchPending();
+
+    expect(result.failed).toBe(1);
+    expect(updates.at(-1)?.status).toBe('failed');
+  });
+
+  it('fails a row whose projection has no registered handler', async () => {
+    const row = makeRow({ id: 'a', projection: 'unknown' });
+    const { service } = createService({ pendingBatch: [row] });
+
+    const result = await service.dispatchPending();
+
+    expect(result.failed).toBe(1);
+    expect(result.dispatched).toBe(0);
+  });
+});

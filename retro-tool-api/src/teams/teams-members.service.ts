@@ -203,7 +203,7 @@ export class TeamsMembersService {
 
     // Push the membership projection so Convex team-scoped reads see the new
     // member (fire-and-forget; no-ops when Convex is unset). SECURITY-ASSESSMENT F1.
-    void this.membersProjectionSync.syncMembership(data.userId, teamId);
+    void this.membersProjectionSync.enqueueMembershipSync(data.userId, teamId);
 
     return member;
   }
@@ -263,7 +263,7 @@ export class TeamsMembersService {
       .where(eq(teamSchema.teamMember.id, member.id))
       .returning();
 
-    void this.membersProjectionSync.removeMembership(memberId, teamId);
+    void this.membersProjectionSync.enqueueMembershipRemoval(memberId, teamId);
 
     return deletedMember;
   }
@@ -428,7 +428,7 @@ export class TeamsMembersService {
       })
       .returning();
 
-    void this.membersProjectionSync.syncMembership(userId, teamId);
+    void this.membersProjectionSync.enqueueMembershipSync(userId, teamId);
 
     return member;
   }
@@ -455,7 +455,7 @@ export class TeamsMembersService {
       .delete(teamSchema.teamMember)
       .where(eq(teamSchema.teamMember.id, member.id));
 
-    void this.membersProjectionSync.removeMembership(userId, teamId);
+    void this.membersProjectionSync.enqueueMembershipRemoval(userId, teamId);
 
     return { message: 'Left team successfully' };
   }

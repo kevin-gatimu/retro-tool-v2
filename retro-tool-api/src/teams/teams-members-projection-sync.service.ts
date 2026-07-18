@@ -1,29 +1,68 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import type { Config } from '../config/configuration';
 import type { ConvexFunctionResponse } from '../common/types';
+import { ProjectionOutboxService } from '../convex-admin/projection-outbox.service';
 import * as teamSchema from './schema';
 
 type Database = NodePgDatabase<typeof teamSchema>;
 
+const PROJECTION = 'teamMembers';
+
 /**
- * Pushes a (userId, teamId) membership projection into Convex after each team
- * membership mutation. Convex holds no team data of its own, so its team-scoped
- * read queries use this projection to filter results to teams the authenticated
- * caller actually belongs to (SECURITY-ASSESSMENT F1). PostgreSQL remains the
- * source of truth; this is a fire-and-forget projection that no-ops silently
- * when Convex is not configured, and the reconciliation path heals any drift.
+ * Projects (userId, teamId) team memberships into Convex. Convex holds no team
+ * data of its own, so its team-scoped read queries use this projection to filter
+ * results to teams the authenticated caller actually belongs to
+ * (SECURITY-ASSESSMENT F1). PostgreSQL remains the source of truth.
+ *
+ * Live membership changes are enqueued through the transactional outbox (durable
+ * + replayable across a Convex maintenance window); the nightly reconcile and
+ * `syncAllMemberships` mark-and-sweep heal any residual drift.
  */
 @Injectable()
-export class TeamsMembersProjectionSyncService {
+export class TeamsMembersProjectionSyncService implements OnModuleInit {
   private readonly logger = new Logger(TeamsMembersProjectionSyncService.name);
 
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly configService: ConfigService<Config, true>,
+    private readonly outbox: ProjectionOutboxService,
   ) {}
+
+  onModuleInit(): void {
+    // entityKey is `<userId>:<teamId>`; sync upserts, delete removes.
+    this.outbox.registerHandler(PROJECTION, (operation, entityKey) => {
+      const sep = entityKey.indexOf(':');
+      const userId = entityKey.slice(0, sep);
+      const teamId = entityKey.slice(sep + 1);
+      return operation === 'delete'
+        ? this.removeMembership(userId, teamId)
+        : this.syncMembership(userId, teamId);
+    });
+  }
+
+  /** Durably enqueue a membership upsert (userId joined teamId). */
+  async enqueueMembershipSync(userId: string, teamId: string): Promise<void> {
+    await this.outbox.enqueueAndDispatch({
+      projection: PROJECTION,
+      operation: 'sync',
+      entityKey: `${userId}:${teamId}`,
+    });
+  }
+
+  /** Durably enqueue a membership removal (userId left teamId). */
+  async enqueueMembershipRemoval(
+    userId: string,
+    teamId: string,
+  ): Promise<void> {
+    await this.outbox.enqueueAndDispatch({
+      projection: PROJECTION,
+      operation: 'delete',
+      entityKey: `${userId}:${teamId}`,
+    });
+  }
 
   async syncMembership(userId: string, teamId: string): Promise<void> {
     await this.runMutation('liveTeamMembers:upsertMembership', {
@@ -59,11 +98,19 @@ export class TeamsMembersProjectionSyncService {
     const reconcileAt = Date.now();
 
     for (const row of rows) {
-      await this.runMutation('liveTeamMembers:upsertMembership', {
-        userId: row.userId,
-        teamId: row.teamId,
-        updatedAt: reconcileAt,
-      });
+      try {
+        await this.runMutation('liveTeamMembers:upsertMembership', {
+          userId: row.userId,
+          teamId: row.teamId,
+          updatedAt: reconcileAt,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'unknown error';
+        this.logger.warn(
+          `Reconcile: membership ${row.userId}/${row.teamId} failed: ${message}`,
+        );
+      }
     }
 
     // Sweep rows not touched by this reconcile (stale memberships). The Convex
@@ -83,46 +130,43 @@ export class TeamsMembersProjectionSyncService {
     return { count: rows.length };
   }
 
+  /**
+   * POST a projection mutation to Convex. Throws on any transport or
+   * Convex-side error so the outbox dispatcher can retry; no-ops silently only
+   * when Convex is unconfigured. `syncAllMemberships` catches per-row.
+   */
   private async runMutation(path: string, args: object): Promise<void> {
     const convexConfig = this.configService.get('convex', { infer: true });
     if (!convexConfig?.url || !convexConfig.adminKey) {
       return;
     }
 
-    try {
-      const response = await fetch(
-        `${convexConfig.url.replace(/\/$/, '')}/api/mutation`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Convex ${convexConfig.adminKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            path,
-            args,
-            format: 'json',
-          }),
+    const response = await fetch(
+      `${convexConfig.url.replace(/\/$/, '')}/api/mutation`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Convex ${convexConfig.adminKey}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          path,
+          args,
+          format: 'json',
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Convex team-member projection mutation ${path} failed with status ${response.status}`,
       );
+    }
 
-      if (!response.ok) {
-        this.logger.warn(
-          `Convex team-member projection mutation ${path} failed with status ${response.status}`,
-        );
-        return;
-      }
-
-      const result = (await response.json()) as ConvexFunctionResponse;
-      if (result.status === 'error') {
-        this.logger.warn(
-          `Convex team-member projection mutation ${path} returned an error: ${result.errorMessage ?? 'unknown error'}`,
-        );
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown error';
-      this.logger.warn(
-        `Convex team-member projection mutation ${path} failed: ${message}`,
+    const result = (await response.json()) as ConvexFunctionResponse;
+    if (result.status === 'error') {
+      throw new Error(
+        `Convex team-member projection mutation ${path} returned an error: ${result.errorMessage ?? 'unknown error'}`,
       );
     }
   }

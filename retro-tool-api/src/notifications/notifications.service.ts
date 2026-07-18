@@ -76,7 +76,7 @@ export class NotificationsService {
       .where(eq(notificationSchema.notification.id, notificationId));
 
     void this.notificationsProjectionSyncService
-      .syncNotificationReadState(userId, notificationId, true)
+      .enqueueReadState(userId, notificationId, true)
       .catch(() => undefined);
 
     return { success: true };
@@ -89,7 +89,7 @@ export class NotificationsService {
       .where(eq(notificationSchema.notification.userId, userId));
 
     void this.notificationsProjectionSyncService
-      .syncAllNotificationsRead(userId)
+      .enqueueAllRead(userId)
       .catch(() => undefined);
 
     return { success: true };
@@ -107,7 +107,7 @@ export class NotificationsService {
     this.gateway.emitToUser(data.userId, 'notification', created);
 
     void this.notificationsProjectionSyncService
-      .syncNotificationProjection(created)
+      .enqueueNotificationSync(created.id)
       .catch(() => undefined);
 
     // Also send a browser push notification (fire-and-forget, non-blocking)

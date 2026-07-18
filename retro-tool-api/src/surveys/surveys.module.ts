@@ -6,9 +6,10 @@ import { SurveysController } from './surveys.controller';
 import { SurveysProjectionSyncService } from './surveys-projection-sync.service';
 import { DatabaseModule } from '../database/database.module';
 import { EmailModule } from '../email/email.module';
+import { ProjectionOutboxModule } from '../convex-admin/projection-outbox.module';
 
 @Module({
-  imports: [DatabaseModule, EmailModule],
+  imports: [DatabaseModule, EmailModule, ProjectionOutboxModule],
   controllers: [SurveysController],
   providers: [
     SurveysService,
@@ -16,6 +17,6 @@ import { EmailModule } from '../email/email.module';
     SurveysEmailService,
     SurveysProjectionSyncService,
   ],
-  exports: [SurveysService],
+  exports: [SurveysService, SurveysProjectionSyncService],
 })
 export class SurveysModule {}

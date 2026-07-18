@@ -9,9 +9,16 @@ import { DatabaseModule } from '../database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { WsAuthModule } from '../auth/ws-auth.module';
 import { StandupsModule } from '../standups/standups.module';
+import { ProjectionOutboxModule } from '../convex-admin/projection-outbox.module';
 
 @Module({
-  imports: [DatabaseModule, NotificationsModule, WsAuthModule, StandupsModule],
+  imports: [
+    DatabaseModule,
+    NotificationsModule,
+    WsAuthModule,
+    StandupsModule,
+    ProjectionOutboxModule,
+  ],
   controllers: [IcebreakersController],
   providers: [
     IcebreakersService,
@@ -20,5 +27,6 @@ import { StandupsModule } from '../standups/standups.module';
     IcebreakersProjectionSyncService,
     IcebreakersGateway,
   ],
+  exports: [IcebreakersProjectionSyncService],
 })
 export class IcebreakersModule {}

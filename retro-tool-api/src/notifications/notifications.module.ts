@@ -7,9 +7,10 @@ import { NotificationsProjectionSyncService } from './notifications-projection-s
 import { DatabaseModule } from '../database/database.module';
 import { ConfigModule } from '@nestjs/config';
 import { WsAuthModule } from '../auth/ws-auth.module';
+import { ProjectionOutboxModule } from '../convex-admin/projection-outbox.module';
 
 @Module({
-  imports: [DatabaseModule, ConfigModule, WsAuthModule],
+  imports: [DatabaseModule, ConfigModule, WsAuthModule, ProjectionOutboxModule],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,

@@ -9,10 +9,14 @@ import type { ConvexFunctionResponse } from '../common/types';
 import * as adminSchema from './schema';
 import type { UpdateCronConfigDto } from './dto/update-cron-config.dto';
 import type { ConvexAdminCronService } from './convex-admin-cron.service';
+import { ProjectionReconciliationService } from './projection-reconciliation.service';
+import { ProjectionOutboxService } from './projection-outbox.service';
 import type {
   OperationalMetrics,
   UsageMetrics,
   ConvexCronConfigResponse,
+  ReconcileAllResponse,
+  OutboxStatusResponse,
 } from './types';
 
 export type { OperationalMetrics, UsageMetrics, ConvexCronConfigResponse };
@@ -31,6 +35,8 @@ export class ConvexAdminService {
     private readonly configService: ConfigService<Config, true>,
     private readonly commonService: CommonService,
     private readonly teamsMembersProjectionSync: TeamsMembersProjectionSyncService,
+    private readonly projectionReconciliation: ProjectionReconciliationService,
+    private readonly projectionOutbox: ProjectionOutboxService,
   ) {}
 
   /** Injected post-construction to avoid circular dependency */
@@ -172,6 +178,50 @@ export class ConvexAdminService {
   async reconcileMemberships(userId: string): Promise<{ count: number }> {
     await this.assertSuperAdmin(userId);
     return this.teamsMembersProjectionSync.syncAllMemberships();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Full projection reconciliation
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Rebuild every Convex projection from PostgreSQL (membership/security first)
+   * and mark-and-sweep stale rows. Super-admin only. Returns a structured,
+   * per-projection report; callers can use `ok` to gate a deployment.
+   */
+  async reconcileAllProjections(userId: string): Promise<ReconcileAllResponse> {
+    await this.assertSuperAdmin(userId);
+    return this.projectionReconciliation.reconcileAll();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Projection outbox controls
+  // ---------------------------------------------------------------------------
+
+  async getOutboxStatus(userId: string): Promise<OutboxStatusResponse> {
+    await this.assertSuperAdmin(userId);
+    return this.projectionOutbox.getStatus();
+  }
+
+  /**
+   * Pause or resume the outbox dispatcher. Pausing lets a stop-first Convex
+   * maintenance window keep buffering projection events durably; resuming
+   * replays them in order.
+   */
+  async setOutboxPaused(
+    userId: string,
+    paused: boolean,
+  ): Promise<OutboxStatusResponse> {
+    await this.assertSuperAdmin(userId);
+    await this.projectionOutbox.setPaused(paused, userId);
+    return this.projectionOutbox.getStatus();
+  }
+
+  /** Drain the entire pending outbox in order (used after a maintenance pause). */
+  async replayOutbox(userId: string): Promise<OutboxStatusResponse> {
+    await this.assertSuperAdmin(userId);
+    await this.projectionOutbox.replayAll();
+    return this.projectionOutbox.getStatus();
   }
 
   // ---------------------------------------------------------------------------

@@ -8,9 +8,16 @@ import { DatabaseModule } from '../database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { EmailModule } from '../email/email.module';
 import { WsAuthModule } from '../auth/ws-auth.module';
+import { ProjectionOutboxModule } from '../convex-admin/projection-outbox.module';
 
 @Module({
-  imports: [DatabaseModule, NotificationsModule, EmailModule, WsAuthModule],
+  imports: [
+    DatabaseModule,
+    NotificationsModule,
+    EmailModule,
+    WsAuthModule,
+    ProjectionOutboxModule,
+  ],
   controllers: [EstimatesController],
   providers: [
     EstimatesService,
@@ -18,5 +25,6 @@ import { WsAuthModule } from '../auth/ws-auth.module';
     EstimatesProjectionSyncService,
     EstimatesGateway,
   ],
+  exports: [EstimatesProjectionSyncService],
 })
 export class EstimatesModule {}
