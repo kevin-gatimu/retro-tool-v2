@@ -198,7 +198,6 @@ az webapp config appsettings set `
     BETTER_AUTH_SECRET="<generated-secret>" `
     BETTER_AUTH_URL="<apiUrl>" `
     FRONTEND_URL="<uiUrl>" `
-    REDIS_URL="<redis-connection-string>" `
     CONVEX_SYNC_URL="<convex-url>" `
     CONVEX_SYNC_ADMIN_KEY="<convex-admin-key>" `
     RESEND_API_KEY="<resend-key>"

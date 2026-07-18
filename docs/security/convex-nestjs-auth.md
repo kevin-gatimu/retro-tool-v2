@@ -8,9 +8,8 @@ it work.
 
 > **Scope:** the trust relationship between Convex and the API. For the broader
 > Convex data model and sync layer see
-> [convex-architecture.md](convex-architecture.md); for the app's other auth
-> flows see [auth-workflows.md](auth-workflows.md); for the hardening rationale
-> see [AUTH-SECURITY-PLAN.md](../AUTH-SECURITY-PLAN.md).
+> [convex.md](../architecture/convex.md); for the app's other auth flows and the
+> JWT hardening rationale see [authentication.md](./authentication.md).
 
 ---
 
@@ -127,7 +126,7 @@ travels entirely inside the signed token the browser carries.
 ### API side — issuer (`retro-tool-api`)
 
 The Better Auth `jwt` plugin, configured in
-[auth.config.ts](../retro-tool-api/src/auth/auth.config.ts):
+[auth.config.ts](../../retro-tool-api/src/auth/auth.config.ts):
 
 ```ts
 jwt({
@@ -150,7 +149,7 @@ This plugin auto-mounts two routes under Better Auth's `/api/auth` base path
 | `GET /api/auth/jwks` | Returns the **public** half of the signing key(s) as a JWKS document — unauthenticated, safe to expose. |
 
 The RSA key pair is generated lazily and stored in the `jwks` Drizzle table
-([auth/schema/index.ts](../retro-tool-api/src/auth/schema/index.ts), migration
+([auth/schema/index.ts](../../retro-tool-api/src/auth/schema/index.ts), migration
 `0015_dazzling_black_cat`); the private key is AES-encrypted at rest.
 
 **Token claims** (verified by decoding a real token in this repo):
@@ -170,7 +169,7 @@ Header: `{ "alg": "RS256", "kid": "<key id matching a JWKS entry>" }`.
 
 ### Convex side — verifier (`convex-backend`)
 
-[convex/auth.config.ts](../convex-backend/convex/auth.config.ts):
+[convex/auth.config.ts](../../convex-backend/convex/auth.config.ts):
 
 ```ts
 const authConfig: AuthConfig = {
@@ -218,7 +217,7 @@ they legitimately differ in local Docker:
 
 In deployed environments both use the public API host, e.g.
 `https://retrotool-prod-api.azurewebsites.net` and
-`…/api/auth/jwks`. Set these in [infra/README.md](../infra/README.md) step 7.
+`…/api/auth/jwks`. Set these in [infra/README.md](../../infra/README.md) step 7.
 
 > **The #1 failure mode:** a byte-mismatch on `JWT_ISSUER` (extra trailing slash,
 > `http` vs `https`, missing port). Verification then fails on the `iss` check and
@@ -230,11 +229,11 @@ In deployed environments both use the public API host, e.g.
 ## 4. End-to-end request lifecycle
 
 1. **User signs in** to the API normally (password / OTP / passkey / OAuth — see
-   [auth-workflows.md](auth-workflows.md)). This establishes a Better Auth session
+   [authentication.md](./authentication.md)). This establishes a Better Auth session
    (cookie, or bearer in private windows). Convex is not involved yet.
 
 2. **UI obtains a JWT.** The Convex client is wrapped in `ConvexProviderWithAuth`
-   in [realtime-providers.tsx](../retro-tool-ui/src/lib/realtime-providers.tsx).
+   in [realtime-providers.tsx](../../retro-tool-ui/src/lib/realtime-providers.tsx).
    Its `useAuth` hook's `fetchAccessToken` calls:
 
    ```ts
@@ -261,7 +260,7 @@ In deployed environments both use the public API host, e.g.
    key, `iss === JWT_ISSUER`, `aud === JWT_AUDIENCE`, and `exp` not passed.
 
 6. **The function authorizes the caller.** Convex functions call
-   `requireIdentity(ctx)` ([convex/lib/authz.ts](../convex-backend/convex/lib/authz.ts)),
+   `requireIdentity(ctx)` ([convex/lib/authz.ts](../../convex-backend/convex/lib/authz.ts)),
    which returns `{ subject, role }` or throws `Unauthenticated`. Per-user reads
    compare `identity.subject` against the row's stored `userId`. It uses
    **`subject`** (the bare `sub`), not `tokenIdentifier` (which is `sub`+`iss` and
@@ -284,7 +283,7 @@ them:
 | Transport | Convex client / WebSocket | `POST {CONVEX_SYNC_URL}/api/mutation` HTTP |
 | Callable functions | public `query`/`mutation` (with `requireIdentity`) | `internalMutation` / `internalQuery` (admin-key only) |
 | Identity | derived from JWT `sub` | none — fully trusted server principal |
-| Code | [realtime-providers.tsx](../retro-tool-ui/src/lib/realtime-providers.tsx) | [convex-admin.service.ts](../retro-tool-api/src/convex-admin/convex-admin.service.ts) `runMutation` |
+| Code | [realtime-providers.tsx](../../retro-tool-ui/src/lib/realtime-providers.tsx) | [convex-admin.service.ts](../../retro-tool-api/src/convex-admin/convex-admin.service.ts) `runMutation` |
 
 The admin key bypasses the "internal functions aren't client-callable"
 restriction, which is exactly why the server-driven `internalMutation`s stay
@@ -307,7 +306,7 @@ controller. They're produced by the Better Auth `jwt` plugin and served by the
 - `@thallesp/nestjs-better-auth` registers `toNodeHandler(auth)` as Express
   middleware for everything matching `/api/auth` and `/api/auth/*`, **before** the
   Nest router. That `/api` is Better Auth's own `basePath`, independent of Nest's
-  global `api` prefix in [main.ts](../retro-tool-api/src/main.ts).
+  global `api` prefix in [main.ts](../../retro-tool-api/src/main.ts).
 
 Because these are handled by the Better Auth middleware (not the Nest router),
 they need no controller and no `@AllowAnonymous` — the global `AuthGuard` never
@@ -332,7 +331,7 @@ set.
   public key, which is meant to be public.
 - Token theft is bounded to the **15-minute** TTL.
 
-**Residual risks (accepted, tracked in [AUTH-SECURITY-PLAN.md](../AUTH-SECURITY-PLAN.md)):**
+**Residual risks (accepted, tracked in [authentication.md](./authentication.md)):**
 
 - **Revocation lag:** JWTs are stateless, so a signed-out or banned user retains
   Convex *read* access until the token expires (≤15 min). Acceptable for a

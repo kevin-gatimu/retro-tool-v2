@@ -3,7 +3,7 @@
 NestJS REST API + WebSocket backend for the Retro Tool application. Handles authentication, retrospective board management, story estimate session management, in-app notifications, browser push notifications, analytics reporting, and automated email workflows.
 
 - [License](../LICENSE)
-- [RBAC & Permissions](../docs/RBAC.md)
+- [RBAC & Permissions](../docs/security/rbac.md)
 
 ## Tech Stack
 
@@ -908,4 +908,4 @@ See [LICENSE](../LICENSE) at the repository root.
 
 ## Permissions
 
-See [docs/RBAC.md](../docs/RBAC.md) for the full role and permission matrix covering all user roles, organization roles, team roles, and retro actions.
+See [docs/security/rbac.md](../docs/security/rbac.md) for the full role and permission matrix covering all user roles, organization roles, team roles, and retro actions.

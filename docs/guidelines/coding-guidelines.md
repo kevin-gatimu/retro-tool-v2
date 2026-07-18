@@ -1,8 +1,8 @@
 # Coding Guidelines — Retro Tool
 
 Practical dos and don'ts for this monorepo, derived from the actual code, lint configs, and
-conventions on `staging`. Read alongside [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md), and
-[docs/file-naming-conventions.md](docs/file-naming-conventions.md).
+conventions on `staging`. Read alongside [CLAUDE.md](../../CLAUDE.md), [AGENTS.md](../../AGENTS.md), and
+[docs/file-naming-conventions.md](file-naming-conventions.md).
 
 > **Golden rules:** Postgres is the system of record — the API owns all writes. Never write
 > "planning poker" — the term is **"story estimate(s)"**. Run type-check + lint after every change.
@@ -80,7 +80,7 @@ src/
 
 ## 2. File & folder naming
 
-Full reference: [docs/file-naming-conventions.md](docs/file-naming-conventions.md). Summary:
+Full reference: [docs/file-naming-conventions.md](file-naming-conventions.md). Summary:
 
 | Kind | File name | Export |
 | --- | --- | --- |
@@ -422,7 +422,7 @@ For a single deployed product, release-please is less ceremony.
 
 ## Sources
 
-Project-internal: [CLAUDE.md](CLAUDE.md), [docs/file-naming-conventions.md](docs/file-naming-conventions.md),
+Project-internal: [CLAUDE.md](../../CLAUDE.md), [docs/file-naming-conventions.md](file-naming-conventions.md),
 `retro-tool-ui/eslint.config.js`, `retro-tool-api/eslint.config.mjs`, both `tsconfig.json` files,
 and the `teams` module as reference implementation.
 

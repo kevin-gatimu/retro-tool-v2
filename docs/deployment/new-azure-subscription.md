@@ -7,8 +7,8 @@ prior knowledge of the project's history.
 
 > This document is the **end-to-end order** and the **core commands**. For the
 > deep Convex-specific mechanics it links to
-> [convex-staging-deployment-runbook.md](./convex-staging-deployment-runbook.md)
-> (concrete steps) and [CONVEX-AZURE-SELF-HOSTING-PLAN.md](./CONVEX-AZURE-SELF-HOSTING-PLAN.md)
+> [convex-staging-runbook.md](./convex-staging-runbook.md)
+> (concrete steps) and [convex-azure-self-hosting-plan.md](./convex-azure-self-hosting-plan.md)
 > (design/rationale). Read those for anything this guide summarizes.
 
 ---
@@ -25,7 +25,7 @@ projections. After every business mutation the API pushes a projection intent to
 Convex; Convex never owns business logic. Convex authenticates each subscription
 by verifying an RS256 JWT the API issues, fetching the API's public JWKS. The
 image the Convex container runs is digest-pinned via
-[`convex-backend/compatibility.json`](../convex-backend/compatibility.json).
+[`convex-backend/compatibility.json`](../../convex-backend/compatibility.json).
 
 ### Resource inventory (per environment)
 
@@ -129,7 +129,7 @@ az bicep upgrade
 ## 2. One-time: GitHub OIDC federated identity
 
 So the workflows can deploy without stored credentials. Full guide:
-[infra/README-oidc.md](../infra/README-oidc.md).
+[infra/README-oidc.md](../../infra/README-oidc.md).
 
 1. Create (or reuse) an **App Registration** in Entra ID (the OIDC guide defaults
    to display name `retro-tool`).
@@ -272,7 +272,7 @@ REVOKE ALL ON DATABASE retro_tool_db FROM PUBLIC;
 
 The Convex App Service runs a **digest-pinned** image; nothing pushes it for you.
 Import the digest recorded in
-[`convex-backend/compatibility.json`](../convex-backend/compatibility.json)
+[`convex-backend/compatibility.json`](../../convex-backend/compatibility.json)
 (`az acr import` preserves the digest, so the pin resolves). As of this writing the
 manifest digest is `sha256:1738f1673f8d63161043a7859710d2301b1e9d6271e06afbb7af31594ea3a58f`
 — **read the file for the current value** rather than trusting this copy:
@@ -482,9 +482,9 @@ a Variable of the same name via `secrets.X || vars.X`).
 > cause conflicts.
 
 The full env-var surface each app supports (beyond what the pipeline sets) is in
-[`retro-tool-api/.env.example`](../retro-tool-api/.env.example),
-[`retro-tool-ui/.env.example`](../retro-tool-ui/.env.example), and
-[`convex-backend/.env.example`](../convex-backend/.env.example).
+[`retro-tool-api/.env.example`](../../retro-tool-api/.env.example),
+[`retro-tool-ui/.env.example`](../../retro-tool-ui/.env.example), and
+[`convex-backend/.env.example`](../../convex-backend/.env.example).
 
 ---
 
@@ -564,7 +564,7 @@ node retro-tool-api/dist/convex-admin/reconcile-projections.js
 or, authenticated as super-admin: `POST /api/convex-admin/reconcile-projections`.
 It is idempotent and exits non-zero on any partial failure — **do not proceed past
 a failed reconciliation**. See the runbook's
-[Phase C](./convex-staging-deployment-runbook.md) for details.
+[Phase C](./convex-staging-runbook.md) for details.
 
 ---
 
@@ -611,7 +611,7 @@ a failed reconciliation**. See the runbook's
   single-instance, so an image change cannot be zero-downtime. Follow the
   stop-first maintenance sequence (export → pause outbox → stop → deploy new pinned
   digest → start → wait `/version` → `convex deploy` → resume + reconcile) in the
-  runbook's [Backend image upgrades](./convex-staging-deployment-runbook.md#backend-image-upgrades-stop-first)
+  runbook's [Backend image upgrades](./convex-staging-runbook.md#backend-image-upgrades-stop-first)
   section. An older digest is **not** a safe rollback after an in-place migration.
 - **Secret rotation.** To rotate `INSTANCE_SECRET`: generate a new hex value,
   update the KV `convex-instance-secret` (re-run the Convex Bicep so the
@@ -622,7 +622,7 @@ a failed reconciliation**. See the runbook's
   roll the API back with `az webapp config container set` pointing at a prior tag.
   For the UI, redeploy a prior artifact (remember `VITE_*` is compile-time).
 - **Convex Cloud escape hatch.** The runbook documents a full
-  [Rollback to Convex Cloud](./convex-staging-deployment-runbook.md#rollback-to-convex-cloud)
+  [Rollback to Convex Cloud](./convex-staging-runbook.md#rollback-to-convex-cloud)
   path — keep the previous `CONVEX_SYNC_URL`/key and UI artifact recorded until the
   self-hosted backend is proven stable.
 
@@ -630,10 +630,10 @@ a failed reconciliation**. See the runbook's
 
 ## Reference index
 
-- Design & rationale: [CONVEX-AZURE-SELF-HOSTING-PLAN.md](./CONVEX-AZURE-SELF-HOSTING-PLAN.md)
-- Convex phase-by-phase bootstrap + rollback: [convex-staging-deployment-runbook.md](./convex-staging-deployment-runbook.md)
-- Core infra commands + GitHub env config: [../infra/README.md](../infra/README.md)
-- OIDC federated identity: [../infra/README-oidc.md](../infra/README-oidc.md)
-- Convex ↔ NestJS JWT auth deep dive: [convex-nestjs-auth.md](./convex-nestjs-auth.md)
-- Convex architecture (topology, secrets, sync layer): [convex-architecture.md](./convex-architecture.md)
+- Design & rationale: [convex-azure-self-hosting-plan.md](./convex-azure-self-hosting-plan.md)
+- Convex phase-by-phase bootstrap + rollback: [convex-staging-runbook.md](./convex-staging-runbook.md)
+- Core infra commands + GitHub env config: [../infra/README.md](../../infra/README.md)
+- OIDC federated identity: [../infra/README-oidc.md](../../infra/README-oidc.md)
+- Convex ↔ NestJS JWT auth deep dive: [convex-nestjs-auth.md](../security/convex-nestjs-auth.md)
+- Convex architecture (topology, secrets, sync layer): [convex.md](../architecture/convex.md)
 ```

@@ -4,10 +4,10 @@ How this monorepo uses Convex: the deployment topology, every key/secret, the
 data model, how NestJS writes to it, how the UI reads from it, and how it's
 authenticated and deployed.
 
-> **Related docs:** [convex-self-hosting.md](convex-self-hosting.md) (running the
+> **Related docs:** [convex-self-hosting.md](../deployment/convex-self-hosting.md) (running the
 > self-hosted backend, env vars, admin key, troubleshooting) ·
-> [AUTH-SECURITY-PLAN.md](../AUTH-SECURITY-PLAN.md) (the JWT-auth hardening) ·
-> [infra/README.md](../infra/README.md) (deploy-time env setup).
+> [security/authentication.md](../security/authentication.md) (the JWT-auth hardening) ·
+> [infra/README.md](../../infra/README.md) (deploy-time env setup).
 
 ---
 
@@ -34,7 +34,7 @@ authenticated and deployed.
 This is **not** the official `@convex-dev/better-auth` integration — that runs
 Better Auth *inside* Convex and would invert the ownership model. We deliberately
 use Convex's generic `customJwt` provider so Convex only *verifies* tokens the
-external NestJS API issues. See [AUTH-SECURITY-PLAN.md](../AUTH-SECURITY-PLAN.md).
+external NestJS API issues. See [security/authentication.md](../security/authentication.md).
 
 ---
 
@@ -79,14 +79,14 @@ most common source of confusion. The categories:
 > `process.env` **inside Convex functions**, so they live on the **Convex
 > deployment** (set via `convex env set`), **not** in any `.env` file. The `.env.*`
 > files only configure the CLI/container/API/UI. See
-> [convex-self-hosting.md](convex-self-hosting.md#function-runtime-variables-read-by-processenv-inside-convex-functions)
-> and [infra/README.md](../infra/README.md) step 7.
+> [convex-self-hosting.md](../deployment/convex-self-hosting.md#function-runtime-variables-read-by-processenv-inside-convex-functions)
+> and [infra/README.md](../../infra/README.md) step 7.
 
 Code references: API reads `convex.url`/`convex.adminKey` in
-[configuration.ts](../retro-tool-api/src/config/configuration.ts); the sync
+[configuration.ts](../../retro-tool-api/src/config/configuration.ts); the sync
 services gate on them. Convex reads `process.env.JWT_*` in
-[auth.config.ts](../convex-backend/convex/auth.config.ts). UI reads
-`VITE_CONVEX_URL` in [convex-client.ts](../retro-tool-ui/src/lib/convex-client.ts).
+[auth.config.ts](../../convex-backend/convex/auth.config.ts). UI reads
+`VITE_CONVEX_URL` in [convex-client.ts](../../retro-tool-ui/src/lib/convex-client.ts).
 
 ---
 
@@ -164,14 +164,14 @@ Content-Type: application/json
 ```
 
 Shared runner: `runMutation(path, args)` in
-[convex-admin.service.ts](../retro-tool-api/src/convex-admin/convex-admin.service.ts).
+[convex-admin.service.ts](../../retro-tool-api/src/convex-admin/convex-admin.service.ts).
 Each domain has its own sync service that no-ops when Convex isn't configured:
 
 | Service | Triggers on | Calls |
 | --- | --- | --- |
-| [retros-projection-sync.service.ts](../retro-tool-api/src/retros/retros-projection-sync.service.ts) | retro gateway events | `liveRetros:upsertRetroProjection`, then `upsertRetroBoard` for every team member; `deleteRetroProjection` |
-| [estimates-projection-sync.service.ts](../retro-tool-api/src/estimates/estimates-projection-sync.service.ts) | estimate gateway events | `liveEstimates:upsertSessionProjection` + `upsertEstimateBoard` per member; `deleteSessionProjection` |
-| [notifications-projection-sync.service.ts](../retro-tool-api/src/notifications/notifications-projection-sync.service.ts) | notification create / read | `liveNotifications:upsert…`, `markNotificationReadProjection`, `markAllNotificationsReadProjection` |
+| [retros-projection-sync.service.ts](../../retro-tool-api/src/retros/retros-projection-sync.service.ts) | retro gateway events | `liveRetros:upsertRetroProjection`, then `upsertRetroBoard` for every team member; `deleteRetroProjection` |
+| [estimates-projection-sync.service.ts](../../retro-tool-api/src/estimates/estimates-projection-sync.service.ts) | estimate gateway events | `liveEstimates:upsertSessionProjection` + `upsertEstimateBoard` per member; `deleteSessionProjection` |
+| [notifications-projection-sync.service.ts](../../retro-tool-api/src/notifications/notifications-projection-sync.service.ts) | notification create / read | `liveNotifications:upsert…`, `markNotificationReadProjection`, `markAllNotificationsReadProjection` |
 
 Board snapshots are computed **per team member** because each user's board view
 can differ (carried-forward items, permissions baked into the snapshot).
@@ -179,13 +179,13 @@ can differ (carried-forward items, permissions baked into the snapshot).
 **Aggregates** are written by the API calling the `upsert*Stat` functions on
 entity lifecycle events. **`clearTables`** (admin-only) is invoked by the
 super-admin endpoint and a scheduled cron
-([convex-admin-cron.service.ts](../retro-tool-api/src/convex-admin/convex-admin-cron.service.ts))
+([convex-admin-cron.service.ts](../../retro-tool-api/src/convex-admin/convex-admin-cron.service.ts))
 to purge stale projection rows, surfaced in the admin UI at `/admin/convex`
 (immediate "Clear Tables Now" + a recurring "Scheduled Cleanup").
 
 `clearTables` enforces an allowlist — the `CLEARABLE_TABLES` constant in
-[admin.ts](../convex-backend/convex/admin.ts) — and the UI's table list in
-[convex.tsx](../retro-tool-ui/src/routes/admin/convex.tsx) mirrors it exactly.
+[admin.ts](../../convex-backend/convex/admin.ts) — and the UI's table list in
+[convex.tsx](../../retro-tool-ui/src/routes/admin/convex.tsx) mirrors it exactly.
 Clearable set: `liveRetroSessions`, `liveEstimateSessions`,
 `liveIcebreakerSessions`, `liveRetroBoards`, `liveEstimateBoards`,
 `liveIcebreakerBoards`, `liveStandupEntries`, `liveStandupBoards`,
@@ -213,23 +213,23 @@ clearing it is recoverable.
 
 ## 6. How the UI reads from Convex
 
-- **Client:** [convex-client.ts](../retro-tool-ui/src/lib/convex-client.ts) lazily
+- **Client:** [convex-client.ts](../../retro-tool-ui/src/lib/convex-client.ts) lazily
   creates one `ConvexReactClient(VITE_CONVEX_URL)`; returns `null` if unset.
-- **Provider + auth:** [realtime-providers.tsx](../retro-tool-ui/src/lib/realtime-providers.tsx)
+- **Provider + auth:** [realtime-providers.tsx](../../retro-tool-ui/src/lib/realtime-providers.tsx)
   wraps the app in `ConvexProviderWithAuth` with a `useAuth` hook that fetches the
   JWT from `GET /api/auth/token` (see §7). Falls back to plain children when
   Convex is unconfigured.
-- **Feature toggle:** [realtime-config.ts](../retro-tool-ui/src/lib/realtime-config.ts)
+- **Feature toggle:** [realtime-config.ts](../../retro-tool-ui/src/lib/realtime-config.ts)
   reads `VITE_*_REALTIME_BACKEND`. `usesConvexForRetros()` etc. decide Convex vs
   Socket.IO **per feature**, so realtime can roll out gradually.
 - **Sync components** subscribe to a board query and hydrate the TanStack Query
   cache from the snapshot (replacing REST polling). They gate on
   `useConvexAuth().isAuthenticated` and pass **no `userId`** (derived server-side):
-  - [retro-convex-sync.tsx](../retro-tool-ui/src/routes/retros/components/retro-convex-sync.tsx) → `liveRetros:getRetroBoard`
-  - [estimate-convex-sync.tsx](../retro-tool-ui/src/routes/estimate/components/estimate-convex-sync.tsx) → `liveEstimates:getEstimateBoard`
-  - [notification-convex-sync.tsx](../retro-tool-ui/src/components/notification-convex-sync.tsx) → `liveNotifications:listUserNotifications`
+  - [retro-convex-sync.tsx](../../retro-tool-ui/src/routes/retros/components/retro-convex-sync.tsx) → `liveRetros:getRetroBoard`
+  - [estimate-convex-sync.tsx](../../retro-tool-ui/src/routes/estimate/components/estimate-convex-sync.tsx) → `liveEstimates:getEstimateBoard`
+  - [notification-convex-sync.tsx](../../retro-tool-ui/src/components/notification-convex-sync.tsx) → `liveNotifications:listUserNotifications`
   - list syncs: `retro-list-convex-sync.tsx`, `estimate-list-convex-sync.tsx`
-- **Direct presence** in [$retroId.tsx](../retro-tool-ui/src/routes/retros/$retroId.tsx)
+- **Direct presence** in [$retroId.tsx](../../retro-tool-ui/src/routes/retros/$retroId.tsx)
   uses `useConvexMutation`/`useConvexQuery` for typing + ready status.
 
 Function references are string-cast (`'liveRetros:getRetroBoard' as unknown as
@@ -246,10 +246,10 @@ Convex verifies the RS256 JWTs the NestJS API issues; it does not manage session
    `sub`=Better Auth user id, `role`, 15-min expiry.
 2. **UI attaches** it via `ConvexProviderWithAuth` (§6).
 3. **Convex verifies** via the `customJwt` provider in
-   [auth.config.ts](../convex-backend/convex/auth.config.ts): matches `iss`/`aud`,
+   [auth.config.ts](../../convex-backend/convex/auth.config.ts): matches `iss`/`aud`,
    fetches `JWT_JWKS_URL` to check the RS256 signature.
 4. **Functions authorize** with `requireIdentity(ctx)`
-   ([lib/authz.ts](../convex-backend/convex/lib/authz.ts)) and compare
+   ([lib/authz.ts](../../convex-backend/convex/lib/authz.ts)) and compare
    `identity.subject` (= the user id stored in projection rows). It deliberately
    uses `subject`, **not** `tokenIdentifier` (which is `sub`+`iss` and wouldn't
    match).
@@ -266,13 +266,13 @@ Convex verifies the RS256 JWTs the NestJS API issues; it does not manage session
 > **Residual:** team-scoped reads enforce *authenticated* but not *team
 > membership* (Convex holds no membership data). JWT TTL means Convex authz lags
 > session revocation by ≤15 min. Both are acceptable for read-only projections and
-> tracked in [AUTH-SECURITY-PLAN.md](../AUTH-SECURITY-PLAN.md).
+> tracked in [security/authentication.md](../security/authentication.md).
 
 ---
 
 ## 8. Deploy & codegen workflow
 
-Scripts in [convex-backend/package.json](../convex-backend/package.json):
+Scripts in [convex-backend/package.json](../../convex-backend/package.json):
 
 | Command | Targets | Notes |
 | --- | --- | --- |
@@ -289,7 +289,7 @@ API; `deploy-ui.yml` validates and bakes `VITE_CONVEX_URL` into the UI build.
 
 **Per-deployment one-time setup** (after first deploy, and whenever the API host
 changes): set `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_JWKS_URL` on the Convex
-deployment — [infra/README.md](../infra/README.md) step 7.
+deployment — [infra/README.md](../../infra/README.md) step 7.
 
 ---
 
@@ -297,7 +297,7 @@ deployment — [infra/README.md](../infra/README.md) step 7.
 
 - **Self-hosted admin key is ephemeral** — regenerated whenever the container is
   recreated; update it in both env files. See
-  [convex-self-hosting.md](convex-self-hosting.md#admin-key-is-tied-to-the-running-container).
+  [convex-self-hosting.md](../deployment/convex-self-hosting.md#admin-key-is-tied-to-the-running-container).
 - **`localhost` inside the Convex container is the container**, so `JWT_JWKS_URL`
   for local must be `http://host.docker.internal:8000/api/auth/jwks` (or the
   compose service name), not `localhost:8000`.

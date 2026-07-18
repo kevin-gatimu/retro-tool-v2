@@ -3,7 +3,7 @@
 > A description of the system **as it exists today** (branch: `staging`). Sources: the code in
 > `retro-tool-api/`, `retro-tool-ui/`, `convex-backend/`, `infra/`, and the docs under `docs/`
 > (`RBAC.md`, `app-flows.md`, `auth-workflows.md`, `convex-architecture.md`, `api-security.md`,
-> `invitations.md`), plus `AUTH-SECURITY-PLAN.md` and the package READMEs. When this document and
+> `invitations-and-onboarding.md`), plus `AUTH-SECURITY-PLAN.md` and the package READMEs. When this document and
 > the code disagree, trust the code.
 
 ---
@@ -44,6 +44,7 @@ It is a **pnpm monorepo** with three deployable applications and one shared pack
 ### Component diagram
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart LR
     subgraph Browser
         UI["retro-tool-ui (React 19 SPA)\nAzure Static Web App"]
@@ -74,8 +75,12 @@ flowchart LR
 ### Azure topology — three isolated environments
 
 Infrastructure is provisioned by **Azure CLI + Bicep** (`infra/deploy.bicep` → `infra/main.bicep`,
-subscription-scoped; also runnable via the manual `provision-infra.yml` workflow). Apps are deployed
-by GitHub Actions (`ci.yml`, `deploy-api.yml`, `deploy-ui.yml`) — infra is **never** deployed from CI.
+subscription-scoped) from a developer machine. Apps are deployed by GitHub Actions (`ci.yml`,
+`deploy-api.yml`, `deploy-ui.yml`, `deploy-convex.yml`, orchestrated for staging by
+`release-staging.yml`) — infra is **never** deployed from CI. See
+[cloud.md](cloud.md) for the full Azure topology and
+[../deployment/release-and-branch-strategy.md](../deployment/release-and-branch-strategy.md) for
+what deploys when.
 
 | Environment | Branch | Resource group | API | UI | Convex |
 | --- | --- | --- | --- | --- | --- |
@@ -173,6 +178,7 @@ as the rollout fallback. The notifications gateway joins each client to room `us
 Convex never manages sessions; it only **verifies** short-lived JWTs the API issues:
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
     participant UI as UI (ConvexProviderWithAuth)
     participant API as NestJS (Better Auth jwt plugin)
@@ -266,6 +272,7 @@ Every admin status/role change writes an audit row to `adminActionLog`. Sign-in 
 ### 3.1 The canonical write → project → subscribe path
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
     participant UI as UI (TanStack Query)
     participant API as NestJS API
@@ -300,6 +307,47 @@ the **read fan-out** (board snapshots, lists, notifications) plus browser-writte
 
 ### 3.3 Module-by-module
 
+Every domain is a self-contained NestJS module (`module.ts` / `controller.ts` / `service.ts`,
+optional `gateway.ts` + `*-projection-sync.service.ts`, plus `dto/`, `types/index.ts`, `schema/`).
+They group into platform, identity/access, and product layers:
+
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+flowchart TB
+    subgraph app["AppModule"]
+        subgraph platform["Platform"]
+            auth["AuthModule<br/>Better Auth, OTP, WS auth, JWT"]
+            db["DatabaseModule<br/>single Drizzle pool"]
+            convexadmin["ConvexAdminModule<br/>runMutation, outbox, reconcile, cron"]
+        end
+        subgraph identity["Identity & access"]
+            users["UsersModule"]
+            orgs["OrganizationsModule"]
+            teams["TeamsModule"]
+            teamroles["TeamRolesModule"]
+            invites["InvitationsModule"]
+            sessions["SessionsModule"]
+            prefs["UserPreferencesModule"]
+        end
+        subgraph product["Product features"]
+            retros["RetrosModule"]
+            estimates["EstimatesModule + EstimateTemplatesModule"]
+            icebreakers["IcebreakersModule + IcebreakerTemplatesModule"]
+            standups["StandupsModule"]
+            polls["PollsModule"]
+            surveys["SurveysModule"]
+            actions["ActionItemsModule"]
+            reports["ReportsModule<br/>(live SQL, no tables)"]
+            notifications["NotificationsModule"]
+        end
+    end
+```
+
+Global cross-cutting on `AppModule`: `ThrottlerBehindProxyGuard` (100/60s default),
+`LastActiveInterceptor`, `ScheduleModule`, and `HealthController` (`/health*`, excluded from the
+`/api` prefix). Shared helpers live in `src/common/` and `src/lib/`; email is a library
+(`src/lib/email.ts`), not a module.
+
 | Module (API `src/`) | Write path | Realtime / projection | Notes |
 | --- | --- | --- | --- |
 | **auth** | Better Auth middleware → `user`/`session`/`account`/`verification`/`passkey`/`jwks` | n/a | See §2; OTP proxy controllers under `/api/otp/*` |
@@ -315,7 +363,7 @@ the **read fan-out** (board snapshots, lists, notifications) plus browser-writte
 | **surveys** | `/surveys*` → `survey`, `surveyQuestion`, `surveyResponse`, `surveyAnswer` | Convex `liveSurveys` — same invalidate-and-refetch pattern | Scopes: team / org / system |
 | **notifications** | Created by other services → `notification`; push subs in `pushSubscription` | Gateway `/notifications` emits `new-notification` to room `user:{id}`; Convex `liveNotifications` for bell/list; web-push (VAPID) for browser push | Read state mirrored to projection (`mark*ReadProjection`) |
 | **invitations** | Unified + org/team invite endpoints → `orgInvitation` / `teamInvitation` (tokenised links, 3-day expiry) | In-app notification on membership | Accepting auto-approves `pending` users and verifies email; "Add Member" is the direct, no-email variant |
-| **reports** | **No tables** — live SQL over existing schemas + Convex aggregates (`liveReports.ts`, 7 counters) | Convex `@convex-dev/aggregate` component | Team metrics, health score, system stats (`getSystemStats` checks the JWT `role` claim) |
+| **reports** | **No tables** — live SQL over existing schemas via `/api/reports/v2/*` | None (Convex aggregates were retired; the only registered Convex component is `@convex-dev/rate-limiter`) | Team metrics, health score, system stats (`getSystemStats` checks the JWT `role` claim) |
 | **email** | `lib/email.ts` → Resend; every send logged to `emailLog` | n/a | Verification, OTP, reset, invitations, reminders, digests |
 | **convex-admin** | `runMutation` runner; super-admin `clearTables`; `convexCronConfig` singleton row | Scheduled purge of stale projection rows (`convex-admin-cron.service.ts`) | Admin UI at `/admin/convex` with metrics |
 
@@ -390,6 +438,7 @@ into `retros.schema.ts`, `cards.schema.ts`, `action-items.schema.ts`); migration
 ### 4.2 ER overview (core entities)
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 erDiagram
     user ||--o{ session : "has"
     user ||--o{ account : "auth providers"
@@ -486,7 +535,7 @@ global retro/user counts).
 
 | Gap | Detail |
 | --- | --- |
-| **Socket.IO Redis adapter is disabled** | `src/adapters/socket-io.adapter.ts` logs `"Redis adapter disabled"` — no `@socket.io/redis-adapter` wiring exists, even though Redis 7 is provisioned in `docker-compose.local.yml` (and listed in the stack docs). With >1 API instance, gateway broadcasts would only reach clients connected to the emitting instance. Convex-backed features mask this in staging/prod, but the `socket-io` fallback mode is effectively **single-instance only**. No Redis is provisioned in the Azure Bicep at all. |
+| **Socket.IO Redis adapter is disabled** | `retro-tool-api/src/adapters/socket-io.adapter.ts` logs `"Redis adapter disabled"` — no `@socket.io/redis-adapter` wiring exists. Redis is not provisioned anywhere (not in `docker/docker-compose.local.yml`, not in Azure Bicep). With >1 API instance, gateway broadcasts would only reach clients connected to the emitting instance. Convex-backed features mask this in staging/prod, but the `socket-io` fallback mode is effectively **single-instance only**. |
 | **No API-level server cache** | Redis isn't used for caching or shared throttler storage; throttler counters are per-instance (per-IP limits loosen under horizontal scale). |
 | **Single Postgres, no read replicas** | Burstable B1ms; reports run live SQL against the primary. Fine at current scale; a tier bump and/or replicas are the first lever. |
 | **No autoscale rules / multi-region** | Scaling is manual; all compute in one region (Static Web App aside). |

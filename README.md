@@ -100,7 +100,7 @@ The platform has two parallel role dimensions: a **system-level role** on every 
 └────────────────────────────────────────────────────────────────┘
 ```
 
-> Full permission matrices are in [docs/RBAC.md](docs/RBAC.md).
+> Full permission matrices are in [docs/security/rbac.md](docs/security/rbac.md).
 
 ---
 
@@ -238,7 +238,7 @@ VITE_ESTIMATES_REALTIME_BACKEND=convex   # or: socket-io
 
 Socket.IO remains the fallback transport when either flag is set to `socket-io`.
 
-> Deep dive: [docs/convex-architecture.md](docs/convex-architecture.md) · [docs/convex-nestjs-auth.md](docs/convex-nestjs-auth.md) · [convex-backend/README.md](convex-backend/README.md)
+> Deep dive: [docs/architecture/convex.md](docs/architecture/convex.md) · [docs/security/convex-nestjs-auth.md](docs/security/convex-nestjs-auth.md) · [convex-backend/README.md](convex-backend/README.md)
 
 ---
 
@@ -361,7 +361,7 @@ Socket.IO remains the fallback transport when either flag is set to `socket-io`.
 | Aggregates    | `@convex-dev/aggregate`      |
 | Auth bridge   | Better Auth JWT                |
 
-> Full details: [convex-backend/README.md](convex-backend/README.md) · [docs/convex-architecture.md](docs/convex-architecture.md)
+> Full details: [convex-backend/README.md](convex-backend/README.md) · [docs/architecture/convex.md](docs/architecture/convex.md)
 
 ---
 
@@ -637,22 +637,23 @@ az deployment sub create --location southafricanorth --template-file infra/deplo
 
 | Document                                                  | Description                                                        |
 | --------------------------------------------------------- | ------------------------------------------------------------------ |
-| [docs/RBAC.md](docs/RBAC.md)                               | Complete role and permission matrices                              |
-| [docs/app-flows.md](docs/app-flows.md)                     | Every major user-facing flow (auth, org, team, retro, estimates)   |
-| [docs/invitations.md](docs/invitations.md)                 | Invitation system (org + team)                                     |
-| [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker (local + production)                      |
+| [docs/security/rbac.md](docs/security/rbac.md)                               | Complete role and permission matrices                              |
+| [docs/workflows/app-flows.md](docs/workflows/app-flows.md)                     | Every major user-facing flow (auth, org, team, retro, estimates)   |
+| [docs/workflows/invitations-and-onboarding.md](docs/workflows/invitations-and-onboarding.md) | Invitation system (org + team), accept-invite journey, onboarding & password rules |
+| [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md) | Running Convex in Docker (local + production)                      |
 | [docs/future-roadmap.md](docs/future-roadmap.md)           | Planned features: IceBreakers, AI summaries, Jira/ADO export, SAML |
 
 ### Infrastructure & Deployment
 
-| Document                                                                                                  | Description                                                              |
-| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [infra/README.md](infra/README.md)                                                                         | Bicep deployment commands, what-if, outputs, post-provisioning checklist |
-| [infra/README-oidc.md](infra/README-oidc.md)                                                               | OIDC federated-credential setup for GitHub Actions                       |
-| [docs/Azure Infrastructure Provisioning Guide.md](<docs/Azure%20Infrastructure%20Provisioning%20Guide.md>) | Full provisioning walkthrough                                            |
-| [docs/Azure Resources Guide.md](<docs/Azure%20Resources%20Guide.md>)                                       | Azure resource inventory and architecture                                |
-| [docs/CONVEX-AZURE-SELF-HOSTING-PLAN.md](docs/CONVEX-AZURE-SELF-HOSTING-PLAN.md)                            | Plan for self-hosting Convex on Azure App Service                        |
-| [docs/convex-staging-deployment-runbook.md](docs/convex-staging-deployment-runbook.md)                     | Staging Convex deployment runbook                                        |
+| Document | Description |
+| --- | --- |
+| [infra/README.md](infra/README.md) | Bicep deployment commands, what-if, outputs, post-provisioning checklist |
+| [infra/README-oidc.md](infra/README-oidc.md) | OIDC federated-credential setup for GitHub Actions |
+| [docs/deployment/azure-provisioning.md](docs/deployment/azure-provisioning.md) | Full provisioning walkthrough |
+| [docs/deployment/azure-resources.md](docs/deployment/azure-resources.md) | Azure resource inventory and architecture |
+| [docs/deployment/convex-azure-self-hosting-plan.md](docs/deployment/convex-azure-self-hosting-plan.md) | Plan for self-hosting Convex on Azure App Service |
+| [docs/deployment/convex-staging-runbook.md](docs/deployment/convex-staging-runbook.md) | Staging Convex deployment runbook |
+| [docs/deployment/release-and-branch-strategy.md](docs/deployment/release-and-branch-strategy.md) | Branch model, release-please versioning, conventional commits, deploy triggers |
 
 ### Backend
 
@@ -670,7 +671,7 @@ az deployment sub create --location southafricanorth --template-file infra/deplo
 
 | Document                                                  | Description                                     |
 | --------------------------------------------------------- | ----------------------------------------------- |
-| [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker (local and production) |
+| [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md) | Running Convex in Docker (local and production) |
 | [convex-backend/README.md](convex-backend/README.md)       | Convex backend setup and modules                |
 
 ---

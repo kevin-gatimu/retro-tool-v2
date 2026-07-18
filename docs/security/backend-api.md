@@ -5,7 +5,7 @@ How the NestJS API (`retro-tool-api`) is hardened across the four areas of the
 
 ## Helmet (response headers)
 
-`helmet()` is applied globally in [`src/main.ts`](../retro-tool-api/src/main.ts), **before** all other
+`helmet()` is applied globally in [`src/main.ts`](../../retro-tool-api/src/main.ts), **before** all other
 middleware so it covers every response. It sets the standard hardening headers (`X-Content-Type-Options:
 nosniff`, `X-Frame-Options`, HSTS over HTTPS, etc.).
 
@@ -28,15 +28,15 @@ HTTPS, so it is a no-op in local dev.
 Two layers, both per-IP:
 
 1. **Global** — `@nestjs/throttler` (`ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])` in
-   [`src/app.module.ts`](../retro-tool-api/src/app.module.ts)) → ~100 requests/minute/IP across the
+   [`src/app.module.ts`](../../retro-tool-api/src/app.module.ts)) → ~100 requests/minute/IP across the
    whole API, enforced by a global `APP_GUARD`.
 2. **Auth routes** — Better Auth's own stricter `rateLimit`
-   ([`src/auth/auth.config.ts`](../retro-tool-api/src/auth/auth.config.ts)) layered on top: 5 sign-ups /
+   ([`src/auth/auth.config.ts`](../../retro-tool-api/src/auth/auth.config.ts)) layered on top: 5 sign-ups /
    5 min, 10 sign-ins / min, 3 password resets / 5 min.
 
 **Behind a proxy:** Azure App Service terminates TLS at a reverse proxy, so the real client IP arrives
 in `X-Forwarded-For`. `main.ts` sets Express `trust proxy = 1`, and
-[`ThrottlerBehindProxyGuard`](../retro-tool-api/src/common/guards/throttler-behind-proxy.guard.ts) keys
+[`ThrottlerBehindProxyGuard`](../../retro-tool-api/src/common/guards/throttler-behind-proxy.guard.ts) keys
 the limit off `req.ips[0]` (falling back to `req.ip`). Without `trust proxy`, every request would appear
 to come from the proxy and share one bucket.
 
@@ -46,11 +46,11 @@ is not affected.
 
 ## CORS
 
-[`src/main.ts`](../retro-tool-api/src/main.ts) calls `app.enableCors` with an **allow-list** of origins
+[`src/main.ts`](../../retro-tool-api/src/main.ts) calls `app.enableCors` with an **allow-list** of origins
 (`credentials: true`) resolved from `ALLOWED_ORIGINS` (comma-separated), falling back to `FRONTEND_URL` +
 `LOCAL_SERVER_URL`. In **production the app refuses to boot** if no origins resolve, rather than starting
 with an empty/`undefined` list. Socket.IO mirrors the same allow-list in
-[`adapters/socket-io.adapter.ts`](../retro-tool-api/src/adapters/socket-io.adapter.ts). Better Auth's
+[`adapters/socket-io.adapter.ts`](../../retro-tool-api/src/adapters/socket-io.adapter.ts). Better Auth's
 `trustedOrigins` is also set to the same list.
 
 ## CSRF

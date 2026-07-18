@@ -1,6 +1,6 @@
 # Convex Self-Hosting — Staging Deployment Runbook
 
-> Companion to [CONVEX-AZURE-SELF-HOSTING-PLAN.md](./CONVEX-AZURE-SELF-HOSTING-PLAN.md).
+> Companion to [convex-azure-self-hosting-plan.md](./convex-azure-self-hosting-plan.md).
 > This is the concrete, step-by-step procedure to get the self-hosted Convex
 > backend running on Azure **App Service** in the `staging` environment and to
 > cut the API + UI over to it, with a clean rollback to Convex Cloud.
@@ -22,8 +22,8 @@ of record; Convex holds only the reconstructable realtime projection layer.
 | Key Vault | `retrotool-staging-cvx-<hash>` |
 | Public URL | `https://retrotool-staging-convex.azurewebsites.net` |
 
-Infra: [infra/convex-staging.bicep](../infra/convex-staging.bicep) +
-[infra/modules/](../infra/modules/). Deploy workflow:
+Infra: [infra/convex-staging.bicep](../../infra/convex-staging.bicep) +
+[infra/modules/](../../infra/modules/). Deploy workflow:
 [.github/workflows/deploy-convex.yml](../.github/workflows/deploy-convex.yml),
 orchestrated by [.github/workflows/release-staging.yml](../.github/workflows/release-staging.yml).
 
@@ -38,7 +38,7 @@ These are data-plane / bootstrap steps the Bicep and workflow deliberately do
 
 The workflow references `retrotoolstagingacr.azurecr.io/convex-backend@sha256:…`
 but nothing pushes it. Mirror the upstream digest recorded in
-[convex-backend/compatibility.json](../convex-backend/compatibility.json)
+[convex-backend/compatibility.json](../../convex-backend/compatibility.json)
 (`az acr import` preserves the digest, so the pin resolves):
 
 ```bash
@@ -136,9 +136,9 @@ In the repository's **staging** environment (Settings → Environments → stagi
 ### A6. Grant the deploy principal role-assignment rights ⚠️
 
 The Bicep creates **three role assignments** — AcrPull for the Convex runtime
-identity ([convex-staging.bicep](../infra/convex-staging.bicep) `acrPullAssignment`),
+identity ([convex-staging.bicep](../../infra/convex-staging.bicep) `acrPullAssignment`),
 and Key Vault Secrets User + Secrets Officer on the vault
-([modules/convex-key-vault.bicep](../infra/modules/convex-key-vault.bicep)
+([modules/convex-key-vault.bicep](../../infra/modules/convex-key-vault.bicep)
 `runtimeSecretsUser` / `bootstrapSecretsOfficer`). Every `az deployment group
 create` re-asserts them, so ARM checks `Microsoft.Authorization/roleAssignments/write`
 **on every run, even when the assignments already exist and are unchanged** —
@@ -232,7 +232,7 @@ node retro-tool-api/dist/convex-admin/reconcile-projections.js
 
 or, authenticated as a super-admin: `POST /api/convex-admin/reconcile-projections`.
 
-Both run [`ProjectionReconciliationService.reconcileAll()`](../retro-tool-api/src/convex-admin/projection-reconciliation.service.ts):
+Both run [`ProjectionReconciliationService.reconcileAll()`](../../retro-tool-api/src/convex-admin/projection-reconciliation.service.ts):
 idempotent, batched, mark-and-sweeps stale rows (via the Convex
 `admin:pruneStaleByUpdatedAt` mutation), and reports per-projection
 `{ scanned, deletedStale, failed, durationMs }` with a run ID. If any projection
@@ -243,12 +243,12 @@ proceed** past a failed reconciliation.
 
 Business mutations no longer push to Convex fire-and-forget. Each enqueues a
 durable **projection intent** in the same PostgreSQL transaction as its write
-([`projection_outbox`](../retro-tool-api/drizzle/0027_projection_outbox.sql)); a
+([`projection_outbox`](../../retro-tool-api/drizzle/0027_projection_outbox.sql)); a
 dispatcher (immediate best-effort + a per-minute advisory-locked cron on the
 serving API slot) delivers them, recomputing current state from PostgreSQL so
 delivery is idempotent and converges to truth.
 
-Super-admin endpoints ([convex-admin.controller.ts](../retro-tool-api/src/convex-admin/convex-admin.controller.ts)):
+Super-admin endpoints ([convex-admin.controller.ts](../../retro-tool-api/src/convex-admin/convex-admin.controller.ts)):
 
 | Endpoint | Purpose |
 |---|---|
@@ -286,7 +286,7 @@ data-bearing upgrade, the full maintenance sequence is:
 1. Switch affected UI features to their Socket.IO / REST fallback (flip the
    `VITE_*_REALTIME_BACKEND` flags and redeploy the UI), keeping API writes live.
 2. Pause Convex projection dispatch (the API buffers projection events durably —
-   see the outbox in [CONVEX-AZURE-SELF-HOSTING-PLAN.md](./CONVEX-AZURE-SELF-HOSTING-PLAN.md)).
+   see the outbox in [convex-azure-self-hosting-plan.md](./convex-azure-self-hosting-plan.md)).
 3. Verify PostgreSQL PITR + Azure Files backup, then take a logical export:
    `pnpm --dir convex-backend exec convex export --path convex-staging-<date>.zip`
    (with `CONVEX_SELF_HOSTED_URL` / `CONVEX_SELF_HOSTED_ADMIN_KEY` set).

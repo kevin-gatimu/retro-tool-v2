@@ -1,8 +1,6 @@
-# Email Features - Frontend Documentation
+# Email — frontend flows
 
-## Overview
-
-The frontend triggers email sends through API calls and displays user feedback for email-related actions. This document covers email-related UI components, hooks, and flows from the user perspective.
+> UI components, hooks, and user-facing flows for every email trigger in the app (verification, password reset, invitations, join requests, retro reports).
 
 ## Email-Triggered User Flows
 
@@ -30,7 +28,7 @@ Backend: Validates token, marks user emailVerified: true
 Frontend shows success screen → "Go to Dashboard"
 ```
 
-**File**: `src/routes/auth/sign-up.tsx`
+**File**: `retro-tool-ui/src/routes/auth/sign-up.tsx`
 
 - Form validation with Zod
 - Success state: "Welcome, Admin!" (if first user) or pending approval notice
@@ -62,13 +60,13 @@ Backend: Validates token, updates password
 Frontend redirects to sign-in on success
 ```
 
-**File**: `src/routes/auth/forgot-password.tsx`
+**File**: `retro-tool-ui/src/routes/auth/forgot-password.tsx`
 
 - Email input validation
 - Success state: Displays submitted email with instructions
 - Error handling: Toast errors
 
-**File**: `src/routes/auth/reset-password.tsx`
+**File**: `retro-tool-ui/src/routes/auth/reset-password.tsx`
 
 - Password requirements checklist
 - Passwords-match validation
@@ -100,7 +98,7 @@ User clicks new link in email
 Verification flow completes → Dashboard
 ```
 
-**File**: `src/routes/auth/verify-email.tsx`
+**File**: `retro-tool-ui/src/routes/auth/verify-email.tsx`
 
 - States: `loading`, `success`, `error`, `no-token`
 - Resend button: Hidden if user not signed in
@@ -168,13 +166,13 @@ User clicks link → redirected to organizations page
 User is now org member with assigned role
 ```
 
-**File**: `src/routes/organizations/$orgId.tsx`
+**File**: `retro-tool-ui/src/routes/organizations/$orgId.tsx`
 
 - "Invite Member" button (visible to org admins only)
 - Dialog with email input + role dropdown
 - Error handling: Toast on API failure
 
-**File**: `src/routes/organizations/hooks/useOrganizationMutations.ts`
+**File**: `retro-tool-ui/src/routes/organizations/hooks/use-organization-mutations.ts`
 
 ```typescript
 export function useInviteOrgMemberMutation(orgId: string) {
@@ -264,14 +262,14 @@ Toast: "Report sent to N recipient(s)"
 Button returns to normal state
 ```
 
-**File**: `src/components/retro-report.tsx`
+**File**: `retro-tool-ui/src/components/retro-report.tsx`
 
 - Location: Bottom of retro board when status === 'completed'
 - Button: "Email Report" with Mail icon, next to expand/collapse toggle
 - Disabled while sending: Shows "Sending..." text
 - On error: Toast with error message
 
-**Hook**: `src/routes/retros/hooks/useSendRetroReport.ts`
+**Hook**: `retro-tool-ui/src/routes/retros/hooks/use-send-retro-report.ts`
 
 ```typescript
 export function useSendRetroReport(retroId: string) {
@@ -290,7 +288,7 @@ export function useSendRetroReport(retroId: string) {
 
 ## API Endpoints
 
-All email-related endpoints are defined in `src/lib/api-endpoints.ts`:
+All email-related endpoints are defined in `retro-tool-ui/src/lib/api-endpoints.ts`:
 
 ```typescript
 // Authentication
@@ -315,39 +313,39 @@ POST /api/retros/:id/send-report
 
 ### Authentication Hooks
 
-**File**: `src/routes/auth/hooks/useSignUp.ts`
+**File**: `retro-tool-ui/src/routes/auth/hooks/use-sign-up.ts`
 
 - Sign-up form submission
 - Triggers verification email via Better Auth
 
-**File**: `src/routes/auth/hooks/useForgotPassword.ts`
+**File**: `retro-tool-ui/src/routes/auth/hooks/use-forgot-password.ts`
 
 - Forgot password form → triggers reset email
 
-**File**: `src/routes/auth/hooks/useResetPassword.ts`
+**File**: `retro-tool-ui/src/routes/auth/hooks/use-reset-password.ts`
 
 - Validates reset token, submits new password
 
-**File**: `src/routes/auth/hooks/useAdminCheck.ts`
+**File**: `retro-tool-ui/src/routes/auth/hooks/use-admin-check.ts`
 
 - Checks if first user (admin) exists
 
 ### Organization Hooks
 
-**File**: `src/routes/organizations/hooks/useOrganizationMutations.ts`
+**File**: `retro-tool-ui/src/routes/organizations/hooks/use-organization-mutations.ts`
 
 - `useInviteOrgMemberMutation(orgId)` → sends invite email
 
 ### Team Hooks
 
-**File**: `src/routes/teams/` (if exists)
+**File**: `retro-tool-ui/src/routes/teams/`
 
 - Join request mutations
 - Approve/reject join request mutations
 
 ### Retro Hooks
 
-**File**: `src/routes/retros/hooks/useSendRetroReport.ts`
+**File**: `retro-tool-ui/src/routes/retros/hooks/use-send-retro-report.ts`
 
 - Sends retro report email to team members
 
@@ -399,7 +397,7 @@ Common error scenarios:
 
 ### API Layer
 
-**File**: `src/lib/api.ts`
+**File**: `retro-tool-ui/src/lib/api.ts`
 
 - Wrapper around fetch
 - Methods: `api.get()`, `api.post()`, `api.patch()`, `api.put()`, `api.delete()`
@@ -408,7 +406,7 @@ Common error scenarios:
 
 ### Auth Client
 
-**File**: `src/lib/auth-client.ts`
+**File**: `retro-tool-ui/src/lib/auth-client.ts`
 
 - Better Auth client configured for API at `{VITE_API_URL}/api/auth`
 - Cookie-based sessions (sent with `credentials: 'include'`)
@@ -484,10 +482,10 @@ mutation.isError // true if failed
 ### Environment Setup for Testing
 
 ```env
-# .env for frontend
-VITE_API_URL=http://localhost:3000
+# retro-tool-ui/.env.local
+VITE_API_URL=http://localhost:8000
 
-# .env for backend
+# retro-tool-api/.env.local
 RESEND_API_KEY=re_test_...  # Or leave blank for console logging
 ```
 

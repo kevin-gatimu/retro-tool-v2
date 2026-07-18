@@ -142,7 +142,7 @@ VITE_NOTIFICATIONS_REALTIME_BACKEND=convex
 
 Convex-sync components sit alongside their route and are named `*-convex-sync.tsx`. They are responsible only for subscribing to Convex queries and calling the NestJS API to trigger syncs.
 
-**File naming:** UI source files use **`kebab-case`** (`notification-bell.tsx`, `use-current-user.ts`). The file name is kebab; the export keeps idiomatic case — components `PascalCase`, hooks `useCamelCase` (file prefixed `use-`). Route files under `src/routes/` are the exception — TanStack Router names them (`index.tsx`, `$teamId.tsx`, `__root.tsx`). Skeletons use `skeleton/index.tsx` (route group) or `<name>.skeleton.tsx` (single route). Full reference: [docs/file-naming-conventions.md](docs/file-naming-conventions.md).
+**File naming:** UI source files use **`kebab-case`** (`notification-bell.tsx`, `use-current-user.ts`). The file name is kebab; the export keeps idiomatic case — components `PascalCase`, hooks `useCamelCase` (file prefixed `use-`). Route files under `src/routes/` are the exception — TanStack Router names them (`index.tsx`, `$teamId.tsx`, `__root.tsx`). Skeletons use `skeleton/index.tsx` (route group) or `<name>.skeleton.tsx` (single route). Full reference: [docs/guidelines/file-naming-conventions.md](docs/guidelines/file-naming-conventions.md).
 
 **RBAC in the UI:**
 
@@ -196,13 +196,13 @@ Team: team-lead > member
 
 The first user to sign up is auto-bootstrapped as `super-admin`. All subsequent users start `pending` and require admin approval before they can access the platform.
 
-Full permission matrices → [docs/RBAC.md](docs/RBAC.md)
+Full permission matrices → [docs/security/rbac.md](docs/security/rbac.md)
 
 ---
 
 ## Key user flows — reference
 
-Detailed step-by-step flows for every major feature are in [docs/app-flows.md](docs/app-flows.md):
+Detailed step-by-step flows for every major feature are in [docs/workflows/app-flows.md](docs/workflows/app-flows.md):
 
 - Auth: sign-up, OAuth, sign-in, email verification, password reset, sign-out
 - User approval lifecycle (pending → approved / rejected / suspended)
@@ -224,7 +224,6 @@ Detailed step-by-step flows for every major feature are in [docs/app-flows.md](d
 | `BETTER_AUTH_SECRET` | Session signing secret |
 | `BETTER_AUTH_URL` | API base URL |
 | `FRONTEND_URL` | CORS origin |
-| `REDIS_URL` | Redis connection |
 | `CONVEX_SYNC_URL` | Convex Admin API URL |
 | `CONVEX_SYNC_ADMIN_KEY` | Convex admin key |
 | `RESEND_API_KEY` | Email provider |
@@ -254,7 +253,7 @@ Detailed step-by-step flows for every major feature are in [docs/app-flows.md](d
 ```bash
 pnpm install              # install all dependencies
 pnpm local:up             # full Docker stack
-pnpm local:infra          # infra only (Postgres, Redis, Convex)
+pnpm local:infra          # infra only (Postgres + self-hosted Convex)
 pnpm dev:api              # NestJS watch mode
 pnpm dev:ui               # Vite dev server
 pnpm dev:convex           # Convex function watcher
@@ -274,17 +273,21 @@ pnpm --dir retro-tool-api db:seed
 
 | Document | What it covers |
 |---|---|
-| [docs/RBAC.md](docs/RBAC.md) | Full permission matrices, helper functions, user status lifecycle |
-| [docs/api-security.md](docs/api-security.md) | API hardening: Helmet, rate limiting, CORS, CSRF posture/residual risk |
-| [docs/file-naming-conventions.md](docs/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
-| [docs/app-flows.md](docs/app-flows.md) | Every major user-facing flow end-to-end |
-| [docs/deployment-guide.md](docs/deployment-guide.md) | Azure deployment step-by-step |
-| [docs/azure-cloud-resources.md](docs/azure-cloud-resources.md) | Azure resource inventory |
-| [docs/convex-components.md](docs/convex-components.md) | Rate limiter, aggregate, and auth bridge reference |
-| [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker |
-| [docs/local-cloud-testing.md](docs/local-cloud-testing.md) | Testing locally against cloud resources |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and fixes |
+| [docs/security/rbac.md](docs/security/rbac.md) | Full permission matrices, helper functions, user status lifecycle |
+| [docs/security/backend-api.md](docs/security/backend-api.md) | API hardening: Helmet, rate limiting, CORS, CSRF posture/residual risk |
+| [docs/guidelines/file-naming-conventions.md](docs/guidelines/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
+| [docs/workflows/app-flows.md](docs/workflows/app-flows.md) | Every major user-facing flow end-to-end |
+| [docs/security/authentication.md](docs/security/authentication.md) | Every sign-in method + credential model + per-flow file traces |
+| [docs/security/frontend.md](docs/security/frontend.md) | UI security: token storage, XSS/CSP posture, route/RBAC gating |
+| [docs/security/database.md](docs/security/database.md) | DB security: TLS, credential injection, SQL-injection posture, no-RLS reality |
+| [docs/database/schema.md](docs/database/schema.md) | Tables by domain (columns, keys, FKs, indexes), enums, ER diagram |
+| [docs/architecture/overview.md](docs/architecture/overview.md) | System architecture — components, data flow, tech stack |
+| [docs/deployment/azure-provisioning.md](docs/deployment/azure-provisioning.md) | Azure deployment step-by-step (Bicep) |
+| [docs/deployment/azure-resources.md](docs/deployment/azure-resources.md) | Azure resource inventory |
+| [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md) | Running Convex in Docker |
+| [docs/workflows/running-the-app.md](docs/workflows/running-the-app.md) | Running locally / against staging / against production |
 | [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: IceBreakers, AI summaries, Jira/ADO export, SAML |
+| [docs/README.md](docs/README.md) | Documentation index — all docs by domain |
 | [retro-tool-api/README.md](retro-tool-api/README.md) | API setup, seed credentials |
 | [retro-tool-ui/README.md](retro-tool-ui/README.md) | UI setup, route map |
 | [convex-backend/README.md](convex-backend/README.md) | Convex package notes |

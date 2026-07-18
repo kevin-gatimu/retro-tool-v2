@@ -5,8 +5,6 @@
 > Research date: 2026-07-17
 > Decision owner: engineering/platform
 
-> Azure Container Apps alternative: [CONVEX-AZURE-CONTAINER-APPS-SELF-HOSTING-PLAN.md](./CONVEX-AZURE-CONTAINER-APPS-SELF-HOSTING-PLAN.md)
-
 ## Executive decision
 
 Self-host Convex in **one dedicated Azure staging Linux Web App for Containers**. Keep development on local Docker Compose. Do not create any additional Azure Convex deployments from this plan.
@@ -103,7 +101,7 @@ Do not copy real URLs, database connection strings, instance secrets, or admin k
 
 ### Local Docker findings
 
-[`docker/docker-compose.local.yml`](../docker/docker-compose.local.yml) is useful but not yet a cloud-faithful durability test:
+[`docker/docker-compose.local.yml`](../../docker/docker-compose.local.yml) is useful but not yet a cloud-faithful durability test:
 
 - it uses `ghcr.io/get-convex/convex-backend:latest` and the dashboard `:latest` tag;
 - it does not mount `/convex/data`;
@@ -115,7 +113,7 @@ Before switching staging, pin the local image to the same tested version/digest 
 
 ### Existing Azure infrastructure findings
 
-[`infra/main.bicep`](../infra/main.bicep) currently provisions ACR, a user-assigned identity, PostgreSQL Flexible Server, one Linux App Service plan/API Web App, and a Static Web App. It does not provision:
+[`infra/main.bicep`](../../infra/main.bicep) currently provisions ACR, a user-assigned identity, PostgreSQL Flexible Server, one Linux App Service plan/API Web App, and a Static Web App. It does not provision:
 
 - a Convex Web App or App Service plan;
 - a Convex database/least-privilege role;
@@ -131,9 +129,9 @@ The current staging PostgreSQL defaults are Burstable B1ms, 32 GiB, seven-day re
 - [`.github/workflows/deploy-api.yml`](../.github/workflows/deploy-api.yml) deploys the API image and configures the Convex projection URL/key, but does not deploy Convex infrastructure or functions.
 - [`.github/workflows/deploy-ui.yml`](../.github/workflows/deploy-ui.yml) supplies estimates, retros, and notifications flags. It omits the icebreaker and standup flags, so their cloud builds can silently use defaults.
 - There is no `deploy-convex.yml`, immutable Convex image policy, coordinated staging release job, reconciliation gate, or Convex backup/upgrade workflow.
-- [`retro-tool-api/src/health.controller.ts`](../retro-tool-api/src/health.controller.ts) currently returns HTTP 200 from `GET /health/ready` even when its body says `not_ready`. It is not a safe deployment-slot gate until dependency failure returns HTTP 503.
+- [`retro-tool-api/src/health.controller.ts`](../../retro-tool-api/src/health.controller.ts) currently returns HTTP 200 from `GET /health/ready` even when its body says `not_ready`. It is not a safe deployment-slot gate until dependency failure returns HTTP 503.
 - `ENABLE_CRON_JOBS` is parsed in configuration but does not gate the `@Cron` reconciliation or dynamically registered Convex cleanup job. An API candidate slot would therefore execute scheduled work unless the code is fixed.
-- [`retro-tool-api/src/ensure-convex-database.ts`](../retro-tool-api/src/ensure-convex-database.ts) creates a database through an administrative API connection. It does not create a least-privilege Convex owner role, and the normal API deployment does not provide a private bootstrap execution path.
+- [`retro-tool-api/src/ensure-convex-database.ts`](../../retro-tool-api/src/ensure-convex-database.ts) creates a database through an administrative API connection. It does not create a least-privilege Convex owner role, and the normal API deployment does not provide a private bootstrap execution path.
 
 Create the Convex database and role with an idempotent, VNet-connected infrastructure/bootstrap job. Do not make ordinary API startup or application migrations responsible for database-server administration.
 
@@ -156,6 +154,7 @@ The repo declares Convex SDK `^1.18.0`, which permits drift and is far behind cu
 The following diagram is the desired end state for the **single Azure staging deployment**. Start with the default Azure Static Web Apps and App Service hostnames and their platform-managed HTTPS certificates. Custom domains, Azure DNS, and a centralized edge/WAF are optional future changes that require their own routing, cookie/CORS, and WebSocket validation; they are not required for this migration.
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart TB
   PEOPLE["Retro Tool users"]
   BROWSER["Browser<br/>React SPA and service worker"]
@@ -456,7 +455,7 @@ Quarterly, restore into isolated resources, deploy the pinned backend/functions,
 
 ## Infrastructure-as-code changes
 
-Refactor [`infra/main.bicep`](../infra/main.bicep) into reviewable modules while keeping [`infra/deploy.bicep`](../infra/deploy.bicep) as the staging entry point.
+Refactor [`infra/main.bicep`](../../infra/main.bicep) into reviewable modules while keeping [`infra/deploy.bicep`](../../infra/deploy.bicep) as the staging entry point.
 
 Recommended modules:
 
@@ -551,6 +550,7 @@ For a backend image upgrade, take a logical export first and use the upgrade run
 The pipeline runs directly from the `staging` branch without a second cloud stage. It builds each artifact once, serializes all changes with one staging lock, and makes health/rollback decisions from machine-readable gates. The following target flow covers the whole application:
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart TD
   CHANGE["Merge or push to staging branch"]
   CI["CI quality gates<br/>type-check, lint, tests, Bicep validation,<br/>secret scan and dependency policy"]

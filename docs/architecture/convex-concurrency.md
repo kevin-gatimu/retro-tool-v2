@@ -3,7 +3,7 @@
 > How this app stays correct — and avoids retry storms — when many writes hit
 > the Convex realtime layer at once. Read this before adding or editing any
 > `convex-backend/convex/*.ts` mutation, alongside
-> [convex-backend/convex/_generated/ai/guidelines.md](../convex-backend/convex/_generated/ai/guidelines.md).
+> [convex-backend/convex/_generated/ai/guidelines.md](../../convex-backend/convex/_generated/ai/guidelines.md).
 
 ## TL;DR — the one rule
 
@@ -76,7 +76,7 @@ their read/write sets don't overlap and OCC never triggers.
 ### Enabling typing: schema-bound server builders
 
 Chained `.eq().eq()` on a composite index only type-checks against the real
-`DataModel`. [convex/server.ts](../convex-backend/convex/server.ts) therefore
+`DataModel`. [convex/server.ts](../../convex-backend/convex/server.ts) therefore
 re-exports the **schema-bound** builders from `./_generated/server` (not the
 schema-generic `*Generic` ones). This is what makes the point-read pattern
 expressible everywhere; without it, code fell back to the very
@@ -86,23 +86,23 @@ expressible everywhere; without it, code fell back to the very
 
 1. **Point reads for point writes.** Full composite key + `.unique()`. Applied to
    the board upserts/getters in
-   [liveEstimates.ts](../convex-backend/convex/liveEstimates.ts),
-   [liveRetros.ts](../convex-backend/convex/liveRetros.ts),
-   [liveIcebreakers.ts](../convex-backend/convex/liveIcebreakers.ts),
-   [liveStandups.ts](../convex-backend/convex/liveStandups.ts); to
+   [liveEstimates.ts](../../convex-backend/convex/liveEstimates.ts),
+   [liveRetros.ts](../../convex-backend/convex/liveRetros.ts),
+   [liveIcebreakers.ts](../../convex-backend/convex/liveIcebreakers.ts),
+   [liveStandups.ts](../../convex-backend/convex/liveStandups.ts); to
    `upsertMembership`/`deleteMembership` in
-   [liveTeamMembers.ts](../convex-backend/convex/liveTeamMembers.ts); to the
+   [liveTeamMembers.ts](../../convex-backend/convex/liveTeamMembers.ts); to the
    ephemeral `startTyping`/`stopTyping`/`setReadyStatus` writes in
-   [liveRetros.ts](../convex-backend/convex/liveRetros.ts); and to
-   `assertTeamMembership` in [lib/authz.ts](../convex-backend/convex/lib/authz.ts)
+   [liveRetros.ts](../../convex-backend/convex/liveRetros.ts); and to
+   `assertTeamMembership` in [lib/authz.ts](../../convex-backend/convex/lib/authz.ts)
    (a hot auth path called by many team-scoped queries with a client-supplied
    `teamId`).
 
 2. **No contended aggregates in Convex.** Vote tallies, counts, and analytics are
    computed in PostgreSQL and read through `/api/**`. Convex stores no shared
    counter for concurrent writers to fight over, so there is no aggregate
-   hot-row. (This is also why the `@convex-dev/aggregate` component was retired —
-   see [REPORTS-REDESIGN-PLAN.md](./REPORTS-REDESIGN-PLAN.md).)
+   hot-row. (This is also why the `@convex-dev/aggregate` component was retired:
+   reports are computed in PostgreSQL, not accumulated in Convex.)
 
 3. **Idempotent, last-writer-wins.** Every projection upsert re-applies the
    current state and is stamped with `updatedAt`, so a retry — or an
@@ -118,14 +118,14 @@ expressible everywhere; without it, code fell back to the very
 ## Two concurrency layers outside Convex
 
 - **Delivery (NestJS → Convex).** Live projection writes go through a
-  transactional **outbox** ([projection-outbox.service.ts](../retro-tool-api/src/convex-admin/projection-outbox.service.ts)):
+  transactional **outbox** ([projection-outbox.service.ts](../../retro-tool-api/src/convex-admin/projection-outbox.service.ts)):
   the intent commits in the same PostgreSQL transaction as the business write,
   and an asynchronous dispatcher delivers it. The dispatcher runs under a
   **PostgreSQL advisory lock** (`OUTBOX_DISPATCH_LOCK_ID` in
-  [convex-admin-cron.service.ts](../retro-tool-api/src/convex-admin/convex-admin-cron.service.ts)),
+  [convex-admin-cron.service.ts](../../retro-tool-api/src/convex-admin/convex-admin-cron.service.ts)),
   so with multiple API instances only one dispatches at a time. Delivery is
   idempotent and retryable, and a `dedupeKey` collapses superseded intents for
-  the same entity. See [convex-architecture.md](./convex-architecture.md).
+  the same entity. See [convex.md](./convex.md).
 
 - **Business writes (PostgreSQL).** Standard SQL transactions on the system of
   record. Convex is strictly downstream; its concurrency is never on the
