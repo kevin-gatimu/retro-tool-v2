@@ -1,27 +1,16 @@
 name: Deploy API
 
 on:
-  push:
-    branches: [main, staging, develop]
-    paths:
-      - 'retro-tool-api/**'
-      - 'packages/shared/contracts/**'
-      - '.github/workflows/deploy-api.yml'
+  workflow_call:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target environment'
-        required: true
-        type: choice
-        options: [develop, staging, production]
 
 concurrency:
   group: deploy-api-${{ github.ref_name }}
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: '24'
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  NODE_VERSION: "24"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   id-token: write
@@ -46,23 +35,14 @@ jobs:
       - run: pnpm --filter retro-tool-api test:ci
       - run: pnpm --filter retro-tool-api build
 
-  # ─────────────────── Determine target environment ───────────────────
+  # ───────────────────── Staging-only environment ─────────────────────
   set-env:
     runs-on: ubuntu-latest
     outputs:
       environment: ${{ steps.pick.outputs.environment }}
     steps:
       - id: pick
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref_name }}" = "develop" ]; then
-            echo "environment=develop" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref_name }}" = "staging" ]; then
-            echo "environment=staging" >> "$GITHUB_OUTPUT"
-          else
-            echo "environment=production" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "environment=staging" >> "$GITHUB_OUTPUT"
 
   # ──────────────────── Build & push image ────────────────────────────
   build:
@@ -111,7 +91,7 @@ jobs:
           IMAGE_TAG="${TARGET_ENV}-${GITHUB_SHA::8}"
           IMAGE_NAME="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${IMAGE_TAG}"
           IMAGE_LATEST="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${TARGET_ENV}-latest"
-          # Human-readable release tag (from release-please) so prod rollbacks
+          # Human-readable release tag so staging rollbacks
           # are "v1.1.0 -> v1.0.3" instead of SHA archaeology.
           APP_VERSION="$(node -p "require('./retro-tool-api/package.json').version")"
           IMAGE_VERSION="${ACR_LOGIN_SERVER}/${API_IMAGE_REPOSITORY}:${TARGET_ENV}-v${APP_VERSION}"
@@ -356,7 +336,7 @@ jobs:
 
       - name: Health check
         run: |
-          URL="https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net/health"
+          URL="https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net/health/ready"
           echo "Waiting for API to be healthy at ${URL}..."
           for i in $(seq 1 60); do
             STATUS=$(curl -s -o /dev/null -w '%{http_code}' "${URL}" || echo "000")

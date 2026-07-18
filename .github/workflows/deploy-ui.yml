@@ -1,27 +1,16 @@
 name: Deploy UI
 
 on:
-  push:
-    branches: [main, staging, develop]
-    paths:
-      - 'retro-tool-ui/**'
-      - 'packages/shared/contracts/**'
-      - '.github/workflows/deploy-ui.yml'
+  workflow_call:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target environment'
-        required: true
-        type: choice
-        options: [develop, staging, production]
 
 concurrency:
   group: deploy-ui-${{ github.ref_name }}
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: '24'
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  NODE_VERSION: "24"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   id-token: write
@@ -45,23 +34,14 @@ jobs:
       - run: pnpm --filter retro-tool-ui type-check
       - run: pnpm --filter retro-tool-ui test
 
-  # ─────────────────── Determine target environment ───────────────────
+  # ───────────────────── Staging-only environment ─────────────────────
   set-env:
     runs-on: ubuntu-latest
     outputs:
       environment: ${{ steps.pick.outputs.environment }}
     steps:
       - id: pick
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref_name }}" = "develop" ]; then
-            echo "environment=develop" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref_name }}" = "staging" ]; then
-            echo "environment=staging" >> "$GITHUB_OUTPUT"
-          else
-            echo "environment=production" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "environment=staging" >> "$GITHUB_OUTPUT"
 
   # ──────── Build & Deploy to Azure Static Web App ────────────────────
   deploy:
@@ -91,6 +71,8 @@ jobs:
           VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
           VITE_ESTIMATES_REALTIME_BACKEND: ${{ vars.VITE_ESTIMATES_REALTIME_BACKEND }}
           VITE_RETROS_REALTIME_BACKEND: ${{ vars.VITE_RETROS_REALTIME_BACKEND }}
+          VITE_ICEBREAKERS_REALTIME_BACKEND: ${{ vars.VITE_ICEBREAKERS_REALTIME_BACKEND }}
+          VITE_STANDUPS_REALTIME_BACKEND: ${{ vars.VITE_STANDUPS_REALTIME_BACKEND }}
           VITE_NOTIFICATIONS_REALTIME_BACKEND: ${{ vars.VITE_NOTIFICATIONS_REALTIME_BACKEND }}
         run: |
           for key in \
@@ -99,6 +81,8 @@ jobs:
             VITE_API_URL \
             VITE_ESTIMATES_REALTIME_BACKEND \
             VITE_RETROS_REALTIME_BACKEND \
+            VITE_ICEBREAKERS_REALTIME_BACKEND \
+            VITE_STANDUPS_REALTIME_BACKEND \
             VITE_NOTIFICATIONS_REALTIME_BACKEND; do
             if [ -z "${!key}" ]; then
               echo "Required UI build variable is missing: ${key}"
@@ -107,7 +91,7 @@ jobs:
           done
 
           USES_CONVEX=false
-          for backend in "${VITE_ESTIMATES_REALTIME_BACKEND}" "${VITE_RETROS_REALTIME_BACKEND}" "${VITE_NOTIFICATIONS_REALTIME_BACKEND}"; do
+          for backend in "${VITE_ESTIMATES_REALTIME_BACKEND}" "${VITE_RETROS_REALTIME_BACKEND}" "${VITE_ICEBREAKERS_REALTIME_BACKEND}" "${VITE_STANDUPS_REALTIME_BACKEND}" "${VITE_NOTIFICATIONS_REALTIME_BACKEND}"; do
             [ "${backend}" = "convex" ] && USES_CONVEX=true && break
           done
 
@@ -140,6 +124,22 @@ jobs:
               ;;
           esac
 
+          case "${VITE_ICEBREAKERS_REALTIME_BACKEND}" in
+            socket-io|convex) ;;
+            *)
+              echo "Invalid VITE_ICEBREAKERS_REALTIME_BACKEND: ${VITE_ICEBREAKERS_REALTIME_BACKEND}. Allowed: socket-io|convex"
+              exit 1
+              ;;
+          esac
+
+          case "${VITE_STANDUPS_REALTIME_BACKEND}" in
+            socket-io|convex) ;;
+            *)
+              echo "Invalid VITE_STANDUPS_REALTIME_BACKEND: ${VITE_STANDUPS_REALTIME_BACKEND}. Allowed: socket-io|convex"
+              exit 1
+              ;;
+          esac
+
           case "${VITE_NOTIFICATIONS_REALTIME_BACKEND}" in
             socket-io|convex) ;;
             *)
@@ -167,6 +167,8 @@ jobs:
           VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
           VITE_ESTIMATES_REALTIME_BACKEND: ${{ vars.VITE_ESTIMATES_REALTIME_BACKEND }}
           VITE_RETROS_REALTIME_BACKEND: ${{ vars.VITE_RETROS_REALTIME_BACKEND }}
+          VITE_ICEBREAKERS_REALTIME_BACKEND: ${{ vars.VITE_ICEBREAKERS_REALTIME_BACKEND }}
+          VITE_STANDUPS_REALTIME_BACKEND: ${{ vars.VITE_STANDUPS_REALTIME_BACKEND }}
           VITE_NOTIFICATIONS_REALTIME_BACKEND: ${{ vars.VITE_NOTIFICATIONS_REALTIME_BACKEND }}
         run: pnpm --filter retro-tool-ui build
 

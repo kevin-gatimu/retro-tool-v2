@@ -23,15 +23,12 @@ importers:
 
   convex-backend:
     dependencies:
-      '@convex-dev/aggregate':
-        specifier: ^0.2.1
-        version: 0.2.1(convex@1.35.1(react@19.2.5))
       '@convex-dev/rate-limiter':
         specifier: ^0.3.2
-        version: 0.3.2(convex@1.35.1(react@19.2.5))(react@19.2.5)
+        version: 0.3.2(convex@1.42.3(react@19.2.5))(react@19.2.5)
       convex:
-        specifier: ^1.18.0
-        version: 1.35.1(react@19.2.5)
+        specifier: 1.42.3
+        version: 1.42.3(react@19.2.5)
     devDependencies:
       '@eslint/js':
         specifier: ^9.18.0
@@ -870,11 +867,6 @@ packages:
         optional: true
       conventional-commits-parser:
         optional: true
-
-  '@convex-dev/aggregate@0.2.1':
-    resolution: {integrity: sha512-z8GeUC+cIZEgtMXecX6WTBQHNW4E2ioRsc5IkO8BWnCjgDOru/Mw8zXe9JPe35JkqDjlSVKuwxiQHKs/jaYAyA==}
-    peerDependencies:
-      convex: ^1.24.8
 
   '@convex-dev/rate-limiter@0.3.2':
     resolution: {integrity: sha512-+oBPsBfFbzdxiF/9XaaTQmVnvDlvEfg/c69/v8LxTbw4VLuiflIKlfnPQL8OS0azXQQ11hcPWHmU8ytFmHKDXA==}
@@ -4477,6 +4469,25 @@ packages:
       react:
         optional: true
 
+  convex@1.42.3:
+    resolution: {integrity: sha512-7Tz/lH6UlZdiqzLPF/zrlH6Rlo/DOp836dL+GZkUMEQ2jaGGNnBIiIDcOOiEqtfSehuQ65r/rdNMnb4LupowaA==}
+    engines: {node: '>=18.0.0', npm: '>=7.0.0'}
+    hasBin: true
+    peerDependencies:
+      '@auth0/auth0-react': ^2.0.1
+      '@clerk/clerk-react': ^4.12.8 || ^5.0.0
+      '@clerk/react': ^6.4.3
+      react: ^18.0.0 || ^19.0.0-0 || ^19.0.0
+    peerDependenciesMeta:
+      '@auth0/auth0-react':
+        optional: true
+      '@clerk/clerk-react':
+        optional: true
+      '@clerk/react':
+        optional: true
+      react:
+        optional: true
+
   cookie-es@2.0.1:
     resolution: {integrity: sha512-aVf4A4hI2w70LnF7GG+7xDQUkliwiXWXFvTjkip4+b64ygDQ2sJPRSKFDHbxn8o0xu9QzPkMuuiWIXyFSE2slA==}
 
@@ -7377,6 +7388,18 @@ packages:
       utf-8-validate:
         optional: true
 
+  ws@8.21.0:
+    resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}
     engines: {node: '>=18'}
@@ -7903,13 +7926,9 @@ snapshots:
     optionalDependencies:
       conventional-commits-parser: 6.4.0
 
-  '@convex-dev/aggregate@0.2.1(convex@1.35.1(react@19.2.5))':
+  '@convex-dev/rate-limiter@0.3.2(convex@1.42.3(react@19.2.5))(react@19.2.5)':
     dependencies:
-      convex: 1.35.1(react@19.2.5)
-
-  '@convex-dev/rate-limiter@0.3.2(convex@1.35.1(react@19.2.5))(react@19.2.5)':
-    dependencies:
-      convex: 1.35.1(react@19.2.5)
+      convex: 1.42.3(react@19.2.5)
     optionalDependencies:
       react: 19.2.5
 
@@ -11391,6 +11410,17 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
+  convex@1.42.3(react@19.2.5):
+    dependencies:
+      esbuild: 0.27.0
+      prettier: 3.8.2
+      ws: 8.21.0
+    optionalDependencies:
+      react: 19.2.5
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   cookie-es@2.0.1: {}
 
   cookie-parser@1.4.7:
@@ -14554,6 +14584,8 @@ snapshots:
   ws@8.18.3: {}
 
   ws@8.20.0: {}
+
+  ws@8.21.0: {}
 
   xml-name-validator@5.0.0: {}
 
