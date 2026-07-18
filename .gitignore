@@ -94,3 +94,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # GitHub Actions env values for scripts/sync-github-env.mjs — real values, never commit.
 # The .example template IS committed.
 .github-env.*.local
+
+# Ignore all plain-text files by default (often contain local secrets/scratch notes).
+# Negate any that must stay tracked (e.g. the served robots.txt web asset).
+*.txt
+!retro-tool-ui/public/robots.txt
