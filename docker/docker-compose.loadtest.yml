@@ -1,0 +1,26 @@
+# Load-test override for the local stack. Layer it ON TOP of the normal compose
+# file so the self-hosted Convex backend is constrained to roughly the staging
+# Azure App Service B1 tier (≈1 vCPU / 1.75 GiB) — otherwise a local test runs
+# on your full dev CPU and tells you nothing about the single-worker ceiling
+# that actually bounds staging/production projection throughput.
+#
+# Usage:
+#   docker compose --env-file docker/.env \
+#     -f docker/docker-compose.local.yml \
+#     -f docker/docker-compose.loadtest.yml up -d
+#
+# The Convex worker is the bottleneck under burst; constraining it is the whole
+# point of a representative test. Postgres is intentionally left unconstrained
+# (local Postgres is faster than Azure Flexible Server, so this measures the
+# projection/Convex path optimistically — good enough for relative before/after).
+
+services:
+  convex-backend:
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0" # B1 ≈ 1 vCPU
+          memory: "1.75g" # B1 ≈ 1.75 GiB
+    environment:
+      # Match the staging backend's log level so logging overhead is comparable.
+      RUST_LOG: warn

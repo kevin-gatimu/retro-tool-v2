@@ -12,6 +12,7 @@ import {
   UsePipes,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,6 +26,7 @@ import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { EstimatesService } from './estimates.service';
 import { EstimatesReportService } from './estimates-report.service';
+import { EstimatesProjectionSyncService } from './estimates-projection-sync.service';
 import { EstimatesGateway } from './estimates.gateway';
 import type { SessionUser } from '../common/types';
 import {
@@ -43,6 +45,9 @@ import {
   CastVoteSchema,
   CastVoteBody,
   type CastVoteDto,
+  ParticipantPresenceSchema,
+  ParticipantPresenceBody,
+  type ParticipantPresenceDto,
   UpdateSessionNameSchema,
   UpdateSessionNameBody,
   type UpdateSessionNameDto,
@@ -62,8 +67,54 @@ export class EstimatesController {
   constructor(
     private readonly estimatesService: EstimatesService,
     private readonly estimatesReportService: EstimatesReportService,
+    private readonly estimatesProjectionSync: EstimatesProjectionSyncService,
     private readonly estimatesGateway: EstimatesGateway,
   ) {}
+
+  /**
+   * Trigger the same Convex projection re-sync the gateway's `emitSessionChanged`
+   * performs, minus the Socket.IO room broadcast. Both write paths (this REST
+   * controller and {@link EstimatesGateway}) coexist during the migration; the
+   * REST path pushes state to Convex directly via the outbox-backed sync service
+   * so estimates can later run Convex-only.
+   */
+  private syncSession(sessionId: string): void {
+    void this.estimatesProjectionSync.enqueueSessionSync(sessionId);
+  }
+
+  /**
+   * Mirror the gateway's per-command membership gate: handshake/session auth
+   * proves identity, not membership. Without this a member of no relation to the
+   * session's team could join or cast votes by ID (SECURITY-ASSESSMENT F2).
+   */
+  private async assertSessionMember(
+    sessionId: string,
+    userId: string,
+  ): Promise<void> {
+    const isMember = await this.estimatesService.isSessionMember(
+      sessionId,
+      userId,
+    );
+    if (!isMember) {
+      throw new ForbiddenException('You are not a member of this session');
+    }
+  }
+
+  /** Mirror the gateway's manager-only gate for host commands. */
+  private async assertCanManage(
+    sessionId: string,
+    userId: string,
+  ): Promise<void> {
+    const canManage = await this.estimatesService.canManageSession(
+      sessionId,
+      userId,
+    );
+    if (!canManage) {
+      throw new ForbiddenException(
+        'You do not have permission to manage this session',
+      );
+    }
+  }
 
   @Get()
   @ApiOperation({ summary: 'List all estimate sessions for the current user' })
@@ -144,6 +195,97 @@ export class EstimatesController {
     );
     this.estimatesGateway.emitSessionChanged(id);
     return result;
+  }
+
+  // ==========================================================================
+  // Convex-only REST write path (Phase 2 of socket-io-elimination-plan).
+  // These mirror the gateway commands 1:1 with the same authorization the
+  // gateway applied inline, then push state to Convex via the projection-sync
+  // service (the polls pattern) rather than through the Socket.IO gateway. They
+  // coexist with the gateway until Phase 4 deletes it, and are wired into the UI
+  // in Phase 3. The pre-existing REST endpoints above (`/votes`, `/rounds/start`,
+  // `DELETE /:id`, `/join`) remain the active socket-mode path for now.
+  // ==========================================================================
+
+  @Post(':id/participant')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Toggle participant presence (join/leave) — session members only',
+  })
+  @ApiParam({ name: 'id', description: 'Estimate session ID' })
+  @ApiBody({ type: ParticipantPresenceBody })
+  @ApiResponse({ status: 200, description: '{ success: true }' })
+  @UsePipes(new ZodValidationPipe(ParticipantPresenceSchema))
+  async setParticipantPresence(
+    @Session() session: SessionUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ParticipantPresenceDto,
+  ) {
+    await this.assertSessionMember(id, session.user.id);
+    await this.estimatesService.upsertParticipant(
+      id,
+      session.user.id,
+      body.online,
+    );
+    this.syncSession(id);
+    return { success: true };
+  }
+
+  @Post(':id/vote')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cast a vote in the current round — session members only',
+  })
+  @ApiParam({ name: 'id', description: 'Estimate session ID' })
+  @ApiBody({ type: CastVoteBody })
+  @ApiResponse({ status: 200, description: '{ success: true }' })
+  @UsePipes(new ZodValidationPipe(CastVoteSchema))
+  async castVoteRest(
+    @Session() session: SessionUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CastVoteDto,
+  ) {
+    await this.assertSessionMember(id, session.user.id);
+    await this.estimatesService.upsertVote(id, session.user.id, body.points);
+    // Vote values stay masked in the projection until reveal — do not echo the
+    // cast value back here (the gateway only emitted { voterId }).
+    this.syncSession(id);
+    return { success: true };
+  }
+
+  @Post(':id/round')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Start a new estimate round (manager only)',
+  })
+  @ApiParam({ name: 'id', description: 'Estimate session ID' })
+  @ApiBody({ type: NewEstimateRoundBody })
+  @ApiResponse({ status: 200, description: '{ success: true }' })
+  @UsePipes(new ZodValidationPipe(NewEstimateRoundSchema))
+  async startRoundRest(
+    @Session() session: SessionUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: NewEstimateRoundDto,
+  ) {
+    await this.assertCanManage(id, session.user.id);
+    await this.estimatesService.startRound(id, session.user.id, body);
+    this.syncSession(id);
+    return { success: true };
+  }
+
+  @Post(':id/end')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'End the estimate session (manager only)' })
+  @ApiParam({ name: 'id', description: 'Estimate session ID' })
+  @ApiResponse({ status: 200, description: '{ success: true }' })
+  async endSessionRest(
+    @Session() session: SessionUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.assertCanManage(id, session.user.id);
+    await this.estimatesService.endSession(id, session.user.id);
+    this.syncSession(id);
+    return { success: true };
   }
 
   @Post(':id/votes')

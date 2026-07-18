@@ -34,6 +34,7 @@ import type { Template } from '@/common/types/templates'
 import { RetroReport } from '@/components/retro-report'
 import { MusicPlayer } from '@/components/music-player'
 import { usesConvexForRetros } from '@/lib/realtime-config'
+import { RealtimeStatusBanner } from '@/components/realtime-status-banner'
 import { RetroConvexSync } from './components/retro-convex-sync'
 import { RetroDiscussionView } from './components/retro-discussion-view'
 import { RetroHeader } from './components/retro-header'
@@ -49,6 +50,13 @@ import { RetroBoardSkeleton, RetroDetailSkeleton } from './skeleton'
 const RetroBoard = lazy(() =>
   import('./components/retro-board').then((m) => ({ default: m.RetroBoard })),
 )
+
+// Slow REST backstop poll kept even in Convex realtime mode. If Convex silently
+// stops delivering (socket down, JWT auth failure), the board still refreshes
+// from REST within this window instead of showing stale/empty data forever.
+// Socket.IO mode keeps a faster 3s poll (its own connection model).
+const CONVEX_BACKSTOP_POLL_MS = 30_000
+const SOCKET_IO_POLL_MS = 3_000
 
 const startTypingMutationRef = convexApi.liveRetros.startTyping
 const stopTypingMutationRef = convexApi.liveRetros.stopTyping
@@ -209,7 +217,9 @@ function RetroDetailPage() {
     queryKey: ['retro', retroId],
     queryFn: () => api.get<RetroDetail>(RETROS_ENDPOINTS.BY_ID(retroId)),
     staleTime: 5_000,
-    refetchInterval: usesConvexRealtime ? false : 3_000,
+    refetchInterval: usesConvexRealtime
+      ? CONVEX_BACKSTOP_POLL_MS
+      : SOCKET_IO_POLL_MS,
   })
 
   // Clear typing + ready status when the active phase ends
@@ -647,6 +657,7 @@ function RetroDetailPage() {
         />
       ) : null}
       <div className="flex flex-col space-y-3 sm:space-y-4">
+        <RealtimeStatusBanner active={usesConvexRealtime} />
         <RetroHeader
           retroName={retroName}
           retroStatus={retroStatus}

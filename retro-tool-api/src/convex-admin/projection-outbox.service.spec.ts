@@ -25,7 +25,11 @@ describe('ProjectionOutboxService', () => {
     status: 'pending',
     attempts: 0,
     lastError: null,
-    createdAt: new Date(),
+    nextAttemptAt: new Date(0),
+    // Old timestamp so per-entity coalescing treats the row as past its debounce
+    // + maxWait window and delivers immediately; tests that exercise coalescing
+    // timing override createdAt explicitly.
+    createdAt: new Date(0),
     dispatchedAt: null,
     ...over,
   });
@@ -38,7 +42,7 @@ describe('ProjectionOutboxService', () => {
     pendingBatch: ProjectionOutboxRow[];
     paused?: boolean;
   }) => {
-    const updates: Array<{ status?: string }> = [];
+    const updates: Array<{ status?: string; nextAttemptAt?: Date }> = [];
 
     // A select chain that dispatches based on which table/columns are queried.
     const database = {
@@ -78,7 +82,7 @@ describe('ProjectionOutboxService', () => {
         return chain;
       }),
       update: jest.fn(() => ({
-        set: (patch: { status?: string }) => ({
+        set: (patch: { status?: string; nextAttemptAt?: Date }) => ({
           where: () => {
             updates.push(patch);
             return Promise.resolve();
@@ -169,5 +173,40 @@ describe('ProjectionOutboxService', () => {
 
     expect(result.failed).toBe(1);
     expect(result.dispatched).toBe(0);
+  });
+
+  it('pushes nextAttemptAt into the future with backoff on a failed delivery', async () => {
+    const row = makeRow({ id: 'a', attempts: 0 });
+    const { service, updates } = createService({ pendingBatch: [row] });
+    service.registerHandler(
+      'retros',
+      jest.fn().mockRejectedValue(new Error('convex down')),
+    );
+
+    const before = Date.now();
+    await service.dispatchPending();
+
+    const failUpdate = updates.at(-1);
+    expect(failUpdate?.status).toBe('pending');
+    // Backoff base is 2s; the retry must be scheduled at least ~1s out (allowing
+    // for clock skew) rather than being immediately re-eligible.
+    const nextAttemptAt = failUpdate?.nextAttemptAt;
+    expect(nextAttemptAt).toBeInstanceOf(Date);
+    expect((nextAttemptAt as Date).getTime()).toBeGreaterThan(before + 1_000);
+  });
+
+  it('holds a freshly-created row for coalescing instead of delivering immediately', async () => {
+    // createdAt = now → inside the debounce window, so it should be held back
+    // (not delivered, not superseded) this pass.
+    const fresh = makeRow({ id: 'a', createdAt: new Date() });
+    const { service } = createService({ pendingBatch: [fresh] });
+    const handler = jest.fn().mockResolvedValue(undefined);
+    service.registerHandler('retros', handler);
+
+    const result = await service.dispatchPending();
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(result.dispatched).toBe(0);
+    expect(result.skippedSuperseded).toBe(0);
   });
 });

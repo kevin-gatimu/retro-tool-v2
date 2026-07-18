@@ -13,7 +13,16 @@ import { EstimatesService } from './estimates.service';
 import { EstimatesProjectionSyncService } from './estimates-projection-sync.service';
 import { NewEstimateRoundDto, UpdateEstimateStoryDto } from './dtos';
 import type { ClientData } from '../common/types';
+import type { EstimatesClientData } from './types';
 import { WsAuthService } from '../auth/ws-auth';
+
+/**
+ * Per-socket state for the estimates namespace. Tracks the sessions this socket
+ * joined so {@link EstimatesGateway.handleDisconnect} can clear presence for a
+ * dropped connection (tab close, network drop, sleep) — without this a
+ * disconnected member stays `isOnline=true` forever (P4 of the socket-io
+ * elimination plan).
+ */
 
 @WebSocketGateway({
   namespace: '/estimates',
@@ -43,11 +52,38 @@ export class EstimatesGateway
     this.logger.log(`Client connected: userId=${userId}`);
   }
 
-  handleDisconnect(client: Socket): void {
-    const { userId } = client.data as ClientData;
-    if (userId) {
-      this.logger.log(`Client disconnected: userId=${userId}`);
-    }
+  async handleDisconnect(client: Socket): Promise<void> {
+    const { userId, joinedSessionIds } = client.data as EstimatesClientData;
+    if (!userId) return;
+
+    this.logger.log(`Client disconnected: userId=${userId}`);
+
+    // Clear presence for every session this socket joined. Without this a
+    // dropped socket (tab close, network drop, sleep) never emits an explicit
+    // `leave-session`, so the participant stays `isOnline=true` forever (P4).
+    if (!joinedSessionIds?.size) return;
+
+    await Promise.all(
+      [...joinedSessionIds].map(async (sessionId) => {
+        try {
+          await this.estimatesService.upsertParticipant(
+            sessionId,
+            userId,
+            false,
+          );
+          this.server
+            .to(`session:${sessionId}`)
+            .emit('participant-left', { userId });
+          this.emitSessionChanged(sessionId);
+        } catch (error) {
+          this.logger.warn(
+            `Failed to clear presence on disconnect for session=${sessionId} userId=${userId}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+      }),
+    );
   }
 
   // ============================================================================
@@ -74,6 +110,11 @@ export class EstimatesGateway
     await this.estimatesService.upsertParticipant(data.sessionId, userId, true);
     await client.join(`session:${data.sessionId}`);
 
+    // Remember the joined session so a dropped socket can clear presence in
+    // handleDisconnect (P4). Mirrors how the socket tracks its rooms.
+    const clientData = client.data as EstimatesClientData;
+    (clientData.joinedSessionIds ??= new Set<string>()).add(data.sessionId);
+
     const participant = await this.estimatesService.getParticipant(
       data.sessionId,
       userId,
@@ -98,6 +139,11 @@ export class EstimatesGateway
       false,
     );
     await client.leave(`session:${data.sessionId}`);
+
+    // Explicit leave clears the tracked join so handleDisconnect doesn't redo it.
+    (client.data as EstimatesClientData).joinedSessionIds?.delete(
+      data.sessionId,
+    );
 
     this.server
       .to(`session:${data.sessionId}`)

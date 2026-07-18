@@ -144,6 +144,9 @@ importers:
       uid:
         specifier: ^2.0.2
         version: 2.0.2
+      undici:
+        specifier: ^7.24.7
+        version: 7.24.7
       web-push:
         specifier: ^3.6.7
         version: 3.6.7

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { MusicPlayer } from '@/components/music-player'
+import { RealtimeStatusBanner } from '@/components/realtime-status-banner'
 import { EstimateConvexSync } from './components/estimate-convex-sync'
 import { CompletedSessionReport } from './components/completed-session-report'
 import { ParticipantsPanel } from './components/participants-panel'
@@ -261,6 +262,7 @@ function EstimateSessionPage() {
       {usesConvexRealtime ? <EstimateConvexSync sessionId={sessionId} /> : null}
       <TooltipProvider>
         <div className="space-y-6">
+          <RealtimeStatusBanner active={usesConvexRealtime} />
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">

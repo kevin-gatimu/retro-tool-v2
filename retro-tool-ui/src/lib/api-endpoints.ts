@@ -162,6 +162,14 @@ export const ESTIMATES_ENDPOINTS = {
   CONSENSUS: (id: string) => `/api/estimates/${id}/consensus`,
   REVOTE: (id: string) => `/api/estimates/${id}/revote`,
   SEND_REPORT: (id: string) => `/api/estimates/${id}/send-report`,
+
+  // Convex-only live write path (socket-io-elimination-plan Phase 2). These
+  // mirror the Socket.IO gateway commands 1:1 and are wired into the hook in
+  // Phase 3; the socket path above stays active until then.
+  PARTICIPANT: (id: string) => `/api/estimates/${id}/participant`,
+  VOTE: (id: string) => `/api/estimates/${id}/vote`,
+  ROUND: (id: string) => `/api/estimates/${id}/round`,
+  END: (id: string) => `/api/estimates/${id}/end`,
 } as const
 
 // ---------------------------------------------------------------------------

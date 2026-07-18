@@ -43,6 +43,7 @@ const TASKS = {
   'seed:roles': { steps: ['seed/seed-team-roles'], localOnly: true },
   'seed:users': { steps: ['seed/seed-users'], localOnly: true },
   'seed:large-org': { steps: ['seed/seed-large-org'], localOnly: true },
+  'seed:load': { steps: ['seed/seed-load-test'], localOnly: true },
   // Everything safe to run against shared environments (templates + roles).
   'seed:prod-safe': { steps: [...SEED_TEMPLATES, 'seed/seed-team-roles'] },
 };

@@ -7,6 +7,7 @@ import { DatabaseModule } from '../database/database.module';
 import { createAuth } from './auth.config';
 import { AuthController } from './auth.controller';
 import { SignupCleanupMiddleware } from './auth-signup.middleware';
+import { JwtAlignmentService } from './jwt-alignment.service';
 import { OtpController } from './otp/otp.controller';
 import { OtpService } from './otp/otp.service';
 
@@ -24,8 +25,8 @@ import { OtpService } from './otp/otp.service';
     }),
   ],
   controllers: [AuthController, OtpController],
-  providers: [OtpService],
-  exports: [BetterAuthModule],
+  providers: [OtpService, JwtAlignmentService],
+  exports: [BetterAuthModule, JwtAlignmentService],
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
