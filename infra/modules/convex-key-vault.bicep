@@ -72,5 +72,10 @@ resource postgresUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
 }
 
 output name string = vault.name
-output instanceSecretUri string = 'https://${vault.name}${environment().suffixes.keyvaultDns}/secrets/${instanceSecretResource.name}'
-output postgresUrlSecretUri string = 'https://${vault.name}${environment().suffixes.keyvaultDns}/secrets/${postgresUrlSecret.name}'
+// Emit VERSION-PINNED secret URIs (secretUriWithVersion), not versionless ones.
+// App Service caches KV references and does not re-fetch a rotated secret on a
+// plain restart; a versioned URI changes the app-setting value whenever the
+// secret rotates, forcing App Service to re-resolve on the next deploy. This is
+// what prevents a rotated INSTANCE_SECRET/POSTGRES_URL from being served stale.
+output instanceSecretUri string = instanceSecretResource.properties.secretUriWithVersion
+output postgresUrlSecretUri string = postgresUrlSecret.properties.secretUriWithVersion
