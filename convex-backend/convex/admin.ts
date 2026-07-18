@@ -11,6 +11,8 @@ const CLEARABLE_TABLES = [
   'liveStandupEntries',
   'liveStandupBoards',
   'liveNotifications',
+  'livePolls',
+  'liveSurveys',
   'livePresence',
   'liveTyping',
   'liveReadyStatus',
