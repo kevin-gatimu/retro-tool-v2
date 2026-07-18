@@ -16,6 +16,7 @@
     "local:infra": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml up -d postgres convex-backend convex-dashboard",
     "local:down": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml down",
     "local:logs": "docker compose --env-file docker/.env -f docker/docker-compose.local.yml logs -f",
+    "gh:env:sync": "node scripts/sync-github-env.mjs",
     "local:bootstrap": "node scripts/local-dev.mjs",
     "local:reset": "node scripts/local-dev.mjs --reset",
     "local:dev": "pnpm --parallel --filter retro-tool-api --filter retro-tool-ui --filter convex-backend dev",

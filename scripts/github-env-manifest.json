@@ -1,0 +1,50 @@
+{
+  "$comment": "Declares every GitHub Actions environment key the deploy workflows read, classified as 'secret' (encrypted) or 'variable' (plain). Values live in a git-ignored .github-env.<env>.local file, never here. Consumed by scripts/sync-github-env.mjs. When a workflow starts reading a new secrets.X / vars.X, add it here so the sync stays authoritative.",
+  "environments": ["staging", "production", "develop"],
+  "keys": {
+    "AZURE_CLIENT_ID": { "kind": "secret", "desc": "App Registration client ID (GitHub OIDC login)" },
+    "AZURE_TENANT_ID": { "kind": "secret", "desc": "Entra ID tenant ID" },
+    "AZURE_SUBSCRIPTION_ID": { "kind": "secret", "desc": "Azure subscription ID" },
+
+    "DATABASE_URL": { "kind": "secret", "desc": "PostgreSQL connection string for retro_tool_db" },
+    "BETTER_AUTH_SECRET": { "kind": "secret", "desc": "Session signing secret" },
+    "POSTGRES_ADMIN_PASSWORD": { "kind": "secret", "desc": "Postgres server admin password (infra provisioning)" },
+
+    "MICROSOFT_CLIENT_ID": { "kind": "secret", "desc": "OAuth app client ID" },
+    "MICROSOFT_CLIENT_SECRET": { "kind": "secret", "desc": "OAuth app client secret" },
+    "MICROSOFT_TENANT_ID": { "kind": "secret", "desc": "OAuth tenant ID" },
+
+    "RESEND_API_KEY": { "kind": "secret", "desc": "Transactional email API key" },
+    "SWA_DEPLOYMENT_TOKEN": { "kind": "secret", "desc": "Static Web App deploy token" },
+    "API_ADMIN_TOKEN": { "kind": "secret", "desc": "Bearer token for super-admin API calls in deploy steps (outbox pause/resume, reconcile)" },
+
+    "VAPID_PUBLIC_KEY": { "kind": "secret", "desc": "Web-push VAPID public key" },
+    "VAPID_PRIVATE_KEY": { "kind": "secret", "desc": "Web-push VAPID private key" },
+    "VAPID_SUBJECT": { "kind": "secret", "desc": "Web-push VAPID contact URL" },
+
+    "CONVEX_SYNC_URL": { "kind": "secret", "desc": "Convex deployment URL the API projects into. Self-hosted App Service for staging." },
+    "CONVEX_SYNC_ADMIN_KEY": { "kind": "secret", "desc": "Admin key the API uses for projection writes" },
+    "CONVEX_INSTANCE_SECRET": { "kind": "secret", "desc": "Self-hosted Convex INSTANCE_SECRET (hex). Staging Convex stack only." },
+    "CONVEX_POSTGRES_URL": { "kind": "secret", "desc": "Self-hosted Convex Postgres URL (host only, no db/query). Staging Convex stack only." },
+    "CONVEX_SELF_HOSTED_ADMIN_KEY": { "kind": "secret", "desc": "Admin key for the Convex CLI / function deploy. Same value as CONVEX_SYNC_ADMIN_KEY for self-hosted." },
+
+    "ACR_LOGIN_SERVER": { "kind": "variable", "desc": "ACR login server URL" },
+    "API_WEBAPP_NAME": { "kind": "variable", "desc": "API App Service name" },
+    "API_IMAGE_REPOSITORY": { "kind": "variable", "desc": "API container image repository name" },
+    "AZURE_RESOURCE_GROUP": { "kind": "variable", "desc": "Resource group name" },
+    "FRONTEND_URL": { "kind": "variable", "desc": "UI URL (CORS + redirects)" },
+    "SWA_URL": { "kind": "variable", "desc": "Static Web App URL" },
+    "EMAIL_FROM": { "kind": "variable", "desc": "Sender address for emails" },
+    "EMAIL_SANDBOX_TO": { "kind": "variable", "desc": "Resend sandbox recipient override (API config.email.sandboxTo). Not wired through deploy-api.yml — set on App Service directly if needed." },
+
+    "VITE_API_URL": { "kind": "variable", "desc": "API base URL baked into the UI bundle" },
+    "VITE_APP_ENV": { "kind": "variable", "desc": "Environment label (local|development|staging|production)" },
+    "VITE_APP_TITLE": { "kind": "variable", "desc": "Browser tab title" },
+    "VITE_CONVEX_URL": { "kind": "variable", "desc": "Convex URL for realtime, baked into the UI bundle" },
+    "VITE_ESTIMATES_REALTIME_BACKEND": { "kind": "variable", "desc": "socket-io|convex" },
+    "VITE_RETROS_REALTIME_BACKEND": { "kind": "variable", "desc": "socket-io|convex" },
+    "VITE_ICEBREAKERS_REALTIME_BACKEND": { "kind": "variable", "desc": "socket-io|convex" },
+    "VITE_STANDUPS_REALTIME_BACKEND": { "kind": "variable", "desc": "socket-io|convex" },
+    "VITE_NOTIFICATIONS_REALTIME_BACKEND": { "kind": "variable", "desc": "socket-io|convex" }
+  }
+}

@@ -89,3 +89,8 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+.convex-cutover-rollback.txt
+
+# GitHub Actions env values for scripts/sync-github-env.mjs — real values, never commit.
+# The .example template IS committed.
+.github-env.*.local

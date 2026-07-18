@@ -1,0 +1,67 @@
+# GitHub Actions environment values — TEMPLATE.
+#
+# Copy to .github-env.<env>.local (e.g. .github-env.staging.local), fill in the
+# real values, then push them all at once:
+#
+#     pnpm gh:env:sync staging -- --dry-run   # preview
+#     pnpm gh:env:sync staging                # apply
+#
+# The .github-env.<env>.local files are git-ignored — never commit real values.
+# Which key is a secret vs a variable is decided by scripts/github-env-manifest.json,
+# not here; you only supply values. Keys you leave out are left untouched on GitHub.
+#
+# KEY=VALUE, one per line. First '=' splits. '#' comments and blank lines ignored.
+
+# ── Azure OIDC login ─────────────────────────────────────────────
+AZURE_CLIENT_ID=
+AZURE_TENANT_ID=
+AZURE_SUBSCRIPTION_ID=
+
+# ── Core API secrets ─────────────────────────────────────────────
+DATABASE_URL=
+BETTER_AUTH_SECRET=
+POSTGRES_ADMIN_PASSWORD=
+
+# ── OAuth (Microsoft) ────────────────────────────────────────────
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+MICROSOFT_TENANT_ID=
+
+# ── Email / SWA / admin ──────────────────────────────────────────
+RESEND_API_KEY=
+SWA_DEPLOYMENT_TOKEN=
+API_ADMIN_TOKEN=
+
+# ── Web push (VAPID) ─────────────────────────────────────────────
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=
+
+# ── Convex (staging = self-hosted App Service) ───────────────────
+# CONVEX_SYNC_URL and VITE_CONVEX_URL must match the same deployment.
+# For self-hosted staging both are https://retrotool-staging-convex.azurewebsites.net
+CONVEX_SYNC_URL=
+CONVEX_SYNC_ADMIN_KEY=
+CONVEX_INSTANCE_SECRET=
+CONVEX_POSTGRES_URL=
+CONVEX_SELF_HOSTED_ADMIN_KEY=
+
+# ── Non-sensitive variables ──────────────────────────────────────
+ACR_LOGIN_SERVER=
+API_WEBAPP_NAME=
+API_IMAGE_REPOSITORY=
+AZURE_RESOURCE_GROUP=
+FRONTEND_URL=
+SWA_URL=
+EMAIL_FROM=
+
+# ── UI build-time variables (baked into the bundle) ──────────────
+VITE_API_URL=
+VITE_APP_ENV=
+VITE_APP_TITLE=
+VITE_CONVEX_URL=
+VITE_ESTIMATES_REALTIME_BACKEND=convex
+VITE_RETROS_REALTIME_BACKEND=convex
+VITE_ICEBREAKERS_REALTIME_BACKEND=convex
+VITE_STANDUPS_REALTIME_BACKEND=convex
+VITE_NOTIFICATIONS_REALTIME_BACKEND=convex

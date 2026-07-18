@@ -101,6 +101,38 @@ az group delete --name retrotool-<env>-rg --yes --no-wait
 
 Each GitHub environment (`production`, `staging`, `develop`) needs secrets and variables. The deploy workflow (`deploy-api.yml`) reads these to build, push, and configure the App Service.
 
+> **GitHub is the source of truth for App Service config.** `deploy-api.yml` rewrites
+> the API's App Service settings from these GitHub secrets/variables on **every**
+> deploy (e.g. `CONVEX_SYNC_URL: ${{ vars.CONVEX_SYNC_URL || secrets.CONVEX_SYNC_URL }}`).
+> Editing an App Service setting by hand in the Azure Portal is **transient** — the
+> next deploy overwrites it with the GitHub value. Always change the value in GitHub,
+> then redeploy.
+
+### Bulk-sync GitHub env config (recommended)
+
+Setting keys one at a time in the GitHub UI is how config drifts (a stale
+`CONVEX_SYNC_URL` secret silently reverted an App Service change). Instead, keep
+all values in one git-ignored file and push them together:
+
+```powershell
+# 1. Copy the template and fill in real values (git-ignored — never committed):
+cp .github-env.example .github-env.staging.local
+
+# 2. Preview, then apply, then redeploy so App Service picks them up:
+pnpm gh:env:sync staging -- --dry-run          # show what would change
+pnpm gh:env:sync staging                        # apply to the GitHub 'staging' environment
+pnpm gh:env:sync staging -- --only CONVEX_SYNC_URL,VITE_CONVEX_URL   # sync a subset
+pnpm gh:env:sync staging -- --prune             # report GitHub keys missing from the manifest
+```
+
+- **`scripts/github-env-manifest.json`** (committed) classifies every key as a
+  `secret` (encrypted, set via stdin so it never hits the process list) or a
+  `variable` (plain). When a workflow starts reading a new `secrets.X` / `vars.X`,
+  add it here.
+- **`.github-env.<env>.local`** (git-ignored) holds the values. Keys you omit are
+  left untouched, so you can safely sync just the few that changed.
+- Requires the `gh` CLI authenticated with repo admin rights.
+
 ### Secrets (sensitive — you must add these manually)
 
 | Secret | Description | How to get it |
