@@ -141,12 +141,17 @@ export const upsertEstimateBoard = internalMutation({
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    const existing = (
-      await ctx.db
+    // Read only this user's row via the composite index. The per-member board
+    // fan-out pushes many users' boards for the same session concurrently; a
+    // `by_session_id` scan would put every board row in each call's read-set,
+    // so concurrent upserts overlap and fail Convex's OCC retry. Scoping to
+    // (sessionId, userId) keeps each call's read/write set disjoint.
+    const existing = await ctx.db
       .query('liveEstimateBoards')
-      .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
-      .collect()
-    ).find((board) => board.userId === args.userId)
+      .withIndex('by_session_user', (q) =>
+        q.eq('sessionId', args.sessionId).eq('userId', args.userId),
+      )
+      .unique()
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -176,12 +181,12 @@ export const getEstimateBoard = query({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
-    const board = (
-      await ctx.db
-        .query('liveEstimateBoards')
-        .withIndex('by_session_id', (q) => q.eq('sessionId', args.sessionId))
-        .collect()
-    ).find((item) => item.userId === identity.subject)
+    const board = await ctx.db
+      .query('liveEstimateBoards')
+      .withIndex('by_session_user', (q) =>
+        q.eq('sessionId', args.sessionId).eq('userId', identity.subject),
+      )
+      .unique()
 
     if (!board) {
       return null

@@ -66,15 +66,15 @@ export async function assertTeamMembership(
     return
   }
 
-  // Query the composite index by its `teamId` prefix, then match the caller in
-  // JS — the `./server` wrappers are schema-generic so a chained `.eq().eq()`
-  // isn't typed here, and a team's membership list is bounded.
-  const membership = (
-    await ctx.db
-      .query('liveTeamMembers')
-      .withIndex('by_team_user', (q) => q.eq('teamId', teamId))
-      .collect()
-  ).find((row) => row.userId === identity.subject)
+  // Read the caller's single membership row via the full composite index
+  // (teamId, userId) rather than scanning the whole team and matching in JS —
+  // keeps the read-set to one row so it can't contend with concurrent writes.
+  const membership = await ctx.db
+    .query('liveTeamMembers')
+    .withIndex('by_team_user', (q) =>
+      q.eq('teamId', teamId).eq('userId', identity.subject),
+    )
+    .unique()
 
   if (!membership) {
     throw new ConvexError('Forbidden')

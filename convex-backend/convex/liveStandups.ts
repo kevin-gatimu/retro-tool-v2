@@ -12,14 +12,16 @@ export const upsertEntryProjection = internalMutation({
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    const existingProjection = (
-      await ctx.db
-        .query('liveStandupEntries')
-        .withIndex('by_standup_id', (queryBuilder) =>
-          queryBuilder.eq('standupId', args.standupId),
-        )
-        .collect()
-    ).find((entry) => entry.entryDate === args.entryDate)
+    // Read only this day's row via the composite index. Concurrent projection
+    // upserts for different dates of the same standup would otherwise share a
+    // `by_standup_id` read-set and fail Convex's OCC retry. Scoping to
+    // (standupId, entryDate) keeps each call's read/write set disjoint.
+    const existingProjection = await ctx.db
+      .query('liveStandupEntries')
+      .withIndex('by_standup_date', (q) =>
+        q.eq('standupId', args.standupId).eq('entryDate', args.entryDate),
+      )
+      .unique()
 
     const nextProjection = {
       standupId: args.standupId,
@@ -75,15 +77,21 @@ export const upsertStandupBoard = internalMutation({
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    const existing = (
-      await ctx.db
-        .query('liveStandupBoards')
-        .withIndex('by_standup_id', (q) => q.eq('standupId', args.standupId))
-        .collect()
-    ).find(
-      (board) =>
-        board.entryDate === args.entryDate && board.userId === args.userId,
-    )
+    // Read only this user's row via the full composite index. The per-member
+    // board fan-out pushes many users' boards for the same standup/date
+    // concurrently; a `by_standup_id` scan would put every board row in each
+    // call's read-set, so concurrent upserts overlap and fail Convex's OCC
+    // retry. Scoping to (standupId, entryDate, userId) keeps each call's
+    // read/write set disjoint.
+    const existing = await ctx.db
+      .query('liveStandupBoards')
+      .withIndex('by_standup_date_user', (q) =>
+        q
+          .eq('standupId', args.standupId)
+          .eq('entryDate', args.entryDate)
+          .eq('userId', args.userId),
+      )
+      .unique()
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -111,15 +119,15 @@ export const getStandupBoard = query({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
-    const board = (
-      await ctx.db
-        .query('liveStandupBoards')
-        .withIndex('by_standup_id', (q) => q.eq('standupId', args.standupId))
-        .collect()
-    ).find(
-      (item) =>
-        item.entryDate === args.entryDate && item.userId === identity.subject,
-    )
+    const board = await ctx.db
+      .query('liveStandupBoards')
+      .withIndex('by_standup_date_user', (q) =>
+        q
+          .eq('standupId', args.standupId)
+          .eq('entryDate', args.entryDate)
+          .eq('userId', identity.subject),
+      )
+      .unique()
 
     if (!board) {
       return null

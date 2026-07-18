@@ -17,15 +17,17 @@ export const upsertMembership = internalMutation({
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    // Query the composite index by its `teamId` prefix, then match userId in JS.
-    // The `./server` wrappers are schema-generic, so a chained `.eq().eq()` isn't
-    // typed here; a team's membership list is bounded, so the prefix scan is cheap.
-    const existing = (
-      await ctx.db
-        .query('liveTeamMembers')
-        .withIndex('by_team_user', (q) => q.eq('teamId', args.teamId))
-        .collect()
-    ).find((row) => row.userId === args.userId)
+    // Read only this membership row via the full composite index. Membership
+    // fan-out pushes many rows for the same team concurrently; a `by_team_user`
+    // prefix scan would put every team member in each call's read-set, so
+    // concurrent upserts overlap and fail Convex's OCC retry. Scoping to
+    // (teamId, userId) keeps each call's read/write set disjoint.
+    const existing = await ctx.db
+      .query('liveTeamMembers')
+      .withIndex('by_team_user', (q) =>
+        q.eq('teamId', args.teamId).eq('userId', args.userId),
+      )
+      .unique()
 
     if (existing) {
       // Stale-guard: ignore an out-of-order sync that predates what we have.
@@ -51,12 +53,12 @@ export const deleteMembership = internalMutation({
     teamId: v.string(),
   },
   handler: async (ctx, args) => {
-    const existing = (
-      await ctx.db
-        .query('liveTeamMembers')
-        .withIndex('by_team_user', (q) => q.eq('teamId', args.teamId))
-        .collect()
-    ).find((row) => row.userId === args.userId)
+    const existing = await ctx.db
+      .query('liveTeamMembers')
+      .withIndex('by_team_user', (q) =>
+        q.eq('teamId', args.teamId).eq('userId', args.userId),
+      )
+      .unique()
 
     if (!existing) {
       return { operation: 'noop' as const }
