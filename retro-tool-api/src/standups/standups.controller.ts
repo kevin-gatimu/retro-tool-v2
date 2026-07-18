@@ -167,7 +167,7 @@ export class StandupsController {
       session.user.id,
       id,
     );
-    await this.standupsProjectionSyncService.deleteStandupProjection(id);
+    await this.standupsProjectionSyncService.enqueueStandupDelete(id);
     this.standupsGateway.emitStandupListChanged();
     return result;
   }

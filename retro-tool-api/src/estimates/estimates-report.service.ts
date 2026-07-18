@@ -150,20 +150,19 @@ export class EstimatesReportService {
       );
     }
     if (normalizedSearch) {
-      conditions.push(
-        or(
-          ilike(
-            estimatesSchema.storyEstimateSession.name,
-            `%${normalizedSearch}%`,
-          ),
-          ilike(
-            estimatesSchema.storyEstimateSession.currentStory,
-            `%${normalizedSearch}%`,
-          ),
-          ilike(teamSchema.team.name, `%${normalizedSearch}%`),
-          ilike(orgSchema.organization.name, `%${normalizedSearch}%`),
-        )!,
+      const orClause = or(
+        ilike(
+          estimatesSchema.storyEstimateSession.name,
+          `%${normalizedSearch}%`,
+        ),
+        ilike(
+          estimatesSchema.storyEstimateSession.currentStory,
+          `%${normalizedSearch}%`,
+        ),
+        ilike(teamSchema.team.name, `%${normalizedSearch}%`),
+        ilike(orgSchema.organization.name, `%${normalizedSearch}%`),
       );
+      if (orClause) conditions.push(orClause);
     }
 
     const whereClause = and(...conditions);

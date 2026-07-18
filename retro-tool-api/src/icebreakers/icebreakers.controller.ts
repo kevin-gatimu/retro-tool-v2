@@ -258,7 +258,7 @@ export class IcebreakersController {
       id,
       session.user.id,
     );
-    await this.icebreakersProjectionSyncService.deleteSessionProjection(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionDelete(id);
     if (link) {
       this.standupsGateway.emitEntryChanged(link.standupId, link.entryDate);
     }

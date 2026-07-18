@@ -183,7 +183,7 @@ export class IcebreakersGateway
     this.server
       .to(`session:${sessionId}`)
       .emit('session-changed', { sessionId });
-    void this.icebreakersProjectionSyncService.syncSessionProjection(sessionId);
+    void this.icebreakersProjectionSyncService.enqueueSessionSync(sessionId);
   }
 
   private normalizeDecision(value: string): TIcebreakerPromptDecision | null {

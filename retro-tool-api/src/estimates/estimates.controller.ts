@@ -40,6 +40,15 @@ import {
   SetConsensusSchema,
   SetConsensusBody,
   type SetConsensusDto,
+  CastVoteSchema,
+  CastVoteBody,
+  type CastVoteDto,
+  UpdateSessionNameSchema,
+  UpdateSessionNameBody,
+  type UpdateSessionNameDto,
+  StartTimerSchema,
+  StartTimerBody,
+  type StartTimerDto,
   sendEstimateReportSchema,
   SendEstimateReportDto,
   SendEstimateReportDtoClass,
@@ -108,13 +117,14 @@ export class EstimatesController {
   @Post()
   @ApiOperation({ summary: 'Create a new estimate session' })
   @ApiResponse({ status: 201, description: '{ id: string }' })
+  @ApiBody({ type: CreateEstimateSessionBody })
   @UsePipes(new ZodValidationPipe(CreateEstimateSessionSchema))
   createSession(
     @Session() session: SessionUser,
-    @Body() body: CreateEstimateSessionBody,
+    @Body() body: CreateEstimateSessionDto,
   ) {
     return this.estimatesService
-      .createSession(session.user.id, body as CreateEstimateSessionDto)
+      .createSession(session.user.id, body)
       .then((result) => {
         this.estimatesGateway.emitSessionChanged(result.id);
         return result;
@@ -138,15 +148,17 @@ export class EstimatesController {
 
   @Post(':id/votes')
   @ApiOperation({ summary: 'Cast a vote in an estimate session' })
+  @ApiBody({ type: CastVoteBody })
+  @UsePipes(new ZodValidationPipe(CastVoteSchema))
   async castVote(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('points') points: string,
+    @Body() body: CastVoteDto,
   ) {
     const result = await this.estimatesService.upsertVote(
       id,
       session.user.id,
-      points,
+      body.points,
     );
     this.estimatesGateway.emitSessionChanged(id);
     return result;
@@ -179,16 +191,17 @@ export class EstimatesController {
 
   @Post(':id/clear')
   @ApiOperation({ summary: 'Clear votes and start a new round' })
+  @ApiBody({ type: NewEstimateRoundBody })
   @UsePipes(new ZodValidationPipe(NewEstimateRoundSchema))
   async clearVotes(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: NewEstimateRoundBody,
+    @Body() body: NewEstimateRoundDto,
   ) {
     const result = await this.estimatesService.clearVotes(
       id,
       session.user.id,
-      body as NewEstimateRoundDto,
+      body,
     );
     this.estimatesGateway.emitSessionChanged(id);
     return result;
@@ -196,16 +209,17 @@ export class EstimatesController {
 
   @Post(':id/rounds/start')
   @ApiOperation({ summary: 'Start first or next round using ticket number' })
+  @ApiBody({ type: NewEstimateRoundBody })
   @UsePipes(new ZodValidationPipe(NewEstimateRoundSchema))
   async startRound(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: NewEstimateRoundBody,
+    @Body() body: NewEstimateRoundDto,
   ) {
     const result = await this.estimatesService.startRound(
       id,
       session.user.id,
-      body as NewEstimateRoundDto,
+      body,
     );
     this.estimatesGateway.emitSessionChanged(id);
     return result;
@@ -213,16 +227,17 @@ export class EstimatesController {
 
   @Patch(':id/story')
   @ApiOperation({ summary: 'Update the current story being estimated' })
+  @ApiBody({ type: UpdateEstimateStoryBody })
   @UsePipes(new ZodValidationPipe(UpdateEstimateStorySchema))
   async updateStory(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: UpdateEstimateStoryBody,
+    @Body() body: UpdateEstimateStoryDto,
   ) {
     const result = await this.estimatesService.updateStory(
       id,
       session.user.id,
-      body as UpdateEstimateStoryDto,
+      body,
     );
     this.estimatesGateway.emitSessionChanged(id);
     return result;
@@ -230,26 +245,35 @@ export class EstimatesController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update session name' })
+  @ApiBody({ type: UpdateSessionNameBody })
+  @UsePipes(new ZodValidationPipe(UpdateSessionNameSchema))
   async updateSession(
+    @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('name') name: string,
+    @Body() body: UpdateSessionNameDto,
   ) {
-    const result = await this.estimatesService.updateSessionName(id, name);
+    const result = await this.estimatesService.updateSessionName(
+      id,
+      session.user.id,
+      body.name,
+    );
     this.estimatesGateway.emitSessionChanged(id);
     return result;
   }
 
   @Post(':id/timer')
   @ApiOperation({ summary: 'Start a countdown timer for the session' })
+  @ApiBody({ type: StartTimerBody })
+  @UsePipes(new ZodValidationPipe(StartTimerSchema))
   async startTimer(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('duration') duration: number,
+    @Body() body: StartTimerDto,
   ) {
     const result = await this.estimatesService.startTimer(
       id,
       session.user.id,
-      duration,
+      body.duration,
     );
     this.estimatesGateway.emitSessionChanged(id);
     return result;
@@ -259,16 +283,17 @@ export class EstimatesController {
   @ApiOperation({
     summary: 'Set the agreed points for the current revealed round',
   })
+  @ApiBody({ type: SetConsensusBody })
   @UsePipes(new ZodValidationPipe(SetConsensusSchema))
   async setConsensus(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: SetConsensusBody,
+    @Body() body: SetConsensusDto,
   ) {
     const result = await this.estimatesService.setConsensus(
       id,
       session.user.id,
-      (body as SetConsensusDto).agreedPoints,
+      body.agreedPoints,
     );
     this.estimatesGateway.emitSessionChanged(id);
     return result;

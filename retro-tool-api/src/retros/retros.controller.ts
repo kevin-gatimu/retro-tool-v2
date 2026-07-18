@@ -31,6 +31,12 @@ import {
   createCommentSchema,
   CreateCommentDto,
   CreateCommentDtoClass,
+  updateCommentSchema,
+  UpdateCommentDto,
+  UpdateCommentDtoClass,
+  carryForwardCardsSchema,
+  CarryForwardCardsDto,
+  CarryForwardCardsDtoClass,
   mergeCardsSchema,
   MergeCardsDto,
   MergeCardsDtoClass,
@@ -266,7 +272,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.deleteRetro(session.user.id, id);
-    await this.retrosProjectionSyncService.deleteRetroProjection(id);
+    await this.retrosProjectionSyncService.enqueueRetroDelete(id);
     this.retrosGateway.emitRetroListChanged();
     return result;
   }
@@ -600,18 +606,20 @@ export class RetrosController {
   @Patch('comments/:id')
   @ApiOperation({ summary: 'Update a comment' })
   @ApiParam({ name: 'id', type: String, description: 'Comment ID' })
+  @ApiBody({ type: UpdateCommentDtoClass })
   @ApiResponse({ status: 200, description: 'Comment updated' })
   @ApiResponse({ status: 403, description: 'Not the comment author' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
+  @UsePipes(new ZodValidationPipe(updateCommentSchema))
   async updateComment(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('content') content: string,
+    @Body() body: UpdateCommentDto,
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.updateComment(
       session.user.id,
       id,
-      content,
+      body.content,
     );
     if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
     return result;
@@ -735,25 +743,20 @@ export class RetrosController {
     summary: 'Create action items for undiscussed cards (carry forward)',
   })
   @ApiParam({ name: 'id', type: String, description: 'Retrospective ID' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: { cardIds: { type: 'array', items: { type: 'string' } } },
-      required: ['cardIds'],
-    },
-  })
+  @ApiBody({ type: CarryForwardCardsDtoClass })
   @ApiResponse({ status: 200, description: '{ created: number }' })
   @ApiResponse({ status: 400, description: 'Retro not completed' })
   @ApiResponse({ status: 403, description: 'Not a team member' })
+  @UsePipes(new ZodValidationPipe(carryForwardCardsSchema))
   async carryForwardCards(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('cardIds') cardIds: string[],
+    @Body() body: CarryForwardCardsDto,
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.carryForwardCards(
       session.user.id,
       id,
-      cardIds,
+      body.cardIds,
     );
     if (result.created > 0) {
       this.retrosGateway.emitRetroChanged(id);

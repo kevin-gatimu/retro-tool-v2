@@ -80,35 +80,35 @@ export class RetrosGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   emitRetroChanged(retroId: string): void {
     this.server.to(`retro:${retroId}`).emit('retro-changed', { retroId });
-    void this.retrosProjectionSyncService.syncRetroProjection(retroId);
+    void this.retrosProjectionSyncService.enqueueRetroSync(retroId);
   }
 
   emitRetroStatusChanged(retroId: string, status: TRetroStatus): void {
     this.server
       .to(`retro:${retroId}`)
       .emit('retro-changed', { retroId, status });
-    void this.retrosProjectionSyncService.syncRetroProjection(retroId);
+    void this.retrosProjectionSyncService.enqueueRetroSync(retroId);
   }
 
   emitDiscussionCardChanged(retroId: string, cardId: string): void {
     this.server
       .to(`retro:${retroId}`)
       .emit('discussion-card-changed', { retroId, cardId });
-    void this.retrosProjectionSyncService.syncRetroProjection(retroId);
+    void this.retrosProjectionSyncService.enqueueRetroSync(retroId);
   }
 
   emitDiscussionActionItemChanged(retroId: string, actionItemId: string): void {
     this.server
       .to(`retro:${retroId}`)
       .emit('discussion-action-item-changed', { retroId, actionItemId });
-    void this.retrosProjectionSyncService.syncRetroProjection(retroId);
+    void this.retrosProjectionSyncService.enqueueRetroSync(retroId);
   }
 
   emitCarriedForwardChanged(retroId: string, actionItemId?: string): void {
     this.server
       .to(`retro:${retroId}`)
       .emit('carried-forward-changed', { retroId, actionItemId });
-    void this.retrosProjectionSyncService.syncRetroProjection(retroId);
+    void this.retrosProjectionSyncService.enqueueRetroSync(retroId);
   }
 
   emitRetroListChanged(): void {

@@ -277,6 +277,6 @@ export class EstimatesGateway
     this.server
       .to(`session:${sessionId}`)
       .emit('session-changed', { sessionId });
-    void this.estimatesProjectionSyncService.syncSessionProjection(sessionId);
+    void this.estimatesProjectionSyncService.enqueueSessionSync(sessionId);
   }
 }

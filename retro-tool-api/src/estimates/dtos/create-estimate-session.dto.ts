@@ -56,6 +56,39 @@ export class NewEstimateRoundBody {
   storyLink?: string;
 }
 
+export const CastVoteSchema = z.object({
+  points: z.string().min(1).max(20),
+});
+
+export type CastVoteDto = z.infer<typeof CastVoteSchema>;
+
+export class CastVoteBody {
+  @ApiProperty({ example: '5' })
+  points: string;
+}
+
+export const UpdateSessionNameSchema = z.object({
+  name: z.string().min(1).max(255),
+});
+
+export type UpdateSessionNameDto = z.infer<typeof UpdateSessionNameSchema>;
+
+export class UpdateSessionNameBody {
+  @ApiProperty({ example: 'Sprint 42 Planning' })
+  name: string;
+}
+
+export const StartTimerSchema = z.object({
+  duration: z.number().int().positive().max(3600),
+});
+
+export type StartTimerDto = z.infer<typeof StartTimerSchema>;
+
+export class StartTimerBody {
+  @ApiProperty({ example: 120, description: 'Countdown seconds (max 3600)' })
+  duration: number;
+}
+
 export const SetConsensusSchema = z.object({
   agreedPoints: z.string().min(1).max(20),
 });

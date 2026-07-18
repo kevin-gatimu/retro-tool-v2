@@ -1,4 +1,4 @@
-import type { EstimateVoteView } from './types/index';
+import type { EstimateVoteView, RoundStats } from './types/index';
 
 /**
  * Pure helpers for story-estimate calculations — no DB or service state. Kept
@@ -23,13 +23,6 @@ export function pointsToNumber(points: string): number | null {
   if (points === '½') return 0.5;
   const parsed = Number.parseFloat(points);
   return Number.isNaN(parsed) ? null : parsed;
-}
-
-export interface RoundStats {
-  votesCount: number;
-  average: number | null;
-  min: number | null;
-  max: number | null;
 }
 
 /** Aggregate a round's votes into count/average/min/max over numeric points. */

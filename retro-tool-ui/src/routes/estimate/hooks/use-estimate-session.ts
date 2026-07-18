@@ -32,8 +32,12 @@ export function useEstimateSession(sessionId: string) {
     queryFn: () =>
       api.get<EstimateSession>(ESTIMATES_ENDPOINTS.BY_ID(sessionId)),
     staleTime: 30_000,
-    // Fallback sync in case a websocket room event is missed.
-    refetchInterval: usesConvexRealtime ? false : 5_000,
+    // Fallback sync in case a websocket room event is missed. In Convex mode
+    // team members get sub-second updates from the board subscription, but a
+    // non-member viewer has no Convex board row and would otherwise never
+    // refresh — so keep a slow 15s poll as a harmless backstop for them (and a
+    // no-op for members). Non-convex mode keeps the fast 5s socket fallback.
+    refetchInterval: usesConvexRealtime ? 15_000 : 5_000,
   })
 
   useEffect(() => {

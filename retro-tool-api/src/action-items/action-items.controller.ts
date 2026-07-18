@@ -30,6 +30,9 @@ import {
   createActionItemSchema,
   CreateActionItemDto,
   CreateActionItemDtoClass,
+  createActionItemCommentSchema,
+  CreateActionItemCommentDto,
+  CreateActionItemCommentDtoClass,
   updateActionItemSchema,
   UpdateActionItemDto,
   UpdateActionItemDtoClass,
@@ -113,20 +116,22 @@ export class ActionItemsController {
   }
 
   @Post(':id/comments')
+  @UsePipes(new ZodValidationPipe(createActionItemCommentSchema))
   @ApiOperation({ summary: 'Add a comment to an action item' })
   @ApiParam({ name: 'id', type: String })
+  @ApiBody({ type: CreateActionItemCommentDtoClass })
   @ApiResponse({ status: 201, description: 'Comment created' })
   @ApiResponse({ status: 403, description: 'Not a team member' })
   @ApiResponse({ status: 404, description: 'Action item not found' })
   async createActionItemComment(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('content') content: string,
+    @Body() body: CreateActionItemCommentDto,
     @Session() session: SessionUser,
   ) {
     return this.actionItemsService.createActionItemComment(
       session.user.id,
       id,
-      content,
+      body.content,
     );
   }
 

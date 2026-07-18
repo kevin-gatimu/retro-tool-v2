@@ -96,3 +96,10 @@ export type EstimateVoteView = {
   value: string;
   user: { id: string; name: string; jobRole: string | null };
 };
+
+export interface RoundStats {
+  votesCount: number;
+  average: number | null;
+  min: number | null;
+  max: number | null;
+}

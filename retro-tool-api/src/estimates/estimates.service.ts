@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -33,6 +34,7 @@ import type {
   EstimateVoteView,
   SessionDetail,
   SessionSummary,
+  SessionTemplate,
 } from './types/index';
 import { roundStoryLabel, computeRoundStats } from './estimates.utils';
 
@@ -45,6 +47,8 @@ type Database = NodePgDatabase<
 
 @Injectable()
 export class EstimatesService {
+  private readonly logger = new Logger(EstimatesService.name);
+
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly notificationsService: NotificationsService,
@@ -379,7 +383,7 @@ export class EstimatesService {
     if (!membership) throw new ForbiddenException('Access denied');
 
     // Fetch template if session has one
-    let sessionTemplate: import('./types/index').SessionTemplate | null = null;
+    let sessionTemplate: SessionTemplate | null = null;
     if (row.session.templateId) {
       const [tmpl] = await this.database
         .select({
@@ -666,7 +670,11 @@ export class EstimatesService {
 
     void this.notificationsService
       .notifyTeamOfEstimateSession(id, data.name, data.teamId)
-      .catch(() => undefined);
+      .catch((err: unknown) =>
+        this.logger.warn(
+          `Failed to notify team of estimate session: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
 
     await this.invalidateEstimateCaches(id, { invalidateLists: true });
 
@@ -976,8 +984,13 @@ export class EstimatesService {
 
   async updateSessionName(
     sessionId: string,
+    userId: string,
     name: string,
   ): Promise<StoryEstimateSession> {
+    // Only the session creator may rename it — matches startTimer/reveal/etc.
+    // (previously unauthenticated: any user could rename any session by id).
+    await this.assertSessionCreator(sessionId, userId);
+
     const [existing] = await this.database
       .select()
       .from(estimatesSchema.storyEstimateSession)

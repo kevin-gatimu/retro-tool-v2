@@ -99,3 +99,28 @@ export class VotePollDtoClass {
   @ApiProperty({ description: 'Option ID to vote for' })
   optionId: string;
 }
+
+export const emailPollResultsSchema = z.object({
+  recipients: z.array(z.email()).max(50).optional(),
+});
+export type EmailPollResultsDto = z.infer<typeof emailPollResultsSchema>;
+
+export class EmailPollResultsDtoClass {
+  @ApiPropertyOptional({
+    description:
+      'Email addresses to send to (restricted to team members). Omit to send to the whole team.',
+    type: [String],
+    example: ['user@example.com'],
+  })
+  recipients?: string[];
+}
+
+export const setPollClosedSchema = z.object({
+  isClosed: z.boolean(),
+});
+export type SetPollClosedDto = z.infer<typeof setPollClosedSchema>;
+
+export class SetPollClosedDtoClass {
+  @ApiProperty({ description: 'Whether the poll is closed' })
+  isClosed: boolean;
+}

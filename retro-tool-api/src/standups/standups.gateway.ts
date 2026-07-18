@@ -69,10 +69,7 @@ export class StandupsGateway
     this.server
       .to(`standup:${standupId}`)
       .emit('standup-entry-changed', { standupId, date });
-    void this.standupsProjectionSyncService.syncEntryProjection(
-      standupId,
-      date,
-    );
+    void this.standupsProjectionSyncService.enqueueEntrySync(standupId, date);
   }
 
   emitStandupChanged(standupId: string): void {

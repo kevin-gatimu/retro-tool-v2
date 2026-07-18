@@ -42,6 +42,17 @@ function EstimateSessionPage() {
 
   const timeRemaining = useRoundTimer(session?.timerEndsAt ?? null)
 
+  // Redirect away from a missing/ended session. Runs in an effect (not the
+  // render body) so we never call navigate/toast during render.
+  useEffect(() => {
+    if (isError) {
+      toast.warning('Session not available', {
+        description: 'This estimation session has ended or does not exist.',
+      })
+      navigate({ to: '/estimate' })
+    }
+  }, [isError, navigate])
+
   const {
     castVoteMutation,
     removeVoteMutation,
@@ -178,10 +189,6 @@ function EstimateSessionPage() {
   }
 
   if (isError) {
-    toast.warning('Session not available', {
-      description: 'This estimation session has ended or does not exist.',
-    })
-    navigate({ to: '/estimate' })
     return null
   }
 

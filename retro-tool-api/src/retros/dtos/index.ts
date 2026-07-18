@@ -2,6 +2,8 @@ export * from './create-retro.dto';
 export * from './create-card.dto';
 export * from './update-card.dto';
 export * from './create-comment.dto';
+export * from './update-comment.dto';
+export * from './carry-forward-cards.dto';
 export * from './merge-cards.dto';
 export * from './create-template.dto';
 export * from './update-template.dto';

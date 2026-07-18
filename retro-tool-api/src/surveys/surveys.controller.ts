@@ -89,7 +89,7 @@ export class SurveysController {
       session.user.id,
       body,
     );
-    void this.surveysProjectionSync.syncSurveyProjection(result.id);
+    void this.surveysProjectionSync.enqueueSurveySync(result.id);
     return result;
   }
 
@@ -126,7 +126,7 @@ export class SurveysController {
       id,
       body,
     );
-    void this.surveysProjectionSync.syncSurveyProjection(id);
+    void this.surveysProjectionSync.enqueueSurveySync(id);
     return result;
   }
 
@@ -143,7 +143,7 @@ export class SurveysController {
     @Session() session: SessionUser,
   ) {
     const result = await this.surveysService.respond(session.user.id, id, body);
-    void this.surveysProjectionSync.syncSurveyProjection(id);
+    void this.surveysProjectionSync.enqueueSurveySync(id);
     return result;
   }
 
@@ -186,7 +186,7 @@ export class SurveysController {
       id,
       dto.isClosed,
     );
-    void this.surveysProjectionSync.syncSurveyProjection(id);
+    void this.surveysProjectionSync.enqueueSurveySync(id);
     return result;
   }
 
@@ -200,7 +200,7 @@ export class SurveysController {
     @Session() session: SessionUser,
   ) {
     const result = await this.surveysService.deleteSurvey(session.user.id, id);
-    void this.surveysProjectionSync.deleteSurveyProjection(id);
+    void this.surveysProjectionSync.enqueueSurveyDelete(id);
     return result;
   }
 }
