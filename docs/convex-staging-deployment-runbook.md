@@ -135,14 +135,39 @@ In the repository's **staging** environment (Settings → Environments → stagi
 
 ### A6. Grant the deploy principal role-assignment rights ⚠️
 
-The Bicep creates **role assignments** (AcrPull for the Convex runtime identity;
-Key Vault Secrets User / Secrets Officer on the vault). That requires
-`Microsoft.Authorization/roleAssignments/write` — **plain Contributor is not
-enough**. Grant the GitHub OIDC deployment principal **Owner** or **User Access
-Administrator** on `retrotool-staging-rg`.
+The Bicep creates **three role assignments** — AcrPull for the Convex runtime
+identity ([convex-staging.bicep](../infra/convex-staging.bicep) `acrPullAssignment`),
+and Key Vault Secrets User + Secrets Officer on the vault
+([modules/convex-key-vault.bicep](../infra/modules/convex-key-vault.bicep)
+`runtimeSecretsUser` / `bootstrapSecretsOfficer`). Every `az deployment group
+create` re-asserts them, so ARM checks `Microsoft.Authorization/roleAssignments/write`
+**on every run, even when the assignments already exist and are unchanged** —
+plain **Contributor is not enough** and idempotency does not save you.
 
-> This is the most common first-deploy failure. If the deployment fails with
-> `AuthorizationFailed` on a `roleAssignments` write, this is why.
+Grant the GitHub OIDC deployment principal the **least-privilege role that can
+assign roles**, scoped to the resource group only (not the subscription):
+
+```bash
+# Role Based Access Control Administrator — can write role assignments but
+# nothing else, unlike the broader Owner / User Access Administrator.
+az role assignment create \
+  --assignee-object-id <CI_SP_OBJECT_ID> \
+  --assignee-principal-type ServicePrincipal \
+  --role "Role Based Access Control Administrator" \
+  --scope "/subscriptions/<SUB_ID>/resourceGroups/retrotool-staging-rg"
+```
+
+> The CI principal's object id is the one that appears in the failure message
+> (`The client '…' with object id '<GUID>'`). Get it directly with
+> `az ad sp show --id <AZURE_CLIENT_ID> --query id -o tsv`.
+>
+> **This is the most common first-deploy failure.** Symptom in the `convex /
+> deploy` job at the **"Deploy staging Convex infrastructure"** step:
+> `InvalidTemplateDeployment … Authorization failed … does not have permission
+> to perform action 'Microsoft.Authorization/roleAssignments/write'`. The stack
+> can already be fully deployed and healthy and this still fails — it is purely a
+> permission gap on the CI principal, not a template error. Fix once with the
+> grant above; no code change and no re-provision is needed.
 
 ---
 

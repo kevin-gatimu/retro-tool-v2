@@ -6,7 +6,7 @@ Provisions all Azure resources for Retro Tool via CLI. Each environment gets an 
 
 1. **Azure CLI** (v2.20+): `winget install -e --id Microsoft.AzureCLI`
 2. **Bicep CLI** (bundled): `az bicep upgrade`
-3. **Azure subscription** with **Owner** or **User Access Administrator** at subscription scope — both `main.bicep` and `convex-staging.bicep` create role assignments (AcrPull, Key Vault Secrets User), which Contributor cannot grant
+3. **Azure subscription** with **Owner** or **User Access Administrator** at subscription scope — both `main.bicep` and `convex-staging.bicep` create role assignments (AcrPull, Key Vault Secrets User), which Contributor cannot grant. The **CI deploy principal** (GitHub OIDC) does not need subscription Owner: grant it **Role Based Access Control Administrator** scoped to the target resource group so `convex-staging.bicep` can re-assert its role assignments on every run (see [Troubleshooting](#troubleshooting))
 
 ## File Structure
 
@@ -365,3 +365,5 @@ az deployment group create --resource-group retrotool-staging-rg `
 | OAuth callback fails | Check redirect URI matches exactly in App Registration |
 | Static Web App 404 | Ensure `staticwebapp.config.json` has `navigationFallback` set |
 | ACR pull fails (503) | Verify Bicep was deployed: `az webapp config show --name <name> --query acrUseManagedIdentityCreds` must be `true` |
+| `convex / deploy` fails at "Deploy staging Convex infrastructure" with `InvalidTemplateDeployment … does not have permission to perform action 'Microsoft.Authorization/roleAssignments/write'` | The CI OIDC principal has only Contributor, which cannot write the role assignments `convex-staging.bicep` declares (re-asserted every run, even when unchanged). Grant it **Role Based Access Control Administrator** on `retrotool-staging-rg`: `az role assignment create --assignee-object-id <sp-object-id> --assignee-principal-type ServicePrincipal --role "Role Based Access Control Administrator" --scope /subscriptions/<sub>/resourceGroups/retrotool-staging-rg`. Object id is in the error message, or `az ad sp show --id <AZURE_CLIENT_ID> --query id -o tsv`. |
+| `convex / validate` fails at "Validate Bicep" with `azure/login … Not all values are present. Ensure 'client-id' and 'tenant-id' are supplied` | The validate job runs only `az bicep build` (a **local** compile that needs no Azure auth). Do **not** add `azure/login` to it — the OIDC creds live only in the `staging` environment, which validate intentionally does not use. Install the CLI standalone with `az bicep install` instead. |

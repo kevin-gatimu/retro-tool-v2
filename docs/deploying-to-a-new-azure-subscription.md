@@ -174,14 +174,26 @@ gotcha #8), `postgresAdminLogin` (`pgadmin`), `dockerImageName`
 **Preview first** if you like: swap `create` for `what-if`.
 
 **Grant the deploy principal role-assignment rights on the RG** (needed before the
-Convex stack in step 6, and any workflow deploy). Contributor is insufficient:
+Convex stack in step 6, and any workflow deploy). Contributor is insufficient —
+`convex-staging.bicep` declares three role assignments (AcrPull + Key Vault
+Secrets User/Officer) and re-asserts them on **every** deploy, so ARM checks
+`Microsoft.Authorization/roleAssignments/write` even when they already exist.
+Grant the least-privilege role that can assign roles, scoped to the RG only:
 
 ```bash
+# Role Based Access Control Administrator can write role assignments and nothing
+# else — prefer it over the broader Owner / User Access Administrator.
 az role assignment create \
-  --assignee <APP_REGISTRATION_CLIENT_ID> \
-  --role "Owner" \
+  --assignee-object-id <DEPLOY_SP_OBJECT_ID> \
+  --assignee-principal-type ServicePrincipal \
+  --role "Role Based Access Control Administrator" \
   --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<NEW_RG>
 ```
+
+> Object id: `az ad sp show --id <APP_REGISTRATION_CLIENT_ID> --query id -o tsv`.
+> If you run the initial provisioning manually as a human **Owner**, you already
+> have this — the grant is specifically so the **CI service principal** can
+> re-run the Convex deploy without subscription Owner.
 
 **Capture the outputs** — you'll need them repeatedly:
 
@@ -585,7 +597,8 @@ a failed reconciliation**. See the runbook's
 | Admin key stopped working after a secret change | Admin key is signed by `INSTANCE_SECRET`; rotating it invalidates all keys | Regenerate (7a) and update **both** `CONVEX_SYNC_ADMIN_KEY` and `CONVEX_SELF_HOSTED_ADMIN_KEY` |
 | Convex can't connect to Postgres / picks the wrong DB | `POSTGRES_URL` had a database name or `?sslmode=` query string | Use **host:port only**; Convex derives the DB from `INSTANCE_NAME` (hyphens→underscores); TLS is enforced by `DO_NOT_REQUIRE_SSL=false` |
 | Works locally, JWKS fetch fails on Azure (or vice-versa) | Local dev uses `host.docker.internal` because the container can't reach the host via `localhost`; on Azure both are public | On Azure, `JWT_JWKS_URL` = `<API_ORIGIN>/api/auth/jwks` (public https) |
-| Bicep deploy fails `AuthorizationFailed` on a `roleAssignments` write | Deploy principal has Contributor, not enough to create role assignments | Grant **Owner** or **User Access Administrator** on the RG (step 3) |
+| `convex / deploy` fails at "Deploy staging Convex infrastructure" with `InvalidTemplateDeployment … does not have permission to perform action 'Microsoft.Authorization/roleAssignments/write'` | CI principal has Contributor, which cannot write the role assignments the Convex Bicep re-asserts every run (fails even when they already exist) | Grant **Role Based Access Control Administrator** on the RG (step 3). Purely a permission gap — no code change or re-provision needed |
+| `convex / validate` fails at "Validate Bicep" with `azure/login … Ensure 'client-id' and 'tenant-id' are supplied` | Someone added `azure/login` to the validate job, but its only Azure command is `az bicep build` (a local compile), and the OIDC creds live only in the `staging` environment | Remove `azure/login` from validate; use `az bicep install` + `az bicep build` (no auth) |
 | Static Web App deploy fails / region error | SWA isn't available in `southafricanorth` | Leave `staticWebAppLocation=westeurope` (everything else stays southafricanorth) |
 | API 504 Gateway Timeout | `WEBSITES_PORT` wrongly set on the API app | The API workflow sets `PORT=8080` and Azure auto-detects — do not set `WEBSITES_PORT` on the API |
 | ACR pull fails (503) | Managed-identity pull not configured | `az webapp config show --name <API_WEBAPP> --query acrUseManagedIdentityCreds` must be `true` (re-run core Bicep) |
