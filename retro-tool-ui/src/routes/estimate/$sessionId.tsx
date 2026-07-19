@@ -31,7 +31,7 @@ function EstimateSessionPage() {
   const { sessionId } = Route.useParams()
   const navigate = useNavigate()
 
-  const { session, isLoading, isError, usesConvexRealtime } =
+  const { session, isLoading, isError, usesConvexRealtime, onlineUserIds } =
     useEstimateSession(sessionId)
 
   const [selectedPoints, setSelectedPoints] = useState<string | null>(null)
@@ -241,9 +241,17 @@ function EstimateSessionPage() {
           ?.agreedPoints ?? null)
       : null
 
+  // Online state comes from the live Convex presence subscription so join/leave
+  // reflects instantly. Fall back to the board snapshot's `isOnline` only until
+  // the presence subscription first resolves (onlineUserIds === null), avoiding
+  // an empty-list flash on first paint.
+  const isParticipantOnline = (
+    p: (typeof session.participants)[number],
+  ): boolean => (onlineUserIds ? onlineUserIds.has(p.userId) : p.isOnline)
+
   // Sort participants: current user first, then others
   const onlineParticipants = session.participants
-    .filter((p) => p.isOnline)
+    .filter(isParticipantOnline)
     .filter((p, i, arr) => arr.findIndex((x) => x.userId === p.userId) === i)
     .sort((a, b) => {
       // Current user always first

@@ -183,6 +183,21 @@ export default defineSchema({
     .index('by_retro', ['retroId'])
     .index('by_retro_user', ['retroId', 'userId']),
 
+  // Per-user online presence for estimate sessions. A high-frequency,
+  // low-value signal (join/leave flaps), so it gets its own direct Convex path
+  // — clients call `setPresence` and subscribe to `getSessionPresence` — instead
+  // of riding the coalesced projection-outbox → board fan-out. Mirrors the retro
+  // `liveReadyStatus` shape.
+  liveEstimatePresence: defineTable({
+    sessionId: v.string(),
+    userId: v.string(),
+    displayName: v.string(),
+    online: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index('by_session', ['sessionId'])
+    .index('by_session_user', ['sessionId', 'userId']),
+
   // Team-membership projection (userId → teamId) pushed from NestJS after each
   // membership mutation. Convex has no team data of its own, so team-scoped
   // read queries (list projections, team stats) use this table to filter results

@@ -18,3 +18,12 @@
  * full lists.
  */
 export const LIST_PROJECTION_CAP = 500
+
+/**
+ * Max presence rows read per session. Presence is one row per participant, so a
+ * real session never approaches this — the cap just keeps the subscribed read
+ * bounded (per the Convex guidelines' "never unbounded .collect()" rule) so a
+ * runaway row count can't bloat the reactive read-set or blow the per-query
+ * document limit.
+ */
+export const MAX_PRESENCE_PER_SESSION = 200

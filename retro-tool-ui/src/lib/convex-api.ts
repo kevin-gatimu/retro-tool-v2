@@ -39,6 +39,13 @@ export const convexApi = {
     listActiveSessionProjections: makeFunctionReference<'query'>(
       'liveEstimates:listActiveSessionProjections',
     ),
+    setPresence: makeFunctionReference<'mutation'>('liveEstimates:setPresence'),
+    getSessionPresence: makeFunctionReference<'query'>(
+      'liveEstimates:getSessionPresence',
+    ),
+    listOnlineCounts: makeFunctionReference<'query'>(
+      'liveEstimates:listOnlineCounts',
+    ),
   },
   liveIcebreakers: {
     getIcebreakerBoard: makeFunctionReference<'query'>(
