@@ -14,3 +14,26 @@ managePackageManagerVersions: false
 minimumReleaseAge: 0
 
 resolutionMode: highest
+
+# Security overrides — force patched versions of transitive (and pinned) deps
+# flagged by `pnpm audit --prod --audit-level high`. Each pins the advisory's
+# patched floor. Revisit when direct deps advance past these so the overrides
+# can be dropped.
+overrides:
+  better-auth: '>=1.6.13'
+  # Keep the passkey plugin + core in lockstep with better-auth, or the client
+  # type augmentation (authClient.passkey.*) breaks against a newer core.
+  '@better-auth/passkey': '>=1.6.13'
+  '@better-auth/core': '>=1.6.13'
+  multer: '>=2.2.0'
+  # Stay on undici 7.x — undici 8 dropped internals jsdom 28 requires
+  # (undici/lib/handler/wrap-handler.js), which breaks the vitest/jsdom pool.
+  undici: '>=7.28.0 <8'
+  kysely: '>=0.28.17'
+  # Stay on fast-uri 3.x — an open '>=3.1.2' silently resolves to 4.x, a major
+  # jump beyond the advisory's patched floor.
+  fast-uri: '>=3.1.2 <4'
+  ws: '>=8.21.0'
+  # NB: no vitest/vite override needed — better-auth >=1.6.13 no longer pulls
+  # them into the production tree, so the prod audit is clean without forcing a
+  # major bump of our own dev-time vitest.

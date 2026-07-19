@@ -28,7 +28,7 @@ feature-branch → PR → develop → PR → staging → PR → main
 ```
 
 1. Open a PR targeting the appropriate branch.
-2. CI (`ci.yml`) must pass on the PR (lint + type-check + test + build + `pnpm audit --prod`).
+2. CI (`ci.yml`) must pass on the PR (lint + type-check + test + build + `pnpm audit --prod --audit-level high`).
 3. Merge to `develop` for integration testing against the develop environment (deploy is manual there).
 4. Promote to `staging` — the `release-staging.yml` workflow fires automatically on merge.
 5. When staging is validated, promote to `main`. On `main`, release-please maintains the release PR; merging that PR bumps versions and creates the tag. Deploying to production requires a separate manual `workflow_dispatch`.
@@ -105,6 +105,25 @@ Full conventions, commit-type rules, and the no-`wip`-on-main rule are in [../gu
 | `deploy-convex.yml` | `workflow_call` (from `release-staging`) or `workflow_dispatch` | Validates Bicep + Convex functions, deploys self-hosted Convex App Service to **staging**, deploys Convex functions. Stop-first upgrade if image is changing (exports a backup first). |
 | `deploy-api.yml` | `workflow_call` or `workflow_dispatch` | Validates + type-checks API, builds + pushes Docker image to ACR (tagged `staging-<sha>`, `staging-latest`, `staging-v<version>`), runs DB migrations, runs idempotent seeds, deploys container to App Service, health-checks. Targets **staging** environment. |
 | `deploy-ui.yml` | `workflow_call` or `workflow_dispatch` | Validates + type-checks UI, builds Vite with baked-in `VITE_*` env vars, deploys to Azure Static Web App. Targets **staging** environment. |
+
+### Keeping the audit gate green — pnpm workspace overrides
+
+When a transitive dependency contains a High/Critical advisory and the direct dep author hasn't released a fix yet, the standard remediation is to add a version floor to the `overrides:` block in [`pnpm-workspace.yaml`](../../pnpm-workspace.yaml). pnpm resolves **every** instance of that package to at least the floor version, regardless of what the direct dep declares. The overrides block carries a comment for each entry explaining why it exists and what constraint to revisit.
+
+**Current active overrides (as of 2026-07-19):**
+
+| Package | Floor | Reason |
+|---|---|---|
+| `better-auth` | `>=1.6.13` | Security advisory in earlier versions |
+| `@better-auth/passkey` | `>=1.6.13` | Must stay in lockstep with `better-auth` or passkey client type augmentation breaks |
+| `@better-auth/core` | `>=1.6.13` | Same lockstep requirement |
+| `multer` | `>=2.2.0` | Security advisory in earlier versions |
+| `undici` | `>=7.28.0 <8` | Security advisory; capped at `<8` — undici 8 removed internals that jsdom 28 requires, which breaks the vitest/jsdom pool |
+| `kysely` | `>=0.28.17` | Security advisory in earlier versions |
+| `fast-uri` | `>=3.1.2` | Security advisory in earlier versions |
+| `ws` | `>=8.21.0` | Security advisory in earlier versions |
+
+When direct dependencies advance past these floors, the corresponding override entries should be dropped.
 
 ### Staging deploy chain (`release-staging.yml`)
 
