@@ -26,14 +26,13 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
-import { getRetroSocket } from '@/lib/socket'
 import { RETROS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { RetroDetail } from '@/common/types/retros'
-import type { TRetroStatus } from '@/common/enums/retro.enums'
 import type { Template } from '@/common/types/templates'
 import { RetroReport } from '@/components/retro-report'
 import { MusicPlayer } from '@/components/music-player'
 import { usesConvexForRetros } from '@/lib/realtime-config'
+import { RealtimeStatusBanner } from '@/components/realtime-status-banner'
 import { RetroConvexSync } from './components/retro-convex-sync'
 import { RetroDiscussionView } from './components/retro-discussion-view'
 import { RetroHeader } from './components/retro-header'
@@ -41,7 +40,7 @@ import { RetroLobbyView } from './components/retro-lobby-view'
 import { ReadyBar } from './components/ready-bar'
 import { PhaseAlerts } from './components/phase-alerts'
 import { DeleteRetroDialog } from './components/delete-retro-dialog'
-import type { CarriedForwardItem, LocalPendingCards, TypingUser } from './types'
+import type { LocalPendingCards, TypingUser } from './types'
 import { RetroBoardSkeleton, RetroDetailSkeleton } from './skeleton'
 
 // Lazy-load the heavy dnd-kit board so it stays out of the initial route chunk;
@@ -49,6 +48,13 @@ import { RetroBoardSkeleton, RetroDetailSkeleton } from './skeleton'
 const RetroBoard = lazy(() =>
   import('./components/retro-board').then((m) => ({ default: m.RetroBoard })),
 )
+
+// Slow REST backstop poll kept even in Convex realtime mode. If Convex silently
+// stops delivering (socket down, JWT auth failure), the board still refreshes
+// from REST within this window instead of showing stale/empty data forever.
+// Socket.IO mode keeps a faster 3s poll (its own connection model).
+const CONVEX_BACKSTOP_POLL_MS = 30_000
+const SOCKET_IO_POLL_MS = 3_000
 
 const startTypingMutationRef = convexApi.liveRetros.startTyping
 const stopTypingMutationRef = convexApi.liveRetros.stopTyping
@@ -209,7 +215,9 @@ function RetroDetailPage() {
     queryKey: ['retro', retroId],
     queryFn: () => api.get<RetroDetail>(RETROS_ENDPOINTS.BY_ID(retroId)),
     staleTime: 5_000,
-    refetchInterval: usesConvexRealtime ? false : 3_000,
+    refetchInterval: usesConvexRealtime
+      ? CONVEX_BACKSTOP_POLL_MS
+      : SOCKET_IO_POLL_MS,
   })
 
   // Clear typing + ready status when the active phase ends
@@ -231,123 +239,6 @@ function RetroDetailPage() {
     stopTypingConvex,
     clearAllReadyConvex,
   ])
-
-  useEffect(() => {
-    if (usesConvexRealtime) {
-      return
-    }
-
-    const socket = getRetroSocket()
-
-    const joinRoom = () => socket.emit('join-retro', { retroId })
-
-    const onRetroChanged = ({
-      status,
-    }: {
-      retroId: string
-      status?: TRetroStatus
-    }) => {
-      if (status) {
-        queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
-          prev ? { ...prev, status } : prev,
-        )
-      }
-      void queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
-      void queryClient.invalidateQueries({
-        queryKey: ['retro-previous-carried', retroId],
-      })
-    }
-
-    const onDiscussionCardChanged = ({
-      cardId,
-    }: {
-      retroId: string
-      cardId: string
-    }) => {
-      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
-        prev
-          ? {
-              ...prev,
-              currentDiscussionCardId: cardId,
-              currentDiscussionActionItemId: null,
-            }
-          : prev,
-      )
-    }
-
-    const onDiscussionActionItemChanged = ({
-      actionItemId,
-    }: {
-      retroId: string
-      actionItemId: string
-    }) => {
-      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
-        prev
-          ? {
-              ...prev,
-              currentDiscussionActionItemId: actionItemId,
-              currentDiscussionCardId: null,
-            }
-          : prev,
-      )
-    }
-
-    socket.on('retro-changed', onRetroChanged)
-    socket.on('connect', joinRoom)
-    socket.on('discussion-card-changed', onDiscussionCardChanged)
-    socket.on('discussion-action-item-changed', onDiscussionActionItemChanged)
-    const onCarriedForwardChanged = ({
-      retroId: changedRetroId,
-      actionItemId,
-    }: {
-      retroId: string
-      actionItemId?: string
-    }) => {
-      if (actionItemId) {
-        queryClient.setQueryData<CarriedForwardItem[]>(
-          ['retro-previous-carried', changedRetroId],
-          (prev) =>
-            Array.isArray(prev)
-              ? prev.filter((item) => item.id !== actionItemId)
-              : prev,
-        )
-        // Also prune the currently viewed retro key as a safety net.
-        queryClient.setQueryData<CarriedForwardItem[]>(
-          ['retro-previous-carried', retroId],
-          (prev) =>
-            Array.isArray(prev)
-              ? prev.filter((item) => item.id !== actionItemId)
-              : prev,
-        )
-      }
-
-      void queryClient.invalidateQueries({
-        queryKey: ['retro-previous-carried', changedRetroId],
-      })
-      void queryClient.invalidateQueries({
-        queryKey: ['retro-previous-carried', retroId],
-      })
-    }
-    socket.on('carried-forward-changed', onCarriedForwardChanged)
-
-    if (socket.connected) {
-      joinRoom()
-    } else {
-      socket.connect()
-    }
-
-    return () => {
-      socket.emit('leave-retro', { retroId })
-      socket.off('retro-changed', onRetroChanged)
-      socket.off('connect', joinRoom)
-      socket.off('discussion-card-changed', onDiscussionCardChanged)
-      socket.off(
-        'discussion-action-item-changed',
-        onDiscussionActionItemChanged,
-      )
-      socket.off('carried-forward-changed', onCarriedForwardChanged)
-    }
-  }, [retroId, queryClient, usesConvexRealtime])
 
   // Derive jobRole from the current user's participant entry (team role for this retro)
   const currentUserJobRole = useMemo(
@@ -614,6 +505,22 @@ function RetroDetailPage() {
   const canControl = Boolean(
     retro.isCreator || retro.isTeamLead || retro.isSystemAdmin,
   )
+  // Phase transitions (open lobby, start, grouping, voting, discussion) are
+  // creator/team-lead only on the server — system-admins are NOT permitted
+  // (unlike complete/delete, which the server does allow admins to do). Gate
+  // those buttons on this narrower flag so an admin never sees a control that
+  // would 403, which otherwise flashes the board open before the rejection.
+  const canControlPhases = Boolean(retro.isCreator || retro.isTeamLead)
+  // Ending (completing) and deleting a retro is permitted for the creator,
+  // team-lead, org-admin, and system-admin — a strictly broader set than the
+  // phase-transition/discussion controls (creator/team-lead only). Mirrors the
+  // server's completeRetro/deleteRetro permission checks.
+  const canComplete = Boolean(
+    retro.isCreator ||
+    retro.isTeamLead ||
+    retro.isOrgAdmin ||
+    retro.isSystemAdmin,
+  )
   const retroStatus = retro.status
   const currentDiscussionCardId = retro.currentDiscussionCardId ?? null
   const retroName = retro.name || 'Untitled Retrospective'
@@ -647,6 +554,7 @@ function RetroDetailPage() {
         />
       ) : null}
       <div className="flex flex-col space-y-3 sm:space-y-4">
+        <RealtimeStatusBanner active={usesConvexRealtime} />
         <RetroHeader
           retroName={retroName}
           retroStatus={retroStatus}
@@ -662,7 +570,8 @@ function RetroDetailPage() {
           timeRemaining={timeRemaining}
           isLobbyTimerActive={isLobbyTimerActive}
           lobbyTimeRemaining={lobbyTimeRemaining}
-          canControl={canControl}
+          canComplete={canComplete}
+          canControlPhases={canControlPhases}
           usesConvexRealtime={usesConvexRealtime}
           readyCount={readyCount}
           startLobbyMutation={startLobbyMutation}
@@ -754,7 +663,7 @@ function RetroDetailPage() {
           <RetroDiscussionView
             retro={retro}
             previousCarriedItems={previousCarriedItems}
-            canControl={canControl}
+            canControl={canControlPhases}
             retroId={retroId}
             discussCardMutation={discussCardMutation}
             markDiscussedMutation={markDiscussedMutation}

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { MusicPlayer } from '@/components/music-player'
+import { RealtimeStatusBanner } from '@/components/realtime-status-banner'
 import { EstimateConvexSync } from './components/estimate-convex-sync'
 import { CompletedSessionReport } from './components/completed-session-report'
 import { ParticipantsPanel } from './components/participants-panel'
@@ -30,7 +31,7 @@ function EstimateSessionPage() {
   const { sessionId } = Route.useParams()
   const navigate = useNavigate()
 
-  const { session, isLoading, isError, usesConvexRealtime } =
+  const { session, isLoading, isError, usesConvexRealtime, onlineUserIds } =
     useEstimateSession(sessionId)
 
   const [selectedPoints, setSelectedPoints] = useState<string | null>(null)
@@ -240,9 +241,17 @@ function EstimateSessionPage() {
           ?.agreedPoints ?? null)
       : null
 
+  // Online state comes from the live Convex presence subscription so join/leave
+  // reflects instantly. Fall back to the board snapshot's `isOnline` only until
+  // the presence subscription first resolves (onlineUserIds === null), avoiding
+  // an empty-list flash on first paint.
+  const isParticipantOnline = (
+    p: (typeof session.participants)[number],
+  ): boolean => (onlineUserIds ? onlineUserIds.has(p.userId) : p.isOnline)
+
   // Sort participants: current user first, then others
   const onlineParticipants = session.participants
-    .filter((p) => p.isOnline)
+    .filter(isParticipantOnline)
     .filter((p, i, arr) => arr.findIndex((x) => x.userId === p.userId) === i)
     .sort((a, b) => {
       // Current user always first
@@ -254,13 +263,19 @@ function EstimateSessionPage() {
   const displayedParticipants = onlineParticipants
   const votedCount = session.votes.length
   const isTimerActive = timeRemaining !== null && timeRemaining > 0
-  const canEndSession = Boolean(session.isCreator || session.canEndSession)
+  // Server already folds the creator into both flags (canManageSession /
+  // canControlSession return true for the creator), so no client-side OR needed.
+  const canEndSession = Boolean(session.canEndSession)
+  // Narrow gate for session-driving controls (reveal/revote/round/consensus):
+  // creator or team lead only. End Session keeps the broader canEndSession gate.
+  const canControl = Boolean(session.canControl)
 
   return (
     <>
       {usesConvexRealtime ? <EstimateConvexSync sessionId={sessionId} /> : null}
       <TooltipProvider>
         <div className="space-y-6">
+          <RealtimeStatusBanner active={usesConvexRealtime} />
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -368,7 +383,7 @@ function EstimateSessionPage() {
                   </>
                 ) : (
                   <span className="text-muted-foreground italic">
-                    {canEndSession
+                    {canControl
                       ? "Click 'Start Round' in the controls below to begin the first round."
                       : 'Waiting for the host to start the first round...'}
                   </span>
@@ -400,14 +415,18 @@ function EstimateSessionPage() {
             stats={stats}
           />
 
-          {/* Controls (for session creator or admins) */}
-          {canEndSession && (
+          {/* Controls — session-driving actions render for creator/team lead
+              (canControl); End Session renders for the broader manage set
+              (canEndSession: creator, team lead, org/system admin). */}
+          {(canControl || canEndSession) && (
             <SessionControls
               session={session}
               voteOptions={voteOptions}
               agreedPoints={agreedPoints}
               stats={stats}
               votedCount={votedCount}
+              canControl={canControl}
+              canEndSession={canEndSession}
               revealVotesMutation={revealVotesMutation}
               revoteMutation={revoteMutation}
               startRoundMutation={startRoundMutation}

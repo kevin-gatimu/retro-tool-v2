@@ -360,12 +360,13 @@ export function getUserColumns(
                   Suspend
                 </DropdownMenuItem>
               )}
-            {user.status === 'suspended' && (
-              <DropdownMenuItem onClick={() => options.onReactivate(user.id)}>
-                <RefreshCw className="mr-2 h-4 w-4 text-green-500" />
-                Reactivate
-              </DropdownMenuItem>
-            )}
+            {user.status === 'suspended' &&
+              !(targetIsSystemAdmin && !viewerIsSuperAdmin) && (
+                <DropdownMenuItem onClick={() => options.onReactivate(user.id)}>
+                  <RefreshCw className="mr-2 h-4 w-4 text-green-500" />
+                  Reactivate
+                </DropdownMenuItem>
+              )}
             {user.status === 'rejected' && (
               <DropdownMenuItem onClick={() => options.onApprove(user.id)}>
                 <UserCheck className="mr-2 h-4 w-4 text-green-500" />

@@ -3,7 +3,7 @@
 NestJS REST API + WebSocket backend for the Retro Tool application. Handles authentication, retrospective board management, story estimate session management, in-app notifications, browser push notifications, analytics reporting, and automated email workflows.
 
 - [License](../LICENSE)
-- [RBAC & Permissions](../docs/RBAC.md)
+- [RBAC & Permissions](../docs/security/rbac.md)
 
 ## Tech Stack
 
@@ -447,6 +447,30 @@ action-item, and discussion-tracking routes — see the controller for the full 
 | `POST`   | `/estimates/:id/send-report` | Email the session results                 |
 
 See [WebSockets — Estimates Gateway](#estimates-gateway) for real-time voting events.
+
+### Icebreakers
+
+> **Sessions are ephemeral.** Ending a session or advancing past the last prompt hard-deletes
+> the row (cascading to prompts + participants). There is no history or archive endpoint.
+
+| Method   | Path                       | Description                                                                     |
+| -------- | -------------------------- | ------------------------------------------------------------------------------- |
+| `GET`    | `/icebreakers`             | List all icebreaker sessions for the current user                               |
+| `GET`    | `/icebreakers/active`      | List active (non-completed) sessions                                            |
+| `GET`    | `/icebreakers/:id`         | Get a single session with deck, participants, and responses                     |
+| `POST`   | `/icebreakers`             | Create a new icebreaker session                                                 |
+| `POST`   | `/icebreakers/:id/join`    | Join a session as a participant                                                 |
+| `POST`   | `/icebreakers/:id/swipe`   | Keep or skip a specific prompt card (facilitator)                               |
+| `POST`   | `/icebreakers/:id/advance` | Advance to next pending prompt, or finish (hard-delete) when deck is exhausted  |
+| `POST`   | `/icebreakers/:id/timer`   | Start a countdown timer for the current prompt                                  |
+| `PATCH`  | `/icebreakers/:id`         | Update session name                                                             |
+| `DELETE` | `/icebreakers/:id`         | End a session — hard-deletes it (no history)                                    |
+
+**Session lifecycle:** `waiting` → `curating` ⇄ `presenting` → hard-deleted when deck exhausted or session ended early.
+
+**Realtime:** session and board state is pushed to Convex (`liveIcebreakerSessions` / `liveIcebreakerBoards`) after every mutation. Live "great answer" reactions during the `presenting` phase travel via a direct Convex path (`liveIcebreakerReactions:sendReaction` public mutation, 15-second self-expiry) — nothing is written to PostgreSQL.
+
+**Who can manage:** session creator, team lead, org admin, or system admin (`canManageSession`).
 
 ### Reports & Analytics (Dashboards v2)
 
@@ -908,4 +932,4 @@ See [LICENSE](../LICENSE) at the repository root.
 
 ## Permissions
 
-See [docs/RBAC.md](../docs/RBAC.md) for the full role and permission matrix covering all user roles, organization roles, team roles, and retro actions.
+See [docs/security/rbac.md](../docs/security/rbac.md) for the full role and permission matrix covering all user roles, organization roles, team roles, and retro actions.

@@ -3,9 +3,9 @@
 The frontend application for the Retro Tool platform — a collaborative agile retrospective, story-estimate, icebreaker, standup, poll, and survey tool. Built with React 19, TanStack Router, TanStack Query, Radix UI, and TailwindCSS 4.
 
 - [License](../LICENSE)
-- [RBAC & Permissions](../docs/RBAC.md)
+- [RBAC & Permissions](../docs/security/rbac.md)
 - [Backend API](../retro-tool-api/README.md)
-- [File naming conventions](../docs/file-naming-conventions.md)
+- [File naming conventions](../docs/guidelines/file-naming-conventions.md)
 
 ---
 
@@ -53,7 +53,7 @@ Source files use **`kebab-case`** file names; the exported symbol keeps its idio
 (`notification-bell.tsx` → `export function NotificationBell()`, `use-current-user.ts` →
 `export function useCurrentUser()`). Files under `routes/` that define routes are named by
 TanStack Router (`index.tsx`, `$teamId.tsx`, `__root.tsx`, …). See
-[docs/file-naming-conventions.md](../docs/file-naming-conventions.md).
+[docs/guidelines/file-naming-conventions.md](../docs/guidelines/file-naming-conventions.md).
 
 ```text
 src/
@@ -217,7 +217,7 @@ authClient.multiSession.{listDeviceSessions, setActive}
 ## RBAC & Permission Gating
 
 The frontend mirrors the backend RBAC system in `src/lib/rbac.ts`. UI elements are shown or hidden
-based on the current user's roles. See [docs/RBAC.md](../docs/RBAC.md) for the full permission matrix.
+based on the current user's roles. See [docs/security/rbac.md](../docs/security/rbac.md) for the full permission matrix.
 
 ### Key Permission Helpers
 
@@ -397,7 +397,7 @@ POST  /api/users/bulk/status { userIds, status }
 
 ## Roles Reference
 
-See [docs/RBAC.md](../docs/RBAC.md) for the full permission matrix.
+See [docs/security/rbac.md](../docs/security/rbac.md) for the full permission matrix.
 
 | Role           | Context | What they can do in the UI                                       |
 | -------------- | ------- | ---------------------------------------------------------------- |

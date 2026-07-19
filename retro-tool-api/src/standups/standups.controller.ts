@@ -29,7 +29,6 @@ import { StandupsQueryService } from './standups-query.service';
 import { StandupsEntriesService } from './standups-entries.service';
 import { StandupsSubmissionsService } from './standups-submissions.service';
 import { StandupsReportService } from './standups-report.service';
-import { StandupsGateway } from './standups.gateway';
 import { StandupsProjectionSyncService } from './standups-projection-sync.service';
 import type { SessionUser } from '../common/types';
 import {
@@ -64,7 +63,6 @@ export class StandupsController {
     private readonly standupsEntriesService: StandupsEntriesService,
     private readonly standupsSubmissionsService: StandupsSubmissionsService,
     private readonly standupsReportService: StandupsReportService,
-    private readonly standupsGateway: StandupsGateway,
     private readonly standupsProjectionSyncService: StandupsProjectionSyncService,
   ) {}
 
@@ -110,7 +108,6 @@ export class StandupsController {
       session.user.id,
       body,
     );
-    this.standupsGateway.emitStandupListChanged();
     return result;
   }
 
@@ -146,8 +143,6 @@ export class StandupsController {
       id,
       body,
     );
-    this.standupsGateway.emitStandupChanged(id);
-    this.standupsGateway.emitStandupListChanged();
     return result;
   }
 
@@ -168,7 +163,6 @@ export class StandupsController {
       id,
     );
     await this.standupsProjectionSyncService.enqueueStandupDelete(id);
-    this.standupsGateway.emitStandupListChanged();
     return result;
   }
 
@@ -218,7 +212,7 @@ export class StandupsController {
       date,
       body,
     );
-    this.standupsGateway.emitEntryChanged(id, date);
+    await this.standupsProjectionSyncService.enqueueEntrySync(id, date);
     return result;
   }
 
@@ -238,7 +232,7 @@ export class StandupsController {
       id,
       date,
     );
-    this.standupsGateway.emitEntryChanged(id, date);
+    await this.standupsProjectionSyncService.enqueueEntrySync(id, date);
     return result;
   }
 
@@ -258,8 +252,7 @@ export class StandupsController {
       id,
       date,
     );
-    this.standupsGateway.emitEntryChanged(id, date);
-    this.standupsGateway.emitStandupListChanged();
+    await this.standupsProjectionSyncService.enqueueEntrySync(id, date);
     return result;
   }
 
@@ -279,8 +272,7 @@ export class StandupsController {
       id,
       date,
     );
-    this.standupsGateway.emitEntryChanged(id, date);
-    this.standupsGateway.emitStandupListChanged();
+    await this.standupsProjectionSyncService.enqueueEntrySync(id, date);
     return result;
   }
 
@@ -325,7 +317,10 @@ export class StandupsController {
       submissionId,
       body,
     );
-    this.standupsGateway.emitEntryChanged(result.standupId, result.date);
+    await this.standupsProjectionSyncService.enqueueEntrySync(
+      result.standupId,
+      result.date,
+    );
     return { id: result.id };
   }
 
@@ -342,7 +337,10 @@ export class StandupsController {
       session.user.id,
       commentId,
     );
-    this.standupsGateway.emitEntryChanged(result.standupId, result.date);
+    await this.standupsProjectionSyncService.enqueueEntrySync(
+      result.standupId,
+      result.date,
+    );
     return { success: true };
   }
 
@@ -367,7 +365,10 @@ export class StandupsController {
       submissionId,
       body.emoji,
     );
-    this.standupsGateway.emitEntryChanged(result.standupId, result.date);
+    await this.standupsProjectionSyncService.enqueueEntrySync(
+      result.standupId,
+      result.date,
+    );
     return { success: true };
   }
 
@@ -387,7 +388,10 @@ export class StandupsController {
       submissionId,
       decodeURIComponent(emoji),
     );
-    this.standupsGateway.emitEntryChanged(result.standupId, result.date);
+    await this.standupsProjectionSyncService.enqueueEntrySync(
+      result.standupId,
+      result.date,
+    );
     return { success: true };
   }
 }

@@ -1,6 +1,6 @@
 # Convex Backend
 
-This package holds the Convex realtime projection layer for the Retro Tool platform. It is **self-hosted** everywhere: locally it runs in a Docker container, and staging runs the same self-hosted backend on Azure App Service (see [docs/CONVEX-AZURE-SELF-HOSTING-PLAN.md](../docs/CONVEX-AZURE-SELF-HOSTING-PLAN.md) and [docs/convex-staging-deployment-runbook.md](../docs/convex-staging-deployment-runbook.md)). Convex Cloud is not the deployment path; it survives only as a historical/rollback reference in the env templates.
+This package holds the Convex realtime projection layer for the Retro Tool platform. It is **self-hosted** everywhere: locally it runs in a Docker container, and staging runs the same self-hosted backend on Azure App Service (see [docs/deployment/convex-azure-self-hosting-plan.md](../docs/deployment/convex-azure-self-hosting-plan.md) and [docs/deployment/convex-staging-runbook.md](../docs/deployment/convex-staging-runbook.md)). Convex Cloud is not the deployment path; it survives only as a historical/rollback reference in the env templates.
 
 ---
 
@@ -113,7 +113,7 @@ pnpm deploy         # deploys functions to the configured (self-hosted) deployme
 | `JWT_AUDIENCE` | `convex` (the token `aud` / `applicationID`) |
 | `JWT_JWKS_URL` | The API's JWKS endpoint (from the container, use `host.docker.internal`/the compose service name, not `localhost`) |
 
-After verification, `ctx.auth.getUserIdentity().subject` is the Better Auth user id stored in projections. This is distinct from the admin-key path the NestJS sync service uses for projection writes. See [docs/convex-nestjs-auth.md](../docs/convex-nestjs-auth.md).
+After verification, `ctx.auth.getUserIdentity().subject` is the Better Auth user id stored in projections. This is distinct from the admin-key path the NestJS sync service uses for projection writes. See [docs/security/convex-nestjs-auth.md](../docs/security/convex-nestjs-auth.md).
 
 ---
 

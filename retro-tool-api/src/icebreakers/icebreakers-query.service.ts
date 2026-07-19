@@ -6,17 +6,7 @@ import {
 } from '@nestjs/common';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import {
-  eq,
-  and,
-  inArray,
-  count,
-  desc,
-  asc,
-  ilike,
-  or,
-  type SQL,
-} from 'drizzle-orm';
+import { eq, and, inArray, asc } from 'drizzle-orm';
 import * as icebreakersSchema from './schema';
 import * as teamSchema from '../teams/schema';
 import * as authSchema from '../auth/schema';
@@ -24,9 +14,6 @@ import * as orgSchema from '../organizations/schema';
 import {
   ICEBREAKER_SESSION_STATUSES,
   ICEBREAKER_PROMPT_DECISIONS,
-  USER_ROLES,
-  ORG_MEMBER_ROLES,
-  TEAM_MEMBER_TAGS,
 } from '../common/enums';
 import type {
   DeckPromptView,
@@ -44,11 +31,12 @@ type Database = NodePgDatabase<
 >;
 
 /**
- * Read-heavy icebreaker list / detail / history queries. Split out of
- * IcebreakersService (which was ~1,050 lines) since the session aggregation
- * builders are a self-contained read concern; the mutating lifecycle and the
- * permission helpers stay in IcebreakersService, which this service reuses for
- * the `canManage` flag.
+ * Read-heavy icebreaker list / detail queries. Split out of IcebreakersService
+ * (which was ~1,050 lines) since the session aggregation builders are a
+ * self-contained read concern; the mutating lifecycle and the permission
+ * helpers stay in IcebreakersService, which this service reuses for the
+ * `canManage` flag. Icebreakers are ephemeral (ended sessions are deleted), so
+ * there is no history/archive query here.
  */
 @Injectable()
 export class IcebreakersQueryService {
@@ -293,203 +281,5 @@ export class IcebreakersQueryService {
       currentPrompt,
       pendingCount,
     };
-  }
-
-  // ==========================================================================
-  // History
-  // ==========================================================================
-
-  async getHistory(
-    userId: string,
-    page = 1,
-    limit = 15,
-    teamId?: string,
-    search?: string,
-  ): Promise<{
-    sessions: {
-      id: string;
-      name: string;
-      teamId: string;
-      teamName: string | null;
-      teamEmoji: string | null;
-      orgId: string | null;
-      orgName: string | null;
-      participantCount: number;
-      promptCount: number;
-      keptCount: number;
-      updatedAt: Date;
-      createdAt: Date;
-      canDelete: boolean;
-    }[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
-    const normalizedSearch = search?.trim();
-
-    const [fullUser] = await this.database
-      .select({ role: authSchema.user.role })
-      .from(authSchema.user)
-      .where(eq(authSchema.user.id, userId))
-      .limit(1);
-
-    const isAdmin =
-      fullUser?.role === USER_ROLES.SuperAdmin ||
-      fullUser?.role === USER_ROLES.SystemAdmin;
-
-    let allUserTeamMemberships: { teamId: string; tag: string }[] = [];
-    let allowedTeamIds: string[] | null = null;
-    if (!isAdmin) {
-      allUserTeamMemberships = await this.database
-        .select({
-          teamId: teamSchema.teamMember.teamId,
-          tag: teamSchema.teamMember.tag,
-        })
-        .from(teamSchema.teamMember)
-        .where(eq(teamSchema.teamMember.userId, userId));
-      allowedTeamIds = allUserTeamMemberships.map((m) => m.teamId);
-      if (allowedTeamIds.length === 0) {
-        return { sessions: [], total: 0, page, limit };
-      }
-    }
-
-    let adminOrgIds = new Set<string>();
-    let leadTeamIds = new Set<string>();
-    if (!isAdmin) {
-      const orgMemberships = await this.database
-        .select({
-          organizationId: orgSchema.organizationMember.organizationId,
-          role: orgSchema.organizationMember.role,
-        })
-        .from(orgSchema.organizationMember)
-        .where(eq(orgSchema.organizationMember.userId, userId));
-
-      adminOrgIds = new Set(
-        orgMemberships
-          .filter(
-            (m) =>
-              m.role === ORG_MEMBER_ROLES.Owner ||
-              m.role === ORG_MEMBER_ROLES.Admin,
-          )
-          .map((m) => m.organizationId),
-      );
-
-      leadTeamIds = new Set(
-        allUserTeamMemberships
-          .filter((m) => m.tag === TEAM_MEMBER_TAGS.Lead)
-          .map((m) => m.teamId),
-      );
-    }
-
-    const conditions: SQL[] = [
-      eq(
-        icebreakersSchema.icebreakerSession.status,
-        ICEBREAKER_SESSION_STATUSES.Completed,
-      ),
-    ];
-    if (teamId)
-      conditions.push(eq(icebreakersSchema.icebreakerSession.teamId, teamId));
-    if (allowedTeamIds) {
-      conditions.push(
-        inArray(icebreakersSchema.icebreakerSession.teamId, allowedTeamIds),
-      );
-    }
-    if (normalizedSearch) {
-      conditions.push(
-        or(
-          ilike(
-            icebreakersSchema.icebreakerSession.name,
-            `%${normalizedSearch}%`,
-          ),
-          ilike(teamSchema.team.name, `%${normalizedSearch}%`),
-          ilike(orgSchema.organization.name, `%${normalizedSearch}%`),
-        )!,
-      );
-    }
-
-    const whereClause = and(...conditions);
-
-    const [totalRow] = await this.database
-      .select({ total: count() })
-      .from(icebreakersSchema.icebreakerSession)
-      .leftJoin(
-        teamSchema.team,
-        eq(icebreakersSchema.icebreakerSession.teamId, teamSchema.team.id),
-      )
-      .leftJoin(
-        orgSchema.organization,
-        eq(teamSchema.team.organizationId, orgSchema.organization.id),
-      )
-      .where(whereClause);
-
-    const rows = await this.database
-      .select({
-        id: icebreakersSchema.icebreakerSession.id,
-        name: icebreakersSchema.icebreakerSession.name,
-        teamId: icebreakersSchema.icebreakerSession.teamId,
-        teamName: teamSchema.team.name,
-        teamEmoji: teamSchema.team.emoji,
-        orgId: teamSchema.team.organizationId,
-        orgName: orgSchema.organization.name,
-        updatedAt: icebreakersSchema.icebreakerSession.updatedAt,
-        createdAt: icebreakersSchema.icebreakerSession.createdAt,
-      })
-      .from(icebreakersSchema.icebreakerSession)
-      .leftJoin(
-        teamSchema.team,
-        eq(icebreakersSchema.icebreakerSession.teamId, teamSchema.team.id),
-      )
-      .leftJoin(
-        orgSchema.organization,
-        eq(teamSchema.team.organizationId, orgSchema.organization.id),
-      )
-      .where(whereClause)
-      .orderBy(desc(icebreakersSchema.icebreakerSession.updatedAt))
-      .limit(limit)
-      .offset((page - 1) * limit);
-
-    const sessions = await Promise.all(
-      rows.map(async (row) => {
-        const [pc] = await this.database
-          .select({ total: count() })
-          .from(icebreakersSchema.icebreakerParticipant)
-          .where(eq(icebreakersSchema.icebreakerParticipant.sessionId, row.id));
-
-        const [promptCountRow] = await this.database
-          .select({ total: count() })
-          .from(icebreakersSchema.icebreakerSessionPrompt)
-          .where(
-            eq(icebreakersSchema.icebreakerSessionPrompt.sessionId, row.id),
-          );
-
-        const [keptCountRow] = await this.database
-          .select({ total: count() })
-          .from(icebreakersSchema.icebreakerSessionPrompt)
-          .where(
-            and(
-              eq(icebreakersSchema.icebreakerSessionPrompt.sessionId, row.id),
-              eq(
-                icebreakersSchema.icebreakerSessionPrompt.decision,
-                ICEBREAKER_PROMPT_DECISIONS.Kept,
-              ),
-            ),
-          );
-
-        const canDelete =
-          isAdmin ||
-          (row.orgId !== null && adminOrgIds.has(row.orgId)) ||
-          leadTeamIds.has(row.teamId);
-
-        return {
-          ...row,
-          participantCount: pc?.total ?? 0,
-          promptCount: promptCountRow?.total ?? 0,
-          keptCount: keptCountRow?.total ?? 0,
-          canDelete,
-        };
-      }),
-    );
-
-    return { sessions, total: totalRow?.total ?? 0, page, limit };
   }
 }

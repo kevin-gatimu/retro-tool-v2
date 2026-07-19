@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { api } from '@/lib/api'
 import { TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { TeamDetail, TeamMember } from '@/common/types/teams'
+import { useCurrentUser } from '@/hooks/use-current-user'
 import { useUserSearch } from './hooks/use-user-search'
 import {
   useOrgTeamRoles,
@@ -41,6 +42,7 @@ function TeamDetailPage() {
 
   const { data: team } = useTeamDetail(teamId)
   const { data: organization } = useTeamOrganization(team.organizationId)
+  const { data: currentUser } = useCurrentUser()
 
   // Dialog states
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -189,6 +191,8 @@ function TeamDetailPage() {
         teamId={teamId}
         displayedMemberCount={displayedMemberCount}
         canManage={canManage}
+        viewerIsOrgAdminOrAbove={isOrgAdmin || team.isSystemAdmin}
+        viewerUserId={currentUser?.id ?? null}
         canSeeMembers={canSeeMembers}
         isMember={isMember}
         isOrgAdmin={isOrgAdmin}

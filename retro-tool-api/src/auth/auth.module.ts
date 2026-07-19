@@ -7,6 +7,7 @@ import { DatabaseModule } from '../database/database.module';
 import { createAuth } from './auth.config';
 import { AuthController } from './auth.controller';
 import { SignupCleanupMiddleware } from './auth-signup.middleware';
+import { JwtAlignmentService } from './jwt-alignment.service';
 import { OtpController } from './otp/otp.controller';
 import { OtpService } from './otp/otp.service';
 
@@ -14,8 +15,8 @@ import { OtpService } from './otp/otp.service';
   imports: [
     DatabaseModule,
     BetterAuthModule.forRootAsync({
-      // isGlobal so AuthService is injectable app-wide (e.g. in WsAuthService /
-      // the realtime gateways) without re-importing BetterAuthModule everywhere.
+      // isGlobal so AuthService is injectable app-wide without re-importing
+      // BetterAuthModule in every feature module.
       isGlobal: true,
       useFactory: (configService: ConfigService<Config>) => ({
         auth: createAuth(configService),
@@ -24,8 +25,8 @@ import { OtpService } from './otp/otp.service';
     }),
   ],
   controllers: [AuthController, OtpController],
-  providers: [OtpService],
-  exports: [BetterAuthModule],
+  providers: [OtpService, JwtAlignmentService],
+  exports: [BetterAuthModule, JwtAlignmentService],
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

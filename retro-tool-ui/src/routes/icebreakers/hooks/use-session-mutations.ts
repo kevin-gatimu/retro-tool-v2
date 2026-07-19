@@ -3,8 +3,6 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { ICEBREAKERS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { TIcebreakerPromptDecision } from '@/common/enums/icebreaker.enums'
-import { getIcebreakerSocket } from '@/lib/socket'
-import { usesConvexForIcebreakers } from '@/lib/realtime-config'
 
 /**
  * `onEnded` fires after the session is ended so the caller can leave the
@@ -15,7 +13,6 @@ export function useSessionMutations(
   options?: { onEnded?: () => void },
 ) {
   const queryClient = useQueryClient()
-  const usesConvexRealtime = usesConvexForIcebreakers()
 
   const refetchSession = () => {
     void queryClient.refetchQueries({
@@ -23,30 +20,21 @@ export function useSessionMutations(
     })
   }
 
-  // The list page caches ongoing/completed sessions (staleTime 30s), so any
-  // mutation that can complete a session must invalidate those keys or the
-  // session keeps showing as ongoing until a hard reload.
+  // The list page caches the active sessions (staleTime 30s), so any mutation
+  // that ends/finishes a session must invalidate that key or it keeps showing
+  // as active until a hard reload. Icebreakers are ephemeral — there is no
+  // history list to invalidate.
   const invalidateSessionLists = () => {
     void queryClient.invalidateQueries({
       queryKey: ['active-icebreaker-sessions'],
     })
-    void queryClient.invalidateQueries({ queryKey: ['icebreaker-history'] })
   }
 
   const swipePromptMutation = useMutation({
     mutationFn: (input: {
       decision: TIcebreakerPromptDecision
       sessionPromptId: string
-    }) => {
-      const httpPromise = api.post(
-        ICEBREAKERS_ENDPOINTS.SWIPE(sessionId),
-        input,
-      )
-      if (!usesConvexRealtime) {
-        getIcebreakerSocket().emit('swipe-prompt', { sessionId, ...input })
-      }
-      return httpPromise
-    },
+    }) => api.post(ICEBREAKERS_ENDPOINTS.SWIPE(sessionId), input),
     onSuccess: () => {
       refetchSession()
     },
@@ -57,11 +45,18 @@ export function useSessionMutations(
   })
 
   const advancePromptMutation = useMutation({
-    mutationFn: () => api.post(ICEBREAKERS_ENDPOINTS.ADVANCE(sessionId)),
-    onSuccess: () => {
-      refetchSession()
-      // "Finish" (advance past the last prompt) completes the session.
+    mutationFn: () =>
+      api.post<{ ended: boolean }>(ICEBREAKERS_ENDPOINTS.ADVANCE(sessionId)),
+    onSuccess: (result) => {
       invalidateSessionLists()
+      // "Finish" (advance past the last prompt) deletes the session — leave the
+      // runtime instead of refetching a now-missing session (which would 404).
+      if (result.ended) {
+        toast.success('Icebreaker finished')
+        options?.onEnded?.()
+        return
+      }
+      refetchSession()
     },
     onError: (error: Error) => {
       refetchSession()

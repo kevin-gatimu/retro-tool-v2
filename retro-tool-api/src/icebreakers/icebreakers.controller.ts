@@ -7,7 +7,6 @@ import {
   Param,
   ParseUUIDPipe,
   Body,
-  Query,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
@@ -23,9 +22,8 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { IcebreakersService } from './icebreakers.service';
 import { IcebreakersQueryService } from './icebreakers-query.service';
 import { IcebreakersCreationService } from './icebreakers-creation.service';
-import { IcebreakersGateway } from './icebreakers.gateway';
 import { IcebreakersProjectionSyncService } from './icebreakers-projection-sync.service';
-import { StandupsGateway } from '../standups/standups.gateway';
+import { StandupsProjectionSyncService } from '../standups/standups-projection-sync.service';
 import type { SessionUser } from '../common/types';
 import {
   CreateIcebreakerSessionSchema,
@@ -56,19 +54,21 @@ export class IcebreakersController {
     private readonly icebreakersService: IcebreakersService,
     private readonly icebreakersQueryService: IcebreakersQueryService,
     private readonly icebreakersCreationService: IcebreakersCreationService,
-    private readonly icebreakersGateway: IcebreakersGateway,
     private readonly icebreakersProjectionSyncService: IcebreakersProjectionSyncService,
-    private readonly standupsGateway: StandupsGateway,
+    private readonly standupsProjectionSync: StandupsProjectionSyncService,
   ) {}
 
   /**
    * Sessions attached to a standup day appear in that room's feed, so any
    * mutation must also refresh the standup entry for everyone in the room.
    */
-  private async emitStandupIfAttached(sessionId: string): Promise<void> {
+  private async resyncStandupIfAttached(sessionId: string): Promise<void> {
     const link = await this.icebreakersService.getStandupLink(sessionId);
     if (link) {
-      this.standupsGateway.emitEntryChanged(link.standupId, link.entryDate);
+      await this.standupsProjectionSync.enqueueEntrySync(
+        link.standupId,
+        link.entryDate,
+      );
     }
   }
 
@@ -86,27 +86,6 @@ export class IcebreakersController {
   @ApiResponse({ status: 200, description: 'Active session list' })
   getActiveSessions(@Session() session: SessionUser) {
     return this.icebreakersQueryService.getActiveSessions(session.user.id);
-  }
-
-  @Get('history')
-  @ApiOperation({
-    summary: 'List completed icebreaker sessions (paginated, role-scoped)',
-  })
-  @ApiResponse({ status: 200, description: 'Completed session history' })
-  getHistory(
-    @Session() session: SessionUser,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('teamId') teamId?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.icebreakersQueryService.getHistory(
-      session.user.id,
-      page ? Math.max(1, parseInt(page, 10)) : 1,
-      limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 15,
-      teamId,
-      search,
-    );
   }
 
   @Get(':id')
@@ -135,8 +114,8 @@ export class IcebreakersController {
       session.user.id,
       body,
     );
-    this.icebreakersGateway.emitSessionChanged(result.id);
-    await this.emitStandupIfAttached(result.id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(result.id);
+    await this.resyncStandupIfAttached(result.id);
     return result;
   }
 
@@ -151,8 +130,8 @@ export class IcebreakersController {
       session.user.id,
       true,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
-    await this.emitStandupIfAttached(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
+    await this.resyncStandupIfAttached(id);
     return result;
   }
 
@@ -173,25 +152,40 @@ export class IcebreakersController {
       body.decision,
       body.sessionPromptId,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
-    await this.emitStandupIfAttached(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
+    await this.resyncStandupIfAttached(id);
     return result;
   }
 
   @Post(':id/advance')
   @ApiOperation({
-    summary: 'Advance to the next pending prompt or complete the session',
+    summary:
+      'Advance to the next pending prompt or finish (delete) the session',
   })
   async advancePrompt(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
+    // Capture the standup link before advancing — finishing deletes the row,
+    // and the room feed still needs a resync afterwards.
+    const link = await this.icebreakersService.getStandupLink(id);
     const result = await this.icebreakersService.advancePrompt(
       id,
       session.user.id,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
-    await this.emitStandupIfAttached(id);
+    // Finishing hard-deletes the session, so remove its projection rather than
+    // re-syncing a row that no longer exists.
+    if (result.ended) {
+      await this.icebreakersProjectionSyncService.enqueueSessionDelete(id);
+    } else {
+      await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
+    }
+    if (link) {
+      await this.standupsProjectionSync.enqueueEntrySync(
+        link.standupId,
+        link.entryDate,
+      );
+    }
     return result;
   }
 
@@ -209,7 +203,7 @@ export class IcebreakersController {
       session.user.id,
       body.duration,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
     return result;
   }
 
@@ -225,42 +219,34 @@ export class IcebreakersController {
       id,
       body.name,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
-    await this.emitStandupIfAttached(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
+    await this.resyncStandupIfAttached(id);
     return result;
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'End an icebreaker session (mark completed)' })
+  @ApiOperation({
+    summary: 'End an icebreaker session (deletes it — no history)',
+  })
   async endSession(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
+    // Capture the standup link before the row is deleted so the room feed can
+    // still be refreshed afterwards.
+    const link = await this.icebreakersService.getStandupLink(id);
     const result = await this.icebreakersService.endSession(
       id,
       session.user.id,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
-    await this.emitStandupIfAttached(id);
-    return result;
-  }
-
-  @Delete(':id/permanent')
-  @ApiOperation({ summary: 'Permanently delete an icebreaker session' })
-  async deleteSession(
-    @Session() session: SessionUser,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    // Capture the standup link before the row is gone so we can still refresh
-    // the room feed after deletion.
-    const link = await this.icebreakersService.getStandupLink(id);
-    const result = await this.icebreakersService.deleteSession(
-      id,
-      session.user.id,
-    );
+    // Ending hard-deletes the session, so remove its Convex projection (and the
+    // per-member board rows) rather than re-syncing a now-missing row.
     await this.icebreakersProjectionSyncService.enqueueSessionDelete(id);
     if (link) {
-      this.standupsGateway.emitEntryChanged(link.standupId, link.entryDate);
+      await this.standupsProjectionSync.enqueueEntrySync(
+        link.standupId,
+        link.entryDate,
+      );
     }
     return result;
   }

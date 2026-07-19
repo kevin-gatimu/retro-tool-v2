@@ -2,13 +2,15 @@ import confetti from 'canvas-confetti'
 import type { Options, Shape } from 'canvas-confetti'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import type { ReactionKind } from '../types'
 
 // Three "good answer" reactions with escalating intensity:
 //   Celebrate = good · Applause = better · Fire = best.
-// Each fires a burst that launches UP from the clicked button (emoji + paper
-// confetti). Local-only — in a screen-share that's all everyone sees anyway.
+// Each fires a burst that launches UP (emoji + paper confetti). A click fires
+// locally from the button AND broadcasts over Convex, so every participant sees
+// the same burst — see use-icebreaker-reactions.
 type Celebration = {
-  kind: 'celebrate' | 'applause' | 'fire'
+  kind: ReactionKind
   label: string
   buttonEmoji: string
   emojis: string[]
@@ -67,6 +69,12 @@ function emojiShapes(emojis: string[]): Shape[] {
   return shapes
 }
 
+const CELEBRATION_BY_KIND: Record<ReactionKind, Celebration> = {
+  celebrate: CELEBRATIONS[0],
+  applause: CELEBRATIONS[1],
+  fire: CELEBRATIONS[2],
+}
+
 // Normalised viewport origin (0–1) at the centre of the clicked button, so the
 // burst visibly launches from the button itself.
 function originFromElement(el: HTMLElement): { x: number; y: number } {
@@ -77,9 +85,18 @@ function originFromElement(el: HTMLElement): { x: number; y: number } {
   }
 }
 
-function fireCelebration(celebration: Celebration, el: HTMLElement) {
+/**
+ * Fire a reaction's confetti burst at a normalised viewport origin (0–1).
+ * Exported so remote reactions (from other participants, via the Convex
+ * subscription) can launch the same burst from a sensible default origin.
+ */
+export function fireReactionBurst(
+  kind: ReactionKind,
+  origin: { x: number; y: number },
+): void {
+  const celebration = CELEBRATION_BY_KIND[kind]
   const base: Options = {
-    origin: originFromElement(el),
+    origin,
     angle: 90, // straight up
     startVelocity: celebration.startVelocity,
     spread: celebration.spread,
@@ -87,7 +104,7 @@ function fireCelebration(celebration: Celebration, el: HTMLElement) {
     ticks: 220,
   }
 
-  // Paper-confetti layer rising from the button.
+  // Paper-confetti layer rising from the origin.
   confetti({
     ...base,
     particleCount: celebration.particleCount,
@@ -108,9 +125,15 @@ function fireCelebration(celebration: Celebration, el: HTMLElement) {
 
 interface CelebrationBarProps {
   className?: string
+  /**
+   * Called with the reaction kind when a button is clicked, so the parent can
+   * broadcast it to other participants. The local burst always fires from the
+   * clicked button regardless.
+   */
+  onReact?: (kind: ReactionKind) => void
 }
 
-export function CelebrationBar({ className }: CelebrationBarProps) {
+export function CelebrationBar({ className, onReact }: CelebrationBarProps) {
   return (
     <div
       className={cn('flex items-center justify-center gap-3', className)}
@@ -123,7 +146,13 @@ export function CelebrationBar({ className }: CelebrationBarProps) {
           variant="outline"
           size="lg"
           className="gap-2 text-base"
-          onClick={(event) => fireCelebration(celebration, event.currentTarget)}
+          onClick={(event) => {
+            fireReactionBurst(
+              celebration.kind,
+              originFromElement(event.currentTarget),
+            )
+            onReact?.(celebration.kind)
+          }}
         >
           <span aria-hidden="true">{celebration.buttonEmoji}</span>
           {celebration.label}

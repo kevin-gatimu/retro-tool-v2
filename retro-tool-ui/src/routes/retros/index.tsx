@@ -42,7 +42,6 @@ import { RETROS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { Retro } from '@/common/types/retros'
 import { authClient } from '@/lib/auth-client'
 import { usesConvexForRetros } from '@/lib/realtime-config'
-import { getRetroSocket } from '@/lib/socket'
 import { RetroListConvexSync } from './components/retro-list-convex-sync'
 import { ViewConfigToolbar } from '@/components/spaces/view-config-toolbar'
 import { GroupedSessionView } from '@/components/spaces/grouped-session-view'
@@ -209,26 +208,6 @@ function RetrosPage() {
       deleteRetroMutation.mutate(retroToDelete.id)
     }
   }
-
-  useEffect(() => {
-    if (usesConvexRealtime) return
-
-    const socket = getRetroSocket()
-
-    const onRetroListChanged = () => {
-      void queryClient.invalidateQueries({ queryKey: ['retros'] })
-    }
-
-    socket.on('retro-list-changed', onRetroListChanged)
-
-    if (!socket.connected) {
-      socket.connect()
-    }
-
-    return () => {
-      socket.off('retro-list-changed', onRetroListChanged)
-    }
-  }, [queryClient, usesConvexRealtime])
 
   const renderRetroCard = (retro: Retro) => (
     <Card className="hover:border-primary/50 transition-colors relative h-full">

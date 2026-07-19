@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft,
   ArrowRight,
@@ -7,7 +7,8 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -32,18 +33,20 @@ import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 import { api } from '@/lib/api'
-import { getIcebreakerSocket } from '@/lib/socket'
 import { ICEBREAKERS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { IcebreakerSession } from '@/common/types/icebreakers'
 import { ICEBREAKER_SESSION_STATUSES } from '@/common/enums/icebreaker.enums'
 import type { TIcebreakerPromptDecision } from '@/common/enums/icebreaker.enums'
 import { usesConvexForIcebreakers } from '@/lib/realtime-config'
 import { CelebrationBar } from '@/routes/icebreakers/components/celebration-bar'
+import type { ReactionKind } from '@/routes/icebreakers/types'
 import { IcebreakerConvexSync } from '@/routes/icebreakers/components/icebreaker-convex-sync'
 import { SwipeDeck } from '@/routes/icebreakers/components/swipe-deck'
 import { IcebreakerSessionDetailSkeleton } from '@/routes/icebreakers/skeleton'
 import { STATUS_LABELS } from '@/routes/icebreakers/helpers'
 import { useSessionMutations } from '@/routes/icebreakers/hooks/use-session-mutations'
+import { useIcebreakerReactions } from '@/routes/icebreakers/hooks/use-icebreaker-reactions'
+import { useIcebreakerSessionGone } from '@/routes/icebreakers/hooks/use-icebreaker-session-gone'
 
 /**
  * `page` renders the standalone route with its own back affordance; `embedded`
@@ -56,23 +59,21 @@ interface IcebreakerRunnerProps {
   variant?: RunnerVariant
   /**
    * Leave the runner. Standalone navigates back to the list; embedded closes
-   * the modal. Also fired when the host ends the session, or a realtime
-   * `session-ended` arrives.
+   * the modal. Also fired when the host ends the session.
    */
   onExit: () => void
 }
 
 /**
- * Portable icebreaker runtime: joins the session, keeps it live (Convex or
- * socket), and drives the curating → presenting → completed phases. Reused by
- * the standalone `/icebreakers/$sessionId` route and the standup-room modal.
+ * Portable icebreaker runtime: joins the session, keeps it live via Convex,
+ * and drives the curating → presenting → completed phases. Reused by the
+ * standalone `/icebreakers/$sessionId` route and the standup-room modal.
  */
 export function IcebreakerRunner({
   sessionId,
   variant = 'page',
   onExit,
 }: IcebreakerRunnerProps) {
-  const queryClient = useQueryClient()
   const usesConvexRealtime = usesConvexForIcebreakers()
 
   // Join session on mount.
@@ -93,46 +94,6 @@ export function IcebreakerRunner({
     staleTime: 30_000,
     refetchInterval: usesConvexRealtime ? false : 5_000,
   })
-
-  useEffect(() => {
-    if (usesConvexRealtime) {
-      return
-    }
-
-    const socket = getIcebreakerSocket()
-    const joinRoom = () => socket.emit('join-session', { sessionId })
-
-    const onSessionChanged = () => {
-      void queryClient.refetchQueries({
-        queryKey: ['icebreaker-session', sessionId],
-      })
-    }
-    const onSessionEnded = () => {
-      // Drop stale list caches so the ended session doesn't linger as ongoing.
-      void queryClient.invalidateQueries({
-        queryKey: ['active-icebreaker-sessions'],
-      })
-      void queryClient.invalidateQueries({ queryKey: ['icebreaker-history'] })
-      onExit()
-    }
-
-    socket.on('session-changed', onSessionChanged)
-    socket.on('session-ended', onSessionEnded)
-    socket.on('connect', joinRoom)
-
-    if (socket.connected) {
-      joinRoom()
-    } else {
-      socket.connect()
-    }
-
-    return () => {
-      socket.emit('leave-session', { sessionId })
-      socket.off('session-changed', onSessionChanged)
-      socket.off('session-ended', onSessionEnded)
-      socket.off('connect', joinRoom)
-    }
-  }, [sessionId, queryClient, onExit, usesConvexRealtime])
 
   const sync = usesConvexRealtime ? (
     <IcebreakerConvexSync sessionId={sessionId} />
@@ -191,7 +152,21 @@ function SessionView({
 }) {
   const { swipePromptMutation, advancePromptMutation, endSessionMutation } =
     useSessionMutations(sessionId, { onEnded: onExit })
+  // Live "great answer" reactions — broadcast to and received from everyone.
+  const { send: sendReaction } = useIcebreakerReactions(sessionId)
   const [endConfirmOpen, setEndConfirmOpen] = useState(false)
+
+  // Ending or finishing hard-deletes the session. The host who triggered it
+  // leaves via the mutation callbacks; this catches everyone ELSE — when the
+  // session's projection disappears, eject them cleanly instead of stranding
+  // them on a dead session.
+  const handleSessionGone = useCallback(() => {
+    toast.info('Icebreaker ended', {
+      description: 'The host ended this session.',
+    })
+    onExit()
+  }, [onExit])
+  useIcebreakerSessionGone(sessionId, handleSessionGone)
 
   const pending = session.deck.filter((p) => p.decision === 'pending')
   const kept = session.deck.filter((p) => p.decision === 'kept')
@@ -282,6 +257,7 @@ function SessionView({
         decidePending={swipePromptMutation.isPending}
         onAdvance={() => advancePromptMutation.mutate()}
         advancePending={advancePromptMutation.isPending}
+        onReact={sendReaction}
       />
 
       {onlineParticipants.length > 0 && !isCompleted && (
@@ -356,6 +332,7 @@ interface PhaseContentProps {
   decidePending: boolean
   onAdvance: () => void
   advancePending: boolean
+  onReact: (kind: ReactionKind) => void
 }
 
 function PhaseContent({
@@ -367,6 +344,7 @@ function PhaseContent({
   decidePending,
   onAdvance,
   advancePending,
+  onReact,
 }: PhaseContentProps) {
   const { canManage } = session
   const currentPrompt = session.currentPrompt
@@ -439,8 +417,9 @@ function PhaseContent({
             </CardContent>
           </Card>
 
-          {/* Anyone can react to a great answer — fires a local confetti burst. */}
-          <CelebrationBar />
+          {/* Anyone can react to a great answer — fires a confetti burst
+              locally and broadcasts it to every participant. */}
+          <CelebrationBar onReact={onReact} />
 
           {canManage && (
             <div className="flex items-center justify-end gap-3">

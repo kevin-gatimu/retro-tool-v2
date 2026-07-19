@@ -703,10 +703,11 @@ export class OrganizationsService {
   ) {
     const isAdmin = await this.isSystemAdmin(userId);
     const isOwner = await this.isOrgOwner(userId, orgId);
+    const isOrgAdmin = await this.isOrgAdmin(userId, orgId);
 
-    if (!isAdmin && !isOwner) {
+    if (!isAdmin && !isOwner && !isOrgAdmin) {
       throw new ForbiddenException(
-        'Only system admins and organization owners can update member roles',
+        'Only system admins and organization owners/admins can update member roles',
       );
     }
 
@@ -723,6 +724,17 @@ export class OrganizationsService {
 
     if (!member) {
       throw new NotFoundException('Member not found');
+    }
+
+    // Owner guard: an org-admin (who is neither the owner nor a system admin)
+    // may only set roles among {member, org-admin} on non-owner members. They
+    // must not modify the owner's role — only owner/system-admin can create or
+    // change an owner. (The assignable-role type already excludes granting
+    // `org-owner`, so this only needs to protect the existing owner row.)
+    if (!isAdmin && !isOwner && member.role === ORG_MEMBER_ROLES.Owner) {
+      throw new ForbiddenException(
+        'Only system admins and organization owners can change the owner role',
+      );
     }
 
     const [updated] = await this.database

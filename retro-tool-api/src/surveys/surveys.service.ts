@@ -70,8 +70,10 @@ export class SurveysService {
         );
       }
     } else {
-      if (!isSystemAdmin(ctx.role) && !ctx.leadTeamIds.includes(data.teamId!)) {
-        throw new ForbiddenException('Only team leads can create team surveys');
+      if (!isSystemAdmin(ctx.role) && !ctx.teamIds.includes(data.teamId!)) {
+        throw new ForbiddenException(
+          'Only team members can create team surveys',
+        );
       }
     }
 

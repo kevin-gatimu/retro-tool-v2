@@ -83,16 +83,23 @@ export const projectionOutbox = pgTable(
       .default('pending'),
     attempts: integer('attempts').notNull().default(0),
     lastError: text('last_error'),
+    // Earliest time this row is eligible for (re)delivery. Set to now() on
+    // enqueue and pushed into the future with exponential backoff after a failed
+    // attempt, so a persistently-failing row stops head-of-lining the
+    // oldest-first queue and hammering an already-struggling Convex backend.
+    nextAttemptAt: timestamp('next_attempt_at')
+      .notNull()
+      .$defaultFn(() => new Date()),
     createdAt: timestamp('created_at')
       .notNull()
       .$defaultFn(() => new Date()),
     dispatchedAt: timestamp('dispatched_at'),
   },
   (table) => [
-    // Dispatcher scans pending rows oldest-first.
-    index('projection_outbox_status_created_idx').on(
+    // Dispatcher scans pending rows that are due, oldest-first.
+    index('projection_outbox_status_next_attempt_idx').on(
       table.status,
-      table.createdAt,
+      table.nextAttemptAt,
     ),
     index('projection_outbox_dedupe_idx').on(table.dedupeKey),
     index('projection_outbox_projection_idx').on(table.projection),

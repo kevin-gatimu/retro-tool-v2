@@ -47,7 +47,8 @@ interface RetroHeaderProps {
   timeRemaining: number | null
   isLobbyTimerActive: boolean
   lobbyTimeRemaining: number | null
-  canControl: boolean
+  canComplete: boolean
+  canControlPhases: boolean
   usesConvexRealtime: boolean
   readyCount: number
   startLobbyMutation: Mutation
@@ -79,7 +80,8 @@ export function RetroHeader({
   timeRemaining,
   isLobbyTimerActive,
   lobbyTimeRemaining,
-  canControl,
+  canComplete,
+  canControlPhases,
   usesConvexRealtime,
   readyCount,
   startLobbyMutation,
@@ -239,8 +241,17 @@ export function RetroHeader({
             </div>
           )}
 
+        {/* Ready count — visible to EVERYONE in the session, not just the
+            facilitator, so all participants can see how many are ready. */}
+        {retroStatus === 'active' && usesConvexRealtime && (
+          <Badge variant="outline" className="gap-1 text-[11px] h-7 px-2">
+            <CheckCircle2 className="h-3 w-3 text-green-500" />
+            {readyCount}/{participantCount} ready
+          </Badge>
+        )}
+
         {/* Phase controls */}
-        {canControl && (
+        {canControlPhases && (
           <div className="flex items-center gap-2">
             {retroStatus === 'draft' && (
               <>
@@ -277,26 +288,15 @@ export function RetroHeader({
               </Button>
             )}
             {retroStatus === 'active' && (
-              <div className="flex items-center gap-2">
-                {usesConvexRealtime && (
-                  <Badge
-                    variant="outline"
-                    className="gap-1 text-[11px] h-7 px-2"
-                  >
-                    <CheckCircle2 className="h-3 w-3 text-green-500" />
-                    {readyCount}/{participantCount} ready
-                  </Badge>
-                )}
-                <Button
-                  onClick={() => moveToGroupingMutation.mutate()}
-                  disabled={moveToGroupingMutation.isPending}
-                  className="shadow-sm h-8 sm:h-9 text-xs sm:text-sm"
-                  size="sm"
-                >
-                  <GitMerge className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Move to </span>Grouping
-                </Button>
-              </div>
+              <Button
+                onClick={() => moveToGroupingMutation.mutate()}
+                disabled={moveToGroupingMutation.isPending}
+                className="shadow-sm h-8 sm:h-9 text-xs sm:text-sm"
+                size="sm"
+              >
+                <GitMerge className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Move to </span>Grouping
+              </Button>
             )}
             {retroStatus === 'grouping' && (
               <Button
@@ -320,22 +320,27 @@ export function RetroHeader({
                 <span className="hidden sm:inline">Move to </span>Discuss
               </Button>
             )}
-            {retroStatus === 'discussing' && (
-              <Button
-                onClick={() => completeRetroMutation.mutate()}
-                disabled={completeRetroMutation.isPending}
-                variant="default"
-                className="shadow-sm bg-green-600 hover:bg-green-700 h-8 sm:h-9 text-xs sm:text-sm"
-                size="sm"
-              >
-                <CheckCircle className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                Complete
-              </Button>
-            )}
           </div>
         )}
-        {/* Delete retro — available to creators and team leads */}
-        {canControl && (
+        {/* End — completes the retro from the discussion phase. Allowed for
+            creator, team-lead, org-admin, AND system admin (matches the
+            server's completeRetro permission, which is broader than the
+            phase-transition controls above). */}
+        {canComplete && retroStatus === 'discussing' && (
+          <Button
+            onClick={() => completeRetroMutation.mutate()}
+            disabled={completeRetroMutation.isPending}
+            variant="default"
+            className="shadow-sm bg-green-600 hover:bg-green-700 h-8 sm:h-9 text-xs sm:text-sm"
+            size="sm"
+          >
+            <CheckCircle className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            End
+          </Button>
+        )}
+        {/* Delete retro — available to creators, team leads, org admins, and
+            system admins (matches the server's deleteRetro permission). */}
+        {canComplete && (
           <Button
             variant="ghost"
             size="icon"

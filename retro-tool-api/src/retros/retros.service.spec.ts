@@ -16,6 +16,9 @@ interface SelectChainMock {
   where: () => SelectChainMock;
   leftJoin: () => SelectChainMock;
   limit: () => Promise<unknown[]>;
+  update: () => SelectChainMock;
+  set: () => SelectChainMock;
+  delete: () => SelectChainMock;
 }
 
 function createDatabaseMock(resultQueue: unknown[][]): SelectChainMock {
@@ -28,6 +31,11 @@ function createDatabaseMock(resultQueue: unknown[][]): SelectChainMock {
     limit: jest.fn(
       (): Promise<unknown[]> => Promise.resolve(results.shift() ?? []),
     ),
+    // Mutation chains (update().set().where(), delete().where()) resolve to the
+    // chain itself; callers only `await` them for their side effect.
+    update: jest.fn((): SelectChainMock => chain),
+    set: jest.fn((): SelectChainMock => chain),
+    delete: jest.fn((): SelectChainMock => chain),
   };
   return chain;
 }
@@ -88,6 +96,60 @@ describe('RetrosService', () => {
       await expect(
         service.isRetroMember('missing-retro', 'user-1'),
       ).resolves.toBe(false);
+    });
+  });
+
+  describe('completeRetro (permission set)', () => {
+    const discussingRetro = {
+      id: 'retro-1',
+      teamId: 'team-1',
+      status: 'discussing',
+      createdById: 'creator-1',
+    };
+
+    it('allows an org owner/admin (not team member) to complete the retro', async () => {
+      // Queries in order: retro → user role (member) → team membership (none)
+      // → team org lookup → org membership (org-admin).
+      const service = await buildService(
+        createDatabaseMock([
+          [discussingRetro],
+          [{ role: 'member' }],
+          [],
+          [{ organizationId: 'org-1' }],
+          [{ role: 'org-admin' }],
+        ]),
+      );
+
+      await expect(
+        service.completeRetro('org-admin-1', 'retro-1'),
+      ).resolves.toEqual({ success: true });
+    });
+
+    it('rejects a plain team member who is neither creator, lead, nor org admin', async () => {
+      const service = await buildService(
+        createDatabaseMock([
+          [discussingRetro],
+          [{ role: 'member' }],
+          [{ tag: 'member' }],
+          [{ organizationId: 'org-1' }],
+          [{ role: 'member' }],
+        ]),
+      );
+
+      await expect(
+        service.completeRetro('member-1', 'retro-1'),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('allows a system admin to complete the retro without a team membership', async () => {
+      // System admins short-circuit before any membership/org lookup.
+      const service = await buildService(
+        createDatabaseMock([[discussingRetro], [{ role: 'system-admin' }]]),
+      );
+
+      await expect(
+        service.completeRetro('sysadmin-1', 'retro-1'),
+      ).resolves.toEqual({ success: true });
     });
   });
 });

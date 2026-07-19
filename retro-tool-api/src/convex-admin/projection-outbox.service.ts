@@ -1,10 +1,16 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lt, lte, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import type { Config } from '../config/configuration';
 import { generateId } from '../lib/utils';
+import { mapWithConcurrency } from '../lib/concurrency';
 import * as adminSchema from './schema';
 import type {
   OutboxDispatchResult,
@@ -23,6 +29,24 @@ const DISPATCH_BATCH_SIZE = 200;
 // Give up delivering a row after this many attempts; it is marked `failed` and
 // left for reconciliation/drift to heal rather than blocking the queue forever.
 const MAX_ATTEMPTS = 10;
+// Max deliveries in flight at once. Each delivery fans out to N per-member
+// Convex upserts, so this bounds pressure on the single Convex worker while
+// still overlapping HTTP round-trips instead of the old strictly-serial loop.
+const DELIVERY_CONCURRENCY = 6;
+// Exponential backoff base for a failed row's next attempt, capped. Keeps a
+// persistently-failing row from head-of-lining the oldest-first queue and from
+// hammering an already-struggling Convex backend on every tick.
+const BACKOFF_BASE_MS = 2_000;
+const BACKOFF_MAX_MS = 60_000;
+// Per-entity coalescing (trailing-edge debounce with a maxWait cap). During a
+// burst on one board, hold its projection briefly so rapid follow-up mutations
+// collapse into a single re-projection (the newest intent already reprojects
+// current state), instead of re-projecting on every tick. A key becomes
+// deliverable once it has been quiet for DEBOUNCE_MS, or — to bound latency
+// under a *continuous* burst — once its oldest pending change is MAX_COALESCE_
+// WAIT_MS old, whichever comes first. Set DEBOUNCE_MS to 0 to disable.
+const COALESCE_DEBOUNCE_MS = 300;
+const COALESCE_MAX_WAIT_MS = 2_000;
 
 /**
  * Transactional projection outbox.
@@ -43,7 +67,7 @@ const MAX_ATTEMPTS = 10;
  * `dedupeKey` collapses superseded intents for the same entity.
  */
 @Injectable()
-export class ProjectionOutboxService {
+export class ProjectionOutboxService implements OnModuleDestroy {
   private readonly logger = new Logger(ProjectionOutboxService.name);
   private readonly handlers = new Map<string, ProjectionOutboxHandler>();
   // Single-flight guard for the immediate post-enqueue kick: while one drain is
@@ -53,6 +77,9 @@ export class ProjectionOutboxService {
   // arrived while it ran; the cron is the durable backstop regardless.
   private draining = false;
   private drainRequested = false;
+  // Pending re-kick timer for coalesced keys (see scheduleRekick). At most one
+  // outstanding; cleared on destroy so tests/shutdown don't leak a handle.
+  private rekickTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
@@ -90,6 +117,7 @@ export class ProjectionOutboxService {
       entityKey: event.entityKey,
       payload: event.payload ?? null,
       dedupeKey: this.dedupeKey(event),
+      nextAttemptAt: new Date(),
     });
   }
 
@@ -138,6 +166,32 @@ export class ProjectionOutboxService {
     })();
   }
 
+  /**
+   * Schedule a single deferred {@link kick} after `delayMs`, coalescing multiple
+   * requests into the earliest one. Used so keys held back by per-entity
+   * coalescing deliver right after their debounce window rather than waiting for
+   * the per-minute cron. Unref'd so it never keeps the process alive.
+   */
+  private scheduleRekick(delayMs: number): void {
+    const delay = Math.max(0, Math.ceil(delayMs));
+    if (this.rekickTimer !== null) {
+      return; // one already pending; it will re-evaluate remaining holds
+    }
+    this.rekickTimer = setTimeout(() => {
+      this.rekickTimer = null;
+      this.kick();
+    }, delay);
+    this.rekickTimer.unref?.();
+  }
+
+  /** Clear any pending re-kick timer (shutdown / test cleanup). */
+  onModuleDestroy(): void {
+    if (this.rekickTimer !== null) {
+      clearTimeout(this.rekickTimer);
+      this.rekickTimer = null;
+    }
+  }
+
   // ──────────────────────────── Dispatch ──────────────────────────────────
 
   /**
@@ -163,10 +217,19 @@ export class ProjectionOutboxService {
       return empty;
     }
 
+    const now = new Date();
     const batch = await this.database
       .select()
       .from(adminSchema.projectionOutbox)
-      .where(eq(adminSchema.projectionOutbox.status, 'pending'))
+      .where(
+        and(
+          eq(adminSchema.projectionOutbox.status, 'pending'),
+          // Only rows whose backoff window has elapsed are eligible now. A
+          // failed row with a future nextAttemptAt is skipped so it can't
+          // head-of-line the queue or hammer a struggling Convex backend.
+          lte(adminSchema.projectionOutbox.nextAttemptAt, now),
+        ),
+      )
       .orderBy(asc(adminSchema.projectionOutbox.createdAt))
       .limit(DISPATCH_BATCH_SIZE);
 
@@ -193,40 +256,102 @@ export class ProjectionOutboxService {
           inArray(adminSchema.projectionOutbox.dedupeKey, dedupeKeys),
         ),
       );
+    // Track the newest row (the one that would deliver) and the oldest pending
+    // change per key (to bound coalescing latency via maxWait).
     const newestByKey = new Map<string, { id: string; createdAt: Date }>();
+    const oldestByKey = new Map<string, Date>();
     for (const row of newestRows) {
-      const current = newestByKey.get(row.dedupeKey);
-      if (!current || row.createdAt > current.createdAt) {
+      const newest = newestByKey.get(row.dedupeKey);
+      if (!newest || row.createdAt > newest.createdAt) {
         newestByKey.set(row.dedupeKey, {
           id: row.id,
           createdAt: row.createdAt,
         });
+      }
+      const oldest = oldestByKey.get(row.dedupeKey);
+      if (!oldest || row.createdAt < oldest) {
+        oldestByKey.set(row.dedupeKey, row.createdAt);
       }
     }
 
     let dispatched = 0;
     let failed = 0;
     let skippedSuperseded = 0;
+    // If coalescing holds any key back this pass, we re-kick after the shortest
+    // remaining hold so the held projection still lands promptly (kick() only
+    // fires on enqueue; without this a quiet-but-held key would wait for the
+    // 1-minute cron).
+    let earliestReadyInMs = Number.POSITIVE_INFINITY;
 
+    // Close superseded rows first (cheap DB-only updates, no Convex call), then
+    // deliver the rest with bounded concurrency so the per-row fan-out overlaps
+    // instead of running strictly one-at-a-time.
+    const toDeliver: adminSchema.ProjectionOutboxRow[] = [];
     for (const row of batch) {
-      if (newestByKey.get(row.dedupeKey)?.id !== row.id) {
+      const newestEntry = newestByKey.get(row.dedupeKey);
+      if (newestEntry?.id !== row.id) {
         await this.markDispatched(row.id);
         skippedSuperseded += 1;
         continue;
       }
 
+      // Per-entity coalescing: hold this key's delivery until it has been quiet
+      // for COALESCE_DEBOUNCE_MS, capped by COALESCE_MAX_WAIT_MS from its oldest
+      // pending change. A held row stays pending and delivers on a later pass.
+      const holdMs = this.coalesceHoldMs(
+        now,
+        newestEntry.createdAt,
+        oldestByKey.get(row.dedupeKey) ?? row.createdAt,
+      );
+      if (holdMs > 0) {
+        earliestReadyInMs = Math.min(earliestReadyInMs, holdMs);
+        continue;
+      }
+      toDeliver.push(row);
+    }
+
+    await mapWithConcurrency(toDeliver, DELIVERY_CONCURRENCY, async (row) => {
       const ok = await this.deliver(row);
       if (ok) {
         await this.markDispatched(row.id);
         dispatched += 1;
       } else {
-        await this.markAttemptFailed(row.id, row.attempts + 1 >= MAX_ATTEMPTS);
+        await this.markAttemptFailed(row.id, row.attempts + 1);
         failed += 1;
       }
+    });
+
+    // Some keys were held back by coalescing this pass — schedule one re-kick so
+    // they deliver right after their debounce window instead of waiting for the
+    // cron backstop.
+    if (Number.isFinite(earliestReadyInMs)) {
+      this.scheduleRekick(earliestReadyInMs);
     }
 
     const remaining = await this.countByStatus('pending');
     return { dispatched, failed, skippedSuperseded, remaining };
+  }
+
+  /**
+   * How long (ms) to keep coalescing a key before delivering: hold until it has
+   * been quiet for the debounce window, but never longer than the maxWait cap
+   * measured from its oldest pending change. Returns 0 when the key is ready.
+   */
+  private coalesceHoldMs(now: Date, newest: Date, oldest: Date): number {
+    if (COALESCE_DEBOUNCE_MS <= 0) {
+      return 0;
+    }
+    const sinceNewest = now.getTime() - newest.getTime();
+    const sinceOldest = now.getTime() - oldest.getTime();
+    if (sinceOldest >= COALESCE_MAX_WAIT_MS) {
+      return 0; // maxWait reached — deliver now regardless of quiet time.
+    }
+    const quietRemaining = COALESCE_DEBOUNCE_MS - sinceNewest;
+    if (quietRemaining <= 0) {
+      return 0; // been quiet long enough — deliver now.
+    }
+    // Deliver at whichever comes first: end of quiet window or maxWait cap.
+    return Math.min(quietRemaining, COALESCE_MAX_WAIT_MS - sinceOldest);
   }
 
   /**
@@ -394,16 +519,25 @@ export class ProjectionOutboxService {
 
   private async markAttemptFailed(
     id: string,
-    exhausted: boolean,
+    attemptNumber: number,
   ): Promise<void> {
+    const exhausted = attemptNumber >= MAX_ATTEMPTS;
+    // Exponential backoff, capped: attempt 1 → ~2s, 2 → ~4s, 3 → ~8s … clamped
+    // to BACKOFF_MAX_MS. Pushes the row's next eligibility into the future so it
+    // stops head-of-lining the oldest-first queue and hammering Convex.
+    const delayMs = Math.min(
+      BACKOFF_BASE_MS * 2 ** (attemptNumber - 1),
+      BACKOFF_MAX_MS,
+    );
     await this.database
       .update(adminSchema.projectionOutbox)
       .set({
         status: exhausted ? 'failed' : 'pending',
         attempts: sql`${adminSchema.projectionOutbox.attempts} + 1`,
+        nextAttemptAt: new Date(Date.now() + delayMs),
         lastError: exhausted
           ? `Delivery failed after ${MAX_ATTEMPTS} attempts`
-          : 'Delivery attempt failed; will retry',
+          : `Delivery attempt failed; retry in ${Math.round(delayMs / 1000)}s`,
       })
       .where(eq(adminSchema.projectionOutbox.id, id));
   }

@@ -10,8 +10,7 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { useState } from 'react'
 import { usePushNotifications } from '@/hooks/use-push-notifications'
 import { authClient } from '@/lib/auth-client'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +25,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { api } from '@/lib/api'
-import { getNotificationSocket } from '@/lib/socket'
 import { usesConvexForNotifications } from '@/lib/realtime-config'
 import { NOTIFICATIONS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { Notification } from '@/common/types/notifications'
@@ -56,45 +54,6 @@ export function NotificationBell() {
 
   const unreadNotifications = notifications.filter((n) => !n.read)
   const unreadCount = unreadNotifications.length
-
-  useEffect(() => {
-    if (usesConvexRealtime) {
-      return
-    }
-
-    const socket = getNotificationSocket()
-
-    const onNotification = (notification: Notification) => {
-      queryClient.setQueryData<Notification[]>(
-        ['notifications'],
-        (prev = []) => [notification, ...prev],
-      )
-      toast.info(notification.title, {
-        description: notification.message,
-        action: notification.link
-          ? {
-              label: 'View',
-              onClick: () => router.navigate({ to: notification.link! }),
-            }
-          : undefined,
-      })
-      // Real-time membership update: when the current user is approved to a team,
-      // invalidate team queries so their UI reflects membership immediately.
-      if (notification.type === 'team_join_approved') {
-        queryClient.invalidateQueries({ queryKey: ['teams'] })
-      }
-    }
-
-    socket.on('notification', onNotification)
-
-    if (!socket.connected) {
-      socket.connect()
-    }
-
-    return () => {
-      socket.off('notification', onNotification)
-    }
-  }, [queryClient, router, usesConvexRealtime])
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['notifications'] })

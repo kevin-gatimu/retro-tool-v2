@@ -340,8 +340,8 @@ provisions no other Azure Convex deployment. This stack is defined by
 `convex-staging.bicep` + the `modules/` files and deploys **into the existing
 `retrotool-staging-rg`**, reusing the staging ACR and PostgreSQL server.
 
-> Full design: [docs/CONVEX-AZURE-SELF-HOSTING-PLAN.md](../docs/CONVEX-AZURE-SELF-HOSTING-PLAN.md).
-> Step-by-step runbook (one-time bootstrap + rollback): [docs/convex-staging-deployment-runbook.md](../docs/convex-staging-deployment-runbook.md).
+> Full design: [docs/deployment/convex-azure-self-hosting-plan.md](../docs/deployment/convex-azure-self-hosting-plan.md).
+> Step-by-step runbook (one-time bootstrap + rollback): [docs/deployment/convex-staging-runbook.md](../docs/deployment/convex-staging-runbook.md).
 
 ### Resources created
 

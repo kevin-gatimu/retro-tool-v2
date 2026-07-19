@@ -11,6 +11,8 @@ import { DATABASE_CONNECTION } from './database/database-connection';
 import { sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { APP_VERSION } from './lib/app-version';
+import { JwtAlignmentService } from './auth/jwt-alignment.service';
+import type { JwtAlignmentStatus } from './auth/types';
 
 // Liveness/readiness probes must never be rate-limited.
 @SkipThrottle()
@@ -21,6 +23,7 @@ export class HealthController {
   constructor(
     @Inject(DATABASE_CONNECTION)
     private readonly database: NodePgDatabase,
+    private readonly jwtAlignment: JwtAlignmentService,
   ) {}
 
   @Get()
@@ -59,24 +62,32 @@ export class HealthController {
 
   @Get('ready')
   @ApiOperation({
-    summary: 'Readiness probe (checks DB connectivity)',
+    summary: 'Readiness probe (checks DB connectivity + JWT/JWKS alignment)',
   })
-  @ApiResponse({ status: 200, description: 'Readiness status with DB check' })
-  @ApiResponse({ status: 503, description: 'Database dependency is not ready' })
+  @ApiResponse({ status: 200, description: 'Readiness status with checks' })
+  @ApiResponse({ status: 503, description: 'A dependency is not ready' })
   async getReadiness() {
-    const dbOk = await this.checkDatabase();
+    const [dbOk, jwt] = await Promise.all([
+      this.checkDatabase(),
+      this.checkJwtAlignment(),
+    ]);
+
+    // A misaligned/unreachable JWKS silently disables every authenticated
+    // Convex read, so it must fail readiness loudly — not just be reported.
+    const ready = dbOk && jwt === 'ok';
 
     const result = {
-      status: dbOk ? 'ready' : 'not_ready',
+      status: ready ? 'ready' : 'not_ready',
       service: 'retro-tool-api',
       version: APP_VERSION,
       timestamp: new Date().toISOString(),
       checks: {
         database: dbOk ? 'connected' : 'unreachable',
+        jwt,
       },
     };
 
-    if (!dbOk) {
+    if (!ready) {
       throw new ServiceUnavailableException(result);
     }
 
@@ -89,6 +100,20 @@ export class HealthController {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Resolve JWT ↔ JWKS alignment to a single status field. The underlying
+   * check never throws, but guard here too so the health handler can never be
+   * taken down by the guardrail itself.
+   */
+  private async checkJwtAlignment(): Promise<JwtAlignmentStatus> {
+    try {
+      const result = await this.jwtAlignment.check();
+      return result.status;
+    } catch {
+      return 'unreachable';
     }
   }
 }

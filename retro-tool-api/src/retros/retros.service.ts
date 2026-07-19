@@ -1007,13 +1007,41 @@ export class RetrosService {
         )
         .limit(1);
 
-      if (
-        !membership ||
-        (membership.tag !== TEAM_MEMBER_TAGS.Lead &&
-          retro.createdById !== userId)
-      ) {
+      const isCreator = retro.createdById === userId;
+      const isTeamLead = membership?.tag === TEAM_MEMBER_TAGS.Lead;
+
+      // Org owners/admins for the retro's org may also end a retro, matching
+      // the deleteRetro permission set (creator/team-lead/org-admin/sys-admin).
+      const [teamRecord] = await this.database
+        .select({ organizationId: teamSchema.team.organizationId })
+        .from(teamSchema.team)
+        .where(eq(teamSchema.team.id, retro.teamId))
+        .limit(1);
+
+      const isOrgAdmin = teamRecord
+        ? await this.database
+            .select({ role: orgSchema.organizationMember.role })
+            .from(orgSchema.organizationMember)
+            .where(
+              and(
+                eq(orgSchema.organizationMember.userId, userId),
+                eq(
+                  orgSchema.organizationMember.organizationId,
+                  teamRecord.organizationId,
+                ),
+              ),
+            )
+            .limit(1)
+            .then(
+              ([m]) =>
+                m?.role === ORG_MEMBER_ROLES.Owner ||
+                m?.role === ORG_MEMBER_ROLES.Admin,
+            )
+        : false;
+
+      if (!isCreator && !isTeamLead && !isOrgAdmin) {
         throw new ForbiddenException(
-          'Only the creator or team lead can complete the retrospective',
+          'Only system admins, org admins, team leads, and the retro creator can complete the retrospective',
         );
       }
     }

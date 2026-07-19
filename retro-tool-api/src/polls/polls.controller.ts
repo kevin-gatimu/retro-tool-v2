@@ -24,7 +24,7 @@ import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { PollsService } from './polls.service';
 import { PollsProjectionSyncService } from './polls-projection-sync.service';
-import { StandupsGateway } from '../standups/standups.gateway';
+import { StandupsProjectionSyncService } from '../standups/standups-projection-sync.service';
 import type { SessionUser } from '../common/types';
 import {
   createPollSchema,
@@ -52,16 +52,19 @@ export class PollsController {
   constructor(
     private readonly pollsService: PollsService,
     private readonly pollsProjectionSync: PollsProjectionSyncService,
-    private readonly standupsGateway: StandupsGateway,
+    private readonly standupsProjectionSync: StandupsProjectionSyncService,
   ) {}
 
   /** Standup-attached polls live inside the daily room's realtime feed. */
-  private emitIfAttached(result: {
+  private async resyncStandupIfAttached(result: {
     standupId: string | null;
     entryDate: string | null;
-  }): void {
+  }): Promise<void> {
     if (result.standupId && result.entryDate) {
-      this.standupsGateway.emitEntryChanged(result.standupId, result.entryDate);
+      await this.standupsProjectionSync.enqueueEntrySync(
+        result.standupId,
+        result.entryDate,
+      );
     }
   }
 
@@ -93,7 +96,7 @@ export class PollsController {
     @Session() session: SessionUser,
   ) {
     const result = await this.pollsService.createPoll(session.user.id, body);
-    this.emitIfAttached(result);
+    void this.resyncStandupIfAttached(result);
     void this.pollsProjectionSync.enqueuePollSync(result.id);
     return { id: result.id };
   }
@@ -126,7 +129,7 @@ export class PollsController {
       id,
       body.optionId,
     );
-    this.emitIfAttached(result);
+    void this.resyncStandupIfAttached(result);
     void this.pollsProjectionSync.enqueuePollSync(id);
     return { success: true };
   }
@@ -141,7 +144,7 @@ export class PollsController {
     @Session() session: SessionUser,
   ) {
     const result = await this.pollsService.retractVote(session.user.id, id);
-    this.emitIfAttached(result);
+    void this.resyncStandupIfAttached(result);
     void this.pollsProjectionSync.enqueuePollSync(id);
     return { success: true };
   }
@@ -165,7 +168,7 @@ export class PollsController {
       id,
       body,
     );
-    this.emitIfAttached(result);
+    void this.resyncStandupIfAttached(result);
     void this.pollsProjectionSync.enqueuePollSync(id);
     return { success: true };
   }
@@ -205,7 +208,7 @@ export class PollsController {
       id,
       body.isClosed,
     );
-    this.emitIfAttached(result);
+    void this.resyncStandupIfAttached(result);
     void this.pollsProjectionSync.enqueuePollSync(id);
     return { success: true };
   }
@@ -220,7 +223,7 @@ export class PollsController {
     @Session() session: SessionUser,
   ) {
     const result = await this.pollsService.deletePoll(session.user.id, id);
-    this.emitIfAttached(result);
+    void this.resyncStandupIfAttached(result);
     void this.pollsProjectionSync.enqueuePollDelete(id);
     return { success: true };
   }

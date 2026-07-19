@@ -49,7 +49,7 @@ types live in a colocated `types/index.ts`.
 `$teamId.tsx`, `__root.tsx`, …) — leave those as the router expects. Skeletons follow
 `skeleton/index.tsx` (route group) or `<name>.skeleton.tsx` (single route).
 
-Full reference: [docs/file-naming-conventions.md](docs/file-naming-conventions.md).
+Full reference: [docs/guidelines/file-naming-conventions.md](docs/guidelines/file-naming-conventions.md).
 
 ---
 
@@ -62,7 +62,7 @@ pnpm install
 # Start full local stack (Docker)
 pnpm local:up
 
-# Start only infra (Postgres, Redis, Convex) then run apps natively
+# Start only infra (Postgres + self-hosted Convex) then run apps natively
 pnpm local:infra
 pnpm dev:api       # NestJS on :8000
 pnpm dev:ui        # Vite on :3000
@@ -307,7 +307,7 @@ Two role dimensions:
 - **Org roles**: `org-owner` → `org-admin` → `member`
 - **Team roles**: `team-lead` → `member`
 
-First sign-up is auto-bootstrapped as `super-admin`. Full matrices: [docs/RBAC.md](docs/RBAC.md).
+First sign-up is auto-bootstrapped as `super-admin`. Full matrices: [docs/security/rbac.md](docs/security/rbac.md).
 
 ---
 
@@ -340,7 +340,6 @@ GitHub Actions handle app deployment (not infra):
 | Convex Admin API | `http://localhost:3210` |
 | Convex Dashboard | `http://localhost:6791` |
 | PostgreSQL | `localhost:5432` |
-| Redis | `localhost:6379` |
 
 ---
 
@@ -358,19 +357,27 @@ GitHub Actions handle app deployment (not infra):
 
 | Document | What it covers |
 |---|---|
-| [docs/RBAC.md](docs/RBAC.md) | Full permission matrices for system, org, team, and retro actions; helper function signatures; user status lifecycle |
-| [docs/api-security.md](docs/api-security.md) | API hardening: Helmet, rate limiting (throttler + Better Auth), CORS, and the CSRF posture / residual risk |
-| [docs/file-naming-conventions.md](docs/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
-| [docs/app-flows.md](docs/app-flows.md) | Step-by-step flows: auth, user approval, org/team management, retro phases, estimates, notifications |
-| [docs/auth-workflows.md](docs/auth-workflows.md) | Per-flow file traces (which UI/API/DB/Convex files get hit) for sign-up/in, OTP, passkey, OAuth, verification, reset, session validation, sockets, sign-out, RBAC |
-| [docs/infrastructure.md](docs/infrastructure.md) | Azure infrastructure overview |
-| [docs/invitations.md](docs/invitations.md) | Invitation system (org + team) |
-| [docs/convex-architecture.md](docs/convex-architecture.md) | How the app uses Convex: deployment topology, every key/secret, projection schema, NestJS→Convex sync layer, UI consumption, JWT auth, deploy workflow |
-| [docs/convex-nestjs-auth.md](docs/convex-nestjs-auth.md) | Deep dive on Convex ↔ NestJS auth: RS256 JWT issue/verify, JWKS exchange, the JWT_ISSUER/AUDIENCE/JWKS_URL config, request lifecycle, vs the admin-key sync path |
-| [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker (local + production) |
-| [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: IceBreakers, AI summaries, Jira/ADO export, SAML |
+| [docs/security/rbac.md](docs/security/rbac.md) | Full permission matrices for system, org, team, and retro actions; helper function signatures; user status lifecycle |
+| [docs/security/backend-api.md](docs/security/backend-api.md) | API hardening: Helmet, rate limiting (throttler + Better Auth), CORS, and the CSRF posture / residual risk |
+| [docs/guidelines/file-naming-conventions.md](docs/guidelines/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
+| [docs/workflows/app-flows.md](docs/workflows/app-flows.md) | Step-by-step flows: auth, user approval, org/team management, retro phases, estimates, notifications |
+| [docs/security/authentication.md](docs/security/authentication.md) | Every sign-in method (password, email-OTP, passkey, Microsoft OAuth), the credential model, and per-flow file traces (sign-up/in, verification, reset, session validation, sockets, sign-out, RBAC) |
+| [docs/security/frontend.md](docs/security/frontend.md) | UI security: token storage, what's exposed to the browser, XSS/CSP posture, route/RBAC gating, residual risk |
+| [docs/security/database.md](docs/security/database.md) | DB security: TLS to Azure Postgres, credential injection, SQL-injection posture, no-RLS reality, residual risk |
+| [docs/database/schema.md](docs/database/schema.md) | Every table by domain (columns, keys, FKs, indexes), all enums, core entity-relationship diagram |
+| [docs/workflows/invitations-and-onboarding.md](docs/workflows/invitations-and-onboarding.md) | Invitation system (org + team), accept-invite journey, acceptance logic, onboarding & password rules |
+| [docs/architecture/overview.md](docs/architecture/overview.md) | System architecture design document — components, data flow, tech stack, module tree |
+| [docs/architecture/cloud.md](docs/architecture/cloud.md) | Azure cloud architecture — every resource by environment, topology diagram, SKUs, cost posture, deploy workflows |
+| [docs/architecture/convex.md](docs/architecture/convex.md) | How the app uses Convex: deployment topology, every key/secret, projection schema, NestJS→Convex sync layer, UI consumption, JWT auth, deploy workflow |
+| [docs/architecture/convex-concurrency.md](docs/architecture/convex-concurrency.md) | How the projection layer stays correct under concurrent writes (OCC, point reads, idempotency) |
+| [docs/security/convex-nestjs-auth.md](docs/security/convex-nestjs-auth.md) | Deep dive on Convex ↔ NestJS auth: RS256 JWT issue/verify, JWKS exchange, the JWT_ISSUER/AUDIENCE/JWKS_URL config, request lifecycle, vs the admin-key sync path |
+| [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md) | Running Convex in Docker (local + production) |
+| [docs/workflows/running-the-app.md](docs/workflows/running-the-app.md) | Running the app locally, against staging, and against production |
+| [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: AI summaries, Jira/ADO export, SAML, Team Spaces |
+| [docs/README.md](docs/README.md) | Documentation index — all docs by domain |
 | [infra/README.md](infra/README.md) | Azure Bicep deployment commands, outputs, post-provisioning checklist |
 | [infra/README-prod.md](infra/README-prod.md) | Production-specific runbook with App Registration details |
+| [docs/deployment/release-and-branch-strategy.md](docs/deployment/release-and-branch-strategy.md) | Branch model, release-please lockstep versioning, conventional commits, and deployment triggers (including the staging-only gap for production) |
 
 ### Convex AI guidelines
 
