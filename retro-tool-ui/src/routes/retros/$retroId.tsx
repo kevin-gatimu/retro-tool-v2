@@ -624,6 +624,22 @@ function RetroDetailPage() {
   const canControl = Boolean(
     retro.isCreator || retro.isTeamLead || retro.isSystemAdmin,
   )
+  // Phase transitions (open lobby, start, grouping, voting, discussion) are
+  // creator/team-lead only on the server — system-admins are NOT permitted
+  // (unlike complete/delete, which the server does allow admins to do). Gate
+  // those buttons on this narrower flag so an admin never sees a control that
+  // would 403, which otherwise flashes the board open before the rejection.
+  const canControlPhases = Boolean(retro.isCreator || retro.isTeamLead)
+  // Ending (completing) and deleting a retro is permitted for the creator,
+  // team-lead, org-admin, and system-admin — a strictly broader set than the
+  // phase-transition/discussion controls (creator/team-lead only). Mirrors the
+  // server's completeRetro/deleteRetro permission checks.
+  const canComplete = Boolean(
+    retro.isCreator ||
+    retro.isTeamLead ||
+    retro.isOrgAdmin ||
+    retro.isSystemAdmin,
+  )
   const retroStatus = retro.status
   const currentDiscussionCardId = retro.currentDiscussionCardId ?? null
   const retroName = retro.name || 'Untitled Retrospective'
@@ -673,7 +689,8 @@ function RetroDetailPage() {
           timeRemaining={timeRemaining}
           isLobbyTimerActive={isLobbyTimerActive}
           lobbyTimeRemaining={lobbyTimeRemaining}
-          canControl={canControl}
+          canComplete={canComplete}
+          canControlPhases={canControlPhases}
           usesConvexRealtime={usesConvexRealtime}
           readyCount={readyCount}
           startLobbyMutation={startLobbyMutation}
@@ -765,7 +782,7 @@ function RetroDetailPage() {
           <RetroDiscussionView
             retro={retro}
             previousCarriedItems={previousCarriedItems}
-            canControl={canControl}
+            canControl={canControlPhases}
             retroId={retroId}
             discussCardMutation={discussCardMutation}
             markDiscussedMutation={markDiscussedMutation}

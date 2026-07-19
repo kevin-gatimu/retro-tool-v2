@@ -102,17 +102,52 @@ export class EstimatesService {
     return Boolean(membership);
   }
 
-  private async assertSessionCreator(
+  /**
+   * Whether the user may drive the live estimate session (reveal, revote, start
+   * round, set consensus, update story, start timer, rename). Unlike
+   * {@link canManageSession} this is the NARROW gate: only the session creator
+   * or a **team lead** of the session's team — NOT org/system admins. End- and
+   * delete-session stay on the broad {@link canManageSession}.
+   */
+  async canControlSession(sessionId: string, userId: string): Promise<boolean> {
+    const [row] = await this.database
+      .select({
+        createdById: estimatesSchema.storyEstimateSession.createdById,
+        teamId: estimatesSchema.storyEstimateSession.teamId,
+      })
+      .from(estimatesSchema.storyEstimateSession)
+      .where(eq(estimatesSchema.storyEstimateSession.id, sessionId))
+      .limit(1);
+
+    if (!row) throw new NotFoundException('Session not found');
+
+    if (row.createdById === userId) return true;
+
+    const [teamMembership] = await this.database
+      .select({ tag: teamSchema.teamMember.tag })
+      .from(teamSchema.teamMember)
+      .where(
+        and(
+          eq(teamSchema.teamMember.teamId, row.teamId),
+          eq(teamSchema.teamMember.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    return teamMembership?.tag === TEAM_MEMBER_TAGS.Lead;
+  }
+
+  private async assertCanControlSession(
     sessionId: string,
     userId: string,
   ): Promise<StoryEstimateSession> {
-    const session = await this.getSessionRecord(sessionId);
-    if (session.createdById !== userId) {
+    const canControl = await this.canControlSession(sessionId, userId);
+    if (!canControl) {
       throw new ForbiddenException(
-        'Only the session creator can do this action',
+        'Only the session creator or a team lead can do this action',
       );
     }
-    return session;
+    return this.getSessionRecord(sessionId);
   }
 
   async canManageSession(sessionId: string, userId: string): Promise<boolean> {
@@ -597,11 +632,13 @@ export class EstimatesService {
       currentRoundVotes.find((v) => v.voterId === userId)?.points ?? null;
 
     const canEndSession = await this.canManageSession(sessionId, userId);
+    const canControl = await this.canControlSession(sessionId, userId);
 
     const result: SessionDetail = {
       ...row.session,
       isCreator,
       canEndSession,
+      canControl,
       currentUserId: userId,
       userVote,
       template: sessionTemplate,
@@ -841,7 +878,7 @@ export class EstimatesService {
     sessionId: string,
     userId: string,
   ): Promise<StoryEstimateVote[]> {
-    const session = await this.assertSessionCreator(sessionId, userId);
+    const session = await this.assertCanControlSession(sessionId, userId);
     if (!session.currentRoundId) {
       throw new BadRequestException('No active round found for this session');
     }
@@ -882,7 +919,7 @@ export class EstimatesService {
     userId: string,
     newRound: NewEstimateRoundDto,
   ): Promise<void> {
-    await this.assertSessionCreator(sessionId, userId);
+    await this.assertCanControlSession(sessionId, userId);
     const session = await this.getSessionRecord(sessionId);
     if (session.status === ESTIMATE_SESSION_STATUSES.Completed) {
       throw new BadRequestException(
@@ -936,7 +973,7 @@ export class EstimatesService {
     userId: string,
     data: UpdateEstimateStoryDto,
   ): Promise<void> {
-    const session = await this.assertSessionCreator(sessionId, userId);
+    const session = await this.assertCanControlSession(sessionId, userId);
     if (!session.currentRoundId) {
       throw new BadRequestException('No active round found for this session');
     }
@@ -968,7 +1005,7 @@ export class EstimatesService {
     userId: string,
     duration: number,
   ): Promise<Date> {
-    await this.assertSessionCreator(sessionId, userId);
+    await this.assertCanControlSession(sessionId, userId);
 
     const timerEndsAt = new Date(Date.now() + duration * 1000);
 
@@ -987,9 +1024,10 @@ export class EstimatesService {
     userId: string,
     name: string,
   ): Promise<StoryEstimateSession> {
-    // Only the session creator may rename it — matches startTimer/reveal/etc.
-    // (previously unauthenticated: any user could rename any session by id).
-    await this.assertSessionCreator(sessionId, userId);
+    // Only the session creator or a team lead may rename it — matches
+    // startTimer/reveal/etc. (previously unauthenticated: any user could rename
+    // any session by id).
+    await this.assertCanControlSession(sessionId, userId);
 
     const [existing] = await this.database
       .select()
@@ -1038,7 +1076,7 @@ export class EstimatesService {
     userId: string,
     agreedPoints: string,
   ): Promise<void> {
-    const session = await this.assertSessionCreator(sessionId, userId);
+    const session = await this.assertCanControlSession(sessionId, userId);
     if (session.status !== ESTIMATE_SESSION_STATUSES.Revealed) {
       throw new BadRequestException(
         'Consensus can only be set after votes are revealed',
@@ -1057,7 +1095,7 @@ export class EstimatesService {
   }
 
   async revote(sessionId: string, userId: string): Promise<void> {
-    const session = await this.assertSessionCreator(sessionId, userId);
+    const session = await this.assertCanControlSession(sessionId, userId);
     if (session.status !== ESTIMATE_SESSION_STATUSES.Revealed) {
       throw new BadRequestException(
         'Revote can only be triggered after votes are revealed',

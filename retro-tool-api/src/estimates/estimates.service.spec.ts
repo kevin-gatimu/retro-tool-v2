@@ -79,4 +79,92 @@ describe('EstimatesService', () => {
       ).resolves.toBe(false);
     });
   });
+
+  describe('canControlSession (creator OR team-lead only)', () => {
+    it('returns true for the session creator', async () => {
+      // 1st query: session row → createdById matches userId (short-circuits).
+      const service = await buildService(
+        createDatabaseMock([[{ createdById: 'creator-1', teamId: 'team-1' }]]),
+      );
+
+      await expect(
+        service.canControlSession('session-1', 'creator-1'),
+      ).resolves.toBe(true);
+    });
+
+    it('returns true for a non-creator team lead', async () => {
+      // 1st query: session row; 2nd query: teamMember tag → team-lead.
+      const service = await buildService(
+        createDatabaseMock([
+          [{ createdById: 'creator-1', teamId: 'team-1' }],
+          [{ tag: 'team-lead' }],
+        ]),
+      );
+
+      await expect(
+        service.canControlSession('session-1', 'lead-1'),
+      ).resolves.toBe(true);
+    });
+
+    it('returns false for a plain team member', async () => {
+      const service = await buildService(
+        createDatabaseMock([
+          [{ createdById: 'creator-1', teamId: 'team-1' }],
+          [{ tag: 'member' }],
+        ]),
+      );
+
+      await expect(
+        service.canControlSession('session-1', 'member-1'),
+      ).resolves.toBe(false);
+    });
+
+    it('returns false for an org-admin who is not creator or team lead', async () => {
+      // canControlSession never consults org/system role — only the team-member
+      // row is read, which for an org-admin outsider is empty.
+      const service = await buildService(
+        createDatabaseMock([
+          [{ createdById: 'creator-1', teamId: 'team-1' }],
+          [],
+        ]),
+      );
+
+      await expect(
+        service.canControlSession('session-1', 'org-admin-1'),
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe('canManageSession (broad set — end/delete session)', () => {
+    it('returns true for an org-admin (allowed to end the session)', async () => {
+      // 1st: session+team row (orgId); 2nd: user role (plain member);
+      // 3rd: org membership → org-admin ⇒ true.
+      const service = await buildService(
+        createDatabaseMock([
+          [{ createdById: 'creator-1', teamId: 'team-1', orgId: 'org-1' }],
+          [{ role: 'member' }],
+          [{ role: 'org-admin' }],
+        ]),
+      );
+
+      await expect(
+        service.canManageSession('session-1', 'org-admin-1'),
+      ).resolves.toBe(true);
+    });
+
+    it('returns false for a plain member (cannot end the session)', async () => {
+      const service = await buildService(
+        createDatabaseMock([
+          [{ createdById: 'creator-1', teamId: 'team-1', orgId: 'org-1' }],
+          [{ role: 'member' }],
+          [{ role: 'member' }],
+          [{ tag: 'member' }],
+        ]),
+      );
+
+      await expect(
+        service.canManageSession('session-1', 'member-1'),
+      ).resolves.toBe(false);
+    });
+  });
 });

@@ -133,6 +133,7 @@ export interface EstimateSession {
   createdById: string
   isCreator: boolean
   canEndSession?: boolean
+  canControl?: boolean
   userVote?: string | null
   template: SessionTemplateInfo | null
   templateId: string | null

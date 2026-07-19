@@ -436,18 +436,6 @@ function RoomView({
             </>
           )}
 
-          {/* End standup — visible to all members when active */}
-          {isActive && (
-            <Button
-              variant="outline"
-              className="border-destructive/50 text-destructive hover:border-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => setEndConfirmOpen(true)}
-            >
-              <OctagonX className="mr-2 h-4 w-4" />
-              End standup
-            </Button>
-          )}
-
           {/* Export PDF + email report — visible to all members */}
           <StandupReportMenu
             entryDetail={entryDetail}
@@ -455,7 +443,8 @@ function RoomView({
             date={date}
           />
 
-          {/* Reactivate + Delete — canManage only */}
+          {/* Manage menu — edit / skip / manage-skipped / end / delete — all
+              gated to team-lead, org-admin, and system-admin (canManage). */}
           {canManage && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -490,22 +479,29 @@ function RoomView({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {!isActive && (
-                  <>
-                    <DropdownMenuItem
-                      onClick={() =>
-                        updateStandupMutation.mutate({ isActive: true })
-                      }
-                    >
-                      <Play className="mr-2 h-4 w-4" />
-                      Reactivate standup
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      updateStandupMutation.mutate({ isActive: true })
+                    }
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    Reactivate standup
+                  </DropdownMenuItem>
+                )}
+                {isActive && (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => setEndConfirmOpen(true)}
+                  >
+                    <OctagonX className="mr-2 h-4 w-4" />
+                    End standup
+                  </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onClick={() => setDeleteConfirmOpen(true)}
                 >
+                  <Trash2 className="mr-2 h-4 w-4" />
                   Delete standup
                 </DropdownMenuItem>
               </DropdownMenuContent>

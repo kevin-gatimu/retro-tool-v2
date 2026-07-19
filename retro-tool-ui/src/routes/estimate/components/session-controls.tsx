@@ -21,6 +21,10 @@ interface SessionControlsProps {
   agreedPoints: string
   stats: { avg: string; min: number; max: number } | null
   votedCount: number
+  /** Creator or team lead: may drive the session (reveal/revote/round/consensus). */
+  canControl: boolean
+  /** Broader set (creator, team lead, org/system admin): may end the session. */
+  canEndSession: boolean
   revealVotesMutation: Mutation
   revoteMutation: Mutation
   startRoundMutation: { isPending: boolean }
@@ -36,6 +40,8 @@ export function SessionControls({
   agreedPoints,
   stats,
   votedCount,
+  canControl,
+  canEndSession,
   revealVotesMutation,
   revoteMutation,
   startRoundMutation,
@@ -49,46 +55,49 @@ export function SessionControls({
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Session Controls</CardTitle>
         <CardDescription>
-          You can control the voting and change the Agreed Points.
+          {canControl
+            ? 'You can control the voting and change the Agreed Points.'
+            : 'You can end this session.'}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
           {/* Left — round & session actions */}
           <div className="flex flex-wrap items-center gap-2">
-            {session.status !== 'revealed' ? (
-              <Button
-                onClick={() => revealVotesMutation.mutate()}
-                disabled={
-                  revealVotesMutation.isPending ||
-                  votedCount === 0 ||
-                  !session.currentRound
-                }
-              >
-                <Eye className="mr-2 h-4 w-4" />
-                Reveal Votes
-              </Button>
-            ) : (
-              <>
+            {canControl &&
+              (session.status !== 'revealed' ? (
                 <Button
-                  variant="outline"
-                  onClick={() => revoteMutation.mutate()}
-                  disabled={revoteMutation.isPending}
+                  onClick={() => revealVotesMutation.mutate()}
+                  disabled={
+                    revealVotesMutation.isPending ||
+                    votedCount === 0 ||
+                    !session.currentRound
+                  }
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Revote
+                  <Eye className="mr-2 h-4 w-4" />
+                  Reveal Votes
                 </Button>
-                <Button
-                  onClick={onOpenRoundModal}
-                  disabled={startRoundMutation.isPending}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Round
-                </Button>
-              </>
-            )}
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => revoteMutation.mutate()}
+                    disabled={revoteMutation.isPending}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Revote
+                  </Button>
+                  <Button
+                    onClick={onOpenRoundModal}
+                    disabled={startRoundMutation.isPending}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Round
+                  </Button>
+                </>
+              ))}
 
-            {!session.currentRound && (
+            {canControl && !session.currentRound && (
               <Button
                 onClick={onOpenRoundModal}
                 disabled={startRoundMutation.isPending}
@@ -98,14 +107,16 @@ export function SessionControls({
               </Button>
             )}
 
-            <EndSessionDialog
-              onConfirm={() => endSessionMutation.mutate()}
-              isPending={endSessionMutation.isPending}
-            />
+            {canEndSession && (
+              <EndSessionDialog
+                onConfirm={() => endSessionMutation.mutate()}
+                isPending={endSessionMutation.isPending}
+              />
+            )}
           </div>
 
-          {/* Agreed points (only when votes are revealed) */}
-          {session.status === 'revealed' && (
+          {/* Agreed points (only when votes are revealed, control-only) */}
+          {canControl && session.status === 'revealed' && (
             <>
               <div className="w-full h-px bg-border sm:w-px sm:h-auto sm:self-stretch" />
               <div className="flex flex-col gap-2">

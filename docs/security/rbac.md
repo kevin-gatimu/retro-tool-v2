@@ -52,7 +52,8 @@ System permissions are derived from `user.role` alone.
 |--------|:-----------:|:------------:|:--------------:|
 | Promote user to system-admin | ✓ | | |
 | Demote system-admin to member | ✓ | | |
-| Reactivate suspended user | ✓ | | |
+| Reactivate suspended user (non-admin target) | ✓ | ✓ | |
+| Reactivate suspended **system-admin** | ✓ | | |
 | Suspend a user | ✓ | ✓ | |
 | View all organizations | ✓ | ✓ | |
 | Manage all users (list, view details, change status/role) | ✓ | ✓ | |
@@ -74,8 +75,8 @@ Org permissions are evaluated from the combined `(user.role, organizationMember.
 | Delete organization | ✓ | ✓ | ✓ | | |
 | Invite / add member | ✓ | ✓ | ✓ | ✓ | |
 | Remove member | ✓ | ✓ | ✓ | ✓ | |
-| Promote member to org-admin | ✓ | ✓ | ✓ | | |
-| Demote org-admin to member | ✓ | ✓ | ✓ | | |
+| Change member role (member ↔ org-admin) | ✓ | ✓ | ✓ | ✓ | |
+| Grant/modify the **org-owner** role | ✓ | ✓ | ✓ | | |
 | Transfer org ownership | ✓ | ✓ | ✓ | | |
 | Create team in org | ✓ | ✓ | ✓ | ✓ | |
 | Delete team in org | ✓ | ✓ | ✓ | ✓ | |
@@ -95,7 +96,8 @@ Team permissions are evaluated from the combined `(user.role, organizationMember
 | Update team settings | ✓ | ✓ | ✓ | |
 | Delete team | ✓ | ✓ | | |
 | Invite / add member to team | ✓ | ✓ | ✓ | |
-| Remove member from team | ✓ | ✓ | ✓ | |
+| Remove / change role of a **regular member** | ✓ | ✓ | ✓ | |
+| Remove / change role of **another team-lead** | ✓ | ✓ | | |
 | View join requests | ✓ | ✓ | ✓ | |
 | Approve join request | ✓ | ✓ | ✓ | |
 | Reject join request | ✓ | ✓ | ✓ | |
@@ -106,18 +108,52 @@ Team permissions are evaluated from the combined `(user.role, organizationMember
 
 ## Retro-Level Permissions
 
-Any authenticated team member can create and participate in retros. Control actions (start, end, phase transitions) require being the retro creator or having team-lead/admin authority.
+Any authenticated team member can create and participate in retros. **Phase control** (start, lobby, grouping/voting/discussion transitions, and the discussion-view moderation controls) is restricted to the **creator or team-lead only** — system-admins and org-admins are *not* permitted to drive phases (enforced by `assertRetroModerator` / the start/move guards). **Complete and delete** are broader and additionally allow org-admins and system-admins.
 
-| Action | Any team member | Retro creator | team-lead / org-admin / admin |
-|--------|:---------------:|:-------------:|:-----------------------------:|
-| Create retro | ✓ | | |
-| Read retro | ✓ | ✓ | ✓ |
-| Participate (add cards, vote, comment) | ✓ | ✓ | ✓ |
-| Start retro | | ✓ | ✓ |
-| Move phase (grouping / voting / discussion) | | ✓ | ✓ |
-| Complete retro | | ✓ | ✓ |
-| Delete retro | | ✓ | ✓ |
-| Update retro settings | | ✓ | ✓ |
+| Action | Any team member | Retro creator | team-lead | org-admin | system/super-admin |
+|--------|:---:|:---:|:---:|:---:|:---:|
+| Create retro | ✓ | | | | |
+| Read / participate (cards, vote, comment) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Start / open lobby | | ✓ | ✓ | | |
+| Move phase (grouping / voting / discussion) | | ✓ | ✓ | | |
+| Discussion moderation (pick card, mark discussed, nav) | | ✓ | ✓ | | |
+| Update retro settings | | ✓ | ✓ | | |
+| Complete / End retro | | ✓ | ✓ | ✓ | ✓ |
+| Delete retro | | ✓ | ✓ | ✓ | ✓ |
+
+> The **ready-count** indicator (`N/M ready`) is visible to **every participant** in an active retro, not just the facilitator.
+
+## Story-Estimate Session Permissions
+
+Any session member can vote and toggle their own presence. **Session controls** (reveal votes, revote, start/new round, set consensus/agreed points, start timer, update story) are restricted to the **creator or team-lead only**. **End** and **Delete** session are broader (creator, team-lead, org-owner/admin, system/super-admin — `canManageSession`).
+
+| Action | Session member | Creator | team-lead | org-admin | system/super-admin |
+|--------|:---:|:---:|:---:|:---:|:---:|
+| Vote / toggle own presence | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Reveal / revote / round / consensus / timer / story | | ✓ | ✓ | | |
+| End session | | ✓ | ✓ | ✓ | ✓ |
+| Delete session | | ✓ | ✓ | ✓ | ✓ |
+
+## Standup Permissions
+
+Creating a standup and the manage menu (edit, skip day, manage skipped days, **end**, delete, reactivate) are **manager actions**: team-lead, org-owner/admin, or system/super-admin (`canManageStandup` / `assertCanCreateStandup`). Any team member submits updates, comments, and reacts.
+
+| Action | Team member | team-lead | org-admin | system/super-admin |
+|--------|:---:|:---:|:---:|:---:|
+| Submit update / comment / react | ✓ | ✓ | ✓ | ✓ |
+| Create standup | | ✓ | ✓ | ✓ |
+| Edit / skip / manage-skipped / end / delete / reactivate | | ✓ | ✓ | ✓ |
+
+## Survey Permissions
+
+| Action | Team member | team-lead | org-owner/admin | system/super-admin |
+|--------|:---:|:---:|:---:|:---:|
+| Create **team-scoped** survey | ✓ | ✓ | ✓ | ✓ |
+| Create **org-scoped** survey | | | ✓ | ✓ |
+| Create **system-scoped** survey | | | | ✓ |
+| Respond (open, permitted survey) | ✓ | ✓ | ✓ | ✓ |
+| Edit survey | creator only | creator only | | ✓ (or creator) |
+| Close / delete survey | | ✓ | ✓ | ✓ (or creator) |
 
 ---
 

@@ -17,6 +17,7 @@ describe('EstimatesController', () => {
   let service: {
     isSessionMember: jest.Mock;
     canManageSession: jest.Mock;
+    canControlSession: jest.Mock;
     upsertParticipant: jest.Mock;
     upsertVote: jest.Mock;
     startRound: jest.Mock;
@@ -28,6 +29,7 @@ describe('EstimatesController', () => {
     service = {
       isSessionMember: jest.fn(),
       canManageSession: jest.fn(),
+      canControlSession: jest.fn(),
       upsertParticipant: jest.fn().mockResolvedValue(undefined),
       upsertVote: jest.fn().mockResolvedValue(undefined),
       startRound: jest.fn().mockResolvedValue(undefined),
@@ -114,9 +116,9 @@ describe('EstimatesController', () => {
     });
   });
 
-  describe('manager-only endpoints', () => {
-    it('rejects a non-manager starting a round and does not persist or sync', async () => {
-      service.canManageSession.mockResolvedValue(false);
+  describe('control-only endpoints (creator or team lead)', () => {
+    it('rejects a non-controller starting a round and does not persist or sync', async () => {
+      service.canControlSession.mockResolvedValue(false);
 
       await expect(
         controller.startRoundRest(asSession(), SESSION_ID, {
@@ -128,8 +130,8 @@ describe('EstimatesController', () => {
       expect(projectionSync.enqueueSessionSync).not.toHaveBeenCalled();
     });
 
-    it('lets a manager start a round and triggers a projection sync', async () => {
-      service.canManageSession.mockResolvedValue(true);
+    it('lets a controller start a round and triggers a projection sync', async () => {
+      service.canControlSession.mockResolvedValue(true);
 
       const result = await controller.startRoundRest(asSession(), SESSION_ID, {
         ticketNumber: 'SPR-1',
@@ -143,7 +145,9 @@ describe('EstimatesController', () => {
       );
       expect(result).toEqual({ success: true });
     });
+  });
 
+  describe('manager-only endpoints (end session)', () => {
     it('rejects a non-manager ending the session', async () => {
       service.canManageSession.mockResolvedValue(false);
 

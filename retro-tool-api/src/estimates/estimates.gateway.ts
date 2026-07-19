@@ -184,11 +184,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
-    const canManage: boolean = await this.estimatesService.canManageSession(
+    const canControl: boolean = await this.estimatesService.canControlSession(
       data.sessionId,
       userId,
     );
-    if (!canManage) return;
+    if (!canControl) return;
 
     const votes = await this.estimatesService.revealVotes(
       data.sessionId,
@@ -208,11 +208,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
-    const canManage = await this.estimatesService.canManageSession(
+    const canControl = await this.estimatesService.canControlSession(
       data.sessionId,
       userId,
     );
-    if (!canManage) return;
+    if (!canControl) return;
 
     await this.estimatesService.clearVotes(data.sessionId, userId, {
       storyName: data.storyName,
@@ -232,11 +232,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
-    const canManage = await this.estimatesService.canManageSession(
+    const canControl = await this.estimatesService.canControlSession(
       data.sessionId,
       userId,
     );
-    if (!canManage) return;
+    if (!canControl) return;
 
     await this.estimatesService.startRound(data.sessionId, userId, {
       storyName: data.storyName,
@@ -256,11 +256,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId) return;
 
-    const canManage = await this.estimatesService.canManageSession(
+    const canControl = await this.estimatesService.canControlSession(
       data.sessionId,
       userId,
     );
-    if (!canManage) return;
+    if (!canControl) return;
 
     await this.estimatesService.updateStory(data.sessionId, userId, {
       storyName: data.storyName,
@@ -283,11 +283,11 @@ export class EstimatesGateway
     const { userId } = client.data as ClientData;
     if (!userId || !data?.sessionId || !data?.duration) return;
 
-    const canManage = await this.estimatesService.canManageSession(
+    const canControl = await this.estimatesService.canControlSession(
       data.sessionId,
       userId,
     );
-    if (!canManage) return;
+    if (!canControl) return;
 
     const timerEndsAt = await this.estimatesService.startTimer(
       data.sessionId,

@@ -255,7 +255,12 @@ function EstimateSessionPage() {
   const displayedParticipants = onlineParticipants
   const votedCount = session.votes.length
   const isTimerActive = timeRemaining !== null && timeRemaining > 0
-  const canEndSession = Boolean(session.isCreator || session.canEndSession)
+  // Server already folds the creator into both flags (canManageSession /
+  // canControlSession return true for the creator), so no client-side OR needed.
+  const canEndSession = Boolean(session.canEndSession)
+  // Narrow gate for session-driving controls (reveal/revote/round/consensus):
+  // creator or team lead only. End Session keeps the broader canEndSession gate.
+  const canControl = Boolean(session.canControl)
 
   return (
     <>
@@ -370,7 +375,7 @@ function EstimateSessionPage() {
                   </>
                 ) : (
                   <span className="text-muted-foreground italic">
-                    {canEndSession
+                    {canControl
                       ? "Click 'Start Round' in the controls below to begin the first round."
                       : 'Waiting for the host to start the first round...'}
                   </span>
@@ -402,14 +407,18 @@ function EstimateSessionPage() {
             stats={stats}
           />
 
-          {/* Controls (for session creator or admins) */}
-          {canEndSession && (
+          {/* Controls — session-driving actions render for creator/team lead
+              (canControl); End Session renders for the broader manage set
+              (canEndSession: creator, team lead, org/system admin). */}
+          {(canControl || canEndSession) && (
             <SessionControls
               session={session}
               voteOptions={voteOptions}
               agreedPoints={agreedPoints}
               stats={stats}
               votedCount={votedCount}
+              canControl={canControl}
+              canEndSession={canEndSession}
               revealVotesMutation={revealVotesMutation}
               revoteMutation={revoteMutation}
               startRoundMutation={startRoundMutation}

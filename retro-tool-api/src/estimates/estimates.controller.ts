@@ -100,7 +100,7 @@ export class EstimatesController {
     }
   }
 
-  /** Mirror the gateway's manager-only gate for host commands. */
+  /** Mirror the gateway's manager-only gate for end/delete commands. */
   private async assertCanManage(
     sessionId: string,
     userId: string,
@@ -112,6 +112,26 @@ export class EstimatesController {
     if (!canManage) {
       throw new ForbiddenException(
         'You do not have permission to manage this session',
+      );
+    }
+  }
+
+  /**
+   * Mirror the gateway's control-only gate for session-driving commands
+   * (reveal/revote/round/consensus/timer/story). Narrower than
+   * {@link assertCanManage}: creator or team lead only, not org/system admins.
+   */
+  private async assertCanControl(
+    sessionId: string,
+    userId: string,
+  ): Promise<void> {
+    const canControl = await this.estimatesService.canControlSession(
+      sessionId,
+      userId,
+    );
+    if (!canControl) {
+      throw new ForbiddenException(
+        'Only the session creator or a team lead can do this action',
       );
     }
   }
@@ -256,7 +276,7 @@ export class EstimatesController {
   @Post(':id/round')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Start a new estimate round (manager only)',
+    summary: 'Start a new estimate round (creator or team lead only)',
   })
   @ApiParam({ name: 'id', description: 'Estimate session ID' })
   @ApiBody({ type: NewEstimateRoundBody })
@@ -267,7 +287,7 @@ export class EstimatesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: NewEstimateRoundDto,
   ) {
-    await this.assertCanManage(id, session.user.id);
+    await this.assertCanControl(id, session.user.id);
     await this.estimatesService.startRound(id, session.user.id, body);
     this.syncSession(id);
     return { success: true };

@@ -40,6 +40,10 @@ interface TeamMembersSectionProps {
   teamId: string
   displayedMemberCount: number
   canManage: boolean
+  /** Viewer is org-admin/owner or system-admin (has authority over lead rows). */
+  viewerIsOrgAdminOrAbove: boolean
+  /** Viewer's own user id, so a plain lead can still manage their own row. */
+  viewerUserId: string | null
   canSeeMembers: boolean
   isMember: boolean
   isOrgAdmin: boolean
@@ -90,6 +94,8 @@ export function TeamMembersSection({
   teamId,
   displayedMemberCount,
   canManage,
+  viewerIsOrgAdminOrAbove,
+  viewerUserId,
   canSeeMembers,
   isMember,
   isOrgAdmin,
@@ -213,6 +219,8 @@ export function TeamMembersSection({
             <DataTable
               columns={getTeamMemberColumns({
                 canManage: !!canManage,
+                viewerIsOrgAdminOrAbove,
+                viewerUserId,
                 orgRoles,
                 onUpdateHierarchy: (userId, tag) =>
                   mutations.updateHierarchyMutation.mutate({ userId, tag }),

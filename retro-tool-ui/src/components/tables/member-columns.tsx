@@ -226,6 +226,16 @@ export type TeamMemberRow = {
 
 export function getTeamMemberColumns(options: {
   canManage: boolean
+  /**
+   * Whether the viewer is an org-admin (owner/admin) or system-admin — i.e. has
+   * authority over team-lead rows. A plain team-lead has `canManage` but not
+   * this, and the server rejects a lead acting on another lead, so we hide the
+   * manage actions on lead rows for such viewers.
+   */
+  viewerIsOrgAdminOrAbove: boolean
+  /** The viewing user's own id, so a plain team-lead can still manage their OWN
+   *  lead row (the server permits self-action; `member.userId === viewerUserId`). */
+  viewerUserId: string | null
   orgRoles: OrgTeamRole[]
   onUpdateHierarchy: (userId: string, tag: 'team-lead' | 'member') => void
   onRemove: (userId: string) => void
@@ -356,6 +366,17 @@ export function getTeamMemberColumns(options: {
       header: 'Actions',
       cell: ({ row }) => {
         const member = row.original
+
+        // A plain team-lead (not org-admin/system-admin) cannot manage ANOTHER
+        // team-lead — the server rejects lead-on-lead actions. Hide the menu on
+        // OTHER leads' rows for such viewers; org-admins/system-admins keep
+        // control, and a lead retains actions on their OWN row (the server
+        // allows self-action via `member.userId !== userId`).
+        const isOtherLead =
+          member.tag === 'team-lead' && member.userId !== options.viewerUserId
+        if (isOtherLead && !options.viewerIsOrgAdminOrAbove) {
+          return null
+        }
 
         return (
           <DropdownMenu>

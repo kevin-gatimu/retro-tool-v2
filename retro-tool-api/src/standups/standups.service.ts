@@ -73,6 +73,68 @@ export class StandupsService {
     }
   }
 
+  /**
+   * Team-level "can manage standups" check for actions that have no standup id
+   * yet (i.e. creating one): allow team-leads of the team, org owners/admins of
+   * the team's org, and system/super-admins. Plain team members are rejected —
+   * creating a standup is a manager action (mirrors the per-standup
+   * {@link canManageStandup} role set, minus the creator branch which can't
+   * apply before the standup exists).
+   */
+  async assertCanCreateStandup(teamId: string, userId: string): Promise<void> {
+    const [fullUser] = await this.database
+      .select({ role: authSchema.user.role })
+      .from(authSchema.user)
+      .where(eq(authSchema.user.id, userId))
+      .limit(1);
+    const role = fullUser?.role;
+    if (role === USER_ROLES.SuperAdmin || role === USER_ROLES.SystemAdmin) {
+      return;
+    }
+
+    const [team] = await this.database
+      .select({ orgId: teamSchema.team.organizationId })
+      .from(teamSchema.team)
+      .where(eq(teamSchema.team.id, teamId))
+      .limit(1);
+
+    if (team?.orgId) {
+      const [orgMembership] = await this.database
+        .select({ role: orgSchema.organizationMember.role })
+        .from(orgSchema.organizationMember)
+        .where(
+          and(
+            eq(orgSchema.organizationMember.organizationId, team.orgId),
+            eq(orgSchema.organizationMember.userId, userId),
+          ),
+        )
+        .limit(1);
+      if (
+        orgMembership?.role === ORG_MEMBER_ROLES.Owner ||
+        orgMembership?.role === ORG_MEMBER_ROLES.Admin
+      ) {
+        return;
+      }
+    }
+
+    const [teamMembership] = await this.database
+      .select({ tag: teamSchema.teamMember.tag })
+      .from(teamSchema.teamMember)
+      .where(
+        and(
+          eq(teamSchema.teamMember.teamId, teamId),
+          eq(teamSchema.teamMember.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (teamMembership?.tag !== TEAM_MEMBER_TAGS.Lead) {
+      throw new ForbiddenException(
+        'Only team leads, org admins, and system admins can create standups',
+      );
+    }
+  }
+
   async canManageStandup(standupId: string, userId: string): Promise<boolean> {
     const [row] = await this.database
       .select({
@@ -146,7 +208,7 @@ export class StandupsService {
     userId: string,
     data: CreateStandupDto,
   ): Promise<{ id: string }> {
-    await this.assertTeamMember(data.teamId, userId);
+    await this.assertCanCreateStandup(data.teamId, userId);
 
     const id = generateId();
 
