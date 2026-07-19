@@ -181,18 +181,33 @@ export class IcebreakersController {
 
   @Post(':id/advance')
   @ApiOperation({
-    summary: 'Advance to the next pending prompt or complete the session',
+    summary:
+      'Advance to the next pending prompt or finish (delete) the session',
   })
   async advancePrompt(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
+    // Capture the standup link before advancing — finishing deletes the row,
+    // and the room feed still needs a resync afterwards.
+    const link = await this.icebreakersService.getStandupLink(id);
     const result = await this.icebreakersService.advancePrompt(
       id,
       session.user.id,
     );
-    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
-    await this.resyncStandupIfAttached(id);
+    // Finishing hard-deletes the session, so remove its projection rather than
+    // re-syncing a row that no longer exists.
+    if (result.ended) {
+      await this.icebreakersProjectionSyncService.enqueueSessionDelete(id);
+    } else {
+      await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
+    }
+    if (link) {
+      await this.standupsProjectionSync.enqueueEntrySync(
+        link.standupId,
+        link.entryDate,
+      );
+    }
     return result;
   }
 
@@ -232,17 +247,29 @@ export class IcebreakersController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'End an icebreaker session (mark completed)' })
+  @ApiOperation({
+    summary: 'End an icebreaker session (deletes it — no history)',
+  })
   async endSession(
     @Session() session: SessionUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
+    // Capture the standup link before the row is deleted so the room feed can
+    // still be refreshed afterwards.
+    const link = await this.icebreakersService.getStandupLink(id);
     const result = await this.icebreakersService.endSession(
       id,
       session.user.id,
     );
-    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
-    await this.resyncStandupIfAttached(id);
+    // Ending hard-deletes the session, so remove its Convex projection (and the
+    // per-member board rows) rather than re-syncing a now-missing row.
+    await this.icebreakersProjectionSyncService.enqueueSessionDelete(id);
+    if (link) {
+      await this.standupsProjectionSync.enqueueEntrySync(
+        link.standupId,
+        link.entryDate,
+      );
+    }
     return result;
   }
 

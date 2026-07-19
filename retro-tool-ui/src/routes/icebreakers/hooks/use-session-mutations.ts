@@ -45,11 +45,18 @@ export function useSessionMutations(
   })
 
   const advancePromptMutation = useMutation({
-    mutationFn: () => api.post(ICEBREAKERS_ENDPOINTS.ADVANCE(sessionId)),
-    onSuccess: () => {
-      refetchSession()
-      // "Finish" (advance past the last prompt) completes the session.
+    mutationFn: () =>
+      api.post<{ ended: boolean }>(ICEBREAKERS_ENDPOINTS.ADVANCE(sessionId)),
+    onSuccess: (result) => {
       invalidateSessionLists()
+      // "Finish" (advance past the last prompt) deletes the session — leave the
+      // runtime instead of refetching a now-missing session (which would 404).
+      if (result.ended) {
+        toast.success('Icebreaker finished')
+        options?.onEnded?.()
+        return
+      }
+      refetchSession()
     },
     onError: (error: Error) => {
       refetchSession()

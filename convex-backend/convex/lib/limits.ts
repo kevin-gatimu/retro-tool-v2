@@ -27,3 +27,20 @@ export const LIST_PROJECTION_CAP = 500
  * document limit.
  */
 export const MAX_PRESENCE_PER_SESSION = 200
+
+/**
+ * Max icebreaker reaction rows read per session, and the batch size used to
+ * prune expired ones. Reactions are ephemeral (see REACTION_TTL_MS) and only
+ * the last few seconds are ever surfaced, so a live session never approaches
+ * this — the cap keeps the subscribed read bounded (per the "never unbounded
+ * .collect()" rule) even if a burst of clicks briefly piles up rows.
+ */
+export const MAX_REACTIONS_PER_SESSION = 200
+
+/**
+ * How long a reaction is "recent". `getRecentReactions` only returns rows
+ * newer than this, and `sendReaction` opportunistically prunes older ones, so
+ * the table self-trims without a cron. Kept short: a reaction is a one-shot
+ * confetti burst, not durable state.
+ */
+export const REACTION_TTL_MS = 15_000

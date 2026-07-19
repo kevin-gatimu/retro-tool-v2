@@ -7,7 +7,8 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,11 +39,14 @@ import { ICEBREAKER_SESSION_STATUSES } from '@/common/enums/icebreaker.enums'
 import type { TIcebreakerPromptDecision } from '@/common/enums/icebreaker.enums'
 import { usesConvexForIcebreakers } from '@/lib/realtime-config'
 import { CelebrationBar } from '@/routes/icebreakers/components/celebration-bar'
+import type { ReactionKind } from '@/routes/icebreakers/types'
 import { IcebreakerConvexSync } from '@/routes/icebreakers/components/icebreaker-convex-sync'
 import { SwipeDeck } from '@/routes/icebreakers/components/swipe-deck'
 import { IcebreakerSessionDetailSkeleton } from '@/routes/icebreakers/skeleton'
 import { STATUS_LABELS } from '@/routes/icebreakers/helpers'
 import { useSessionMutations } from '@/routes/icebreakers/hooks/use-session-mutations'
+import { useIcebreakerReactions } from '@/routes/icebreakers/hooks/use-icebreaker-reactions'
+import { useIcebreakerSessionGone } from '@/routes/icebreakers/hooks/use-icebreaker-session-gone'
 
 /**
  * `page` renders the standalone route with its own back affordance; `embedded`
@@ -148,7 +152,21 @@ function SessionView({
 }) {
   const { swipePromptMutation, advancePromptMutation, endSessionMutation } =
     useSessionMutations(sessionId, { onEnded: onExit })
+  // Live "great answer" reactions — broadcast to and received from everyone.
+  const { send: sendReaction } = useIcebreakerReactions(sessionId)
   const [endConfirmOpen, setEndConfirmOpen] = useState(false)
+
+  // Ending or finishing hard-deletes the session. The host who triggered it
+  // leaves via the mutation callbacks; this catches everyone ELSE — when the
+  // session's projection disappears, eject them cleanly instead of stranding
+  // them on a dead session.
+  const handleSessionGone = useCallback(() => {
+    toast.info('Icebreaker ended', {
+      description: 'The host ended this session.',
+    })
+    onExit()
+  }, [onExit])
+  useIcebreakerSessionGone(sessionId, handleSessionGone)
 
   const pending = session.deck.filter((p) => p.decision === 'pending')
   const kept = session.deck.filter((p) => p.decision === 'kept')
@@ -239,6 +257,7 @@ function SessionView({
         decidePending={swipePromptMutation.isPending}
         onAdvance={() => advancePromptMutation.mutate()}
         advancePending={advancePromptMutation.isPending}
+        onReact={sendReaction}
       />
 
       {onlineParticipants.length > 0 && !isCompleted && (
@@ -313,6 +332,7 @@ interface PhaseContentProps {
   decidePending: boolean
   onAdvance: () => void
   advancePending: boolean
+  onReact: (kind: ReactionKind) => void
 }
 
 function PhaseContent({
@@ -324,6 +344,7 @@ function PhaseContent({
   decidePending,
   onAdvance,
   advancePending,
+  onReact,
 }: PhaseContentProps) {
   const { canManage } = session
   const currentPrompt = session.currentPrompt
@@ -396,8 +417,9 @@ function PhaseContent({
             </CardContent>
           </Card>
 
-          {/* Anyone can react to a great answer — fires a local confetti burst. */}
-          <CelebrationBar />
+          {/* Anyone can react to a great answer — fires a confetti burst
+              locally and broadcasts it to every participant. */}
+          <CelebrationBar onReact={onReact} />
 
           {canManage && (
             <div className="flex items-center justify-end gap-3">

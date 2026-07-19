@@ -183,6 +183,23 @@ export default defineSchema({
     .index('by_retro', ['retroId'])
     .index('by_retro_user', ['retroId', 'userId']),
 
+  // Ephemeral "great answer" reactions during an icebreaker's presenting
+  // phase (celebrate / applause / fire). A high-frequency, low-value, transient
+  // signal — like typing indicators — so it takes a direct Convex path instead
+  // of the projection-outbox. Each click inserts one row; every participant
+  // subscribes and fires the confetti burst. Rows are pruned by age so the
+  // table stays bounded (nothing here is durable — PostgreSQL never sees it).
+  liveIcebreakerReactions: defineTable({
+    sessionId: v.string(),
+    userId: v.string(),
+    kind: v.union(
+      v.literal('celebrate'),
+      v.literal('applause'),
+      v.literal('fire'),
+    ),
+    createdAt: v.number(),
+  }).index('by_session_id', ['sessionId']),
+
   // Per-user online presence for estimate sessions. A high-frequency,
   // low-value signal (join/leave flaps), so it gets its own direct Convex path
   // — clients call `setPresence` and subscribe to `getSessionPresence` — instead

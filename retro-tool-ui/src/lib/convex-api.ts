@@ -51,8 +51,17 @@ export const convexApi = {
     getIcebreakerBoard: makeFunctionReference<'query'>(
       'liveIcebreakers:getIcebreakerBoard',
     ),
+    getSessionProjection: makeFunctionReference<'query'>(
+      'liveIcebreakers:getSessionProjection',
+    ),
     listActiveSessionProjections: makeFunctionReference<'query'>(
       'liveIcebreakers:listActiveSessionProjections',
+    ),
+    sendReaction: makeFunctionReference<'mutation'>(
+      'liveIcebreakers:sendReaction',
+    ),
+    getRecentReactions: makeFunctionReference<'query'>(
+      'liveIcebreakers:getRecentReactions',
     ),
   },
   liveStandups: {

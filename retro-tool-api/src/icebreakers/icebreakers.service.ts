@@ -341,11 +341,21 @@ export class IcebreakersService {
    * next pending card (→ Curating) or finish the session (→ Completed) if the
    * deck is dry.
    */
-  async advancePrompt(sessionId: string, userId: string): Promise<void> {
+  /**
+   * Advance to the next pending prompt, or finish the session when the deck is
+   * exhausted. Icebreaker sessions are intentionally not persisted past their
+   * run (they carry no durable value), so "finish" hard-deletes the session
+   * rather than marking it completed — nothing lingers in history. Returns
+   * whether the session ended so the caller can remove the Convex projection
+   * instead of re-syncing it.
+   */
+  async advancePrompt(
+    sessionId: string,
+    userId: string,
+  ): Promise<{ ended: boolean }> {
     await this.assertCanManage(sessionId, userId);
 
     const nextCard = await this.getCurrentPendingPrompt(sessionId);
-    const now = new Date();
 
     if (nextCard) {
       await this.database
@@ -353,20 +363,18 @@ export class IcebreakersService {
         .set({
           status: ICEBREAKER_SESSION_STATUSES.Curating,
           currentPromptId: null,
-          updatedAt: now,
+          updatedAt: new Date(),
         })
         .where(eq(icebreakersSchema.icebreakerSession.id, sessionId));
-    } else {
-      await this.database
-        .update(icebreakersSchema.icebreakerSession)
-        .set({
-          status: ICEBREAKER_SESSION_STATUSES.Completed,
-          currentPromptId: null,
-          timerEndsAt: null,
-          updatedAt: now,
-        })
-        .where(eq(icebreakersSchema.icebreakerSession.id, sessionId));
+      return { ended: false };
     }
+
+    // Deck exhausted → session is over. Hard-delete (cascades prompts and
+    // participants) so it never enters history.
+    await this.database
+      .delete(icebreakersSchema.icebreakerSession)
+      .where(eq(icebreakersSchema.icebreakerSession.id, sessionId));
+    return { ended: true };
   }
 
   // ==========================================================================
@@ -411,17 +419,17 @@ export class IcebreakersService {
     return updated;
   }
 
+  /**
+   * End a session. Icebreaker sessions carry no durable value, so ending one
+   * hard-deletes it (cascading to prompts and participants) rather than marking
+   * it completed — it never appears in history. The caller removes the Convex
+   * projection afterwards.
+   */
   async endSession(sessionId: string, userId: string): Promise<void> {
     await this.assertCanManage(sessionId, userId);
 
     await this.database
-      .update(icebreakersSchema.icebreakerSession)
-      .set({
-        status: ICEBREAKER_SESSION_STATUSES.Completed,
-        currentPromptId: null,
-        timerEndsAt: null,
-        updatedAt: new Date(),
-      })
+      .delete(icebreakersSchema.icebreakerSession)
       .where(eq(icebreakersSchema.icebreakerSession.id, sessionId));
   }
 
