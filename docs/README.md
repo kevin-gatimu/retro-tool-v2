@@ -63,4 +63,4 @@ one-line summary. When a doc and the code disagree, trust the code — and pleas
 
 | Doc | What it covers |
 |---|---|
-| [future-roadmap.md](future-roadmap.md) | Planned features: IceBreakers, AI summaries, Jira/ADO export, SAML |
+| [future-roadmap.md](future-roadmap.md) | Planned features: AI summaries, Jira/ADO export, SAML, Team Spaces |

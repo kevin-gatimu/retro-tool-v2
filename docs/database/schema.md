@@ -704,6 +704,12 @@ Indexes: `template_id`, U `icebreaker_prompt_template_order_unique(template_id, 
 
 #### `icebreaker_session`
 
+> **Ephemeral lifecycle.** Icebreaker sessions are not archived. Calling
+> `DELETE /api/icebreakers/:id` (end) or advancing past the last prompt
+> (`POST /api/icebreakers/:id/advance` with deck exhausted) hard-deletes this row
+> and cascades to `icebreaker_session_prompt` and `icebreaker_participant`. There
+> is no history or completed-session list.
+
 | Column | Type | Constraints |
 | --- | --- | --- |
 | `id` | varchar(255) | PK |
@@ -1077,7 +1083,8 @@ what is orphaned:
 - **Standups** are an attachment hub: `poll` and `icebreaker_session` both carry
   an optional `standup_id` + `entry_date` so they can surface inside a standup's
   daily room. Polls cascade on standup deletion; icebreaker sessions set null
-  (kept in icebreaker history).
+  (the session row survives until it is ended or finished, at which point it is
+  hard-deleted — see [Icebreakers](#36-icebreakers)).
 - **Templates** (`template`, `estimate_template`, `icebreaker_template`) are
   either global built-ins (`organization_id` null, `is_built_in = true`) or
   org-custom (`organization_id` set, cascade on org deletion).

@@ -20,14 +20,14 @@ export function useSessionMutations(
     })
   }
 
-  // The list page caches ongoing/completed sessions (staleTime 30s), so any
-  // mutation that can complete a session must invalidate those keys or the
-  // session keeps showing as ongoing until a hard reload.
+  // The list page caches the active sessions (staleTime 30s), so any mutation
+  // that ends/finishes a session must invalidate that key or it keeps showing
+  // as active until a hard reload. Icebreakers are ephemeral — there is no
+  // history list to invalidate.
   const invalidateSessionLists = () => {
     void queryClient.invalidateQueries({
       queryKey: ['active-icebreaker-sessions'],
     })
-    void queryClient.invalidateQueries({ queryKey: ['icebreaker-history'] })
   }
 
   const swipePromptMutation = useMutation({

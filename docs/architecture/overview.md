@@ -358,7 +358,7 @@ Global cross-cutting on `AppModule`: `ThrottlerBehindProxyGuard` (100/60s defaul
 | **action-items** | `/action-items*` → `actionItem`, `actionItemComment`, `actionItemLike` | Included in retro board snapshots; aggregate `actionItemsByTeamStatus` | Carried forward across retros (`isCarriedForward`), assignee + due date |
 | **estimates / estimate-templates** | Session + round + vote endpoints → `storyEstimateSession`, `storyEstimateRound`, `storyEstimateParticipant`, `storyEstimateVote`; templates → `estimateTemplate(Value)` | Gateway `/estimates` (join/cast-vote/reveal/clear/update-story/timer/end) + Convex `liveEstimateSessions` / `liveEstimateBoards` | Statuses `waiting → voting → revealed → completed`; votes hidden until reveal |
 | **standups** | `/standups*` → `standup`, `standupQuestion`, `standupEntry`, `standupSubmission`, `standupAnswer`, `standupComment`, `standupReaction`, `standupSkippedDay` | Gateway `/standups` + Convex `liveStandupEntries` / `liveStandupBoards` (keyed standup+date+user) | Cadence/schedule days, skipped days |
-| **icebreakers / icebreaker-templates** | `/icebreakers*` → `icebreakerSession(Prompt/Participant)`, templates + prompts | Gateway `/icebreakers` + Convex `liveIcebreakerSessions` / `liveIcebreakerBoards` | Seed-based reproducible decks, swipe decisions, can attach to a standup day |
+| **icebreakers / icebreaker-templates** | `/icebreakers*` → `icebreakerSession(Prompt/Participant)`, templates + prompts | Convex `liveIcebreakerSessions` / `liveIcebreakerBoards`; ephemeral `liveIcebreakerReactions` (direct client mutations, 15 s TTL) | Seed-based reproducible decks, swipe decisions, can attach to a standup day. **Sessions are ephemeral** — ending or finishing hard-deletes the row (no history) |
 | **polls** | `/polls*` → `poll`, `pollOption`, `pollVote` | Convex `livePolls` is a **lightweight signal**: UI invalidates + refetches REST (which applies per-viewer authorization) | Anonymous option; may attach to a standup entry |
 | **surveys** | `/surveys*` → `survey`, `surveyQuestion`, `surveyResponse`, `surveyAnswer` | Convex `liveSurveys` — same invalidate-and-refetch pattern | Scopes: team / org / system |
 | **notifications** | Created by other services → `notification`; push subs in `pushSubscription` | Gateway `/notifications` emits `new-notification` to room `user:{id}`; Convex `liveNotifications` for bell/list; web-push (VAPID) for browser push | Read state mirrored to projection (`mark*ReadProjection`) |
@@ -425,7 +425,7 @@ into `retros.schema.ts`, `cards.schema.ts`, `action-items.schema.ts`); migration
 | | `storyEstimateParticipant` | `sessionId` + `userId`, `isOnline` |
 | | `storyEstimateVote` | `sessionId`, `roundId`, `voterId`, `points` |
 | **standups** | `standup`, `standupQuestion`, `standupSkippedDay`, `standupEntry`, `standupSubmission`, `standupAnswer`, `standupComment`, `standupReaction` | Standup config (cadence, schedule days, start/end time) → dated entries → per-user submissions → per-question answers, plus comments/emoji reactions |
-| **icebreakers** | `icebreakerTemplate`, `icebreakerPrompt`, `icebreakerSession`, `icebreakerSessionPrompt`, `icebreakerParticipant` | Flavoured prompt decks; sessions have `seed` (reproducible), `selectionMode`, swipe `decision` per prompt, optional `standupId`+`entryDate` |
+| **icebreakers** | `icebreakerTemplate`, `icebreakerPrompt`, `icebreakerSession`, `icebreakerSessionPrompt`, `icebreakerParticipant` | Flavoured prompt decks; sessions have `seed` (reproducible), `selectionMode`, swipe `decision` per prompt, optional `standupId`+`entryDate`. **Sessions are ephemeral** — ended or finished sessions are hard-deleted (cascade to prompts + participants); no history table |
 | **polls** | `poll`, `pollOption`, `pollVote` | Team-scoped, optional standup link, `isAnonymous`/`isClosed` |
 | **surveys** | `survey`, `surveyQuestion`, `surveyResponse`, `surveyAnswer` | `scope` enum team/org/system; question `type` + JSON `options`; answers hold text/rating/choice |
 | **notifications** | `notification` | `userId`, `type` enum, title/message/`link`, `read` flag |
@@ -501,7 +501,8 @@ erDiagram
 | `liveRetroSessions` | `retroId`, `teamId`, `status` (draft/waiting/active/grouping/voting/discussing/completed), discussion pointers | API (internal) |
 | `liveRetroBoards` | **Per-user** JSON `snapshot` of the full RetroDetail, keyed `(retroId, userId)` | API (internal) |
 | `liveEstimateSessions` / `liveEstimateBoards` | Same pattern for story estimate sessions | API (internal) |
-| `liveIcebreakerSessions` / `liveIcebreakerBoards` | Same pattern (statuses waiting/curating/presenting/completed) | API (internal) |
+| `liveIcebreakerSessions` / `liveIcebreakerBoards` | Same pattern (statuses waiting/curating/presenting) | API (internal) |
+| `liveIcebreakerReactions` | Ephemeral "great answer" reactions (`celebrate`/`applause`/`fire`) during the presenting phase; rows self-expire after 15 s (`REACTION_TTL_MS`) and are never written to Postgres | client (public mutation `sendReaction`) |
 | `liveStandupEntries` / `liveStandupBoards` | Same pattern, keyed by `(standupId, entryDate[, userId])` | API (internal) |
 | `livePolls`, `liveSurveys` | **Lightweight signals** (id, scope, `isClosed`) — UI invalidates and refetches REST, which applies per-viewer authorization | API (internal) |
 | `liveNotifications` | Full notification rows incl. `read`, indexed `(userId, read)` | API (internal) |

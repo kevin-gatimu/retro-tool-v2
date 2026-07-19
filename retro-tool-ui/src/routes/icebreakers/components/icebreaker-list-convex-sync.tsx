@@ -41,7 +41,6 @@ export function IcebreakerListConvexSync() {
       void queryClient.invalidateQueries({
         queryKey: ['active-icebreaker-sessions'],
       })
-      void queryClient.invalidateQueries({ queryKey: ['icebreaker-history'] })
     } else if (lastSnapshotRef.current === null) {
       // First snapshot after (re)mount: the cached ongoing list may already be
       // stale (e.g. a session was ended on the detail page or by another
@@ -61,9 +60,6 @@ export function IcebreakerListConvexSync() {
         if (cachedIds !== liveIds) {
           void queryClient.invalidateQueries({
             queryKey: ['active-icebreaker-sessions'],
-          })
-          void queryClient.invalidateQueries({
-            queryKey: ['icebreaker-history'],
           })
         }
       }

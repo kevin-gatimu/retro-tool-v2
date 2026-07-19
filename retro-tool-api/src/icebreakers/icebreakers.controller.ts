@@ -7,7 +7,6 @@ import {
   Param,
   ParseUUIDPipe,
   Body,
-  Query,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
@@ -87,27 +86,6 @@ export class IcebreakersController {
   @ApiResponse({ status: 200, description: 'Active session list' })
   getActiveSessions(@Session() session: SessionUser) {
     return this.icebreakersQueryService.getActiveSessions(session.user.id);
-  }
-
-  @Get('history')
-  @ApiOperation({
-    summary: 'List completed icebreaker sessions (paginated, role-scoped)',
-  })
-  @ApiResponse({ status: 200, description: 'Completed session history' })
-  getHistory(
-    @Session() session: SessionUser,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('teamId') teamId?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.icebreakersQueryService.getHistory(
-      session.user.id,
-      page ? Math.max(1, parseInt(page, 10)) : 1,
-      limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 15,
-      teamId,
-      search,
-    );
   }
 
   @Get(':id')
@@ -263,29 +241,6 @@ export class IcebreakersController {
     );
     // Ending hard-deletes the session, so remove its Convex projection (and the
     // per-member board rows) rather than re-syncing a now-missing row.
-    await this.icebreakersProjectionSyncService.enqueueSessionDelete(id);
-    if (link) {
-      await this.standupsProjectionSync.enqueueEntrySync(
-        link.standupId,
-        link.entryDate,
-      );
-    }
-    return result;
-  }
-
-  @Delete(':id/permanent')
-  @ApiOperation({ summary: 'Permanently delete an icebreaker session' })
-  async deleteSession(
-    @Session() session: SessionUser,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    // Capture the standup link before the row is gone so we can still refresh
-    // the room feed after deletion.
-    const link = await this.icebreakersService.getStandupLink(id);
-    const result = await this.icebreakersService.deleteSession(
-      id,
-      session.user.id,
-    );
     await this.icebreakersProjectionSyncService.enqueueSessionDelete(id);
     if (link) {
       await this.standupsProjectionSync.enqueueEntrySync(

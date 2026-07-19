@@ -19,7 +19,8 @@ Reference for every major user-facing flow — what triggers it, what the fronte
 4. [Team Flows](#4-team-flows)
 5. [Retro Flows](#5-retro-flows)
 6. [Story Estimate Flows](#6-story-estimate-flows)
-7. [Notifications](#7-notifications)
+7. [Icebreaker Flows](#7-icebreaker-flows)
+8. [Notifications](#8-notifications)
 
 ---
 
@@ -448,7 +449,83 @@ Retros move through phases in order. Only the creator (or system admin) can adva
 
 ---
 
-## 7. Notifications
+## 7. Icebreaker Flows
+
+Icebreaker sessions are **ephemeral** — they exist only while active. Ending a
+session (via `DELETE /api/icebreakers/:id`) or finishing it (advancing past the
+last prompt) hard-deletes the row and cascades to prompts and participants. There
+is no completed-session list or history archive.
+
+### 7.1 Create Session
+
+1. Facilitator navigates to `/icebreakers`, clicks "New Icebreaker".
+2. Selects team, template (optional), flavour filter (optional), selection mode.
+3. `POST /api/icebreakers` with `{ teamId, templateId?, selectionMode, flavourFilter? }`.
+4. Backend: creates session with `status = 'waiting'`, materialises the seed-ordered prompt deck in `icebreaker_session_prompt`. Enqueues Convex projection sync.
+5. Redirect to session page.
+
+### 7.2 Join Session
+
+1. Participant navigates to the session URL.
+2. `POST /api/icebreakers/:id/join`.
+3. Backend: upserts a `icebreaker_participant` row (`isOnline = true`). Enqueues Convex projection sync.
+4. All viewers see the updated participant list via Convex subscription.
+
+### 7.3 Curate Deck (Facilitator)
+
+During the `curating` phase the facilitator reviews each prompt card:
+
+1. Facilitator decides on a card — clicks "Keep" or "Skip".
+2. `POST /api/icebreakers/:id/swipe` with `{ sessionPromptId, decision: 'kept' | 'skipped' }`.
+3. **Keep** → prompt is marked `kept`, session moves to `presenting`, `currentPromptId` set.
+4. **Skip** → prompt is marked `skipped`, session stays in `curating`, next pending card shown.
+
+### 7.4 Present Prompt
+
+While `status = 'presenting'` the current prompt is visible to all participants:
+
+- Facilitator (or anyone) can start a countdown timer: `POST /api/icebreakers/:id/timer` with `{ duration }` (seconds).
+- Anyone can react with "great answer" reactions.
+
+### 7.5 Live Reactions (Great Answer)
+
+During the `presenting` phase any participant can react:
+
+1. Client calls the Convex public mutation `liveIcebreakers:sendReaction` with `{ sessionId, kind }` where `kind` is `celebrate`, `applause`, or `fire`.
+2. Rate-limited by the `liveInteraction` rate limiter on the caller's identity.
+3. A row is inserted into `liveIcebreakerReactions`. Every participant's `getRecentReactions` subscription fires and triggers a confetti burst.
+4. Rows self-expire after 15 seconds (`REACTION_TTL_MS`); `sendReaction` opportunistically prunes stale rows on each write. Nothing is written to PostgreSQL.
+
+### 7.6 Advance to Next Prompt
+
+After a presented prompt has been answered:
+
+1. Facilitator clicks "Next".
+2. `POST /api/icebreakers/:id/advance`.
+3. Backend checks for the next pending prompt.
+   - **Pending prompt found** → session moves back to `curating`, `currentPromptId` cleared. Convex projection synced.
+   - **Deck exhausted** → session is **hard-deleted** (cascade to prompts + participants). Convex projection removed. Returns `{ ended: true }`.
+
+### 7.7 End Session Early
+
+1. Facilitator clicks "End Session".
+2. `DELETE /api/icebreakers/:id`.
+3. Backend: verifies `canManage`, hard-deletes the session row (cascading to prompts + participants). Enqueues Convex projection delete.
+4. Session disappears from all participants' views immediately.
+
+### 7.8 Session Lifecycle
+
+```text
+waiting → curating ⇄ presenting → [hard-deleted when deck exhausted]
+                                           ↑
+                    DELETE /api/icebreakers/:id (end early) ──────────┘
+```
+
+Status values: `waiting` (created, not started), `curating` (facilitator browsing deck), `presenting` (current prompt on screen). The `completed` status exists in the enum but is never written in the current implementation — sessions go directly from `presenting` to deletion.
+
+---
+
+## 8. Notifications
 
 ### 7.1 In-App Notifications
 
@@ -511,6 +588,9 @@ The app uses a **hybrid realtime approach**:
 | Retro board updates | Socket.IO WebSocket | Server → all participants |
 | Estimates session updates | Socket.IO WebSocket | Server → all participants |
 | In-app notifications | Socket.IO WebSocket | Server → single user room |
+| Icebreaker session/board updates | Convex subscription | Convex → all participants |
+| Icebreaker reactions (presenting phase) | Convex public mutation + subscription | Client → Convex → all participants |
+| Standup updates | Convex subscription | Convex → all participants |
 | Push notifications | Web Push (service worker) | Server → browser (even when closed) |
 | Data fetching / cache | React Query | Client polls / invalidates on mutation |
 

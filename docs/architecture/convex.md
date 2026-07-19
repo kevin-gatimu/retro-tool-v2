@@ -104,6 +104,7 @@ services gate on them. Convex reads `process.env.JWT_*` in
 | `rateLimits.ts` | Per-entity rate limits for board/notification upserts. |
 | `liveRetros.ts` | Retro session/board projections + typing/ready presence. |
 | `liveEstimates.ts` | Estimate session/board projections. |
+| `liveIcebreakers.ts` | Icebreaker session/board projections + ephemeral `liveIcebreakerReactions` (sendReaction / getRecentReactions). |
 | `liveNotifications.ts` | Notification projections. |
 | `liveReports.ts` | Aggregate (stat) upserts + read queries. |
 | `admin.ts` | `clearTables` (internal, admin-key only). |
@@ -117,6 +118,7 @@ services gate on them. Convex reads `process.env.JWT_*` in
 | `liveEstimateSessions` | `sessionId`, `teamId`, `status`, `currentRoundId` | `by_session_id`, `by_team_id` | `upsertSessionProjection` | estimate list sync |
 | `liveEstimateBoards` | `sessionId`, `userId`, `snapshot` (JSON session) | `by_session_id`, `by_session_user` | `upsertEstimateBoard` (per member) | estimate detail sync |
 | `liveIcebreakerSessions` / `liveIcebreakerBoards` | `sessionId`, `teamId`/`userId`, `snapshot` | `by_session_id`, `by_team_id` / `by_session_user` | `upsertIcebreaker*` (per member) | icebreaker list/detail sync |
+| `liveIcebreakerReactions` | `sessionId`, `userId`, `kind` (`celebrate`/`applause`/`fire`), `createdAt` | `by_session_id` | `sendReaction` (client public mutation) | icebreaker presenting phase — confetti burst on every participant |
 | `liveStandupEntries` / `liveStandupBoards` | `standupId`, `entryDate`, `userId`, `snapshot` | `by_standup_id`, `by_standup_date` / `by_standup_date_user` | `upsertStandup*` (per member) | standup list/detail sync |
 | `livePolls` | `pollId`, `teamId`, `isClosed` (lightweight signal) | `by_poll_id`, `by_team_id` | `upsertPollProjection`/`deletePollProjection` | UI invalidate + REST refetch |
 | `liveSurveys` | `surveyId`, `teamId`/`organizationId`, `isClosed` (lightweight signal) | `by_survey_id`, `by_team_id`, `by_org_id` | `upsertSurveyProjection`/`deleteSurveyProjection` | UI invalidate + REST refetch |
@@ -193,6 +195,11 @@ Clearable set: `liveRetroSessions`, `liveEstimateSessions`,
 `liveReadyStatus`. Each is either reconcilable from PostgreSQL or ephemeral, so
 clearing it is recoverable.
 
+> **`liveIcebreakerReactions` is intentionally NOT clearable** — it is a
+> high-frequency transient signal that self-expires via a 15-second TTL
+> (`REACTION_TTL_MS`). Rows are pruned opportunistically by `sendReaction` on
+> each write; no admin intervention is needed.
+>
 > **`liveTeamMembers` is deliberately NOT clearable.** It is the membership
 > projection every projection query authorizes against; a one-click or weekly
 > wipe would drop all Convex authz until a reconcile/self-heal runs. It is kept

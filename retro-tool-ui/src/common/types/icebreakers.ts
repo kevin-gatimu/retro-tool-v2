@@ -162,26 +162,3 @@ export interface IcebreakerSessionSummary {
   }
   participants: { userId: string; isOnline: boolean }[]
 }
-
-export interface IcebreakerHistorySession {
-  id: string
-  name: string
-  teamId: string
-  teamName: string | null
-  teamEmoji: string | null
-  orgId: string | null
-  orgName: string | null
-  participantCount: number
-  promptCount: number
-  keptCount: number
-  updatedAt: string | Date
-  createdAt: string | Date
-  canDelete: boolean
-}
-
-export interface IcebreakerHistoryResponse {
-  sessions: IcebreakerHistorySession[]
-  total: number
-  page: number
-  limit: number
-}

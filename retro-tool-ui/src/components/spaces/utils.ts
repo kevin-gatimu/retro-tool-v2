@@ -19,11 +19,6 @@ export function retroStatusBucket(status: string): StatusBucket {
   return status === 'completed' ? 'completed' : 'ongoing'
 }
 
-/** Icebreaker completed bucket iff status === 'completed'; else ongoing. */
-export function icebreakerStatusBucket(status: string): StatusBucket {
-  return status === 'completed' ? 'completed' : 'ongoing'
-}
-
 /** Comparator for within-group ordering. */
 export function sortComparator<T>(
   sort: SortMode,

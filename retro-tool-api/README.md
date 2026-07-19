@@ -448,6 +448,30 @@ action-item, and discussion-tracking routes — see the controller for the full 
 
 See [WebSockets — Estimates Gateway](#estimates-gateway) for real-time voting events.
 
+### Icebreakers
+
+> **Sessions are ephemeral.** Ending a session or advancing past the last prompt hard-deletes
+> the row (cascading to prompts + participants). There is no history or archive endpoint.
+
+| Method   | Path                       | Description                                                                     |
+| -------- | -------------------------- | ------------------------------------------------------------------------------- |
+| `GET`    | `/icebreakers`             | List all icebreaker sessions for the current user                               |
+| `GET`    | `/icebreakers/active`      | List active (non-completed) sessions                                            |
+| `GET`    | `/icebreakers/:id`         | Get a single session with deck, participants, and responses                     |
+| `POST`   | `/icebreakers`             | Create a new icebreaker session                                                 |
+| `POST`   | `/icebreakers/:id/join`    | Join a session as a participant                                                 |
+| `POST`   | `/icebreakers/:id/swipe`   | Keep or skip a specific prompt card (facilitator)                               |
+| `POST`   | `/icebreakers/:id/advance` | Advance to next pending prompt, or finish (hard-delete) when deck is exhausted  |
+| `POST`   | `/icebreakers/:id/timer`   | Start a countdown timer for the current prompt                                  |
+| `PATCH`  | `/icebreakers/:id`         | Update session name                                                             |
+| `DELETE` | `/icebreakers/:id`         | End a session — hard-deletes it (no history)                                    |
+
+**Session lifecycle:** `waiting` → `curating` ⇄ `presenting` → hard-deleted when deck exhausted or session ended early.
+
+**Realtime:** session and board state is pushed to Convex (`liveIcebreakerSessions` / `liveIcebreakerBoards`) after every mutation. Live "great answer" reactions during the `presenting` phase travel via a direct Convex path (`liveIcebreakerReactions:sendReaction` public mutation, 15-second self-expiry) — nothing is written to PostgreSQL.
+
+**Who can manage:** session creator, team lead, org admin, or system admin (`canManageSession`).
+
 ### Reports & Analytics (Dashboards v2)
 
 Mounted under `/reports/v2`. Responses set a private `Cache-Control` header and

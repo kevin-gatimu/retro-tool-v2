@@ -373,7 +373,7 @@ GitHub Actions handle app deployment (not infra):
 | [docs/security/convex-nestjs-auth.md](docs/security/convex-nestjs-auth.md) | Deep dive on Convex ↔ NestJS auth: RS256 JWT issue/verify, JWKS exchange, the JWT_ISSUER/AUDIENCE/JWKS_URL config, request lifecycle, vs the admin-key sync path |
 | [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md) | Running Convex in Docker (local + production) |
 | [docs/workflows/running-the-app.md](docs/workflows/running-the-app.md) | Running the app locally, against staging, and against production |
-| [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: IceBreakers, AI summaries, Jira/ADO export, SAML |
+| [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: AI summaries, Jira/ADO export, SAML, Team Spaces |
 | [docs/README.md](docs/README.md) | Documentation index — all docs by domain |
 | [infra/README.md](infra/README.md) | Azure Bicep deployment commands, outputs, post-provisioning checklist |
 | [infra/README-prod.md](infra/README-prod.md) | Production-specific runbook with App Registration details |

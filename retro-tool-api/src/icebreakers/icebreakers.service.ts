@@ -337,11 +337,6 @@ export class IcebreakersService {
   }
 
   /**
-   * After a presented prompt has been answered aloud, move back to curating the
-   * next pending card (→ Curating) or finish the session (→ Completed) if the
-   * deck is dry.
-   */
-  /**
    * Advance to the next pending prompt, or finish the session when the deck is
    * exhausted. Icebreaker sessions are intentionally not persisted past their
    * run (they carry no durable value), so "finish" hard-deletes the session
@@ -427,19 +422,6 @@ export class IcebreakersService {
    */
   async endSession(sessionId: string, userId: string): Promise<void> {
     await this.assertCanManage(sessionId, userId);
-
-    await this.database
-      .delete(icebreakersSchema.icebreakerSession)
-      .where(eq(icebreakersSchema.icebreakerSession.id, sessionId));
-  }
-
-  async deleteSession(sessionId: string, userId: string): Promise<void> {
-    const canManage = await this.canManageSession(sessionId, userId);
-    if (!canManage) {
-      throw new ForbiddenException(
-        'You do not have permission to delete this session',
-      );
-    }
 
     await this.database
       .delete(icebreakersSchema.icebreakerSession)
