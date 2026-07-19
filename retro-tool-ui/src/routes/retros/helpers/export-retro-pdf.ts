@@ -215,11 +215,16 @@ export async function exportRetroPdf(
     gapAfter: 6,
   })
   if (undiscussedCards.length === 0) {
-    writeWrapped('All cards were discussed.', {
-      size: 10,
-      style: 'italic',
-      color: [148, 163, 184],
-    })
+    writeWrapped(
+      carriedForwardCards.length > 0
+        ? 'No cards left undiscussed — the rest were carried forward.'
+        : 'All cards were discussed!',
+      {
+        size: 10,
+        style: 'italic',
+        color: [148, 163, 184],
+      },
+    )
   } else {
     writeCardGroup(undiscussedCards, [245, 158, 11])
   }
