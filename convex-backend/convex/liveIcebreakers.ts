@@ -18,26 +18,34 @@ import { rateLimiter } from './rateLimits'
 type Ctx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>
 
 /**
- * Assert the caller may participate in a session's live signals (reactions):
- * the session projection must exist and the caller must belong to its team (or
- * be a system admin). Gates the client-callable reaction functions so an
- * authenticated user can't write to or read from another team's session.
+ * Gate a caller's access to a session's live reaction signals.
+ *
+ * Returns `'missing'` if the session projection doesn't exist — this is normal
+ * during teardown: ending a session deletes its projection while other users'
+ * reaction subscriptions are still briefly live, so treating a missing session
+ * as Forbidden would throw at every subscriber right after End. Callers decide
+ * what to do (the query returns nothing; the mutation rejects).
+ *
+ * When the session DOES exist, the caller must belong to its team (or be a
+ * system admin) — otherwise `assertTeamMembership` throws `Forbidden`, so an
+ * authenticated user still can't touch another team's session.
  */
-async function assertSessionMembership(
+async function checkSessionMembership(
   ctx: Ctx,
   identity: { subject: string; role?: string },
   sessionId: string,
-): Promise<void> {
+): Promise<'ok' | 'missing'> {
   const session = await ctx.db
     .query('liveIcebreakerSessions')
     .withIndex('by_session_id', (q) => q.eq('sessionId', sessionId))
     .unique()
 
   if (!session) {
-    throw new ConvexError('Forbidden')
+    return 'missing'
   }
 
   await assertTeamMembership(ctx, identity, session.teamId)
+  return 'ok'
 }
 
 const icebreakerSessionStatus = v.union(
@@ -261,8 +269,11 @@ export const sendReaction = mutation({
       key: identity.subject,
       throws: true,
     })
-    // Only members of the session's team may broadcast into it.
-    await assertSessionMembership(ctx, identity, args.sessionId)
+    // Only members of the session's team may broadcast into it. A missing
+    // session (already ended) can't be reacted to.
+    if ((await checkSessionMembership(ctx, identity, args.sessionId)) !== 'ok') {
+      throw new ConvexError('Forbidden')
+    }
 
     await ctx.db.insert('liveIcebreakerReactions', {
       sessionId: args.sessionId,
@@ -293,8 +304,14 @@ export const getRecentReactions = query({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
-    // Only members of the session's team may read its reactions.
-    await assertSessionMembership(ctx, identity, args.sessionId)
+    // Only members of the session's team may read its reactions. If the session
+    // is gone (ended), return nothing rather than throwing — other users'
+    // subscriptions stay live for a moment after End and would otherwise error.
+    if (
+      (await checkSessionMembership(ctx, identity, args.sessionId)) !== 'ok'
+    ) {
+      return []
+    }
     const cutoff = Date.now() - REACTION_TTL_MS
     const rows = await ctx.db
       .query('liveIcebreakerReactions')
