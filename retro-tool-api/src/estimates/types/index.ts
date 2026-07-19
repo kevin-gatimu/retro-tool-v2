@@ -1,14 +1,4 @@
 import type { StoryEstimateSession } from '../schema';
-import type { ClientData } from '../../common/types';
-
-/**
- * Socket `client.data` shape for the estimates gateway: the base auth data plus
- * the set of session rooms this socket has joined, so `handleDisconnect` can
- * clear presence for each of them.
- */
-export type EstimatesClientData = ClientData & {
-  joinedSessionIds?: Set<string>;
-};
 
 export type SessionSummary = StoryEstimateSession & {
   team: { id: string; name: string; emoji: string | null };

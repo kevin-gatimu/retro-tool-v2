@@ -26,10 +26,8 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
-import { getRetroSocket } from '@/lib/socket'
 import { RETROS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { RetroDetail } from '@/common/types/retros'
-import type { TRetroStatus } from '@/common/enums/retro.enums'
 import type { Template } from '@/common/types/templates'
 import { RetroReport } from '@/components/retro-report'
 import { MusicPlayer } from '@/components/music-player'
@@ -42,7 +40,7 @@ import { RetroLobbyView } from './components/retro-lobby-view'
 import { ReadyBar } from './components/ready-bar'
 import { PhaseAlerts } from './components/phase-alerts'
 import { DeleteRetroDialog } from './components/delete-retro-dialog'
-import type { CarriedForwardItem, LocalPendingCards, TypingUser } from './types'
+import type { LocalPendingCards, TypingUser } from './types'
 import { RetroBoardSkeleton, RetroDetailSkeleton } from './skeleton'
 
 // Lazy-load the heavy dnd-kit board so it stays out of the initial route chunk;
@@ -241,123 +239,6 @@ function RetroDetailPage() {
     stopTypingConvex,
     clearAllReadyConvex,
   ])
-
-  useEffect(() => {
-    if (usesConvexRealtime) {
-      return
-    }
-
-    const socket = getRetroSocket()
-
-    const joinRoom = () => socket.emit('join-retro', { retroId })
-
-    const onRetroChanged = ({
-      status,
-    }: {
-      retroId: string
-      status?: TRetroStatus
-    }) => {
-      if (status) {
-        queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
-          prev ? { ...prev, status } : prev,
-        )
-      }
-      void queryClient.invalidateQueries({ queryKey: ['retro', retroId] })
-      void queryClient.invalidateQueries({
-        queryKey: ['retro-previous-carried', retroId],
-      })
-    }
-
-    const onDiscussionCardChanged = ({
-      cardId,
-    }: {
-      retroId: string
-      cardId: string
-    }) => {
-      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
-        prev
-          ? {
-              ...prev,
-              currentDiscussionCardId: cardId,
-              currentDiscussionActionItemId: null,
-            }
-          : prev,
-      )
-    }
-
-    const onDiscussionActionItemChanged = ({
-      actionItemId,
-    }: {
-      retroId: string
-      actionItemId: string
-    }) => {
-      queryClient.setQueryData<RetroDetail>(['retro', retroId], (prev) =>
-        prev
-          ? {
-              ...prev,
-              currentDiscussionActionItemId: actionItemId,
-              currentDiscussionCardId: null,
-            }
-          : prev,
-      )
-    }
-
-    socket.on('retro-changed', onRetroChanged)
-    socket.on('connect', joinRoom)
-    socket.on('discussion-card-changed', onDiscussionCardChanged)
-    socket.on('discussion-action-item-changed', onDiscussionActionItemChanged)
-    const onCarriedForwardChanged = ({
-      retroId: changedRetroId,
-      actionItemId,
-    }: {
-      retroId: string
-      actionItemId?: string
-    }) => {
-      if (actionItemId) {
-        queryClient.setQueryData<CarriedForwardItem[]>(
-          ['retro-previous-carried', changedRetroId],
-          (prev) =>
-            Array.isArray(prev)
-              ? prev.filter((item) => item.id !== actionItemId)
-              : prev,
-        )
-        // Also prune the currently viewed retro key as a safety net.
-        queryClient.setQueryData<CarriedForwardItem[]>(
-          ['retro-previous-carried', retroId],
-          (prev) =>
-            Array.isArray(prev)
-              ? prev.filter((item) => item.id !== actionItemId)
-              : prev,
-        )
-      }
-
-      void queryClient.invalidateQueries({
-        queryKey: ['retro-previous-carried', changedRetroId],
-      })
-      void queryClient.invalidateQueries({
-        queryKey: ['retro-previous-carried', retroId],
-      })
-    }
-    socket.on('carried-forward-changed', onCarriedForwardChanged)
-
-    if (socket.connected) {
-      joinRoom()
-    } else {
-      socket.connect()
-    }
-
-    return () => {
-      socket.emit('leave-retro', { retroId })
-      socket.off('retro-changed', onRetroChanged)
-      socket.off('connect', joinRoom)
-      socket.off('discussion-card-changed', onDiscussionCardChanged)
-      socket.off(
-        'discussion-action-item-changed',
-        onDiscussionActionItemChanged,
-      )
-      socket.off('carried-forward-changed', onCarriedForwardChanged)
-    }
-  }, [retroId, queryClient, usesConvexRealtime])
 
   // Derive jobRole from the current user's participant entry (team role for this retro)
   const currentUserJobRole = useMemo(

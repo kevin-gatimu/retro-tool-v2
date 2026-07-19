@@ -17,7 +17,7 @@ import {
   Trash2,
   Vote,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -42,7 +42,6 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { UserAvatar } from '@/components/user-avatar'
 import { api } from '@/lib/api'
-import { getStandupSocket } from '@/lib/socket'
 import { STANDUPS_ENDPOINTS } from '@/lib/api-endpoints'
 import { usesConvexForStandups } from '@/lib/realtime-config'
 import { cn } from '@/lib/utils'
@@ -92,7 +91,6 @@ function StandupRoomPage() {
   const { standupId } = Route.useParams()
   const { date: dateParam } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
-  const queryClient = useQueryClient()
   const usesConvexRealtime = usesConvexForStandups()
 
   const date = dateParam ?? todayDateString()
@@ -117,44 +115,6 @@ function StandupRoomPage() {
     staleTime: 15_000,
     refetchInterval: usesConvexRealtime ? false : 10_000,
   })
-
-  // Socket.IO fallback realtime: refetch the room when anything changes.
-  useEffect(() => {
-    if (usesConvexRealtime) {
-      return
-    }
-
-    const socket = getStandupSocket()
-    const joinRoom = () => socket.emit('join-standup', { standupId })
-
-    const onEntryChanged = (payload: { standupId: string; date: string }) => {
-      void queryClient.refetchQueries({
-        queryKey: ['standup-entry', payload.standupId, payload.date],
-      })
-    }
-    const onStandupChanged = () => {
-      void queryClient.refetchQueries({
-        queryKey: ['standup-entry', standupId],
-      })
-    }
-
-    socket.on('standup-entry-changed', onEntryChanged)
-    socket.on('standup-changed', onStandupChanged)
-    socket.on('connect', joinRoom)
-
-    if (socket.connected) {
-      joinRoom()
-    } else {
-      socket.connect()
-    }
-
-    return () => {
-      socket.emit('leave-standup', { standupId })
-      socket.off('standup-entry-changed', onEntryChanged)
-      socket.off('standup-changed', onStandupChanged)
-      socket.off('connect', joinRoom)
-    }
-  }, [standupId, queryClient, usesConvexRealtime])
 
   if (isLoading) {
     return (

@@ -1,30 +1,35 @@
 import { useEffect } from 'react'
-import {
-  useQuery as useTanStackQuery,
-  useQueryClient,
-} from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
+import { useQuery as useTanStackQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { ESTIMATES_ENDPOINTS } from '@/lib/api-endpoints'
 import type { EstimateSession } from '@/common/types/estimates'
-import { getEstimateSocket } from '@/lib/socket'
 import { usesConvexForEstimates } from '@/lib/realtime-config'
 
 /**
- * Loads a live estimate session: fetches it via TanStack Query, joins the
- * session room on mount, and (when Socket.IO is the active realtime backend)
- * refetches on `session-changed` and navigates away on `session-ended`.
+ * Loads a live estimate session: fetches it via TanStack Query, marks the user
+ * present on mount and absent on unmount via REST, and relies on the Convex
+ * projection subscription for realtime updates. A slow backstop poll covers the
+ * one gap the subscription can't: a non-member viewer has no Convex board row
+ * and would otherwise never refresh.
  */
 export function useEstimateSession(sessionId: string) {
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
   const usesConvexRealtime = usesConvexForEstimates()
 
-  // Join session on mount
+  // Presence: mark online on mount, offline on unmount. The projection-sync
+  // fired by each REST write propagates the change to other participants — no
+  // socket connection is involved.
   useEffect(() => {
     api.post(ESTIMATES_ENDPOINTS.JOIN(sessionId)).catch(() => {
       // Silently ignore join errors
     })
+
+    return () => {
+      api
+        .post(ESTIMATES_ENDPOINTS.PARTICIPANT(sessionId), { online: false })
+        .catch(() => {
+          // Silently ignore leave errors (tab close / navigation away)
+        })
+    }
   }, [sessionId])
 
   const query = useTanStackQuery({
@@ -32,50 +37,12 @@ export function useEstimateSession(sessionId: string) {
     queryFn: () =>
       api.get<EstimateSession>(ESTIMATES_ENDPOINTS.BY_ID(sessionId)),
     staleTime: 30_000,
-    // Fallback sync in case a websocket room event is missed. In Convex mode
-    // team members get sub-second updates from the board subscription, but a
-    // non-member viewer has no Convex board row and would otherwise never
+    // Team members get sub-second updates from the Convex board subscription,
+    // but a non-member viewer has no Convex board row and would otherwise never
     // refresh — so keep a slow 15s poll as a harmless backstop for them (and a
-    // no-op for members). Non-convex mode keeps the fast 5s socket fallback.
-    refetchInterval: usesConvexRealtime ? 15_000 : 5_000,
+    // near no-op for members).
+    refetchInterval: 15_000,
   })
-
-  useEffect(() => {
-    if (usesConvexRealtime) {
-      return
-    }
-
-    const socket = getEstimateSocket()
-
-    const joinRoom = () => socket.emit('join-session', { sessionId })
-
-    const onSessionChanged = () => {
-      void queryClient.refetchQueries({
-        queryKey: ['estimate-session', sessionId],
-      })
-    }
-
-    const onSessionEnded = () => {
-      navigate({ to: '/estimate' })
-    }
-
-    socket.on('session-changed', onSessionChanged)
-    socket.on('session-ended', onSessionEnded)
-    socket.on('connect', joinRoom)
-
-    if (socket.connected) {
-      joinRoom()
-    } else {
-      socket.connect()
-    }
-
-    return () => {
-      socket.emit('leave-session', { sessionId })
-      socket.off('session-changed', onSessionChanged)
-      socket.off('session-ended', onSessionEnded)
-      socket.off('connect', joinRoom)
-    }
-  }, [sessionId, queryClient, navigate, usesConvexRealtime])
 
   return {
     session: query.data,

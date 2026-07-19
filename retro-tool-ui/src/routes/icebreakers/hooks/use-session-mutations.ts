@@ -3,8 +3,6 @@ import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { ICEBREAKERS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { TIcebreakerPromptDecision } from '@/common/enums/icebreaker.enums'
-import { getIcebreakerSocket } from '@/lib/socket'
-import { usesConvexForIcebreakers } from '@/lib/realtime-config'
 
 /**
  * `onEnded` fires after the session is ended so the caller can leave the
@@ -15,7 +13,6 @@ export function useSessionMutations(
   options?: { onEnded?: () => void },
 ) {
   const queryClient = useQueryClient()
-  const usesConvexRealtime = usesConvexForIcebreakers()
 
   const refetchSession = () => {
     void queryClient.refetchQueries({
@@ -37,16 +34,7 @@ export function useSessionMutations(
     mutationFn: (input: {
       decision: TIcebreakerPromptDecision
       sessionPromptId: string
-    }) => {
-      const httpPromise = api.post(
-        ICEBREAKERS_ENDPOINTS.SWIPE(sessionId),
-        input,
-      )
-      if (!usesConvexRealtime) {
-        getIcebreakerSocket().emit('swipe-prompt', { sessionId, ...input })
-      }
-      return httpPromise
-    },
+    }) => api.post(ICEBREAKERS_ENDPOINTS.SWIPE(sessionId), input),
     onSuccess: () => {
       refetchSession()
     },

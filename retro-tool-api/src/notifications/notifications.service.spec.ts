@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsService } from './notifications.service';
 import { DATABASE_CONNECTION } from '../database/database-connection';
-import { NotificationsGateway } from './notifications.gateway';
 import { PushService } from './push.service';
 import { NotificationsProjectionSyncService } from './notifications-projection-sync.service';
 
@@ -13,7 +12,6 @@ describe('NotificationsService', () => {
       providers: [
         NotificationsService,
         { provide: DATABASE_CONNECTION, useValue: {} },
-        { provide: NotificationsGateway, useValue: { emitToUser: jest.fn() } },
         { provide: PushService, useValue: { sendPush: jest.fn() } },
         {
           provide: NotificationsProjectionSyncService,

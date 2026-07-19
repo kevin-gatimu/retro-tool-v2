@@ -23,9 +23,8 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { IcebreakersService } from './icebreakers.service';
 import { IcebreakersQueryService } from './icebreakers-query.service';
 import { IcebreakersCreationService } from './icebreakers-creation.service';
-import { IcebreakersGateway } from './icebreakers.gateway';
 import { IcebreakersProjectionSyncService } from './icebreakers-projection-sync.service';
-import { StandupsGateway } from '../standups/standups.gateway';
+import { StandupsProjectionSyncService } from '../standups/standups-projection-sync.service';
 import type { SessionUser } from '../common/types';
 import {
   CreateIcebreakerSessionSchema,
@@ -56,19 +55,21 @@ export class IcebreakersController {
     private readonly icebreakersService: IcebreakersService,
     private readonly icebreakersQueryService: IcebreakersQueryService,
     private readonly icebreakersCreationService: IcebreakersCreationService,
-    private readonly icebreakersGateway: IcebreakersGateway,
     private readonly icebreakersProjectionSyncService: IcebreakersProjectionSyncService,
-    private readonly standupsGateway: StandupsGateway,
+    private readonly standupsProjectionSync: StandupsProjectionSyncService,
   ) {}
 
   /**
    * Sessions attached to a standup day appear in that room's feed, so any
    * mutation must also refresh the standup entry for everyone in the room.
    */
-  private async emitStandupIfAttached(sessionId: string): Promise<void> {
+  private async resyncStandupIfAttached(sessionId: string): Promise<void> {
     const link = await this.icebreakersService.getStandupLink(sessionId);
     if (link) {
-      this.standupsGateway.emitEntryChanged(link.standupId, link.entryDate);
+      await this.standupsProjectionSync.enqueueEntrySync(
+        link.standupId,
+        link.entryDate,
+      );
     }
   }
 
@@ -135,8 +136,8 @@ export class IcebreakersController {
       session.user.id,
       body,
     );
-    this.icebreakersGateway.emitSessionChanged(result.id);
-    await this.emitStandupIfAttached(result.id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(result.id);
+    await this.resyncStandupIfAttached(result.id);
     return result;
   }
 
@@ -151,8 +152,8 @@ export class IcebreakersController {
       session.user.id,
       true,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
-    await this.emitStandupIfAttached(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
+    await this.resyncStandupIfAttached(id);
     return result;
   }
 
@@ -173,8 +174,8 @@ export class IcebreakersController {
       body.decision,
       body.sessionPromptId,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
-    await this.emitStandupIfAttached(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
+    await this.resyncStandupIfAttached(id);
     return result;
   }
 
@@ -190,8 +191,8 @@ export class IcebreakersController {
       id,
       session.user.id,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
-    await this.emitStandupIfAttached(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
+    await this.resyncStandupIfAttached(id);
     return result;
   }
 
@@ -209,7 +210,7 @@ export class IcebreakersController {
       session.user.id,
       body.duration,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
     return result;
   }
 
@@ -225,8 +226,8 @@ export class IcebreakersController {
       id,
       body.name,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
-    await this.emitStandupIfAttached(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
+    await this.resyncStandupIfAttached(id);
     return result;
   }
 
@@ -240,8 +241,8 @@ export class IcebreakersController {
       id,
       session.user.id,
     );
-    this.icebreakersGateway.emitSessionChanged(id);
-    await this.emitStandupIfAttached(id);
+    await this.icebreakersProjectionSyncService.enqueueSessionSync(id);
+    await this.resyncStandupIfAttached(id);
     return result;
   }
 
@@ -260,7 +261,10 @@ export class IcebreakersController {
     );
     await this.icebreakersProjectionSyncService.enqueueSessionDelete(id);
     if (link) {
-      this.standupsGateway.emitEntryChanged(link.standupId, link.entryDate);
+      await this.standupsProjectionSync.enqueueEntrySync(
+        link.standupId,
+        link.entryDate,
+      );
     }
     return result;
   }

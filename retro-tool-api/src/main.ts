@@ -7,7 +7,6 @@ import helmet from 'helmet';
 import type { Express } from 'express';
 import { Config } from './config/configuration';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { SocketIoAdapter } from './adapters/socket-io.adapter';
 import { APP_VERSION } from './lib/app-version';
 import { configureHttpDispatcher } from './lib/http-dispatcher';
 
@@ -194,7 +193,6 @@ async function bootstrap() {
     });
   }
 
-  app.useWebSocketAdapter(new SocketIoAdapter(app));
   app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({

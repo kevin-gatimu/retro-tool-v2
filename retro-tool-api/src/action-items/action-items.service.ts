@@ -12,7 +12,7 @@ import * as retroSchema from '../retros/schema';
 import * as teamSchema from '../teams/schema';
 import { generateId } from '../lib/utils';
 import { CreateActionItemDto, UpdateActionItemDto } from './dto';
-import { RetrosGateway } from '../retros/retros.gateway';
+import { RetrosProjectionSyncService } from '../retros/retros-projection-sync.service';
 import {
   ACTION_ITEM_STATUSES,
   RETRO_STATUSES,
@@ -25,7 +25,7 @@ type Database = NodePgDatabase<typeof retroSchema & typeof teamSchema>;
 export class ActionItemsService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
-    private readonly retrosGateway: RetrosGateway,
+    private readonly retrosProjectionSyncService: RetrosProjectionSyncService,
   ) {}
 
   async createActionItem(userId: string, dto: CreateActionItemDto) {
@@ -168,10 +168,7 @@ export class ActionItemsService {
         );
     }
 
-    await this.emitRetroUpdatesForActionItem(
-      item.retroId,
-      dto.status === ACTION_ITEM_STATUSES.Completed ? actionItemId : undefined,
-    );
+    await this.emitRetroUpdatesForActionItem(item.retroId);
 
     return updated;
   }
@@ -200,7 +197,7 @@ export class ActionItemsService {
       .delete(retroSchema.actionItem)
       .where(eq(retroSchema.actionItem.id, actionItemId));
 
-    await this.emitRetroUpdatesForActionItem(item.retroId, actionItemId);
+    await this.emitRetroUpdatesForActionItem(item.retroId);
   }
 
   async createActionItemComment(
@@ -368,13 +365,9 @@ export class ActionItemsService {
     return !!row;
   }
 
-  private async emitRetroUpdatesForActionItem(
-    retroId: string,
-    actionItemId?: string,
-  ): Promise<void> {
-    // Always notify the retro that owns the action item
-    this.retrosGateway.emitRetroChanged(retroId);
-    this.retrosGateway.emitCarriedForwardChanged(retroId, actionItemId);
+  private async emitRetroUpdatesForActionItem(retroId: string): Promise<void> {
+    // Always re-project the retro that owns the action item
+    await this.retrosProjectionSyncService.enqueueRetroSync(retroId);
 
     const [retro] = await this.database
       .select({
@@ -403,8 +396,7 @@ export class ActionItemsService {
 
     for (const { id } of relatedRetros) {
       if (id === retroId) continue;
-      this.retrosGateway.emitRetroChanged(id);
-      this.retrosGateway.emitCarriedForwardChanged(id, actionItemId);
+      await this.retrosProjectionSyncService.enqueueRetroSync(id);
     }
   }
 }

@@ -16,7 +16,6 @@ import {
 import { AuthGuard, Roles, Session } from '@thallesp/nestjs-better-auth';
 import { RetrosService } from './retros.service';
 import { RetrosTemplatesService } from './retros-templates.service';
-import { RetrosGateway } from './retros.gateway';
 import { RetrosProjectionSyncService } from './retros-projection-sync.service';
 import {
   createRetroSchema,
@@ -73,7 +72,6 @@ export class RetrosController {
   constructor(
     private readonly retrosService: RetrosService,
     private readonly retrosTemplatesService: RetrosTemplatesService,
-    private readonly retrosGateway: RetrosGateway,
     private readonly retrosProjectionSyncService: RetrosProjectionSyncService,
   ) {}
 
@@ -242,8 +240,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.createRetro(session.user.id, body);
-    this.retrosGateway.emitRetroChanged(result.id);
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(result.id);
     return result;
   }
 
@@ -273,7 +270,6 @@ export class RetrosController {
   ) {
     const result = await this.retrosService.deleteRetro(session.user.id, id);
     await this.retrosProjectionSyncService.enqueueRetroDelete(id);
-    this.retrosGateway.emitRetroListChanged();
     return result;
   }
 
@@ -289,8 +285,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.startLobby(session.user.id, id);
-    this.retrosGateway.emitRetroStatusChanged(id, 'waiting');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -306,8 +301,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.startRetro(session.user.id, id);
-    this.retrosGateway.emitRetroStatusChanged(id, 'active');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -323,8 +317,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.moveToGrouping(session.user.id, id);
-    this.retrosGateway.emitRetroStatusChanged(id, 'grouping');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -340,8 +333,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.moveToVoting(session.user.id, id);
-    this.retrosGateway.emitRetroStatusChanged(id, 'voting');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -360,8 +352,7 @@ export class RetrosController {
       session.user.id,
       id,
     );
-    this.retrosGateway.emitRetroStatusChanged(id, 'discussing');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -377,8 +368,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.completeRetro(session.user.id, id);
-    this.retrosGateway.emitRetroStatusChanged(id, 'completed');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -410,7 +400,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.joinRetro(session.user.id, id);
-    this.retrosGateway.emitRetroChanged(id);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -431,7 +421,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.createCard(session.user.id, body);
-    this.retrosGateway.emitRetroChanged(body.retroId);
+    await this.retrosProjectionSyncService.enqueueRetroSync(body.retroId);
     return result;
   }
 
@@ -455,7 +445,7 @@ export class RetrosController {
       id,
       body,
     );
-    this.retrosGateway.emitRetroChanged(id);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -478,7 +468,7 @@ export class RetrosController {
       id,
       cardId,
     );
-    this.retrosGateway.emitRetroChanged(id);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -501,7 +491,8 @@ export class RetrosController {
       id,
       body,
     );
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -517,7 +508,8 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.deleteCard(session.user.id, id);
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -541,7 +533,8 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.voteForCard(session.user.id, id);
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -557,7 +550,8 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.removeVote(session.user.id, id);
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -583,7 +577,8 @@ export class RetrosController {
       id,
       body,
     );
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -599,7 +594,8 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.deleteComment(session.user.id, id);
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -621,7 +617,8 @@ export class RetrosController {
       id,
       body.content,
     );
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -654,7 +651,7 @@ export class RetrosController {
       id,
       body,
     );
-    this.retrosGateway.emitRetroChanged(id);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -680,7 +677,7 @@ export class RetrosController {
       id,
       cardId,
     );
-    this.retrosGateway.emitDiscussionCardChanged(id, cardId);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -711,7 +708,7 @@ export class RetrosController {
       id,
       actionItemId,
     );
-    this.retrosGateway.emitDiscussionActionItemChanged(id, actionItemId);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -733,7 +730,7 @@ export class RetrosController {
       id,
       cardId,
     );
-    this.retrosGateway.emitRetroChanged(id);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -759,7 +756,7 @@ export class RetrosController {
       body.cardIds,
     );
     if (result.created > 0) {
-      this.retrosGateway.emitRetroChanged(id);
+      await this.retrosProjectionSyncService.enqueueRetroSync(id);
     }
     return result;
   }

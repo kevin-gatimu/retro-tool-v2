@@ -27,7 +27,6 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { EstimatesService } from './estimates.service';
 import { EstimatesReportService } from './estimates-report.service';
 import { EstimatesProjectionSyncService } from './estimates-projection-sync.service';
-import { EstimatesGateway } from './estimates.gateway';
 import type { SessionUser } from '../common/types';
 import {
   CreateEstimateSessionSchema,
@@ -68,15 +67,13 @@ export class EstimatesController {
     private readonly estimatesService: EstimatesService,
     private readonly estimatesReportService: EstimatesReportService,
     private readonly estimatesProjectionSync: EstimatesProjectionSyncService,
-    private readonly estimatesGateway: EstimatesGateway,
   ) {}
 
   /**
-   * Trigger the same Convex projection re-sync the gateway's `emitSessionChanged`
-   * performs, minus the Socket.IO room broadcast. Both write paths (this REST
-   * controller and {@link EstimatesGateway}) coexist during the migration; the
-   * REST path pushes state to Convex directly via the outbox-backed sync service
-   * so estimates can later run Convex-only.
+   * Push the session's latest state to the Convex projection via the
+   * outbox-backed sync service. Estimates run Convex-only for realtime: the UI
+   * subscribes to the projection (plus a slow backstop poll) rather than a
+   * Socket.IO room, so every write path funnels through here after mutating.
    */
   private syncSession(sessionId: string): void {
     void this.estimatesProjectionSync.enqueueSessionSync(sessionId);
@@ -197,7 +194,7 @@ export class EstimatesController {
     return this.estimatesService
       .createSession(session.user.id, body)
       .then((result) => {
-        this.estimatesGateway.emitSessionChanged(result.id);
+        this.syncSession(result.id);
         return result;
       });
   }
@@ -213,7 +210,7 @@ export class EstimatesController {
       session.user.id,
       true,
     );
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -322,7 +319,7 @@ export class EstimatesController {
       session.user.id,
       body.points,
     );
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -336,7 +333,7 @@ export class EstimatesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const result = await this.estimatesService.removeVote(id, session.user.id);
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -347,7 +344,7 @@ export class EstimatesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const result = await this.estimatesService.revealVotes(id, session.user.id);
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -365,7 +362,7 @@ export class EstimatesController {
       session.user.id,
       body,
     );
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -383,7 +380,7 @@ export class EstimatesController {
       session.user.id,
       body,
     );
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -401,7 +398,7 @@ export class EstimatesController {
       session.user.id,
       body,
     );
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -419,7 +416,7 @@ export class EstimatesController {
       session.user.id,
       body.name,
     );
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -437,7 +434,7 @@ export class EstimatesController {
       session.user.id,
       body.duration,
     );
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -457,7 +454,7 @@ export class EstimatesController {
       session.user.id,
       body.agreedPoints,
     );
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -470,7 +467,7 @@ export class EstimatesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const result = await this.estimatesService.revote(id, session.user.id);
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 
@@ -481,7 +478,7 @@ export class EstimatesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const result = await this.estimatesService.endSession(id, session.user.id);
-    this.estimatesGateway.emitSessionChanged(id);
+    this.syncSession(id);
     return result;
   }
 

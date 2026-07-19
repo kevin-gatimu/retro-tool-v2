@@ -16,11 +16,6 @@ export type SessionUserWithSession = {
 };
 
 /**
- * WebSocket client data attached to socket instances
- */
-export type ClientData = { userId?: string };
-
-/**
  * Shared period type for reports filters
  */
 export type ReportPeriod = 'week' | 'month' | 'quarter' | 'year';

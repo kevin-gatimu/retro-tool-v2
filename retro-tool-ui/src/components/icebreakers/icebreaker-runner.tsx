@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft,
   ArrowRight,
@@ -32,7 +32,6 @@ import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 import { api } from '@/lib/api'
-import { getIcebreakerSocket } from '@/lib/socket'
 import { ICEBREAKERS_ENDPOINTS } from '@/lib/api-endpoints'
 import type { IcebreakerSession } from '@/common/types/icebreakers'
 import { ICEBREAKER_SESSION_STATUSES } from '@/common/enums/icebreaker.enums'
@@ -56,23 +55,21 @@ interface IcebreakerRunnerProps {
   variant?: RunnerVariant
   /**
    * Leave the runner. Standalone navigates back to the list; embedded closes
-   * the modal. Also fired when the host ends the session, or a realtime
-   * `session-ended` arrives.
+   * the modal. Also fired when the host ends the session.
    */
   onExit: () => void
 }
 
 /**
- * Portable icebreaker runtime: joins the session, keeps it live (Convex or
- * socket), and drives the curating → presenting → completed phases. Reused by
- * the standalone `/icebreakers/$sessionId` route and the standup-room modal.
+ * Portable icebreaker runtime: joins the session, keeps it live via Convex,
+ * and drives the curating → presenting → completed phases. Reused by the
+ * standalone `/icebreakers/$sessionId` route and the standup-room modal.
  */
 export function IcebreakerRunner({
   sessionId,
   variant = 'page',
   onExit,
 }: IcebreakerRunnerProps) {
-  const queryClient = useQueryClient()
   const usesConvexRealtime = usesConvexForIcebreakers()
 
   // Join session on mount.
@@ -93,46 +90,6 @@ export function IcebreakerRunner({
     staleTime: 30_000,
     refetchInterval: usesConvexRealtime ? false : 5_000,
   })
-
-  useEffect(() => {
-    if (usesConvexRealtime) {
-      return
-    }
-
-    const socket = getIcebreakerSocket()
-    const joinRoom = () => socket.emit('join-session', { sessionId })
-
-    const onSessionChanged = () => {
-      void queryClient.refetchQueries({
-        queryKey: ['icebreaker-session', sessionId],
-      })
-    }
-    const onSessionEnded = () => {
-      // Drop stale list caches so the ended session doesn't linger as ongoing.
-      void queryClient.invalidateQueries({
-        queryKey: ['active-icebreaker-sessions'],
-      })
-      void queryClient.invalidateQueries({ queryKey: ['icebreaker-history'] })
-      onExit()
-    }
-
-    socket.on('session-changed', onSessionChanged)
-    socket.on('session-ended', onSessionEnded)
-    socket.on('connect', joinRoom)
-
-    if (socket.connected) {
-      joinRoom()
-    } else {
-      socket.connect()
-    }
-
-    return () => {
-      socket.emit('leave-session', { sessionId })
-      socket.off('session-changed', onSessionChanged)
-      socket.off('session-ended', onSessionEnded)
-      socket.off('connect', joinRoom)
-    }
-  }, [sessionId, queryClient, onExit, usesConvexRealtime])
 
   const sync = usesConvexRealtime ? (
     <IcebreakerConvexSync sessionId={sessionId} />

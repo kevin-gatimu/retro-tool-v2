@@ -12,7 +12,6 @@ import * as notificationSchema from './schema';
 import * as authSchema from '../auth/schema';
 import * as teamSchema from '../teams/schema';
 import { Notification, NewNotification } from './schema';
-import { NotificationsGateway } from './notifications.gateway';
 import { PushService } from './push.service';
 import { NotificationsProjectionSyncService } from './notifications-projection-sync.service';
 import {
@@ -32,7 +31,6 @@ export class NotificationsService {
 
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
-    private readonly gateway: NotificationsGateway,
     private readonly pushService: PushService,
     private readonly notificationsProjectionSyncService: NotificationsProjectionSyncService,
   ) {}
@@ -103,8 +101,6 @@ export class NotificationsService {
       .insert(notificationSchema.notification)
       .values({ id, ...data })
       .returning();
-
-    this.gateway.emitToUser(data.userId, 'notification', created);
 
     void this.notificationsProjectionSyncService
       .enqueueNotificationSync(created.id)

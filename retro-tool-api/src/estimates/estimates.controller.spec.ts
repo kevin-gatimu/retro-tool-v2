@@ -4,7 +4,6 @@ import { EstimatesController } from './estimates.controller';
 import { EstimatesService } from './estimates.service';
 import { EstimatesReportService } from './estimates-report.service';
 import { EstimatesProjectionSyncService } from './estimates-projection-sync.service';
-import { EstimatesGateway } from './estimates.gateway';
 import type { SessionUser } from '../common/types';
 
 const SESSION_ID = '11111111-1111-1111-1111-111111111111';
@@ -45,10 +44,6 @@ describe('EstimatesController', () => {
         { provide: EstimatesService, useValue: service },
         { provide: EstimatesReportService, useValue: {} },
         { provide: EstimatesProjectionSyncService, useValue: projectionSync },
-        {
-          provide: EstimatesGateway,
-          useValue: { emitSessionChanged: jest.fn() },
-        },
       ],
     }).compile();
 
