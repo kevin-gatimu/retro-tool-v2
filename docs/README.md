@@ -64,3 +64,11 @@ one-line summary. When a doc and the code disagree, trust the code — and pleas
 | Doc | What it covers |
 |---|---|
 | [future-roadmap.md](future-roadmap.md) | Planned features: AI summaries, Jira/ADO export, SAML, Team Spaces |
+
+## End-user guide
+
+The user-facing guide is **not** under `docs/` — it lives in `retro-tool-ui/docs/` and is built
+with VitePress. It is served same-origin at `/docs` from the Azure Static Web App.
+Full maintainer reference (architecture, how to run it, adding pages/images, deploy):
+[guidelines/user-guide-docs.md](guidelines/user-guide-docs.md).
+Do not edit `retro-tool-ui/docs/` from here — that tree is the guide's own content.

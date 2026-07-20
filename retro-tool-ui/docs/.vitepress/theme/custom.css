@@ -1,0 +1,38 @@
+/* Screenshots in the guide are click-to-zoom (see theme/index.ts). Make that
+   affordance obvious: a zoom cursor and a subtle lift/border on hover, plus a
+   soft frame so dark screenshots separate from the page background. Applies on
+   every screen size. */
+.vp-doc img {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  cursor: zoom-in;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.vp-doc img:hover {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  transform: translateY(-2px);
+}
+
+/* While zoomed, the overlay owns the image — drop the hover treatment so it
+   isn't offset or double-bordered inside the lightbox. */
+.medium-zoom-image--opened {
+  cursor: zoom-out;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Dim overlay sits above VitePress chrome so a zoomed shot is never clipped by
+   the sidebar/header on any viewport. */
+.medium-zoom-overlay {
+  z-index: 100;
+}
+.medium-zoom-image--opened {
+  z-index: 101;
+}

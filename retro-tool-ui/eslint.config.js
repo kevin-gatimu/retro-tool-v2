@@ -28,6 +28,9 @@ export default [
       'prettier.config.js',
       'commitlint.config.js',
       'public/**/*.js',
+      // VitePress user guide — has its own build/lint; not part of the app's
+      // TS project (excluded from tsconfig), so keep it out of the app lint too.
+      'docs/**',
     ],
   },
 ]
