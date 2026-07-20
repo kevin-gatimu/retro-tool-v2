@@ -1,19 +1,19 @@
 # Roles and permissions
 
-| Action                                            |          Team member           | Team lead | Org owner/admin | System/super admin |
-| ------------------------------------------------- | :----------------------------: | :-------: | :-------------: | :----------------: |
-| View a standup room and its submissions           |               ✅               |    ✅     |       ✅        |         ✅         |
-| Create a standup                                  |               ❌               |    ✅     |       ✅        |         ✅         |
-| Submit / edit / delete **your own** update        |               ✅               |    ✅     |       ✅        |         ✅         |
-| Comment on any submission                         |               ✅               |    ✅     |       ✅        |         ✅         |
-| Delete **your own** comment                       |               ✅               |    ✅     |       ✅        |         ✅         |
-| Delete **anyone's** comment                       |               ❌               |    ✅     |       ✅        |         ✅         |
-| Add a poll or icebreaker to a room                | if the day accepts submissions |    ✅     |       ✅        |         ✅         |
-| Export / email the report                         |               ✅               |    ✅     |       ✅        |         ✅         |
-| Edit standup (name, cadence, schedule, questions) |               ❌               |    ✅     |       ✅        |         ✅         |
-| Skip / restore a day                              |               ❌               |    ✅     |       ✅        |         ✅         |
-| End / reactivate a standup                        |               ❌               |    ✅     |       ✅        |         ✅         |
-| Delete a standup                                  |               ❌               |    ✅     |       ✅        |         ✅         |
+| Action                                            |          Team member           | Team lead | Org owner/admin |
+| ------------------------------------------------- | :----------------------------: | :-------: | :-------------: |
+| View a standup room and its submissions           |               ✅               |    ✅     |       ✅        |
+| Create a standup                                  |               ❌               |    ✅     |       ✅        |
+| Submit / edit / delete **your own** update        |               ✅               |    ✅     |       ✅        |
+| Comment on any submission                         |               ✅               |    ✅     |       ✅        |
+| Delete **your own** comment                       |               ✅               |    ✅     |       ✅        |
+| Delete **anyone's** comment                       |               ❌               |    ✅     |       ✅        |
+| Add a poll or icebreaker to a room                | if the day accepts submissions |    ✅     |       ✅        |
+| Export / email the report                         |               ✅               |    ✅     |       ✅        |
+| Edit standup (name, cadence, schedule, questions) |               ❌               |    ✅     |       ✅        |
+| Skip / restore a day                              |               ❌               |    ✅     |       ✅        |
+| End / reactivate a standup                        |               ❌               |    ✅     |       ✅        |
+| Delete a standup                                  |               ❌               |    ✅     |       ✅        |
 
 The standup's **creator** also always has manage rights on it, even if their
 team role later changes.
@@ -22,8 +22,7 @@ team role later changes.
 
 The room's **⋮** menu (edit, skip management, reactivate/end, delete) only
 appears if you can manage the standup — a team lead on the standup's team, an
-org owner/admin of its organization, a system/super admin, or the person who
-created it.
+org owner/admin of its organization, or the person who created it.
 
 ## Submitting is scoped to active, non-skipped days
 

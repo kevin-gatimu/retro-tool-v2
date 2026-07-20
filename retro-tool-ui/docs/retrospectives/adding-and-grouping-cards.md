@@ -8,6 +8,10 @@ column.
 
 ![Active board with cards added to each column](/retrospectives/retro-active-annotated.png)
 
+1. A card you added.
+2. The add-card input — type and press Enter, or click Add.
+3. **Move to Grouping** — the facilitator advances the phase from here.
+
 ### How to add a card
 
 1. Click the textarea at the bottom of any column.
@@ -45,6 +49,10 @@ same or very similar topic before voting starts.
 
 ![Grouping phase with checkboxes on each card](/retrospectives/retro-grouping-annotated.png)
 
+1. A card in the Grouping phase.
+2. Its **Select** checkbox — tick to include it in a merge.
+3. **Move to Voting** — the facilitator advances once grouping is done.
+
 ### Merging by drag and drop
 
 Drag one card on top of another card **in the same column** to merge them.
@@ -59,24 +67,21 @@ allowed.
 3. A **Merge (N)** button appears in the column header. Click it to merge all
    selected cards.
 
-**Before** — three separate cards selected, Merge (3) button active:
+**Before** — two similar cards selected, Merge (2) button active:
 
-![Three cards selected in grouping phase, Merge (3) button shown — markers: 1 = Merge button, 2–4 = individual selected cards](/retrospectives/merge-before-annotated.png)
+![Two cards selected in the grouping phase, with the Merge button active](/retrospectives/merge-before-annotated.png)
 
-| Marker | Element                                    |
-| ------ | ------------------------------------------ |
-| 1      | **Merge (3)** button in the column header  |
-| 2–4    | Individual cards, each checked for merging |
+1. **Merge (2)** button in the column header.
+2. First selected card, checked for merging.
+3. Second selected card, checked for merging.
 
-**After** — the three cards become one merged group:
+**After** — the two cards become one merged group:
 
-![Single merged card showing bulleted list of source content and '3 cards merged' badge](/retrospectives/merge-after-annotated.png)
+![Single merged card showing a bulleted list of source content and a '2 cards merged' badge](/retrospectives/merge-after-annotated.png)
 
-| Marker | Element                                                        |
-| ------ | -------------------------------------------------------------- |
-| 1      | Merged card showing all source texts as a bulleted list        |
-| 2      | **3 cards merged** badge (tooltip shows original author names) |
-| 3      | **Unmerge** button — available only during the Grouping phase  |
+1. Merged card, showing all source texts as a bulleted list.
+2. **2 cards merged** badge — hover to see the original authors.
+3. **Unmerge** button — available only during the Grouping phase.
 
 ### Merged card appearance
 

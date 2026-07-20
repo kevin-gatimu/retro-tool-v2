@@ -6,6 +6,10 @@ into concrete action items that carry forward to the next cycle.
 
 ![The Retrospectives list showing ongoing and completed retros](/retrospectives/retros-list-annotated.png)
 
+1. **New Retrospective** — start a new retro.
+2. **View toolbar** — group, sort, and switch layout.
+3. **A retro card** — click to open; the badge shows its current phase.
+
 ## How it works
 
 A retro moves through a fixed sequence of phases. The facilitator (creator or

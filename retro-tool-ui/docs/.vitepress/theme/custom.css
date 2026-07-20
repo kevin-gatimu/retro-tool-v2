@@ -1,3 +1,20 @@
+/* Match the app's brand green (--primary in retro-tool-ui/src/styles.css,
+   oklch(0.696 0.17 162.48) ≈ #00bc7d) so the guide feels like the same
+   product rather than a generic VitePress site. */
+:root {
+  --vp-c-brand-1: #00bc7d;
+  --vp-c-brand-2: #00a870;
+  --vp-c-brand-3: #009966;
+  --vp-c-brand-soft: rgba(0, 188, 125, 0.14);
+}
+
+.dark {
+  --vp-c-brand-1: #24c187;
+  --vp-c-brand-2: #1aad78;
+  --vp-c-brand-3: #00bc7d;
+  --vp-c-brand-soft: rgba(36, 193, 135, 0.16);
+}
+
 /* Screenshots in the guide are click-to-zoom (see theme/index.ts). Make that
    affordance obvious: a zoom cursor and a subtle lift/border on hover, plus a
    soft frame so dark screenshots separate from the page background. Applies on

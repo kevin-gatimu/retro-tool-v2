@@ -1,6 +1,6 @@
 # Managing a poll
 
-If you can manage a poll (its creator, or a team lead / org or system admin),
+If you can manage a poll (its creator, or a team lead / org admin),
 the card shows a **⋮** menu in the top-right corner with everything below.
 
 ![The poll actions menu, opened from the ⋮ button](/polls/manage-menu-annotated.png)

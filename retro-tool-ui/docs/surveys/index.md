@@ -31,9 +31,9 @@ Every survey is created at one of three scopes, chosen when it's created and
 
 - **Team** — visible to members of one team you belong to.
 - **Organization** — visible to everyone in one organization you're an
-  owner/admin of (or, for system admins, any organization).
-- **System** ("Everyone") — visible to every user in the system. Only
-  system/super admins can create these.
+  owner/admin of.
+- **System** ("Everyone") — visible to every user in the system. Creating
+  these is restricted to select roles.
 
 ## The three screens
 

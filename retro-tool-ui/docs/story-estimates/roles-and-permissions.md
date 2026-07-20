@@ -11,23 +11,23 @@ permissions apply only to that person.
 
 ## Permission matrix
 
-| Action                     | Any team member | Facilitator (creator) | Team lead | Org/system admin |
-| -------------------------- | :-------------: | :-------------------: | :-------: | :--------------: |
-| View the session list      |       Yes       |          Yes          |    Yes    |       Yes        |
-| Join a session and vote    |       Yes       |          Yes          |    Yes    |       Yes        |
-| View the completed session |       Yes       |          Yes          |    Yes    |       Yes        |
-| Export PDF / email report  |       Yes       |          Yes          |    Yes    |       Yes        |
-| Start a round              |        —        |          Yes          |    Yes    |        —         |
-| Reveal votes               |        —        |          Yes          |    Yes    |        —         |
-| Set Agreed Points          |        —        |          Yes          |    Yes    |        —         |
-| Revote                     |        —        |          Yes          |    Yes    |        —         |
-| Start the next round       |        —        |          Yes          |    Yes    |        —         |
-| End the session            |        —        |          Yes          |    Yes    |       Yes        |
-| Delete a completed session |        —        |          Yes          |    Yes    |       Yes        |
+| Action                     | Any team member | Facilitator (creator) | Team lead | Org admin |
+| -------------------------- | :-------------: | :-------------------: | :-------: | :-------: |
+| View the session list      |       Yes       |          Yes          |    Yes    |    Yes    |
+| Join a session and vote    |       Yes       |          Yes          |    Yes    |    Yes    |
+| View the completed session |       Yes       |          Yes          |    Yes    |    Yes    |
+| Export PDF / email report  |       Yes       |          Yes          |    Yes    |    Yes    |
+| Start a round              |        —        |          Yes          |    Yes    |     —     |
+| Reveal votes               |        —        |          Yes          |    Yes    |     —     |
+| Set Agreed Points          |        —        |          Yes          |    Yes    |     —     |
+| Revote                     |        —        |          Yes          |    Yes    |     —     |
+| Start the next round       |        —        |          Yes          |    Yes    |     —     |
+| End the session            |        —        |          Yes          |    Yes    |    Yes    |
+| Delete a completed session |        —        |          Yes          |    Yes    |    Yes    |
 
 ::: tip Facilitator vs team lead
 Team leads share the facilitator controls (start rounds, reveal, set agreed
-points). Any org or system admin can end or delete a session regardless of who
+points). Any org admin can end or delete a session regardless of who
 created it.
 :::
 

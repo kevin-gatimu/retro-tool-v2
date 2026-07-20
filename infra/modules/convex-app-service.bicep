@@ -137,8 +137,12 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
           value: 'true'
         }
         {
+          // Warn-level only: the open-source backend logs an INFO line on every
+          // accepted admin-key request (the API pushes projections every few
+          // seconds), which floods the log stream and Log Analytics ingestion.
+          // Warnings and errors are still captured.
           name: 'RUST_LOG'
-          value: 'info'
+          value: 'warn'
         }
       ]
     }

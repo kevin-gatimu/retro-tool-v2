@@ -397,10 +397,11 @@ bearer migration for sockets is deferred).
 
 ### 10. Sign-out
 
-`signOutWithCleanup()` in [lib/auth-client.ts](../../retro-tool-ui/src/lib/auth-client.ts):
-clears the sessionStorage bearer token → `authClient.signOut()` → `POST
-/api/auth/sign-out` revokes the `session` row + expires the cookie. UI clears the
-query cache and returns to `/auth/sign-in`.
+`signOutWithCleanup(queryClient)` in [lib/auth-client.ts](../../retro-tool-ui/src/lib/auth-client.ts)
+takes the caller's TanStack `QueryClient` (passed via `useQueryClient()`) and: clears the
+sessionStorage bearer token → `authClient.signOut()` → `POST /api/auth/sign-out` revokes the
+`session` row + expires the cookie → `queryClient.clear()` (evicts all cached queries, avoiding
+stale-cache leakage across the sign-out/sign-in boundary). UI then returns to `/auth/sign-in`.
 
 ### 11. RBAC & approval lifecycle
 

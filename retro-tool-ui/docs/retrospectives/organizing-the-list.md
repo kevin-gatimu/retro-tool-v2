@@ -7,6 +7,11 @@ you across devices.
 
 ![Retrospectives list showing the toolbar with Group, Sort, Layout, and Show completed controls](/retrospectives/organize-toolbar-annotated.png)
 
+1. **Group** — how retros are divided into sections.
+2. **Sort** — the order within each group.
+3. **Layout** — Cards vs List.
+4. **Show completed** — toggle completed retros on or off.
+
 ## Toolbar controls
 
 ### Group
@@ -44,6 +49,8 @@ The **Cards** layout is useful when you want to scan status at a glance. The
 
 ![List layout — compact rows with one retrospective per row and the list button active](/retrospectives/organize-list-annotated.png)
 
+1. The **List** layout button, active.
+
 ### Show completed
 
 A toggle switch to the right of the layout buttons. When **on** (default),
@@ -57,6 +64,9 @@ Each group section header has a chevron button. Click any header to collapse
 or expand that section.
 
 ![ONGOING sub-group collapsed while COMPLETED remains expanded](/retrospectives/organize-collapsed-annotated.png)
+
+1. **Ongoing** — collapsed (chevron points right).
+2. **Completed** — expanded (chevron points down).
 
 ::: tip Completed groups auto-collapse
 When you first open the list, completed retrospectives are collapsed by default

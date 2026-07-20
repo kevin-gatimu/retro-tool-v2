@@ -20,7 +20,7 @@ even if empty.
 
 ## Skipping a day
 
-A team lead, org admin, or system admin can mark a scheduled day as skipped
+A team lead or org admin can mark a scheduled day as skipped
 — useful for holidays or days the team is off. From the room's manage menu
 (**⋮**), choose **Skip this day** (or **Restore this day** if it's already
 skipped), or open **Manage skipped days…** for a full calendar view.

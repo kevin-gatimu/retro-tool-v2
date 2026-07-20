@@ -5,6 +5,11 @@ a split-panel discussion view.
 
 ![Discussion phase: queue sidebar, focused card, and discussion notes panel](/retrospectives/retro-discussion-annotated.png)
 
+1. Discussion queue — all cards, sorted by vote count.
+2. The focused card, shown to every participant.
+3. **Mark as Discussed** for the focused card.
+4. **Discussion Notes** — add a note about the focused card.
+
 ## The discussion layout
 
 The screen has two main areas:
@@ -50,7 +55,11 @@ If a previous retro (on the same team) had cards that were marked for
 carry-forward, they appear as a separate **Carried Forward** section at the
 bottom of the sidebar, below the current retro's discussion queue.
 
-![Discussion view showing 'Discussion Points (1)' for the current retro's cards and 'Carried Forward (2)' section for items brought from the previous retro](/retrospectives/carried-forward-discussion-annotated.png)
+![Discussion view showing the current retro's discussion queue and a Carried Forward section below it](/retrospectives/carried-forward-discussion-annotated.png)
+
+1. **Discussion Points** — this retro's own cards.
+2. **Carried Forward** — items brought over from a previous retro.
+3. A carried-forward item focused in the main panel, with its amber label.
 
 The facilitator can:
 

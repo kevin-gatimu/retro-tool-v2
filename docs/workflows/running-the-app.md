@@ -35,6 +35,7 @@ All commands run from the repo root.
 | **UI** | `pnpm dev:ui` | `pnpm dev:ui:staging` | `pnpm dev:ui:prod` |
 | **Convex watcher** | `pnpm dev:convex` | `pnpm dev:convex:staging` | `pnpm dev:convex:prod` |
 | **API + UI together** | `pnpm local:dev` | `pnpm dev:staging` | — |
+| **API + UI + Convex + docs** | `pnpm local:dev:all` | — | — |
 | **Env file** | `.env.local` | `.env.staging-local` | `.env.production-local` |
 
 Under the hood the `:staging` / `:prod` scripts use `dotenv-cli` to pre-load the environment-specific
@@ -56,7 +57,8 @@ pnpm dev:convex    # Convex function watcher (self-hosted)
 ```
 
 Or start the full stack in Docker with `pnpm local:up`, and run all three app processes together with
-`pnpm local:dev`. Stop infra with `pnpm local:down`; tail logs with `pnpm local:logs`.
+`pnpm local:dev` (add the VitePress user-guide dev server too with `pnpm local:dev:all`). Stop infra
+with `pnpm local:down`; tail logs with `pnpm local:logs`.
 
 `.env.local` points at the **self-hosted** Convex, whose JWKS URL is your own localhost — so the
 three-way JWT alignment described below is automatic. First run: `pnpm local:bootstrap` (seed) /

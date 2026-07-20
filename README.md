@@ -25,16 +25,16 @@ A collaborative agile retrospective and story-estimation platform. Built for eng
 
 Retro Tool provides everything a team needs to run effective agile ceremonies:
 
-| Feature                         | Description                                                                                                                                             |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Retrospectives**        | Phased retro boards (brainstorm → group → vote → discuss → action items) with built-in templates (Start/Stop/Continue, 4Ls, Mad/Sad/Glad, and more) |
-| **Story Estimates**       | Real-time story-estimation sessions with reveal mechanics and consensus tracking                                                                        |
-| **Organizations & Teams** | Hierarchical org → team → member structure with fine-grained RBAC                                                                                     |
-| **Action Items**          | Per-retro action items with carry-forward tracking across sessions                                                                                      |
-| **Reports & Analytics**   | Dashboards for retro completion rates, card counts, vote counts, and action item health — answered from PostgreSQL via the `/api/reports/v2/*` endpoints |
-| **Notifications**         | In-app notification centre + browser push notifications (VAPID)                                                                                         |
-| **Email Workflows**       | Retro reminders, weekly digests, and transactional email via Resend                                                                                     |
-| **Multi-Session Auth**    | Email/password + OAuth (Microsoft) via Better Auth with multi-session support                                                                           |
+| Feature                         | Description                                                                                                                                                |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Retrospectives**        | Phased retro boards (brainstorm → group → vote → discuss → action items) with built-in templates (Start/Stop/Continue, 4Ls, Mad/Sad/Glad, and more)    |
+| **Story Estimates**       | Real-time story-estimation sessions with reveal mechanics and consensus tracking                                                                           |
+| **Organizations & Teams** | Hierarchical org → team → member structure with fine-grained RBAC                                                                                        |
+| **Action Items**          | Per-retro action items with carry-forward tracking across sessions                                                                                         |
+| **Reports & Analytics**   | Dashboards for retro completion rates, card counts, vote counts, and action item health — answered from PostgreSQL via the`/api/reports/v2/*` endpoints |
+| **Notifications**         | In-app notification centre + browser push notifications (VAPID)                                                                                            |
+| **Email Workflows**       | Retro reminders, weekly digests, and transactional email via Resend                                                                                        |
+| **Multi-Session Auth**    | Email/password + OAuth (Microsoft) via Better Auth with multi-session support                                                                              |
 
 ---
 
@@ -214,16 +214,16 @@ User casts a vote in browser
 
 ### What Convex Manages
 
-| Module                   | What it stores                                                             | Queries exposed to browser                             |
-| ------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `liveRetros.ts`        | Active retro board snapshot (cards, votes, phase, participants)   | `getRetroBoard`        |
-| `liveEstimates.ts`     | Active estimate session snapshot (stories, votes, reveal state)   | `getEstimateBoard`     |
-| `liveStandups.ts`      | Active standup snapshot (updates, participants)                   | `getStandupBoard`      |
-| `liveIcebreakers.ts`   | Active icebreaker snapshot                                        | `getIcebreakerBoard`   |
-| `liveSurveys.ts` / `livePolls.ts` | Active survey / poll snapshot and live results         | `getSurvey`, `getPoll` |
-| `liveTeamMembers.ts`   | Team-member presence / roster projection                         | `getTeamMembers`       |
-| `liveNotifications.ts` | Per-user notification projection                                  | `getUserNotifications` |
-| `rateLimits.ts`        | Token-bucket and fixed-window guards on every upsert              | —                      |
+| Module                                | What it stores                                                  | Queries exposed to browser |
+| ------------------------------------- | --------------------------------------------------------------- | -------------------------- |
+| `liveRetros.ts`                     | Active retro board snapshot (cards, votes, phase, participants) | `getRetroBoard`          |
+| `liveEstimates.ts`                  | Active estimate session snapshot (stories, votes, reveal state) | `getEstimateBoard`       |
+| `liveStandups.ts`                   | Active standup snapshot (updates, participants)                 | `getStandupBoard`        |
+| `liveIcebreakers.ts`                | Active icebreaker snapshot                                      | `getIcebreakerBoard`     |
+| `liveSurveys.ts` / `livePolls.ts` | Active survey / poll snapshot and live results                  | `getSurvey`, `getPoll` |
+| `liveTeamMembers.ts`                | Team-member presence / roster projection                        | `getTeamMembers`         |
+| `liveNotifications.ts`              | Per-user notification projection                                | `getUserNotifications`   |
+| `rateLimits.ts`                     | Token-bucket and fixed-window guards on every upsert            | —                         |
 
 > Historical/analytical reporting is **not** in Convex — the `@convex-dev/aggregate` counters that once backed a `liveReports` module were retired in the reports v2 redesign. Report dashboards are now answered from PostgreSQL via `/api/reports/v2/*`.
 
@@ -376,6 +376,7 @@ files, runs migrations + seeds, and deploys the Convex functions:
 ```powershell
 pnpm local:bootstrap      # full setup (add --reset via `pnpm local:reset` for a clean slate)
 pnpm local:dev            # then run API + UI + Convex watcher, each reading its own .env.local
+pnpm local:dev:all        # same, plus the VitePress user-guide dev server (retro-tool-ui/docs)
 ```
 
 `local:bootstrap` is idempotent — safe to re-run any time creds or the admin key
@@ -635,25 +636,25 @@ az deployment sub create --location southafricanorth --template-file infra/deplo
 
 ### Project-wide
 
-| Document                                                  | Description                                                        |
-| --------------------------------------------------------- | ------------------------------------------------------------------ |
-| [docs/security/rbac.md](docs/security/rbac.md)                               | Complete role and permission matrices                              |
-| [docs/workflows/app-flows.md](docs/workflows/app-flows.md)                     | Every major user-facing flow (auth, org, team, retro, estimates)   |
+| Document                                                                                    | Description                                                                        |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [docs/security/rbac.md](docs/security/rbac.md)                                               | Complete role and permission matrices                                              |
+| [docs/workflows/app-flows.md](docs/workflows/app-flows.md)                                   | Every major user-facing flow (auth, org, team, retro, estimates)                   |
 | [docs/workflows/invitations-and-onboarding.md](docs/workflows/invitations-and-onboarding.md) | Invitation system (org + team), accept-invite journey, onboarding & password rules |
-| [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md) | Running Convex in Docker (local + production)                      |
-| [docs/future-roadmap.md](docs/future-roadmap.md)           | Planned features: IceBreakers, AI summaries, Jira/ADO export, SAML |
+| [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md)             | Running Convex in Docker (local + production)                                      |
+| [docs/future-roadmap.md](docs/future-roadmap.md)                                             | Planned features: IceBreakers, AI summaries, Jira/ADO export, SAML                 |
 
 ### Infrastructure & Deployment
 
-| Document | Description |
-| --- | --- |
-| [infra/README.md](infra/README.md) | Bicep deployment commands, what-if, outputs, post-provisioning checklist |
-| [infra/README-oidc.md](infra/README-oidc.md) | OIDC federated-credential setup for GitHub Actions |
-| [docs/deployment/azure-provisioning.md](docs/deployment/azure-provisioning.md) | Full provisioning walkthrough |
-| [docs/deployment/azure-resources.md](docs/deployment/azure-resources.md) | Azure resource inventory and architecture |
-| [docs/deployment/convex-azure-self-hosting-plan.md](docs/deployment/convex-azure-self-hosting-plan.md) | Plan for self-hosting Convex on Azure App Service |
-| [docs/deployment/convex-staging-runbook.md](docs/deployment/convex-staging-runbook.md) | Staging Convex deployment runbook |
-| [docs/deployment/release-and-branch-strategy.md](docs/deployment/release-and-branch-strategy.md) | Branch model, release-please versioning, conventional commits, deploy triggers |
+| Document                                                                                              | Description                                                                    |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [infra/README.md](infra/README.md)                                                                     | Bicep deployment commands, what-if, outputs, post-provisioning checklist       |
+| [infra/README-oidc.md](infra/README-oidc.md)                                                           | OIDC federated-credential setup for GitHub Actions                             |
+| [docs/deployment/azure-provisioning.md](docs/deployment/azure-provisioning.md)                         | Full provisioning walkthrough                                                  |
+| [docs/deployment/azure-resources.md](docs/deployment/azure-resources.md)                               | Azure resource inventory and architecture                                      |
+| [docs/deployment/convex-azure-self-hosting-plan.md](docs/deployment/convex-azure-self-hosting-plan.md) | Plan for self-hosting Convex on Azure App Service                              |
+| [docs/deployment/convex-staging-runbook.md](docs/deployment/convex-staging-runbook.md)                 | Staging Convex deployment runbook                                              |
+| [docs/deployment/release-and-branch-strategy.md](docs/deployment/release-and-branch-strategy.md)       | Branch model, release-please versioning, conventional commits, deploy triggers |
 
 ### Backend
 
@@ -669,10 +670,10 @@ az deployment sub create --location southafricanorth --template-file infra/deplo
 
 ### Realtime
 
-| Document                                                  | Description                                     |
-| --------------------------------------------------------- | ----------------------------------------------- |
+| Document                                                                        | Description                                     |
+| ------------------------------------------------------------------------------- | ----------------------------------------------- |
 | [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md) | Running Convex in Docker (local and production) |
-| [convex-backend/README.md](convex-backend/README.md)       | Convex backend setup and modules                |
+| [convex-backend/README.md](convex-backend/README.md)                             | Convex backend setup and modules                |
 
 ---
 

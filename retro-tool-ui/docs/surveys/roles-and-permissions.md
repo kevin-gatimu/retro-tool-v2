@@ -1,34 +1,32 @@
 # Roles and permissions
 
 Survey permissions depend on the survey's **scope** (Team / Organization /
-System) and, within that scope, your role. System and super admins can do
-everything, everywhere.
+System) and, within that scope, your role.
 
 ## Who can create a survey at each scope
 
-| Scope               | Who can create                                                    |
-| ------------------- | ----------------------------------------------------------------- |
-| Team                | Any member of that team, or a system/super admin.                 |
-| Organization        | An org owner/admin of that organization, or a system/super admin. |
-| System ("Everyone") | System/super admins only.                                         |
+| Scope               | Who can create                           |
+| ------------------- | ---------------------------------------- |
+| Team                | Any member of that team.                 |
+| Organization        | An org owner/admin of that organization. |
+| System ("Everyone") | Restricted to select roles.              |
 
 The **Scope** dropdown in the create dialog only ever shows the scopes you're
 actually allowed to use.
 
 ## Who can edit a survey (title, description, questions)
 
-The survey's **creator**, or a system/super admin. This holds at every scope
-— system-wide surveys are editable only by system/super admins (who are also
-the only people who can create them). Scope, team, and organization can never
-be changed after creation, even by someone who can edit everything else.
+The survey's **creator**. This holds at every scope. Scope, team, and
+organization can never be changed after creation, even by someone who can
+edit everything else.
 
 ## Who can close, reopen, or delete a survey
 
-| Scope        | Who can manage (close/reopen/delete)                                                                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------ |
-| Team         | The creator, the team's lead, an org owner/admin of the team's parent organization, or a system/super admin. |
-| Organization | The creator, an org owner/admin of that organization, or a system/super admin.                               |
-| System       | System/super admins only — not even the creator otherwise, since only system/super admins can create these.  |
+| Scope        | Who can manage (close/reopen/delete)                                                   |
+| ------------ | -------------------------------------------------------------------------------------- |
+| Team         | The creator, the team's lead, or an org owner/admin of the team's parent organization. |
+| Organization | The creator, or an org owner/admin of that organization.                               |
+| System       | Restricted to select roles — not even the creator otherwise.                           |
 
 ## Who can see a survey
 

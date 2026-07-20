@@ -5,6 +5,10 @@ controls disappear and a thumbs-up button appears on every card.
 
 ![Voting phase with thumbs-up buttons and vote counts](/retrospectives/retro-voting-annotated.png)
 
+1. The votes-used banner — how many of your votes you've cast.
+2. A card's **👍** vote button and running count.
+3. **Move to Discuss** — the facilitator advances once voting is done.
+
 ## Casting a vote
 
 Click the **👍** button on any card to give it a vote. The button turns solid

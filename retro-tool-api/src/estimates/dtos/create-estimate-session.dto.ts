@@ -84,7 +84,7 @@ export const StartTimerSchema = z.object({
 
 export type StartTimerDto = z.infer<typeof StartTimerSchema>;
 
-export class StartTimerBody {
+export class EstimateStartTimerBody {
   @ApiProperty({ example: 120, description: 'Countdown seconds (max 3600)' })
   duration: number;
 }

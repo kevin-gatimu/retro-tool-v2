@@ -33,7 +33,7 @@ import {
   SwipePromptBody,
   SwipePromptDto,
   StartTimerSchema,
-  StartTimerBody,
+  IcebreakerStartTimerBody,
   StartTimerDto,
   UpdateSessionSchema,
   UpdateSessionBody,
@@ -191,7 +191,7 @@ export class IcebreakersController {
 
   @Post(':id/timer')
   @ApiOperation({ summary: 'Start a countdown timer for the current prompt' })
-  @ApiBody({ type: StartTimerBody })
+  @ApiBody({ type: IcebreakerStartTimerBody })
   @UsePipes(new ZodValidationPipe(StartTimerSchema))
   async startTimer(
     @Session() session: SessionUser,

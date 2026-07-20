@@ -7,8 +7,8 @@ can read, comment, and react to it throughout the day.
 A standup has a **cadence** (daily, weekly, fortnightly, or a one-time
 check-in) and a **schedule** of which days it runs. Every day it's scheduled
 for gets its own **room** — a persistent page where updates for that specific
-date live. Team leads, org admins, and system admins can create and manage
-standups; anyone on the team can submit an update, comment, and react.
+date live. Team leads and org admins can create and manage standups; anyone
+on the team can submit an update, comment, and react.
 
 ## The three screens
 

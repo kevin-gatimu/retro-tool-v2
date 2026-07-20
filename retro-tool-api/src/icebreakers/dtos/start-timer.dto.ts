@@ -7,7 +7,7 @@ export const StartTimerSchema = z.object({
 
 export type StartTimerDto = z.infer<typeof StartTimerSchema>;
 
-export class StartTimerBody {
+export class IcebreakerStartTimerBody {
   @ApiProperty({ example: 60, description: 'Countdown duration in seconds' })
   duration: number;
 }

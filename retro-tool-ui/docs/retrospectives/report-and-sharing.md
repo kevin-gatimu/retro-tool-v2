@@ -4,6 +4,10 @@ When a retro is completed, the board is replaced by the **Retro Report**.
 
 ![The completed retro report with stats and card sections](/retrospectives/retro-report-annotated.png)
 
+1. Stats row — participants, cards, votes cast, comments.
+2. **Report** menu — export as PDF or email the report.
+3. **Most Voted** — the card with the highest vote count.
+
 ## Report overview
 
 The report is accessible to any participant who opens the retro link after
@@ -59,13 +63,12 @@ then click **Carry Forward**. This creates action items on the current retro
 that will appear in the next retro's discussion phase as **Carried Forward**
 items.
 
-![Not Discussed section with two cards checked, Carry Forward button active — markers: 1 = Not Discussed section, 2–3 = checked cards, 4 = Carry Forward button](/retrospectives/carry-forward-selection-annotated.png)
+![Not Discussed section with two cards checked and the Carry Forward button active](/retrospectives/carry-forward-selection-annotated.png)
 
-| Marker | Element                                                                   |
-| ------ | ------------------------------------------------------------------------- |
-| 1      | **Not Discussed** section header                                          |
-| 2–3    | Cards checked for carry-forward                                           |
-| 4      | **Carry Forward (2)** button — enabled once at least one card is selected |
+1. **Not Discussed** section header.
+2. First card checked for carry-forward.
+3. Second card checked for carry-forward.
+4. **Carry Forward** button — enabled once at least one card is selected.
 
 After clicking **Carry Forward**, the report immediately updates: the selected
 cards are removed from **Not Discussed** and appear in a new **Carried
@@ -74,6 +77,8 @@ will show them in the **Carried From Previous Retro** section of its report.
 
 ![Sprint 43 Retro report showing 'Carried From Previous Retro (2)' section with two items brought forward from Sprint 42 Retro](/retrospectives/carried-from-previous-report-annotated.png)
 
+1. **Carried From Previous Retro** — items brought over from Sprint 42's carry-forward.
+
 Only the retro **creator** can carry items forward from the report (not the
 team lead or admins). The carry-forward button and checkboxes are hidden for
 all other roles.
@@ -81,7 +86,7 @@ all other roles.
 ## Deleting a retrospective
 
 The trash icon in the retro header is available to the creator, the team lead,
-org admins, and system admins. Clicking it opens a confirmation dialog. Deleting
+and org admins. Clicking it opens a confirmation dialog. Deleting
 a retro permanently removes it along with all its cards, votes, comments, and
 action items and cannot be undone.
 

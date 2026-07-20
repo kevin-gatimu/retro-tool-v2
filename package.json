@@ -21,6 +21,7 @@
     "local:bootstrap": "node scripts/local-dev.mjs",
     "local:reset": "node scripts/local-dev.mjs --reset",
     "local:dev": "pnpm --parallel --filter retro-tool-api --filter retro-tool-ui --filter convex-backend dev",
+    "local:dev:all": "concurrently -n api,ui,convex,docs -c blue,green,magenta,yellow \"pnpm dev:api\" \"pnpm dev:ui\" \"pnpm dev:convex\" \"pnpm --dir retro-tool-ui docs:dev\"",
     "dev:api": "pnpm --dir retro-tool-api dev",
     "dev:staging": "pnpm --parallel --filter retro-tool-api --filter retro-tool-ui dev:staging",
     "dev:api:staging": "pnpm --dir retro-tool-api dev:staging",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
+    "concurrently": "^9.1.2",
     "husky": "^9.1.7",
     "lint-staged": "^16.3.3"
   }

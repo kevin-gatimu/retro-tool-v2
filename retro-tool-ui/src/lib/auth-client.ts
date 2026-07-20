@@ -2,6 +2,7 @@ import { createAuthClient } from 'better-auth/react'
 import { passkeyClient } from '@better-auth/passkey/client'
 import { jwtClient, multiSessionClient } from 'better-auth/client/plugins'
 import { env } from '#/env'
+import type { QueryClient } from '@tanstack/react-query'
 
 // Storage key for the session bearer token. The bearer is the primary API
 // credential; the cookie is kept as a fallback during the cookie→bearer rollout.
@@ -85,9 +86,26 @@ export const authClient = createAuthClient({
 })
 
 /**
- * Enhanced sign-out that clears bearer token
+ * Enhanced sign-out that clears the bearer token and the React Query cache.
+ * Without the cache clear, a sign-out that isn't followed by a hard reload
+ * (most call sites navigate via `window.location`, but `header-user.tsx`'s
+ * does not) can leave the next signed-in user seeing the previous user's
+ * cached query results (e.g. the sidebar's `['sidebar-user']` query), since
+ * most queries aren't keyed by user id. `queryClient` is a required param
+ * (pass `useQueryClient()` from the calling component) rather than imported
+ * here, so this framework-agnostic auth module doesn't depend on the React
+ * Query integration layer — and so no call site can silently skip the clear.
+ * `clear()` wipes the whole cache rather than just user-scoped keys —
+ * deliberate: auditing every query key in the app for which ones are
+ * user-derived-but-unkeyed is its own project, and a full clear on sign-out
+ * (a rare, not-perf-sensitive event) is the safe default. Runs after
+ * `signOut()` resolves so no in-flight refetch races the credential being
+ * cleared.
  */
-export async function signOutWithCleanup(): Promise<void> {
+export async function signOutWithCleanup(
+  queryClient: QueryClient,
+): Promise<void> {
   clearBearerToken()
   await authClient.signOut()
+  queryClient.clear()
 }

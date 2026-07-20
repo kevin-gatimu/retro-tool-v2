@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   AlertCircle,
@@ -41,6 +41,7 @@ export const Route = createFileRoute('/profile/')({
 
 function ProfilePage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: session } = authClient.useSession()
   const [user, setUser] = useState<UserData | null>(null)
   const [isSaved, setIsSaved] = useState(false)
@@ -61,7 +62,7 @@ function ProfilePage() {
     mutationFn: () => api.delete(USERS_ENDPOINTS.BY_ID(user!.id)),
     onSuccess: async () => {
       toast.success('Your account has been deleted')
-      await signOutWithCleanup()
+      await signOutWithCleanup(queryClient)
       navigate({ to: '/auth/sign-in' })
     },
     onError: (err: Error) =>

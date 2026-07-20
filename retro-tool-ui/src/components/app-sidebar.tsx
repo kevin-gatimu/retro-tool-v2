@@ -1,6 +1,6 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { ChevronsUpDown, Laptop, LogOut, Moon, Sun } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSyncExternalStore } from 'react'
 import { UserAvatar } from '@/components/user-avatar'
 import { Badge } from '@/components/ui/badge'
@@ -105,6 +105,7 @@ function ThemeToggle() {
 
 export function AppSidebar() {
   const { data: session } = authClient.useSession()
+  const queryClient = useQueryClient()
   const routerState = useRouterState()
   const currentPath = routerState.location.pathname
 
@@ -168,7 +169,7 @@ export function AppSidebar() {
   }
 
   const handleSignOut = async () => {
-    await signOutWithCleanup()
+    await signOutWithCleanup(queryClient)
     window.location.href = '/auth/sign-in'
   }
 

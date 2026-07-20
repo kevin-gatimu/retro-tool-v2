@@ -51,7 +51,7 @@ import {
   UpdateSessionNameBody,
   type UpdateSessionNameDto,
   StartTimerSchema,
-  StartTimerBody,
+  EstimateStartTimerBody,
   type StartTimerDto,
   sendEstimateReportSchema,
   SendEstimateReportDto,
@@ -422,7 +422,7 @@ export class EstimatesController {
 
   @Post(':id/timer')
   @ApiOperation({ summary: 'Start a countdown timer for the session' })
-  @ApiBody({ type: StartTimerBody })
+  @ApiBody({ type: EstimateStartTimerBody })
   @UsePipes(new ZodValidationPipe(StartTimerSchema))
   async startTimer(
     @Session() session: SessionUser,

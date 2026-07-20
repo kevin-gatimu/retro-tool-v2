@@ -1,8 +1,8 @@
 # Creating a standup
 
 Creating a standup is a manager action. **New Standup** only appears on the
-standup list if you're a team lead on at least one team, an org owner/admin,
-or a system admin — the same rule the server enforces.
+standup list if you're a team lead on at least one team, or an org
+owner/admin — the same rule the server enforces.
 
 ![New standup form: details, schedule, and questions](/standups/new-standup-annotated.png)
 
