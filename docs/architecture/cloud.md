@@ -103,7 +103,7 @@ Provisioned by [`infra/main.bicep`](../../infra/main.bicep). Deployed via the Az
 | 3c | PostgreSQL Flexible Server | `Microsoft.DBforPostgreSQL/flexibleServers` | `retrotool-<env>-db` | **Standard_B1ms — Burstable** (1 vCore / 2 GiB) | Burstable compute + 32 GiB P4 storage | **System of record** — all durable business data (`retro_tool_db`). PG 17, 7-day backup, HA off, `AllowAzureServices` firewall, `?sslmode=require` |
 | 3d | App Service Plan (API) | `Microsoft.Web/serverfarms` | `retrotool-<env>-plan` | **P0v3 — PremiumV3**, Linux | Dedicated, always-on compute | Hosts the API web app |
 | 3e | App Service — API | `Microsoft.Web/sites` (`app,linux,container`) | `retrotool-<env>-api` | (on 3d) | (plan-based) | **NestJS REST + Socket.IO**. HTTPS-only, Always On, HTTP/2, **WebSockets on**, TLS 1.2, FTPS off, AcrPull via identity |
-| 3f | Static Web App | `Microsoft.Web/staticSites` | `retrotool-<env>-ui` | **Standard**, **West Europe** | Standard tier | **React UI**, edge-served. Staging environments enabled |
+| 3f | Static Web App | `Microsoft.Web/staticSites` | `retrotool-<env>-ui` | **Standard**, **West Europe** | Standard tier | **React UI** + **user guide**, edge-served. Staging environments enabled. `navigationFallback` rewrites unknown paths to `index.html` except `/docs/*` (served as static VitePress output) and other static asset patterns — see `retro-tool-ui/public/staticwebapp.config.json` |
 
 > **Entra ID App Registration** (global, not Bicep-managed) backs GitHub OIDC
 > login and Microsoft OAuth / Better Auth social sign-in.
@@ -188,7 +188,7 @@ flowchart LR
 
     c -->|"az deployment group create<br/>+ convex deploy"| cvx["Convex App Service"]
     a -->|"build image → ACR<br/>migrate → seed → deploy"| apisvc["API App Service"]
-    u -->|"vite build → SWA upload"| swa["Static Web App"]
+    u -->|"vite build + vitepress build → SWA upload"| swa["Static Web App"]
 ```
 
 | Workflow | Target | What it does |
@@ -196,7 +196,7 @@ flowchart LR
 | [`release-staging.yml`](../../.github/workflows/release-staging.yml) | orchestrator | On push to `staging` (path-filtered) or dispatch: runs `convex` → `api` → `ui` in order |
 | [`deploy-convex.yml`](../../.github/workflows/deploy-convex.yml) | `retrotool-staging-convex` | Validate (digest-pin + `az bicep build`) → single-worker guard → **stop-first** image upgrade (export → pause outbox → stop) → `az deployment group create` → start → wait `/version` → set Convex `JWT_*` env → `convex deploy` → resume outbox + reconcile |
 | [`deploy-api.yml`](../../.github/workflows/deploy-api.yml) | `retrotool-<env>-api` | Validate → build & push image to ACR → DB migrate → seed → set app settings (**GitHub is the source of truth** — overwrites portal edits) → deploy container → `/health/ready` check |
-| [`deploy-ui.yml`](../../.github/workflows/deploy-ui.yml) | `retrotool-<env>-ui` | Validate realtime flags → Vite build → `static-web-apps-deploy` upload of `dist` |
+| [`deploy-ui.yml`](../../.github/workflows/deploy-ui.yml) | `retrotool-<env>-ui` | Validate realtime flags → `pnpm --filter retro-tool-ui build` (`vite build` then `vitepress build docs`) → `static-web-apps-deploy` upload of `dist` (contains SPA at `/` and user guide at `/docs`) |
 
 > Deploy-time config lives in the GitHub environment (secrets + variables), synced
 > in bulk with [`scripts/sync-github-env.mjs`](../../scripts/sync-github-env.mjs)

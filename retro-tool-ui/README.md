@@ -22,6 +22,7 @@ The frontend application for the Retro Tool platform — a collaborative agile r
 9. [Roles Reference](#roles-reference)
 10. [Environment Setup](#environment-setup)
 11. [Running the App](#running-the-app)
+12. [User Guide (VitePress)](#user-guide-vitepress)
 
 ---
 
@@ -488,6 +489,52 @@ App runs at `http://localhost:3000`.
 
 > The API server must be running at `VITE_API_URL` (default `http://localhost:8000`) for
 > authentication and data fetching to work. The UI does not talk to Postgres directly.
+
+---
+
+## User Guide (VitePress)
+
+An end-user guide lives alongside the app source in `retro-tool-ui/docs/` and is built with
+VitePress. It is served same-origin at `/docs` from the same Azure Static Web App artifact as the
+React SPA.
+
+### How it works
+
+The VitePress config (`docs/.vitepress/config.ts`) sets:
+
+- `base: '/docs/'` — all asset URLs are rooted at `/docs`.
+- `outDir: '../dist/docs'` — output lands inside the Vite build output (`retro-tool-ui/dist/docs`),
+  so the `deploy-ui.yml` workflow's single upload of `retro-tool-ui/dist` ships both the SPA and
+  the guide.
+
+The SWA routing config (`public/staticwebapp.config.json`) excludes `/docs/*` from the SPA
+`navigationFallback` rewrite, so requests to `/docs/*` are served as plain static files rather than
+being rewritten to `index.html`.
+
+### Scripts (`retro-tool-ui/package.json`)
+
+| Script              | What it does                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `pnpm docs:dev`     | VitePress dev server with hot-reload (`vitepress dev docs`)                          |
+| `pnpm docs:build`   | Build the guide only (`vitepress build docs`)                                        |
+| `pnpm docs:preview` | Preview the built guide (`vitepress preview docs`)                                   |
+| `pnpm build`        | Full production build: `vite build` then `vitepress build docs` (both SPA and guide) |
+
+### Local development
+
+Run the VitePress dev server independently of the main app:
+
+```bash
+pnpm --filter retro-tool-ui docs:dev
+```
+
+The guide hot-reloads on any change to `retro-tool-ui/docs/**/*.md` or the VitePress config. It
+does not depend on the API or Convex being running.
+
+### Content location
+
+Do **not** edit files under `retro-tool-ui/docs/` via the maintainer docs tooling — that directory
+is the user-facing guide itself and is authored separately.
 
 ---
 
