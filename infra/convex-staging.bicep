@@ -95,6 +95,17 @@ resource runtimeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-
   tags: tags
 }
 
+// Keyed on the identity's resource-ID path (stable across redeploys), not its
+// principal ID -- Azure RBAC itself enforces uniqueness on
+// (principal, role, scope), so naming this by principal ID instead breaks the
+// normal case: it makes Bicep try to create a second assignment for a
+// permission that already exists, failing with RoleAssignmentExists. The
+// tradeoff: if runtimeIdentity is ever deleted and recreated, its principal ID
+// changes while this assignment's name stays the same, and Azure rejects the
+// update as RoleAssignmentUpdateNotPermitted. Recover by deleting the stale
+// assignment first (find it via `az rest --method get --url
+// "https://management.azure.com/<acr-resource-id>/providers/Microsoft.Authorization/roleAssignments?api-version=2022-04-01"`,
+// then `az rest --method delete` on the stale entry's id), then redeploy.
 resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(acr.id, runtimeIdentity.id, acrPullRoleId)
   scope: acr
