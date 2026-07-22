@@ -460,4 +460,12 @@ jobs:
           CONVEX_SYNC_URL: ${{ vars.CONVEX_SYNC_URL || secrets.CONVEX_SYNC_URL }}
           CONVEX_SYNC_ADMIN_KEY: ${{ secrets.CONVEX_SYNC_ADMIN_KEY || vars.CONVEX_SYNC_ADMIN_KEY }}
           NODE_ENV: production
+          # The CLI boots the full AppModule (AuthModule included), so the
+          # config schema's required fields must be set even though this job
+          # never issues or validates auth itself.
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || vars.BETTER_AUTH_SECRET }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL || vars.SWA_URL || secrets.FRONTEND_URL || secrets.SWA_URL }}
+          LOCAL_SERVER_URL: https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net
+          DEPLOYED_SERVER_URL: https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net
+          EMAIL_FROM: ${{ vars.EMAIL_FROM || secrets.EMAIL_FROM }}
         run: node dist/convex-admin/reconcile-projections.js
