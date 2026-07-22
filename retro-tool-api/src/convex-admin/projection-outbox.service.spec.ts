@@ -41,6 +41,7 @@ describe('ProjectionOutboxService', () => {
   const createService = (params: {
     pendingBatch: ProjectionOutboxRow[];
     paused?: boolean;
+    pausedUpdatedAt?: Date;
   }) => {
     const updates: Array<{ status?: string; nextAttemptAt?: Date }> = [];
 
@@ -65,7 +66,14 @@ describe('ProjectionOutboxService', () => {
           orderBy: () => chain,
           limit: (n: number) => {
             if (isPausedRead) {
-              return Promise.resolve([{ paused: params.paused ?? false }]);
+              return Promise.resolve([
+                {
+                  paused: params.paused ?? false,
+                  // Fresh by default so existing "currently paused" tests are
+                  // unaffected by the staleness check; override to exercise it.
+                  updatedAt: params.pausedUpdatedAt ?? new Date(),
+                },
+              ]);
             }
             if (n === 1) {
               // oldestPending / control single-row reads
@@ -89,6 +97,12 @@ describe('ProjectionOutboxService', () => {
           },
         }),
       })),
+      // Only exercised by setPaused's upsert (e.g. the stale-pause auto-heal).
+      insert: jest.fn(() => ({
+        values: () => ({
+          onConflictDoUpdate: () => Promise.resolve(),
+        }),
+      })),
     } as unknown as NodePgDatabase<never>;
 
     const configService = {
@@ -107,6 +121,37 @@ describe('ProjectionOutboxService', () => {
   it('does not dispatch when the dispatcher is paused', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch');
     const { service } = createService({ pendingBatch: [], paused: true });
+    service.registerHandler('retros', jest.fn());
+
+    const result = await service.dispatchPending();
+
+    expect(result.dispatched).toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('auto-resumes and dispatches when the pause is stale (older than 15min)', async () => {
+    const row = makeRow({});
+    const { service } = createService({
+      pendingBatch: [row],
+      paused: true,
+      pausedUpdatedAt: new Date(Date.now() - 20 * 60_000),
+    });
+    const handler = jest.fn().mockResolvedValue(undefined);
+    service.registerHandler('retros', handler);
+
+    const result = await service.dispatchPending();
+
+    expect(result.dispatched).toBe(1);
+    expect(handler).toHaveBeenCalled();
+  });
+
+  it('stays paused when the pause is recent (within 15min)', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const { service } = createService({
+      pendingBatch: [],
+      paused: true,
+      pausedUpdatedAt: new Date(Date.now() - 5 * 60_000),
+    });
     service.registerHandler('retros', jest.fn());
 
     const result = await service.dispatchPending();

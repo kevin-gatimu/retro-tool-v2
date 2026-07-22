@@ -23,6 +23,15 @@ import type {
 type Database = NodePgDatabase<typeof adminSchema>;
 
 const CONTROL_ID = 'singleton';
+// A pause is only ever meant to last for the duration of one reconciliation
+// pass or one image-upgrade maintenance window -- both measured in minutes.
+// If a pausing process dies before its own finally/resume runs (killed,
+// crashed, network partition), nothing else would ever clear the flag, since
+// callers deliberately leave an already-paused dispatcher alone (see
+// reconcileAll's alreadyPaused check) rather than guess whether it's a live
+// operator pause. Treating a pause older than this as abandoned closes that
+// gap regardless of what caused the process to die.
+const STALE_PAUSE_THRESHOLD_MS = 15 * 60 * 1000;
 // Bounded per drain pass so a single dispatch tick stays predictable and the
 // advisory-locked cron slot never holds the lock for an unbounded time.
 const DISPATCH_BATCH_SIZE = 200;
@@ -389,11 +398,29 @@ export class ProjectionOutboxService implements OnModuleDestroy {
 
   async isPaused(): Promise<boolean> {
     const [row] = await this.database
-      .select({ paused: adminSchema.projectionOutboxControl.paused })
+      .select({
+        paused: adminSchema.projectionOutboxControl.paused,
+        updatedAt: adminSchema.projectionOutboxControl.updatedAt,
+      })
       .from(adminSchema.projectionOutboxControl)
       .where(eq(adminSchema.projectionOutboxControl.id, CONTROL_ID))
       .limit(1);
-    return row?.paused ?? false;
+
+    if (!row?.paused) {
+      return false;
+    }
+
+    const pausedForMs = Date.now() - row.updatedAt.getTime();
+    if (pausedForMs > STALE_PAUSE_THRESHOLD_MS) {
+      this.logger.warn(
+        `Outbox has been paused for ${Math.round(pausedForMs / 60_000)}min with no resume — ` +
+          'treating as an abandoned pause (a pausing process likely died before its resume ran) and auto-resuming',
+      );
+      await this.setPaused(false);
+      return false;
+    }
+
+    return true;
   }
 
   async setPaused(paused: boolean, userId?: string): Promise<void> {
