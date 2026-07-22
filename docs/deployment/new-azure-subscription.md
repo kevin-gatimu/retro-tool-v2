@@ -36,15 +36,15 @@ Core stack — `infra/deploy.bicep` → `infra/main.bicep` (subscription scope, 
 | Container Registry (ACR) | `retrotool<env>acr` (hyphens stripped) | Standard, admin disabled, managed-identity pull |
 | User-Assigned Managed Identity | `retrotool-<env>-identity` | AcrPull on the ACR |
 | PostgreSQL Flexible Server | `retrotool-<env>-db` | Burstable B1ms, 32 GiB, PG **17**, DB `retro_tool_db`, `AllowAzureServices` firewall rule |
-| API App Service Plan | `retrotool-<env>-plan` | P0v3 (PremiumV3), Linux |
+| API App Service Plan | `retrotool-<env>-plan` | Bicep default is P0v3 (PremiumV3), Linux — safe to scale down to B1 Basic post-provision if you intend to share it with Convex (see below); the live staging/production plans both run B1 Basic today |
 | API App Service (container) | `retrotool-<env>-api` | WebSockets, HTTPS-only, Always On, min TLS 1.2 |
 | Static Web App (UI) | `retrotool-<env>-ui` | Standard, deployed to **westeurope** |
 
-Self-hosted Convex stack — `infra/convex-staging.bicep` + `infra/modules/*` (resource-group scope, deploys **into the existing RG**, reuses the ACR + PostgreSQL server):
+Self-hosted Convex stack — `infra/convex-staging.bicep` / `infra/convex-production.bicep` + `infra/modules/*` (resource-group scope, deploys **into the existing RG**, reuses the ACR + PostgreSQL server):
 
 | Resource | Bicep name pattern | Notes |
 |---|---|---|
-| Convex App Service Plan | `retrotool-<env>-convex-plan` | B1 Basic, single worker |
+| App Service Plan | **shared with the API's plan by default** — `apiAppServicePlanName` param | Both templates now pass `existingPlanResourceId` to `modules/convex-app-service.bicep` rather than provisioning a dedicated plan, so Convex runs on the **same plan as the API**. This only avoids extra cost when both are the same SKU/tier (both B1 Basic today). `apiAppServicePlanName` **defaults to this repo's actual live plan names** (`retrotool-staging-plan`, `ASP-retrotoolproductionrg-be95`) — **always override it** to your own `<API_WEBAPP_PLAN>` name (`retrotool-<env>-plan` from the core stack, step 3) on a new subscription, or the deployment will fail trying to reference a plan that doesn't exist. To provision a dedicated Convex plan instead (matching the original staging design — isolate Convex's WebSocket load from the API), pass `existingPlanResourceId=''` explicitly; the module then creates `retrotool-<env>-convex-plan` (B1 Basic, single worker) using the `planName`/`planSkuName`/`planSkuTier` params. |
 | Convex App Service (container) | `retrotool-<env>-convex` | Port 3210, `/version` health check, `/convex/data` Azure Files mount |
 | Convex runtime identity | `retrotool-<env>-convex-identity` | AcrPull + Key Vault Secrets User |
 | Key Vault | `retrotool-<env>-cvx-<hash>` | Holds `convex-instance-secret` + `convex-postgres-url`; **version-pinned** secret URIs |
@@ -90,13 +90,18 @@ Decide up front and keep a scratch file:
 | `<API_ORIGIN>` | Public API https origin | `https://retrotool-staging-api.azurewebsites.net` |
 | `<CONVEX_ORIGIN>` | Public Convex https origin | `https://retrotool-staging-convex.azurewebsites.net` |
 
-> **Mark of caution:** the automated GitHub workflow path
-> (`release-staging.yml` → `deploy-convex.yml`) is **staging-only** and hardcodes
-> `retrotool-staging-rg` / `retrotoolstagingacr` / `retrotool-staging-convex` in
-> its `env:` block. For a new subscription that is *also* named `staging`, the
-> workflows work as-is once secrets/vars are set. For a differently-named
-> environment, use the **manual `az` commands** in this guide (steps 5–9) and/or
-> edit those workflow `env:` values.
+> **Mark of caution:** each automated Convex workflow hardcodes its own env
+> names in its `env:` block. `release-staging.yml` → `deploy-convex.yml`
+> targets `retrotool-staging-rg` / `retrotoolstagingacr` / `retrotool-staging-convex`
+> and runs automatically on push to `staging`. A separate
+> `deploy-convex-production.yml` targets `retro_tool` / `retrotool` /
+> `retrotool-prod-convex` and is **manual `workflow_dispatch` only** — there is
+> no automated production release pipeline; trigger it deliberately after
+> `deploy-api`/`deploy-ui` have already gone out to `main`. For a new
+> subscription reusing either of these environment names, the workflows work
+> as-is once secrets/vars are set. For a differently-named environment, use the
+> **manual `az` commands** in this guide (steps 5–9), or copy one of the two
+> workflow files and edit its `env:` block.
 
 ---
 
@@ -194,6 +199,29 @@ az role assignment create \
 > If you run the initial provisioning manually as a human **Owner**, you already
 > have this — the grant is specifically so the **CI service principal** can
 > re-run the Convex deploy without subscription Owner.
+>
+> **If your account is the subscription's classic Account Admin** (common on
+> Visual Studio Enterprise / legacy CSP subscriptions), the `az role assignment`
+> subcommand itself can fail with `(MissingSubscription) The request did not
+> have a subscription or a valid tenant level resource provider` — on **every**
+> scope, even a plain read-only `az role assignment list`, regardless of role
+> name vs. GUID, and it survives `az account clear && az login`. This is a bug
+> in the CLI's role-assignment code path, not a real permission gap: the
+> identical operation succeeds via the raw ARM REST API, which uses the same
+> token but bypasses the broken command —
+>
+> ```bash
+> ROLE_ID="f58310d9-a9f6-439a-9e8d-f62e7b41a168"   # Role Based Access Control Administrator
+> ASSIGNMENT_ID=$(node -e "console.log(require('crypto').randomUUID())")
+> SCOPE="/subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<NEW_RG>"
+>
+> az rest --method put \
+>   --url "https://management.azure.com${SCOPE}/providers/Microsoft.Authorization/roleAssignments/${ASSIGNMENT_ID}?api-version=2022-04-01" \
+>   --body "{\"properties\":{\"roleDefinitionId\":\"/subscriptions/<SUBSCRIPTION_ID>/providers/Microsoft.Authorization/roleDefinitions/${ROLE_ID}\",\"principalId\":\"<DEPLOY_SP_OBJECT_ID>\",\"principalType\":\"ServicePrincipal\"}}"
+> ```
+>
+> Full writeup and common role-definition GUIDs:
+> [infra/README-oidc.md](../../infra/README-oidc.md#known-cli-bug-missingsubscription-on-az-role-assignment).
 
 **Capture the outputs** — you'll need them repeatedly:
 
@@ -261,6 +289,20 @@ REVOKE ALL ON DATABASE retro_tool_db FROM convex_<ENV>;
 REVOKE ALL ON DATABASE retro_tool_db FROM PUBLIC;
 ```
 
+> **Then connect to the new database itself** (not `postgres`) and grant the
+> role its schema — owning the *database* does not automatically grant
+> privileges on the `public` *schema* inside it on Postgres 15+/Azure Flexible
+> Server. Skipping this makes Convex crash-loop on first boot with `db error:
+> permission denied for schema public`, which manifests as the App Service
+> health check timing out with repeated `503`s on `/version` — easy to mistake
+> for an infra/deploy problem when it's actually this one missing grant:
+>
+> ```bash
+> psql "host=<PG_SERVER>.postgres.database.azure.com port=5432 dbname=retrotool_convex_<ENV> user=pgadmin sslmode=require" \
+>   -c "GRANT ALL ON SCHEMA public TO convex_<ENV>;" \
+>   -c "ALTER SCHEMA public OWNER TO convex_<ENV>;"
+> ```
+>
 > The database name **must** equal `<CONVEX_INSTANCE_NAME>` with hyphens replaced
 > by underscores (Convex derives it from `INSTANCE_NAME`). For the default
 > `retrotool-convex-staging` that is `retrotool_convex_staging`. The Bicep
@@ -283,8 +325,12 @@ DIGEST=$(node -p "require('./convex-backend/compatibility.json').backend.manifes
 az acr import \
   --name <ACR_NAME> \
   --source ghcr.io/get-convex/convex-backend@${DIGEST} \
-  --image convex-backend@${DIGEST}
+  --repository convex-backend
 ```
+
+> Use `--repository` (a manifest-only copy that preserves the digest), **not**
+> `--image`/`-t` — that flag expects a tag and rejects a digest as the target,
+> failing with `InvalidImportImageParameter`.
 
 Your `convexImage` reference is then
 `<ACR_LOGIN_SERVER>/convex-backend@${DIGEST}`. When you bump Convex, update
@@ -602,6 +648,11 @@ a failed reconciliation**. See the runbook's
 | Static Web App deploy fails / region error | SWA isn't available in `southafricanorth` | Leave `staticWebAppLocation=westeurope` (everything else stays southafricanorth) |
 | API 504 Gateway Timeout | `WEBSITES_PORT` wrongly set on the API app | The API workflow sets `PORT=8080` and Azure auto-detects — do not set `WEBSITES_PORT` on the API |
 | ACR pull fails (503) | Managed-identity pull not configured | `az webapp config show --name <API_WEBAPP> --query acrUseManagedIdentityCreds` must be `true` (re-run core Bicep) |
+| Convex `/version` never comes up; App Service logs show `db error: permission denied for schema public` | The Convex role owns the *database* but not the `public` *schema* inside it — a Postgres 15+ default, not automatically fixed by `CREATE DATABASE ... OWNER convex_<ENV>` | Connect to the Convex database itself (not `postgres`) and run `GRANT ALL ON SCHEMA public TO convex_<ENV>; ALTER SCHEMA public OWNER TO convex_<ENV>;` (see step 4b) |
+| `az deployment group create` fails with `SubscriptionIsOverQuotaForSku ... Current Limit (Total VMs): 0` on the App Service plan | `location = resourceGroup().location` picked the resource group's own location **metadata**, which can differ from the region every actual resource in it lives in (and from every region the subscription has quota in) | Pin `location` to an explicit region param instead of trusting `resourceGroup().location`; verify with `az group show --name <NEW_RG> --query location` **and** `az resource list --resource-group <NEW_RG> --query "[].location"` — they are not guaranteed to match |
+| `az deployment group create` fails with `RoleAssignmentUpdateNotPermitted: Tenant ID, application ID, principal ID, and scope are not allowed to be updated` | A role assignment's name in this codebase is keyed on the identity's resource-ID path (stable across redeploys), not its principal ID. If that identity is ever deleted and recreated, its principal ID changes while the assignment name (and thus the ARM object it tries to update) stays the same | Find and delete the stale assignment first (`az rest --method get` on the scope's `roleAssignments` list, find the entry whose `principalId` no longer resolves to any identity, `az rest --method delete` it), then redeploy. Do **not** switch the assignment's name to be principal-ID-based instead — Azure RBAC enforces uniqueness on `(principal, role, scope)` regardless of the assignment's own name, so that "fix" makes Bicep try to create a second assignment for a permission that already exists, failing with `RoleAssignmentExists` on every *normal* redeploy (identity never recreated) |
+| Bicep template compiles fine locally but fails ARM validation with a malformed resource ID inside a ternary/`if()`-derived value | ARM's `if()` function is **not short-circuiting** — both branches are evaluated even though only one is used. `resourceId(...)` with an empty/placeholder argument on the discarded branch still throws | Give every branch of a ternary a syntactically valid value, even the one you expect to be discarded (e.g. a non-empty placeholder name) |
+| `release-please` workflow fails with `GitHub Actions is not permitted to create or approve pull requests` | Repo setting **Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests"** is off (GitHub default for new repos) | Enable it in the UI, or `gh api --method PUT repos/<owner>/<repo>/actions/permissions/workflow -f default_workflow_permissions=write -F can_approve_pull_request_reviews=true` |
 
 ---
 

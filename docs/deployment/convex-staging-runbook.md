@@ -220,9 +220,12 @@ recorded** — that is your rollback until stabilization completes.
 
 ### C1. Reconcile projections from PostgreSQL
 
-Immediately after the API points at self-hosted Convex, rebuild every projection
-from the system of record into the fresh (empty) deployment. Membership/security
-is reconciled first. Two ways to run it:
+**This now runs automatically** — `deploy-api.yml`'s `reconcile` job rebuilds
+every projection after every successful API deploy, so no manual step is
+required after cutting `CONVEX_SYNC_URL`/`CONVEX_SYNC_ADMIN_KEY` over and
+redeploying. To run it out of band, rebuild every projection from the system
+of record into the fresh (empty) deployment manually. Membership/security is
+reconciled first. Two ways to run it:
 
 ```bash
 # CLI — from a build with staging DATABASE_URL + CONVEX_SYNC_URL/KEY in env.

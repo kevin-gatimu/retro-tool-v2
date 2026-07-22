@@ -422,3 +422,50 @@ jobs:
               echo "No webapp logs zip was produced by Azure CLI fallback."
             fi
           fi
+
+  # ─────────────── Reconcile Convex projections from PostgreSQL ───────────
+  # Runs after every successful API deploy (not just Convex backend/function
+  # changes) so projections can never silently drift out of sync with a
+  # forgotten manual step -- this is exactly what the initial self-hosted
+  # Convex cutover needed and didn't get automatically. Uses the standalone
+  # CLI (a headless Nest context talking directly to Postgres + Convex), not
+  # the authenticated HTTP endpoint, since that requires a real, non-expiring
+  # super-admin session token that nothing currently provisions.
+  reconcile:
+    needs: [set-env, deploy]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-env.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.13.0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build API
+        run: pnpm --filter retro-tool-api build
+
+      - name: Reconcile projections
+        working-directory: retro-tool-api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
+          CONVEX_SYNC_URL: ${{ vars.CONVEX_SYNC_URL || secrets.CONVEX_SYNC_URL }}
+          CONVEX_SYNC_ADMIN_KEY: ${{ secrets.CONVEX_SYNC_ADMIN_KEY || vars.CONVEX_SYNC_ADMIN_KEY }}
+          NODE_ENV: production
+          # The CLI boots the full AppModule (AuthModule included), so the
+          # config schema's required fields must be set even though this job
+          # never issues or validates auth itself.
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || vars.BETTER_AUTH_SECRET }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL || vars.SWA_URL || secrets.FRONTEND_URL || secrets.SWA_URL }}
+          LOCAL_SERVER_URL: https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net
+          DEPLOYED_SERVER_URL: https://${{ vars.API_WEBAPP_NAME || secrets.API_WEBAPP_NAME }}.azurewebsites.net
+          EMAIL_FROM: ${{ vars.EMAIL_FROM || secrets.EMAIL_FROM }}
+        run: node dist/convex-admin/reconcile-projections.js

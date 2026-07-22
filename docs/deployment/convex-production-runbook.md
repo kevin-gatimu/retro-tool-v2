@@ -228,14 +228,20 @@ the same 30-day / two-upgrade / one-restore-drill gate as staging.
 
 ### C1. Reconcile projections from PostgreSQL
 
-Immediately after the API points at self-hosted Convex, rebuild every
-projection from the system of record into the fresh (empty) deployment:
+**This now runs automatically** — `deploy-api.yml`'s `reconcile` job rebuilds
+every projection after every successful API deploy (not gated on whether
+Convex's image/functions changed), so cutting `CONVEX_SYNC_URL`/
+`CONVEX_SYNC_ADMIN_KEY` over and re-running `deploy-api.yml` is sufficient; no
+separate manual step is required. To run it out of band (e.g. investigating
+drift without a full redeploy), rebuild every projection from the system of
+record manually:
 
 ```bash
 node retro-tool-api/dist/convex-admin/reconcile-projections.js
 ```
 
-or `POST /api/convex-admin/reconcile-projections` as a super-admin. Do **not**
+(needs `DATABASE_URL`, `CONVEX_SYNC_URL`, `CONVEX_SYNC_ADMIN_KEY` in env) or
+`POST /api/convex-admin/reconcile-projections` as a super-admin. Do **not**
 proceed past a failed reconciliation (see
 [convex-staging-runbook.md §C1](./convex-staging-runbook.md#c1-reconcile-projections-from-postgresql)
 for the full contract — identical for production).
