@@ -345,7 +345,7 @@ provisions no other Azure Convex deployment. This stack is defined by
 
 ### Resources created
 
-- **App Service Plan + Web App for Containers** (`retrotool-staging-convex`) — Linux container running the Convex backend on `WEBSITES_PORT=3210`, HTTPS-only, WebSockets on, `/version` health check, **exactly one worker**. B1 (Basic) plan by default (`planSkuName`/`planSkuTier` params) to keep cost low. Convex secrets (`INSTANCE_SECRET`, `POSTGRES_URL`) are injected as `@Microsoft.KeyVault(...)` references resolved by the runtime managed identity.
+- **Web App for Containers** (`retrotool-staging-convex`) — Linux container running the Convex backend on `WEBSITES_PORT=3210`, HTTPS-only, WebSockets on, `/version` health check, **exactly one worker**. Runs on the API's existing App Service plan (`retrotool-staging-plan`, B1 Basic) rather than a dedicated plan — both are the same tier, so sharing costs nothing extra (`existingPlanResourceId` param in `modules/convex-app-service.bicep`; pass empty to provision a dedicated plan instead). Convex secrets (`INSTANCE_SECRET`, `POSTGRES_URL`) are injected as `@Microsoft.KeyVault(...)` references resolved by the runtime managed identity.
 - **User-Assigned Managed Identity** (`retrotool-staging-convex-identity`) — holds AcrPull on the ACR and Key Vault Secrets User on the vault.
 - **Storage account + Azure Files share** (`convex-data`) — mounted at `/convex/data` for durable Convex state (survives restarts, image swaps, plan resizes).
 - **Key Vault** (`retrotool-staging-cvx-<hash>`) — stores the Convex instance secret and Postgres URL; RBAC-authorized, soft-delete on.

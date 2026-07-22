@@ -40,11 +40,8 @@ param convexInstanceSecret string
 @description('Dedicated PostgreSQL role URL without a database path or query string.')
 param convexPostgresUrl string
 
-@description('App Service plan SKU name. B1 is the cheapest tier supporting Always On + WebSockets.')
-param planSkuName string = 'B1'
-
-@description('App Service plan SKU tier matching planSkuName.')
-param planSkuTier string = 'Basic'
+@description('Existing staging API App Service plan — Convex runs on this same plan instead of a dedicated one. Both are B1 Basic, so sharing it costs nothing extra.')
+param apiAppServicePlanName string = 'retrotool-staging-plan'
 
 @description('Optional user/service-principal object ID allowed to manage staging Convex secrets.')
 param bootstrapPrincipalObjectId string = ''
@@ -72,6 +69,12 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
 
 resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' existing = {
   name: postgresServerName
+}
+
+// Shared with the API instead of a dedicated plan — both are B1 Basic, so
+// there is no cost to reusing it.
+resource apiPlan 'Microsoft.Web/serverfarms@2023-12-01' existing = {
+  name: apiAppServicePlanName
 }
 
 // Separate Convex database on the shared staging server. The Convex owner role
@@ -140,9 +143,7 @@ module appService 'modules/convex-app-service.bicep' = {
   params: {
     location: location
     name: '${prefix}-convex'
-    planName: '${prefix}-convex-plan'
-    planSkuName: planSkuName
-    planSkuTier: planSkuTier
+    existingPlanResourceId: apiPlan.id
     runtimeIdentityId: runtimeIdentity.id
     runtimeIdentityClientId: runtimeIdentity.properties.clientId
     acrLoginServer: acr.properties.loginServer
@@ -161,7 +162,7 @@ module appService 'modules/convex-app-service.bicep' = {
 }
 
 output appServiceName string = appService.outputs.name
-output appServicePlanName string = appService.outputs.planName
+output appServicePlanResourceId string = appService.outputs.planResourceId
 output convexUrl string = appService.outputs.url
 output convexDatabaseName string = convexDatabase.name
 output keyVaultName string = keyVault.outputs.name

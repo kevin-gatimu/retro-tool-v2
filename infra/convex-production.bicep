@@ -11,14 +11,17 @@ targetScope = 'resourceGroup'
 @description('The only cloud environment supported by this deployment.')
 param environment string = 'production'
 
-@description('Azure region for Convex and its data plane.')
-param location string = resourceGroup().location
+@description('Azure region for Convex and its data plane. Deliberately NOT resourceGroup().location — retro_tool\'s own resource-group location metadata is uksouth, but every actual production resource (API, ACR, PostgreSQL, App Service plan) lives in southafricanorth, which is also the only region in this subscription with VM quota.')
+param location string = 'southafricanorth'
 
 @description('Existing production Azure Container Registry name.')
 param acrName string = 'retrotool'
 
 @description('Existing production PostgreSQL Flexible Server name.')
 param postgresServerName string = 'retro-tool-db-server'
+
+@description('Existing production API App Service plan — Convex runs on this same plan instead of a dedicated one. Already B1 Basic, matching the cheapest tier Convex needs, so sharing it costs nothing extra. Revisit (split back onto a dedicated plan) if load testing shows Convex WebSocket traffic contending with the API.')
+param apiAppServicePlanName string = 'ASP-retrotoolproductionrg-be95'
 
 @minLength(3)
 @maxLength(24)
@@ -38,12 +41,6 @@ param convexInstanceSecret string
 @secure()
 @description('Dedicated PostgreSQL role URL without a database path or query string.')
 param convexPostgresUrl string
-
-@description('App Service plan SKU name. B1 is the cheapest tier supporting Always On + WebSockets.')
-param planSkuName string = 'B1'
-
-@description('App Service plan SKU tier matching planSkuName.')
-param planSkuTier string = 'Basic'
 
 @description('Optional user/service-principal object ID allowed to manage production Convex secrets.')
 param bootstrapPrincipalObjectId string = ''
@@ -71,6 +68,12 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
 
 resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' existing = {
   name: postgresServerName
+}
+
+// Shared with the API instead of a dedicated plan — already B1 Basic, the
+// cheapest tier Convex needs, so there is no cost to reusing it.
+resource apiPlan 'Microsoft.Web/serverfarms@2023-12-01' existing = {
+  name: apiAppServicePlanName
 }
 
 // Separate Convex database on the shared production server. The Convex owner
@@ -139,9 +142,7 @@ module appService 'modules/convex-app-service.bicep' = {
   params: {
     location: location
     name: '${prefix}-convex'
-    planName: '${prefix}-convex-plan'
-    planSkuName: planSkuName
-    planSkuTier: planSkuTier
+    existingPlanResourceId: apiPlan.id
     runtimeIdentityId: runtimeIdentity.id
     runtimeIdentityClientId: runtimeIdentity.properties.clientId
     acrLoginServer: acr.properties.loginServer
@@ -160,7 +161,7 @@ module appService 'modules/convex-app-service.bicep' = {
 }
 
 output appServiceName string = appService.outputs.name
-output appServicePlanName string = appService.outputs.planName
+output appServicePlanResourceId string = appService.outputs.planResourceId
 output convexUrl string = appService.outputs.url
 output convexDatabaseName string = convexDatabase.name
 output keyVaultName string = keyVault.outputs.name
