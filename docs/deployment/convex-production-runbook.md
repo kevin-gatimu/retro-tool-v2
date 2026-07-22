@@ -7,23 +7,36 @@
 
 ## What you are deploying
 
-One dedicated Linux **App Service (Web App for Containers)** running the official
-Convex backend, alongside the existing production ACR, PostgreSQL Flexible
-Server, API App Service, and Static Web App — all in the shared `retro_tool`
-resource group. PostgreSQL through NestJS stays the system of record; Convex
+One Linux **App Service (Web App for Containers)** running the official Convex
+backend, alongside the existing production ACR, PostgreSQL Flexible Server, API
+App Service, and Static Web App — all in the shared `retro_tool` resource
+group. Unlike staging, Convex does **not** get a dedicated App Service plan in
+production: the API's existing plan (`ASP-retrotoolproductionrg-be95`) is
+already `B1 Basic` — the same cheapest tier Convex needs — so sharing it costs
+nothing extra. PostgreSQL through NestJS stays the system of record; Convex
 holds only the reconstructable realtime projection layer.
 
 | Resource | Name (production) |
 |---|---|
 | Resource group | `retro_tool` |
 | Convex Web App | `retrotool-prod-convex` |
-| Convex App Service plan | `retrotool-prod-convex-plan` (B1 Basic) |
+| App Service plan (shared with the API) | `ASP-retrotoolproductionrg-be95` (B1 Basic) |
 | Convex instance name | `retrotool-convex-prod` |
 | Convex PostgreSQL database | `retrotool_convex_prod` (owner role `convex_prod`) |
 | Application database (must stay isolated) | `retro-tool-db` |
 | Azure Files share (mounted `/convex/data`) | `convex-data` |
 | Key Vault | `retrotool-prod-cvx-<hash>` |
 | Public URL | `https://retrotool-prod-convex.azurewebsites.net` |
+
+> **Shared-plan tradeoff:** the staging self-hosting plan's default guidance is
+> a dedicated plan so Convex WebSocket load can't starve the API — production
+> deliberately overrides that here because the existing API plan was already
+> sitting at the cheapest usable tier, making a second plan pure added cost. If
+> load testing later shows contention between the API and Convex on the shared
+> plan, split Convex back onto its own plan by setting
+> `apiAppServicePlanName` to a new dedicated plan and re-running the module
+> (see `infra/modules/convex-app-service.bicep`'s `existingPlanResourceId`
+> parameter, shared with staging's template).
 
 Infra: [infra/convex-production.bicep](../../infra/convex-production.bicep) +
 [infra/modules/](../../infra/modules/) (shared with staging). Deploy workflow:

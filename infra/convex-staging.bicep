@@ -161,7 +161,7 @@ module appService 'modules/convex-app-service.bicep' = {
 }
 
 output appServiceName string = appService.outputs.name
-output appServicePlanName string = appService.outputs.planName
+output appServicePlanResourceId string = appService.outputs.planResourceId
 output convexUrl string = appService.outputs.url
 output convexDatabaseName string = convexDatabase.name
 output keyVaultName string = keyVault.outputs.name

@@ -8,11 +8,14 @@ targetScope = 'resourceGroup'
 
 param location string
 param name string
-param planName string
-@description('App Service plan SKU name, e.g. B1, P0v3.')
+@description('Name for a new dedicated plan. Ignored when existingPlanResourceId is set.')
+param planName string = ''
+@description('App Service plan SKU name, e.g. B1, P0v3. Ignored when existingPlanResourceId is set.')
 param planSkuName string = 'B1'
-@description('App Service plan SKU tier, e.g. Basic, PremiumV3.')
+@description('App Service plan SKU tier, e.g. Basic, PremiumV3. Ignored when existingPlanResourceId is set.')
 param planSkuTier string = 'Basic'
+@description('Resource ID of an existing App Service plan to place Convex on instead of creating a dedicated one. Both apps must run the same SKU/tier for this to be safe to share.')
+param existingPlanResourceId string = ''
 param runtimeIdentityId string
 param runtimeIdentityClientId string
 param acrLoginServer string
@@ -39,7 +42,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing 
   name: storageAccountName
 }
 
-resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
+resource plan 'Microsoft.Web/serverfarms@2023-12-01' = if (empty(existingPlanResourceId)) {
   name: planName
   location: location
   tags: tags
@@ -54,6 +57,8 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   }
 }
 
+var effectivePlanId = empty(existingPlanResourceId) ? plan.id : existingPlanResourceId
+
 resource site 'Microsoft.Web/sites@2023-12-01' = {
   name: name
   location: location
@@ -66,7 +71,7 @@ resource site 'Microsoft.Web/sites@2023-12-01' = {
     }
   }
   properties: {
-    serverFarmId: plan.id
+    serverFarmId: effectivePlanId
     httpsOnly: true
     // Resolve @Microsoft.KeyVault app-setting references with the assigned
     // user-assigned identity (which holds Key Vault Secrets User on the vault).
@@ -195,6 +200,6 @@ resource diagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' 
 }
 
 output name string = site.name
-output planName string = plan.name
+output planResourceId string = effectivePlanId
 output defaultHostName string = defaultHostName
 output url string = publicOrigin
