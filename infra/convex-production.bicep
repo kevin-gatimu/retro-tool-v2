@@ -60,8 +60,6 @@ var tags = {
   component: 'convex'
   managedBy: 'bicep'
 }
-var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
 }
@@ -94,13 +92,11 @@ resource runtimeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-
   tags: tags
 }
 
-resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, runtimeIdentity.id, acrPullRoleId)
-  scope: acr
-  properties: {
+module acrAccess 'modules/convex-acr-access.bicep' = {
+  name: 'convex-acr-access-prod'
+  params: {
+    acrName: acrName
     principalId: runtimeIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
   }
 }
 
@@ -156,7 +152,7 @@ module appService 'modules/convex-app-service.bicep' = {
     tags: tags
   }
   dependsOn: [
-    acrPullAssignment
+    acrAccess
   ]
 }
 
