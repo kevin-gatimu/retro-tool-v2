@@ -42,8 +42,15 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing 
   name: storageAccountName
 }
 
+// ARM's if() is not short-circuiting — both branches of the ternary below are
+// evaluated regardless of which one is selected. resourceId() with an empty
+// name throws/produces a malformed identifier even on the discarded branch,
+// so planName always needs a syntactically valid fallback here, even though
+// it's never actually used when existingPlanResourceId is set.
+var dedicatedPlanName = empty(planName) ? '${name}-plan' : planName
+
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' = if (empty(existingPlanResourceId)) {
-  name: planName
+  name: dedicatedPlanName
   location: location
   tags: tags
   kind: 'linux'
@@ -57,7 +64,7 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = if (empty(existingPlanRes
   }
 }
 
-var effectivePlanId = empty(existingPlanResourceId) ? plan.id : existingPlanResourceId
+var effectivePlanId = empty(existingPlanResourceId) ? resourceId('Microsoft.Web/serverfarms', dedicatedPlanName) : existingPlanResourceId
 
 resource site 'Microsoft.Web/sites@2023-12-01' = {
   name: name
