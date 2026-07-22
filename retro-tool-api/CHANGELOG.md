@@ -83,6 +83,8 @@
 * **auth:** clear query cache after sign-out; fix(api): dedupe StartTimerBody DTOs ([3e5ffab](https://github.com/kevin-gatimu/retro-tool-v2/commit/3e5ffab91a22f8a895712d4a0762e1a96b9ca65f))
 * **authz:** align client permission gates with server rules across features ([31a96b7](https://github.com/kevin-gatimu/retro-tool-v2/commit/31a96b749ef90882bae0149a79a8cabacbeca287))
 * **ci:** update ACR pull identity verification and adjust production environment scripts ([c56c4bd](https://github.com/kevin-gatimu/retro-tool-v2/commit/c56c4bda160b1031a5871e07cdcea634b4fd48b5))
+* **convex-admin:** auto-heal stale outbox pauses + automate reconciliation ([a78ecd7](https://github.com/kevin-gatimu/retro-tool-v2/commit/a78ecd744ca0bde1cf5bafac0a5bec01e7efdcbc))
+* **convex-admin:** auto-heal stale outbox pauses and automate reconciliation ([a4f25e4](https://github.com/kevin-gatimu/retro-tool-v2/commit/a4f25e4525481572b98bda45bec382dcb7838f16))
 * **deps:** clear high/critical audit advisories via workspace overrides ([5f23642](https://github.com/kevin-gatimu/retro-tool-v2/commit/5f236428290326c4785b25538fec7dace15fa278))
 * destructure response from checkAdminExists in bootstrapFirstAdmin method ([4986efc](https://github.com/kevin-gatimu/retro-tool-v2/commit/4986efc0b069b97c252a49f8716f547352ce506f))
 * ensure all password requirements are met before allowing sign-up; improve UI feedback for password strength ([a3dabb4](https://github.com/kevin-gatimu/retro-tool-v2/commit/a3dabb476e209c37bacd6ed7b0c5535d9da49aa7))
