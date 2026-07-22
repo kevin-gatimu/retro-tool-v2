@@ -11,8 +11,8 @@ targetScope = 'resourceGroup'
 @description('The only cloud environment supported by this deployment.')
 param environment string = 'production'
 
-@description('Azure region for Convex and its data plane.')
-param location string = resourceGroup().location
+@description('Azure region for Convex and its data plane. Deliberately NOT resourceGroup().location — retro_tool\'s own resource-group location metadata is uksouth, but every actual production resource (API, ACR, PostgreSQL, App Service plan) lives in southafricanorth, which is also the only region in this subscription with VM quota.')
+param location string = 'southafricanorth'
 
 @description('Existing production Azure Container Registry name.')
 param acrName string = 'retrotool'
