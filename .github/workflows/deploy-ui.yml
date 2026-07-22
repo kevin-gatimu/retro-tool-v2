@@ -33,14 +33,21 @@ jobs:
       - run: pnpm --filter retro-tool-ui type-check
       - run: pnpm --filter retro-tool-ui test
 
-  # ───────────────────── Staging-only environment ─────────────────────
+  # ───────────────────── Pick target environment by branch ────────────
   set-env:
     runs-on: ubuntu-latest
     outputs:
       environment: ${{ steps.pick.outputs.environment }}
     steps:
       - id: pick
-        run: echo "environment=staging" >> "$GITHUB_OUTPUT"
+        run: |
+          # `staging` is the deliberate fallback for every non-main branch
+          # (including `develop`) until a dedicated develop environment exists.
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "environment=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
+          fi
 
   # ──────── Build & Deploy to Azure Static Web App ────────────────────
   deploy:

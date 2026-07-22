@@ -7,6 +7,7 @@
     "upstreamRelease": "precompiled-2026-07-11-d9da5f7",
     "manifestDigest": "sha256:1738f1673f8d63161043a7859710d2301b1e9d6271e06afbb7af31594ea3a58f",
     "linuxAmd64Digest": "sha256:c24239bb4264875f6ed4d3b3744486c395daa37180e78b81d98e30150a5a1405",
-    "stagingImage": "retrotoolstagingacr.azurecr.io/convex-backend@sha256:1738f1673f8d63161043a7859710d2301b1e9d6271e06afbb7af31594ea3a58f"
+    "stagingImage": "retrotoolstagingacr.azurecr.io/convex-backend@sha256:1738f1673f8d63161043a7859710d2301b1e9d6271e06afbb7af31594ea3a58f",
+    "productionImage": "retrotool.azurecr.io/convex-backend@sha256:1738f1673f8d63161043a7859710d2301b1e9d6271e06afbb7af31594ea3a58f"
   }
 }

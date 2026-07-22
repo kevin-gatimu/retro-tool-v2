@@ -1,0 +1,279 @@
+name: Deploy Convex Production (App Service)
+
+# Provisions and updates the single self-hosted Convex production backend on
+# Azure App Service, then deploys Convex functions. Mirrors deploy-convex.yml
+# (staging) with production naming. Manual dispatch only — there is no
+# automated production release pipeline; trigger this deliberately after
+# deploy-api and deploy-ui have been run against `main`.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-convex-production
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24"
+  AZURE_RESOURCE_GROUP: retro_tool
+  ACR_NAME: retrotool
+  CONVEX_APP_NAME: retrotool-prod-convex
+  API_URL: https://retro-tool-api.azurewebsites.net
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.13.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter convex-backend type-check
+      - run: pnpm --filter convex-backend lint
+      - name: Validate immutable compatibility manifest
+        run: |
+          node - <<'NODE'
+          const manifest = require('./convex-backend/compatibility.json');
+          const image = manifest.backend.productionImage;
+          if (!image.includes('@sha256:')) {
+            throw new Error('The Convex production image must be pinned by sha256 digest.');
+          }
+          if (manifest.convexSdkVersion !== require('./convex-backend/package.json').dependencies.convex) {
+            throw new Error('Convex SDK and compatibility manifest versions differ.');
+          }
+          NODE
+      # `az bicep build` compiles locally and needs no Azure auth — install the
+      # Bicep CLI standalone rather than logging in (the Azure OIDC creds live in
+      # the `production` environment, which this job intentionally does not use).
+      - name: Install Bicep CLI
+        run: az bicep install
+      - name: Validate Bicep
+        run: az bicep build --file infra/convex-production.bicep --stdout > /dev/null
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.13.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Validate protected production inputs
+        env:
+          CONVEX_INSTANCE_SECRET: ${{ secrets.CONVEX_INSTANCE_SECRET }}
+          CONVEX_POSTGRES_URL: ${{ secrets.CONVEX_POSTGRES_URL }}
+          CONVEX_SELF_HOSTED_ADMIN_KEY: ${{ secrets.CONVEX_SELF_HOSTED_ADMIN_KEY }}
+        run: |
+          for key in CONVEX_INSTANCE_SECRET CONVEX_POSTGRES_URL CONVEX_SELF_HOSTED_ADMIN_KEY; do
+            if [ -z "${!key}" ]; then
+              echo "Required production secret is missing: ${key}"
+              exit 1
+            fi
+          done
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID || vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve desired immutable image
+        id: image
+        run: |
+          IMAGE=$(node -p "require('./convex-backend/compatibility.json').backend.productionImage")
+          case "${IMAGE}" in
+            *@sha256:*) ;;
+            *) echo 'Convex image is not digest-pinned'; exit 1 ;;
+          esac
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce single-instance invariant (never scaled out)
+        run: |
+          if ! az webapp show --resource-group "${AZURE_RESOURCE_GROUP}" --name "${CONVEX_APP_NAME}" >/dev/null 2>&1; then
+            echo 'Initial Convex deployment; App Service does not exist yet.'
+            exit 0
+          fi
+          WORKERS=$(az webapp show \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --name "${CONVEX_APP_NAME}" \
+            --query 'siteConfig.numberOfWorkers' -o tsv)
+          if [ -n "${WORKERS}" ] && [ "${WORKERS}" != "1" ]; then
+            echo "Convex must run exactly one worker; found ${WORKERS}. Refusing to deploy."
+            exit 1
+          fi
+
+      - name: Detect whether the backend image is changing
+        id: imagechange
+        env:
+          DESIRED_IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          if ! az webapp show --resource-group "${AZURE_RESOURCE_GROUP}" --name "${CONVEX_APP_NAME}" >/dev/null 2>&1; then
+            echo 'Initial Convex deployment; no running backend yet.'
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CURRENT_FX=$(az webapp config show \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --name "${CONVEX_APP_NAME}" \
+            --query 'linuxFxVersion' -o tsv)
+          DESIRED_FX="DOCKER|${DESIRED_IMAGE}"
+
+          if [ "${CURRENT_FX}" = "${DESIRED_FX}" ]; then
+            echo 'Backend image is unchanged; no stop-first upgrade needed.'
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo 'Backend image is changing; a stop-first upgrade is required.'
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Take a verified Convex export before a backend upgrade
+        if: ${{ steps.imagechange.outputs.changed == 'true' }}
+        working-directory: convex-backend
+        env:
+          CONVEX_SELF_HOSTED_URL: https://retrotool-prod-convex.azurewebsites.net
+          CONVEX_SELF_HOSTED_ADMIN_KEY: ${{ secrets.CONVEX_SELF_HOSTED_ADMIN_KEY }}
+        run: |
+          # Convex recommends a logical export before an in-place upgrade — an
+          # older image is not a safe rollback after a storage migration.
+          STAMP="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          pnpm exec convex export --path "convex-export-${STAMP}.zip"
+          test -s "convex-export-${STAMP}.zip" || { echo 'Convex export is empty or missing'; exit 1; }
+          echo "Verified Convex export convex-export-${STAMP}.zip"
+
+      - name: Upload the pre-upgrade Convex export artifact
+        if: ${{ steps.imagechange.outputs.changed == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: convex-export-prod-${{ github.run_id }}-${{ github.run_attempt }}
+          path: convex-backend/convex-export-*.zip
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Pause the projection outbox and stop the backend (stop-first)
+        if: ${{ steps.imagechange.outputs.changed == 'true' }}
+        env:
+          API_ADMIN_TOKEN: ${{ secrets.API_ADMIN_TOKEN }}
+        run: |
+          # Buffer projection events durably while Convex is down. Requires a
+          # super-admin bearer token; skipped with a warning if unset (the outbox
+          # still buffers, it just won't have been explicitly paused).
+          if [ -n "${API_ADMIN_TOKEN}" ]; then
+            curl --fail --silent --show-error -X POST \
+              -H "Authorization: Bearer ${API_ADMIN_TOKEN}" \
+              "${API_URL}/api/convex-admin/outbox/pause" >/dev/null \
+              && echo 'Projection outbox paused.' \
+              || echo 'WARNING: could not pause outbox; continuing (events still buffer).'
+          else
+            echo 'WARNING: API_ADMIN_TOKEN unset — outbox not explicitly paused (events still buffer durably).'
+          fi
+
+          echo 'Stopping the single Convex Web App before update.'
+          az webapp stop \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --name "${CONVEX_APP_NAME}" \
+            --output none
+
+      - name: Deploy production Convex infrastructure
+        env:
+          CONVEX_IMAGE: ${{ steps.image.outputs.image }}
+          CONVEX_INSTANCE_SECRET: ${{ secrets.CONVEX_INSTANCE_SECRET }}
+          CONVEX_POSTGRES_URL: ${{ secrets.CONVEX_POSTGRES_URL }}
+        run: |
+          az deployment group create \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --name "convex-prod-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --template-file infra/convex-production.bicep \
+            --parameters \
+              environment=production \
+              convexImage="${CONVEX_IMAGE}" \
+              convexInstanceSecret="${CONVEX_INSTANCE_SECRET}" \
+              convexPostgresUrl="${CONVEX_POSTGRES_URL}" \
+            --output none
+
+      - name: Ensure the Web App is started
+        run: |
+          az webapp start \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --name "${CONVEX_APP_NAME}" \
+            --output none
+
+      - name: Wait for Convex process readiness
+        id: endpoint
+        run: |
+          URL="https://$(az webapp show \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --name "${CONVEX_APP_NAME}" \
+            --query 'defaultHostName' -o tsv)"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error "${URL}/version" >/dev/null; then
+              echo "url=${URL}" >> "$GITHUB_OUTPUT"
+              echo "Convex is serving /version at ${URL}"
+              exit 0
+            fi
+            echo "Attempt ${attempt}: /version not ready yet — retrying..."
+            sleep 10
+          done
+          echo 'Convex /version did not become ready.'
+          exit 1
+
+      - name: Verify exactly one running instance
+        run: |
+          WORKERS=$(az webapp show \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --name "${CONVEX_APP_NAME}" \
+            --query 'siteConfig.numberOfWorkers' -o tsv)
+          [ "${WORKERS}" = "1" ] || { echo "Expected one worker; found ${WORKERS}"; exit 1; }
+
+      - name: Configure Convex auth and deploy functions
+        working-directory: convex-backend
+        env:
+          CONVEX_SELF_HOSTED_URL: ${{ steps.endpoint.outputs.url }}
+          CONVEX_SELF_HOSTED_ADMIN_KEY: ${{ secrets.CONVEX_SELF_HOSTED_ADMIN_KEY }}
+        run: |
+          pnpm exec convex env set JWT_ISSUER "${API_URL}"
+          pnpm exec convex env set JWT_AUDIENCE convex
+          pnpm exec convex env set JWT_JWKS_URL "${API_URL}/api/auth/jwks"
+          pnpm exec convex deploy --typecheck enable --message "production ${GITHUB_SHA}"
+
+      - name: Verify backend still healthy after function deployment
+        env:
+          CONVEX_URL: ${{ steps.endpoint.outputs.url }}
+        run: curl --fail --silent --show-error "${CONVEX_URL}/version" >/dev/null
+
+      - name: Resume the projection outbox and reconcile (after an upgrade)
+        if: ${{ steps.imagechange.outputs.changed == 'true' }}
+        env:
+          API_ADMIN_TOKEN: ${{ secrets.API_ADMIN_TOKEN }}
+        run: |
+          # Resume delivery (replays every event buffered during the stop) and
+          # run a full reconciliation to converge the fresh backend to Postgres.
+          if [ -z "${API_ADMIN_TOKEN}" ]; then
+            echo 'WARNING: API_ADMIN_TOKEN unset — resume the outbox and reconcile manually.'
+            exit 0
+          fi
+          curl --fail --silent --show-error -X POST \
+            -H "Authorization: Bearer ${API_ADMIN_TOKEN}" \
+            "${API_URL}/api/convex-admin/outbox/resume" >/dev/null
+          echo 'Projection outbox resumed; replaying buffered events.'
+          curl --fail --silent --show-error -X POST \
+            -H "Authorization: Bearer ${API_ADMIN_TOKEN}" \
+            "${API_URL}/api/convex-admin/reconcile-projections" >/dev/null
+          echo 'Full projection reconciliation triggered.'
