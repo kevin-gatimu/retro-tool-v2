@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf'
 import type { PollView } from '@/common/types/polls'
 import { savePdf } from '@/lib/save-pdf'
 
@@ -38,6 +37,9 @@ function stripUnsupportedGlyphs(text: string): string {
  * filename, or `null` if the user cancelled.
  */
 export async function exportPollPdf(poll: PollView): Promise<string | null> {
+  // Load jsPDF on demand so the ~380 kB library stays out of the route chunk
+  // and only downloads when the user actually exports.
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
 
   const pageWidth = doc.internal.pageSize.getWidth()

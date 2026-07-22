@@ -1,6 +1,21 @@
 import type { Survey } from '../schema';
 import type { TSurveyQuestionType } from '../../common/enums';
 
+/**
+ * The requesting user's role and membership footprint, resolved once per request
+ * and threaded through the survey access-control helpers ({@link canSee},
+ * {@link canEdit}, {@link canManage}).
+ */
+export type SurveyUserContext = {
+  role: string;
+  teamIds: string[];
+  orgAdminIds: string[];
+  orgIds: string[];
+  leadTeamIds: string[];
+  /** Parent org id for each team the user belongs to (teamId → orgId). */
+  orgIdByTeamId: Record<string, string>;
+};
+
 export type SurveyQuestionView = {
   id: string;
   type: TSurveyQuestionType;

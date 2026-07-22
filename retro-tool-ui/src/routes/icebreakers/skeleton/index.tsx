@@ -40,7 +40,7 @@ export function NewIcebreakerSkeleton() {
   )
 }
 
-/** List page (`/icebreakers`): header + card grid. */
+/** List page (`/icebreakers`): header + search row + card grid. */
 export function IcebreakerListSkeleton() {
   return (
     <div className="space-y-6">
@@ -53,6 +53,11 @@ export function IcebreakerListSkeleton() {
           <Skeleton className="h-5 w-64" />
         </div>
         <Skeleton className="h-10 w-40" />
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-7 w-20" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

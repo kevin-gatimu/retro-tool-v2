@@ -66,6 +66,15 @@ function formatRelativeTime(date: string | Date): string {
   return `${days} days left`
 }
 
+function getOrgRoleDisplay(role: string): {
+  label: string
+  icon: typeof Shield
+} {
+  if (role === 'org-owner') return { label: 'Owner', icon: Shield }
+  if (role === 'org-admin') return { label: 'Admin', icon: Shield }
+  return { label: 'Member', icon: User }
+}
+
 // ============================================================================
 // Organization Invitation Columns
 // ============================================================================
@@ -93,15 +102,7 @@ export function getOrgInvitationColumns(options: {
       accessorKey: 'role',
       header: 'Role',
       cell: ({ row }) => {
-        const role = row.original.role
-        const label =
-          role === 'org-owner'
-            ? 'Owner'
-            : role === 'org-admin'
-              ? 'Admin'
-              : 'Member'
-        const Icon =
-          role === 'org-owner' ? Shield : role === 'org-admin' ? Shield : User
+        const { label, icon: Icon } = getOrgRoleDisplay(row.original.role)
         return (
           <Badge variant="outline" className="gap-1 font-normal">
             <Icon className="h-3 w-3" />

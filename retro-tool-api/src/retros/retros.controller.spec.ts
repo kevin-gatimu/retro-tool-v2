@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RetrosController } from './retros.controller';
 import { RetrosService } from './retros.service';
-import { RetrosGateway } from './retros.gateway';
+import { RetrosTemplatesService } from './retros-templates.service';
 import { RetrosProjectionSyncService } from './retros-projection-sync.service';
 
 describe('RetrosController', () => {
@@ -12,13 +12,7 @@ describe('RetrosController', () => {
       controllers: [RetrosController],
       providers: [
         { provide: RetrosService, useValue: {} },
-        {
-          provide: RetrosGateway,
-          useValue: {
-            emitRetroUpdated: jest.fn(),
-            emitCardMoved: jest.fn(),
-          },
-        },
+        { provide: RetrosTemplatesService, useValue: {} },
         { provide: RetrosProjectionSyncService, useValue: {} },
       ],
     }).compile();

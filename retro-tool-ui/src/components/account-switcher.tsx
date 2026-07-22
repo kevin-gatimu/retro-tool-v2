@@ -9,9 +9,20 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
 
-type DeviceSession = {
-  session: { token: string; expiresAt: string; userId: string }
-  user: { id: string; name: string; email: string; image?: string | null }
+function AccountStatusIcon({
+  isSwitching,
+  isActive,
+}: {
+  isSwitching: boolean
+  isActive: boolean
+}) {
+  if (isSwitching) {
+    return <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
+  }
+  if (isActive) {
+    return <Check className="h-4 w-4 shrink-0 text-primary" />
+  }
+  return <LogIn className="h-4 w-4 shrink-0 text-muted-foreground" />
 }
 
 export function AccountSwitcher({ currentUserId }: { currentUserId: string }) {
@@ -25,8 +36,8 @@ export function AccountSwitcher({ currentUserId }: { currentUserId: string }) {
   } = useQuery({
     queryKey: ['multi-device-sessions'],
     queryFn: async () => {
-      const res = await (authClient as any).multiSession.listDeviceSessions()
-      return (res.data ?? []) as DeviceSession[]
+      const res = await authClient.multiSession.listDeviceSessions()
+      return res.data ?? []
     },
     retry: false,
   })
@@ -36,7 +47,7 @@ export function AccountSwitcher({ currentUserId }: { currentUserId: string }) {
     try {
       // setActive → POST /api/auth/multi-session/set-active
 
-      await (authClient as any).multiSession.setActive({ sessionToken })
+      await authClient.multiSession.setActive({ sessionToken })
       window.location.reload()
     } catch {
       toast.error('Failed to switch account')
@@ -99,13 +110,10 @@ export function AccountSwitcher({ currentUserId }: { currentUserId: string }) {
                 {s.user.email}
               </p>
             </div>
-            {switching === s.session.token ? (
-              <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
-            ) : isActive ? (
-              <Check className="h-4 w-4 shrink-0 text-primary" />
-            ) : (
-              <LogIn className="h-4 w-4 shrink-0 text-muted-foreground" />
-            )}
+            <AccountStatusIcon
+              isSwitching={switching === s.session.token}
+              isActive={isActive}
+            />
           </DropdownMenuItem>
         )
       })}

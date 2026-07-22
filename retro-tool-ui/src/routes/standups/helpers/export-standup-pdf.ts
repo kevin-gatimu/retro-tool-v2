@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf'
 import type { StandupEntryDetail } from '@/common/types/standups'
 import { savePdf } from '@/lib/save-pdf'
 import { formatEntryDate } from './index'
@@ -79,6 +78,9 @@ export async function exportStandupPdf(
   entryDetail: StandupEntryDetail,
 ): Promise<string | null> {
   const { standup, submissions, members, polls } = entryDetail
+  // Load jsPDF on demand so the ~380 kB library stays out of the route chunk
+  // and only downloads when the user actually exports.
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
 
   const pageWidth = doc.internal.pageSize.getWidth()

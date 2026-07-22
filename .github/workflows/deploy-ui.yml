@@ -1,27 +1,15 @@
 name: Deploy UI
 
 on:
-  push:
-    branches: [main, staging, develop]
-    paths:
-      - 'retro-tool-ui/**'
-      - 'packages/shared/contracts/**'
-      - '.github/workflows/deploy-ui.yml'
+  workflow_call:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target environment'
-        required: true
-        type: choice
-        options: [develop, staging, production]
 
 concurrency:
   group: deploy-ui-${{ github.ref_name }}
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: '24'
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  NODE_VERSION: "24"
 
 permissions:
   id-token: write
@@ -32,11 +20,11 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11.0.0-rc.0
-      - uses: actions/setup-node@v4
+          version: 11.13.0
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -45,7 +33,7 @@ jobs:
       - run: pnpm --filter retro-tool-ui type-check
       - run: pnpm --filter retro-tool-ui test
 
-  # ─────────────────── Determine target environment ───────────────────
+  # ───────────────────── Pick target environment by branch ────────────
   set-env:
     runs-on: ubuntu-latest
     outputs:
@@ -53,14 +41,12 @@ jobs:
     steps:
       - id: pick
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref_name }}" = "develop" ]; then
-            echo "environment=develop" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref_name }}" = "staging" ]; then
-            echo "environment=staging" >> "$GITHUB_OUTPUT"
-          else
+          # `staging` is the deliberate fallback for every non-main branch
+          # (including `develop`) until a dedicated develop environment exists.
+          if [ "${{ github.ref_name }}" = "main" ]; then
             echo "environment=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
           fi
 
   # ──────── Build & Deploy to Azure Static Web App ────────────────────
@@ -69,13 +55,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ needs.set-env.outputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11.0.0-rc.0
+          version: 11.13.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -91,6 +77,8 @@ jobs:
           VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
           VITE_ESTIMATES_REALTIME_BACKEND: ${{ vars.VITE_ESTIMATES_REALTIME_BACKEND }}
           VITE_RETROS_REALTIME_BACKEND: ${{ vars.VITE_RETROS_REALTIME_BACKEND }}
+          VITE_ICEBREAKERS_REALTIME_BACKEND: ${{ vars.VITE_ICEBREAKERS_REALTIME_BACKEND }}
+          VITE_STANDUPS_REALTIME_BACKEND: ${{ vars.VITE_STANDUPS_REALTIME_BACKEND }}
           VITE_NOTIFICATIONS_REALTIME_BACKEND: ${{ vars.VITE_NOTIFICATIONS_REALTIME_BACKEND }}
         run: |
           for key in \
@@ -99,6 +87,8 @@ jobs:
             VITE_API_URL \
             VITE_ESTIMATES_REALTIME_BACKEND \
             VITE_RETROS_REALTIME_BACKEND \
+            VITE_ICEBREAKERS_REALTIME_BACKEND \
+            VITE_STANDUPS_REALTIME_BACKEND \
             VITE_NOTIFICATIONS_REALTIME_BACKEND; do
             if [ -z "${!key}" ]; then
               echo "Required UI build variable is missing: ${key}"
@@ -107,7 +97,7 @@ jobs:
           done
 
           USES_CONVEX=false
-          for backend in "${VITE_ESTIMATES_REALTIME_BACKEND}" "${VITE_RETROS_REALTIME_BACKEND}" "${VITE_NOTIFICATIONS_REALTIME_BACKEND}"; do
+          for backend in "${VITE_ESTIMATES_REALTIME_BACKEND}" "${VITE_RETROS_REALTIME_BACKEND}" "${VITE_ICEBREAKERS_REALTIME_BACKEND}" "${VITE_STANDUPS_REALTIME_BACKEND}" "${VITE_NOTIFICATIONS_REALTIME_BACKEND}"; do
             [ "${backend}" = "convex" ] && USES_CONVEX=true && break
           done
 
@@ -140,6 +130,22 @@ jobs:
               ;;
           esac
 
+          case "${VITE_ICEBREAKERS_REALTIME_BACKEND}" in
+            socket-io|convex) ;;
+            *)
+              echo "Invalid VITE_ICEBREAKERS_REALTIME_BACKEND: ${VITE_ICEBREAKERS_REALTIME_BACKEND}. Allowed: socket-io|convex"
+              exit 1
+              ;;
+          esac
+
+          case "${VITE_STANDUPS_REALTIME_BACKEND}" in
+            socket-io|convex) ;;
+            *)
+              echo "Invalid VITE_STANDUPS_REALTIME_BACKEND: ${VITE_STANDUPS_REALTIME_BACKEND}. Allowed: socket-io|convex"
+              exit 1
+              ;;
+          esac
+
           case "${VITE_NOTIFICATIONS_REALTIME_BACKEND}" in
             socket-io|convex) ;;
             *)
@@ -154,14 +160,21 @@ jobs:
             console.log('UI env URLs look valid');
           "
 
+      - name: Resolve app version
+        id: version
+        run: echo "version=$(node -p "require('./retro-tool-ui/package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Build UI
         env:
+          VITE_APP_VERSION: v${{ steps.version.outputs.version }}
           VITE_APP_TITLE: ${{ vars.VITE_APP_TITLE }}
           VITE_APP_ENV: ${{ vars.VITE_APP_ENV }}
           VITE_API_URL: ${{ vars.VITE_API_URL }}
           VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
           VITE_ESTIMATES_REALTIME_BACKEND: ${{ vars.VITE_ESTIMATES_REALTIME_BACKEND }}
           VITE_RETROS_REALTIME_BACKEND: ${{ vars.VITE_RETROS_REALTIME_BACKEND }}
+          VITE_ICEBREAKERS_REALTIME_BACKEND: ${{ vars.VITE_ICEBREAKERS_REALTIME_BACKEND }}
+          VITE_STANDUPS_REALTIME_BACKEND: ${{ vars.VITE_STANDUPS_REALTIME_BACKEND }}
           VITE_NOTIFICATIONS_REALTIME_BACKEND: ${{ vars.VITE_NOTIFICATIONS_REALTIME_BACKEND }}
         run: pnpm --filter retro-tool-ui build
 
@@ -172,5 +185,5 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: retro-tool-ui/dist
+          api_location: ""
           skip_app_build: true
-          skip_api_build: true

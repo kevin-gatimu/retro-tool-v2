@@ -1,6 +1,8 @@
 import { mutation, query, internalMutation } from './server'
 import { v } from 'convex/values'
-import { requireIdentity } from './lib/authz'
+import { getCallerTeamIds, isAdminRole, requireIdentity } from './lib/authz'
+import { LIST_PROJECTION_CAP } from './lib/limits'
+import { rateLimiter } from './rateLimits'
 
 const retroStatus = v.union(
   v.literal('draft'),
@@ -114,11 +116,19 @@ export const getRetroProjection = query({
 export const listRecentRetroProjections = query({
   args: {},
   handler: async (ctx) => {
-    await requireIdentity(ctx)
+    const identity = await requireIdentity(ctx)
     const projections = await ctx.db.query('liveRetroSessions').collect()
 
+    // Scope to the caller's teams (`null` = admin, pass all) — invalidation
+    // signal only, but stops cross-tenant retro enumeration.
+    const teamIds = isAdminRole(identity.role)
+      ? null
+      : await getCallerTeamIds(ctx, identity.subject)
+
     return projections
+      .filter((projection) => !teamIds || teamIds.has(projection.teamId))
       .sort((left, right) => left.retroId.localeCompare(right.retroId))
+      .slice(0, LIST_PROJECTION_CAP)
       .map((projection) => ({
         retroId: projection.retroId,
         status: projection.status,
@@ -137,12 +147,17 @@ export const upsertRetroBoard = internalMutation({
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    const existing = (
-      await ctx.db
+    // Read only this user's row via the composite index. The per-member board
+    // fan-out pushes many users' boards for the same retro concurrently; a
+    // `by_retro_id` scan would put every board row in each call's read-set, so
+    // concurrent upserts overlap and fail Convex's OCC retry. Scoping to
+    // (retroId, userId) keeps each call's read/write set disjoint.
+    const existing = await ctx.db
       .query('liveRetroBoards')
-      .withIndex('by_retro_id', (q) => q.eq('retroId', args.retroId))
-      .collect()
-    ).find((board) => board.userId === args.userId)
+      .withIndex('by_retro_user', (q) =>
+        q.eq('retroId', args.retroId).eq('userId', args.userId),
+      )
+      .unique()
 
     if (existing) {
       if (args.updatedAt < existing.updatedAt) {
@@ -175,12 +190,12 @@ export const getRetroBoard = query({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
-    const board = (
-      await ctx.db
+    const board = await ctx.db
       .query('liveRetroBoards')
-      .withIndex('by_retro_id', (q) => q.eq('retroId', args.retroId))
-      .collect()
-    ).find((item) => item.userId === identity.subject)
+      .withIndex('by_retro_user', (q) =>
+        q.eq('retroId', args.retroId).eq('userId', identity.subject),
+      )
+      .unique()
 
     if (!board) {
       return null
@@ -205,12 +220,16 @@ export const startTyping = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
-    const existing = (
-      await ctx.db
-        .query('liveTyping')
-        .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
-        .collect()
-    ).find((r) => r.userId === identity.subject)
+    await rateLimiter.limit(ctx, 'liveInteraction', {
+      key: identity.subject,
+      throws: true,
+    })
+    const existing = await ctx.db
+      .query('liveTyping')
+      .withIndex('by_retro_user', (q) =>
+        q.eq('retroId', args.retroId).eq('userId', identity.subject),
+      )
+      .unique()
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -236,12 +255,16 @@ export const stopTyping = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
-    const existing = (
-      await ctx.db
-        .query('liveTyping')
-        .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
-        .collect()
-    ).find((r) => r.userId === identity.subject)
+    await rateLimiter.limit(ctx, 'liveInteraction', {
+      key: identity.subject,
+      throws: true,
+    })
+    const existing = await ctx.db
+      .query('liveTyping')
+      .withIndex('by_retro_user', (q) =>
+        q.eq('retroId', args.retroId).eq('userId', identity.subject),
+      )
+      .unique()
 
     if (existing) {
       await ctx.db.delete(existing._id)
@@ -274,12 +297,16 @@ export const setReadyStatus = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
-    const existing = (
-      await ctx.db
-        .query('liveReadyStatus')
-        .withIndex('by_retro', (q) => q.eq('retroId', args.retroId))
-        .collect()
-    ).find((r) => r.userId === identity.subject)
+    await rateLimiter.limit(ctx, 'liveInteraction', {
+      key: identity.subject,
+      throws: true,
+    })
+    const existing = await ctx.db
+      .query('liveReadyStatus')
+      .withIndex('by_retro_user', (q) =>
+        q.eq('retroId', args.retroId).eq('userId', identity.subject),
+      )
+      .unique()
 
     if (existing) {
       await ctx.db.patch(existing._id, {

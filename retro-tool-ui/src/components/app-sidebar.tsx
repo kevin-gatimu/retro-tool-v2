@@ -1,34 +1,9 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import {
-  BarChart3,
-  Building2,
-  CalendarCheck,
-  ChevronsUpDown,
-  ChevronDown,
-  ClipboardList,
-  FileText,
-  History,
-  Laptop,
-  LayoutDashboard,
-  LogOut,
-  Moon,
-  Shield,
-  Spade,
-  Sparkles,
-  Sun,
-  User,
-  Users,
-  Vote,
-} from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { ChevronsUpDown, Laptop, LogOut, Moon, Sun } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSyncExternalStore } from 'react'
 import { UserAvatar } from '@/components/user-avatar'
 import { Badge } from '@/components/ui/badge'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +15,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -48,6 +22,15 @@ import {
 } from '@/components/ui/sidebar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { AccountSwitcher } from '@/components/account-switcher'
+import { CollapsibleNavGroup } from '@/components/collapsible-nav-group'
+import {
+  adminNavItems,
+  ceremonyNavItems,
+  engagementNavItems,
+  libraryNavItems,
+  mainNavItems,
+  userNavItems,
+} from '@/components/app-sidebar-nav-items'
 import { useTheme } from '@/hooks/use-theme'
 import { api } from '@/lib/api'
 import {
@@ -55,7 +38,7 @@ import {
   SURVEYS_ENDPOINTS,
   USERS_ENDPOINTS,
 } from '@/lib/api-endpoints'
-import { authClient } from '@/lib/auth-client'
+import { authClient, signOutWithCleanup } from '@/lib/auth-client'
 import { canAccessAdminPanel } from '@/lib/rbac'
 import { usesConvexForSurveys, usesConvexForPolls } from '@/lib/realtime-config'
 import { SurveyListConvexSync } from '@/routes/surveys/components/survey-list-convex-sync'
@@ -63,122 +46,6 @@ import { PollListConvexSync } from '@/routes/polls/components/poll-list-convex-s
 import { USER_ROLES } from '@/common/enums/user.enums'
 import type { TUserRole } from '@/common/enums/user.enums'
 import type { User as AppUser } from '@/common/types/users'
-
-type NavItem = {
-  title: string
-  url: string
-  icon: typeof LayoutDashboard
-  allowedRoles: TUserRole[]
-}
-
-const ALL_ROLES: TUserRole[] = [
-  USER_ROLES.SuperAdmin,
-  USER_ROLES.SystemAdmin,
-  USER_ROLES.OrgAdmin,
-  USER_ROLES.TeamLead,
-  USER_ROLES.Member,
-]
-
-const mainNavItems: NavItem[] = [
-  {
-    title: 'Dashboard',
-    url: '/dashboard',
-    icon: LayoutDashboard,
-    allowedRoles: ALL_ROLES,
-  },
-]
-
-const retroNavItems: NavItem[] = [
-  {
-    title: 'Retrospectives',
-    url: '/retros',
-    icon: History,
-    allowedRoles: ALL_ROLES,
-  },
-  {
-    title: 'Story Estimate',
-    url: '/estimate',
-    icon: Spade,
-    allowedRoles: ALL_ROLES,
-  },
-  {
-    title: 'Icebreakers',
-    url: '/icebreakers',
-    icon: Sparkles,
-    allowedRoles: ALL_ROLES,
-  },
-  {
-    title: 'Standups',
-    url: '/standups',
-    icon: CalendarCheck,
-    allowedRoles: ALL_ROLES,
-  },
-  {
-    title: 'Polls',
-    url: '/polls',
-    icon: Vote,
-    allowedRoles: ALL_ROLES,
-  },
-  {
-    title: 'Surveys',
-    url: '/surveys',
-    icon: ClipboardList,
-    allowedRoles: ALL_ROLES,
-  },
-]
-
-// Templates + Reports form their own small group, visually separated from the
-// session tools above.
-const libraryNavItems: NavItem[] = [
-  {
-    title: 'Templates',
-    url: '/templates',
-    icon: FileText,
-    allowedRoles: ALL_ROLES,
-  },
-  {
-    title: 'Reports',
-    url: '/reports',
-    icon: BarChart3,
-    allowedRoles: [
-      USER_ROLES.SuperAdmin,
-      USER_ROLES.SystemAdmin,
-      USER_ROLES.OrgAdmin,
-      USER_ROLES.TeamLead,
-      USER_ROLES.Member,
-    ],
-  },
-]
-
-const userNavItems: NavItem[] = [
-  {
-    title: 'Organizations',
-    url: '/organizations',
-    icon: Building2,
-    allowedRoles: ALL_ROLES,
-  },
-  {
-    title: 'Teams',
-    url: '/teams',
-    icon: Users,
-    allowedRoles: ALL_ROLES,
-  },
-  {
-    title: 'Profile',
-    url: '/profile',
-    icon: User,
-    allowedRoles: ALL_ROLES,
-  },
-]
-
-const adminNavItems: NavItem[] = [
-  {
-    title: 'Admin Panel',
-    url: '/admin',
-    icon: Shield,
-    allowedRoles: [USER_ROLES.SuperAdmin, USER_ROLES.SystemAdmin],
-  },
-]
 
 // Subscribe to nothing, just return true after hydration
 const subscribeHydration = () => () => {}
@@ -238,6 +105,7 @@ function ThemeToggle() {
 
 export function AppSidebar() {
   const { data: session } = authClient.useSession()
+  const queryClient = useQueryClient()
   const routerState = useRouterState()
   const currentPath = routerState.location.pathname
 
@@ -277,7 +145,10 @@ export function AppSidebar() {
   const visibleMainNavItems = mainNavItems.filter((item) =>
     item.allowedRoles.includes(currentUserRole),
   )
-  const visibleRetroNavItems = retroNavItems.filter((item) =>
+  const visibleCeremonyNavItems = ceremonyNavItems.filter((item) =>
+    item.allowedRoles.includes(currentUserRole),
+  )
+  const visibleEngagementNavItems = engagementNavItems.filter((item) =>
     item.allowedRoles.includes(currentUserRole),
   )
   const visibleLibraryNavItems = libraryNavItems.filter((item) =>
@@ -298,8 +169,7 @@ export function AppSidebar() {
   }
 
   const handleSignOut = async () => {
-    const { signOutWithCleanup } = await import('@/lib/auth-client')
-    await signOutWithCleanup()
+    await signOutWithCleanup(queryClient)
     window.location.href = '/auth/sign-in'
   }
 
@@ -336,85 +206,46 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {visibleRetroNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                      {item.url === '/surveys' && activeSurveyCount > 0 && (
-                        <Badge
-                          variant="default"
-                          className="ml-auto h-5 min-w-5 rounded-full px-1.5 text-xs flex items-center justify-center animate-in zoom-in animate-pulse"
-                        >
-                          {activeSurveyCount > 9 ? '9+' : activeSurveyCount}
-                        </Badge>
-                      )}
-                      {item.url === '/polls' && activePollCount > 0 && (
-                        <Badge
-                          variant="default"
-                          className="ml-auto h-5 min-w-5 rounded-full px-1.5 text-xs flex items-center justify-center animate-in zoom-in animate-pulse"
-                        >
-                          {activePollCount > 9 ? '9+' : activePollCount}
-                        </Badge>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <CollapsibleNavGroup
+          label="Ceremonies"
+          items={visibleCeremonyNavItems}
+          isActive={isActive}
+        />
 
-        {visibleLibraryNavItems.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleLibraryNavItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <Link to={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+        <CollapsibleNavGroup
+          label="Engagement"
+          items={visibleEngagementNavItems}
+          isActive={isActive}
+          collapsedBadgeCount={activePollCount + activeSurveyCount}
+          renderBadge={(item) => {
+            const countByUrl: Record<string, number> = {
+              '/surveys': activeSurveyCount,
+              '/polls': activePollCount,
+            }
+            const count = countByUrl[item.url] ?? 0
+            if (count <= 0) return null
+            return (
+              <Badge
+                variant="default"
+                className="ml-auto h-5 min-w-5 rounded-full px-1.5 text-xs flex items-center justify-center animate-in zoom-in animate-pulse"
+              >
+                {count > 9 ? '9+' : count}
+              </Badge>
+            )
+          }}
+        />
 
-        <Collapsible defaultOpen asChild className="group/account-section">
-          <SidebarGroup>
-            <SidebarGroupLabel className="flex items-center gap-2" asChild>
-              <CollapsibleTrigger className="cursor-pointer">
-                <User className="h-4 w-4" />
-                Account
-                <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/account-section:rotate-0 group-data-[state=closed]/account-section:-rotate-90" />
-              </CollapsibleTrigger>
-            </SidebarGroupLabel>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {visibleUserNavItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                        <Link to={item.url}>
-                          <item.icon />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarGroup>
-        </Collapsible>
+        <CollapsibleNavGroup
+          label="Library"
+          items={visibleLibraryNavItems}
+          isActive={isActive}
+        />
+
+        <CollapsibleNavGroup
+          label="Account"
+          items={visibleUserNavItems}
+          isActive={isActive}
+        />
 
         {isAdmin && (
           <SidebarGroup>
@@ -482,6 +313,9 @@ export function AppSidebar() {
                 <SidebarMenuButton onClick={handleSignOut}>
                   <LogOut className="h-4 w-4" />
                   <span>Sign out</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {__APP_VERSION__}
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

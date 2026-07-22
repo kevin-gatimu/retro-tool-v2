@@ -10,20 +10,22 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsofserviceRouteImport } from './routes/termsofservice'
-import { Route as TemplatesRouteImport } from './routes/templates'
-import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacystatementRouteImport } from './routes/privacystatement'
+import { Route as PrivacyStatementRouteImport } from './routes/privacy-statement'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TemplatesIndexRouteImport } from './routes/templates/index'
 import { Route as TeamsIndexRouteImport } from './routes/teams/index'
 import { Route as SurveysIndexRouteImport } from './routes/surveys/index'
 import { Route as StandupsIndexRouteImport } from './routes/standups/index'
 import { Route as RetrosIndexRouteImport } from './routes/retros/index'
+import { Route as ReportsIndexRouteImport } from './routes/reports/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
 import { Route as PollsIndexRouteImport } from './routes/polls/index'
 import { Route as OrganizationsIndexRouteImport } from './routes/organizations/index'
@@ -37,6 +39,8 @@ import { Route as StandupsNewRouteImport } from './routes/standups/new'
 import { Route as StandupsStandupIdRouteImport } from './routes/standups/$standupId'
 import { Route as RetrosNewRouteImport } from './routes/retros/new'
 import { Route as RetrosRetroIdRouteImport } from './routes/retros/$retroId'
+import { Route as ReportsSystemRouteImport } from './routes/reports/system'
+import { Route as ReportsMeRouteImport } from './routes/reports/me'
 import { Route as ProfileSettingsRouteImport } from './routes/profile/settings'
 import { Route as ProfileSessionsRouteImport } from './routes/profile/sessions'
 import { Route as ProfileSecurityRouteImport } from './routes/profile/security'
@@ -63,20 +67,17 @@ import { Route as AdminTeamRolesRouteImport } from './routes/admin/team-roles'
 import { Route as AdminOrganizationsRouteImport } from './routes/admin/organizations'
 import { Route as AdminOrgSetupRouteImport } from './routes/admin/org-setup'
 import { Route as AdminConvexRouteImport } from './routes/admin/convex'
+import { Route as ReportsTeamTeamIdRouteImport } from './routes/reports/team.$teamId'
+import { Route as ReportsOrgOrgIdRouteImport } from './routes/reports/org.$orgId'
 
 const TermsofserviceRoute = TermsofserviceRouteImport.update({
   id: '/termsofservice',
   path: '/termsofservice',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TemplatesRoute = TemplatesRouteImport.update({
-  id: '/templates',
-  path: '/templates',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReportsRoute = ReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
+const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
+  id: '/terms-of-service',
+  path: '/terms-of-service',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -87,6 +88,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const PrivacystatementRoute = PrivacystatementRouteImport.update({
   id: '/privacystatement',
   path: '/privacystatement',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyStatementRoute = PrivacyStatementRouteImport.update({
+  id: '/privacy-statement',
+  path: '/privacy-statement',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MeRoute = MeRouteImport.update({
@@ -119,6 +125,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TemplatesIndexRoute = TemplatesIndexRouteImport.update({
+  id: '/templates/',
+  path: '/templates/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TeamsIndexRoute = TeamsIndexRouteImport.update({
   id: '/teams/',
   path: '/teams/',
@@ -137,6 +148,11 @@ const StandupsIndexRoute = StandupsIndexRouteImport.update({
 const RetrosIndexRoute = RetrosIndexRouteImport.update({
   id: '/retros/',
   path: '/retros/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsIndexRoute = ReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileIndexRoute = ProfileIndexRouteImport.update({
@@ -202,6 +218,16 @@ const RetrosNewRoute = RetrosNewRouteImport.update({
 const RetrosRetroIdRoute = RetrosRetroIdRouteImport.update({
   id: '/retros/$retroId',
   path: '/retros/$retroId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsSystemRoute = ReportsSystemRouteImport.update({
+  id: '/reports/system',
+  path: '/reports/system',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsMeRoute = ReportsMeRouteImport.update({
+  id: '/reports/me',
+  path: '/reports/me',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileSettingsRoute = ProfileSettingsRouteImport.update({
@@ -334,6 +360,16 @@ const AdminConvexRoute = AdminConvexRouteImport.update({
   path: '/convex',
   getParentRoute: () => AdminRoute,
 } as any)
+const ReportsTeamTeamIdRoute = ReportsTeamTeamIdRouteImport.update({
+  id: '/reports/team/$teamId',
+  path: '/reports/team/$teamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsOrgOrgIdRoute = ReportsOrgOrgIdRouteImport.update({
+  id: '/reports/org/$orgId',
+  path: '/reports/org/$orgId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -342,10 +378,10 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
   '/me': typeof MeRoute
+  '/privacy-statement': typeof PrivacyStatementRoute
   '/privacystatement': typeof PrivacystatementRoute
   '/profile': typeof ProfileRouteWithChildren
-  '/reports': typeof ReportsRoute
-  '/templates': typeof TemplatesRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/termsofservice': typeof TermsofserviceRoute
   '/admin/convex': typeof AdminConvexRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
@@ -373,6 +409,8 @@ export interface FileRoutesByFullPath {
   '/profile/security': typeof ProfileSecurityRoute
   '/profile/sessions': typeof ProfileSessionsRoute
   '/profile/settings': typeof ProfileSettingsRoute
+  '/reports/me': typeof ReportsMeRoute
+  '/reports/system': typeof ReportsSystemRoute
   '/retros/$retroId': typeof RetrosRetroIdRoute
   '/retros/new': typeof RetrosNewRoute
   '/standups/$standupId': typeof StandupsStandupIdRoute
@@ -386,19 +424,23 @@ export interface FileRoutesByFullPath {
   '/organizations/': typeof OrganizationsIndexRoute
   '/polls/': typeof PollsIndexRoute
   '/profile/': typeof ProfileIndexRoute
+  '/reports/': typeof ReportsIndexRoute
   '/retros/': typeof RetrosIndexRoute
   '/standups/': typeof StandupsIndexRoute
   '/surveys/': typeof SurveysIndexRoute
   '/teams/': typeof TeamsIndexRoute
+  '/templates/': typeof TemplatesIndexRoute
+  '/reports/org/$orgId': typeof ReportsOrgOrgIdRoute
+  '/reports/team/$teamId': typeof ReportsTeamTeamIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRouteWithChildren
   '/me': typeof MeRoute
+  '/privacy-statement': typeof PrivacyStatementRoute
   '/privacystatement': typeof PrivacystatementRoute
-  '/reports': typeof ReportsRoute
-  '/templates': typeof TemplatesRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/termsofservice': typeof TermsofserviceRoute
   '/admin/convex': typeof AdminConvexRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
@@ -426,6 +468,8 @@ export interface FileRoutesByTo {
   '/profile/security': typeof ProfileSecurityRoute
   '/profile/sessions': typeof ProfileSessionsRoute
   '/profile/settings': typeof ProfileSettingsRoute
+  '/reports/me': typeof ReportsMeRoute
+  '/reports/system': typeof ReportsSystemRoute
   '/retros/$retroId': typeof RetrosRetroIdRoute
   '/retros/new': typeof RetrosNewRoute
   '/standups/$standupId': typeof StandupsStandupIdRoute
@@ -439,10 +483,14 @@ export interface FileRoutesByTo {
   '/organizations': typeof OrganizationsIndexRoute
   '/polls': typeof PollsIndexRoute
   '/profile': typeof ProfileIndexRoute
+  '/reports': typeof ReportsIndexRoute
   '/retros': typeof RetrosIndexRoute
   '/standups': typeof StandupsIndexRoute
   '/surveys': typeof SurveysIndexRoute
   '/teams': typeof TeamsIndexRoute
+  '/templates': typeof TemplatesIndexRoute
+  '/reports/org/$orgId': typeof ReportsOrgOrgIdRoute
+  '/reports/team/$teamId': typeof ReportsTeamTeamIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -452,10 +500,10 @@ export interface FileRoutesById {
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
   '/me': typeof MeRoute
+  '/privacy-statement': typeof PrivacyStatementRoute
   '/privacystatement': typeof PrivacystatementRoute
   '/profile': typeof ProfileRouteWithChildren
-  '/reports': typeof ReportsRoute
-  '/templates': typeof TemplatesRoute
+  '/terms-of-service': typeof TermsOfServiceRoute
   '/termsofservice': typeof TermsofserviceRoute
   '/admin/convex': typeof AdminConvexRoute
   '/admin/org-setup': typeof AdminOrgSetupRoute
@@ -483,6 +531,8 @@ export interface FileRoutesById {
   '/profile/security': typeof ProfileSecurityRoute
   '/profile/sessions': typeof ProfileSessionsRoute
   '/profile/settings': typeof ProfileSettingsRoute
+  '/reports/me': typeof ReportsMeRoute
+  '/reports/system': typeof ReportsSystemRoute
   '/retros/$retroId': typeof RetrosRetroIdRoute
   '/retros/new': typeof RetrosNewRoute
   '/standups/$standupId': typeof StandupsStandupIdRoute
@@ -496,10 +546,14 @@ export interface FileRoutesById {
   '/organizations/': typeof OrganizationsIndexRoute
   '/polls/': typeof PollsIndexRoute
   '/profile/': typeof ProfileIndexRoute
+  '/reports/': typeof ReportsIndexRoute
   '/retros/': typeof RetrosIndexRoute
   '/standups/': typeof StandupsIndexRoute
   '/surveys/': typeof SurveysIndexRoute
   '/teams/': typeof TeamsIndexRoute
+  '/templates/': typeof TemplatesIndexRoute
+  '/reports/org/$orgId': typeof ReportsOrgOrgIdRoute
+  '/reports/team/$teamId': typeof ReportsTeamTeamIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -510,10 +564,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/me'
+    | '/privacy-statement'
     | '/privacystatement'
     | '/profile'
-    | '/reports'
-    | '/templates'
+    | '/terms-of-service'
     | '/termsofservice'
     | '/admin/convex'
     | '/admin/org-setup'
@@ -541,6 +595,8 @@ export interface FileRouteTypes {
     | '/profile/security'
     | '/profile/sessions'
     | '/profile/settings'
+    | '/reports/me'
+    | '/reports/system'
     | '/retros/$retroId'
     | '/retros/new'
     | '/standups/$standupId'
@@ -554,19 +610,23 @@ export interface FileRouteTypes {
     | '/organizations/'
     | '/polls/'
     | '/profile/'
+    | '/reports/'
     | '/retros/'
     | '/standups/'
     | '/surveys/'
     | '/teams/'
+    | '/templates/'
+    | '/reports/org/$orgId'
+    | '/reports/team/$teamId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
     | '/auth'
     | '/me'
+    | '/privacy-statement'
     | '/privacystatement'
-    | '/reports'
-    | '/templates'
+    | '/terms-of-service'
     | '/termsofservice'
     | '/admin/convex'
     | '/admin/org-setup'
@@ -594,6 +654,8 @@ export interface FileRouteTypes {
     | '/profile/security'
     | '/profile/sessions'
     | '/profile/settings'
+    | '/reports/me'
+    | '/reports/system'
     | '/retros/$retroId'
     | '/retros/new'
     | '/standups/$standupId'
@@ -607,10 +669,14 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/polls'
     | '/profile'
+    | '/reports'
     | '/retros'
     | '/standups'
     | '/surveys'
     | '/teams'
+    | '/templates'
+    | '/reports/org/$orgId'
+    | '/reports/team/$teamId'
   id:
     | '__root__'
     | '/'
@@ -619,10 +685,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/me'
+    | '/privacy-statement'
     | '/privacystatement'
     | '/profile'
-    | '/reports'
-    | '/templates'
+    | '/terms-of-service'
     | '/termsofservice'
     | '/admin/convex'
     | '/admin/org-setup'
@@ -650,6 +716,8 @@ export interface FileRouteTypes {
     | '/profile/security'
     | '/profile/sessions'
     | '/profile/settings'
+    | '/reports/me'
+    | '/reports/system'
     | '/retros/$retroId'
     | '/retros/new'
     | '/standups/$standupId'
@@ -663,10 +731,14 @@ export interface FileRouteTypes {
     | '/organizations/'
     | '/polls/'
     | '/profile/'
+    | '/reports/'
     | '/retros/'
     | '/standups/'
     | '/surveys/'
     | '/teams/'
+    | '/templates/'
+    | '/reports/org/$orgId'
+    | '/reports/team/$teamId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -676,16 +748,18 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
   MeRoute: typeof MeRoute
+  PrivacyStatementRoute: typeof PrivacyStatementRoute
   PrivacystatementRoute: typeof PrivacystatementRoute
   ProfileRoute: typeof ProfileRouteWithChildren
-  ReportsRoute: typeof ReportsRoute
-  TemplatesRoute: typeof TemplatesRoute
+  TermsOfServiceRoute: typeof TermsOfServiceRoute
   TermsofserviceRoute: typeof TermsofserviceRoute
   EstimateSessionIdRoute: typeof EstimateSessionIdRoute
   EstimateNewRoute: typeof EstimateNewRoute
   IcebreakersSessionIdRoute: typeof IcebreakersSessionIdRoute
   IcebreakersNewRoute: typeof IcebreakersNewRoute
   OrganizationsOrgIdRoute: typeof OrganizationsOrgIdRoute
+  ReportsMeRoute: typeof ReportsMeRoute
+  ReportsSystemRoute: typeof ReportsSystemRoute
   RetrosRetroIdRoute: typeof RetrosRetroIdRoute
   RetrosNewRoute: typeof RetrosNewRoute
   StandupsStandupIdRoute: typeof StandupsStandupIdRoute
@@ -696,10 +770,14 @@ export interface RootRouteChildren {
   IcebreakersIndexRoute: typeof IcebreakersIndexRoute
   OrganizationsIndexRoute: typeof OrganizationsIndexRoute
   PollsIndexRoute: typeof PollsIndexRoute
+  ReportsIndexRoute: typeof ReportsIndexRoute
   RetrosIndexRoute: typeof RetrosIndexRoute
   StandupsIndexRoute: typeof StandupsIndexRoute
   SurveysIndexRoute: typeof SurveysIndexRoute
   TeamsIndexRoute: typeof TeamsIndexRoute
+  TemplatesIndexRoute: typeof TemplatesIndexRoute
+  ReportsOrgOrgIdRoute: typeof ReportsOrgOrgIdRoute
+  ReportsTeamTeamIdRoute: typeof ReportsTeamTeamIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -711,18 +789,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsofserviceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/templates': {
-      id: '/templates'
-      path: '/templates'
-      fullPath: '/templates'
-      preLoaderRoute: typeof TemplatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reports': {
-      id: '/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof ReportsRouteImport
+    '/terms-of-service': {
+      id: '/terms-of-service'
+      path: '/terms-of-service'
+      fullPath: '/terms-of-service'
+      preLoaderRoute: typeof TermsOfServiceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -737,6 +808,13 @@ declare module '@tanstack/react-router' {
       path: '/privacystatement'
       fullPath: '/privacystatement'
       preLoaderRoute: typeof PrivacystatementRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy-statement': {
+      id: '/privacy-statement'
+      path: '/privacy-statement'
+      fullPath: '/privacy-statement'
+      preLoaderRoute: typeof PrivacyStatementRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/me': {
@@ -781,6 +859,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/templates/': {
+      id: '/templates/'
+      path: '/templates'
+      fullPath: '/templates/'
+      preLoaderRoute: typeof TemplatesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/teams/': {
       id: '/teams/'
       path: '/teams'
@@ -807,6 +892,13 @@ declare module '@tanstack/react-router' {
       path: '/retros'
       fullPath: '/retros/'
       preLoaderRoute: typeof RetrosIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/': {
+      id: '/reports/'
+      path: '/reports'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof ReportsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile/': {
@@ -898,6 +990,20 @@ declare module '@tanstack/react-router' {
       path: '/retros/$retroId'
       fullPath: '/retros/$retroId'
       preLoaderRoute: typeof RetrosRetroIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/system': {
+      id: '/reports/system'
+      path: '/reports/system'
+      fullPath: '/reports/system'
+      preLoaderRoute: typeof ReportsSystemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/me': {
+      id: '/reports/me'
+      path: '/reports/me'
+      fullPath: '/reports/me'
+      preLoaderRoute: typeof ReportsMeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile/settings': {
@@ -1082,6 +1188,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminConvexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/reports/team/$teamId': {
+      id: '/reports/team/$teamId'
+      path: '/reports/team/$teamId'
+      fullPath: '/reports/team/$teamId'
+      preLoaderRoute: typeof ReportsTeamTeamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/org/$orgId': {
+      id: '/reports/org/$orgId'
+      path: '/reports/org/$orgId'
+      fullPath: '/reports/org/$orgId'
+      preLoaderRoute: typeof ReportsOrgOrgIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1175,16 +1295,18 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
   MeRoute: MeRoute,
+  PrivacyStatementRoute: PrivacyStatementRoute,
   PrivacystatementRoute: PrivacystatementRoute,
   ProfileRoute: ProfileRouteWithChildren,
-  ReportsRoute: ReportsRoute,
-  TemplatesRoute: TemplatesRoute,
+  TermsOfServiceRoute: TermsOfServiceRoute,
   TermsofserviceRoute: TermsofserviceRoute,
   EstimateSessionIdRoute: EstimateSessionIdRoute,
   EstimateNewRoute: EstimateNewRoute,
   IcebreakersSessionIdRoute: IcebreakersSessionIdRoute,
   IcebreakersNewRoute: IcebreakersNewRoute,
   OrganizationsOrgIdRoute: OrganizationsOrgIdRoute,
+  ReportsMeRoute: ReportsMeRoute,
+  ReportsSystemRoute: ReportsSystemRoute,
   RetrosRetroIdRoute: RetrosRetroIdRoute,
   RetrosNewRoute: RetrosNewRoute,
   StandupsStandupIdRoute: StandupsStandupIdRoute,
@@ -1195,10 +1317,14 @@ const rootRouteChildren: RootRouteChildren = {
   IcebreakersIndexRoute: IcebreakersIndexRoute,
   OrganizationsIndexRoute: OrganizationsIndexRoute,
   PollsIndexRoute: PollsIndexRoute,
+  ReportsIndexRoute: ReportsIndexRoute,
   RetrosIndexRoute: RetrosIndexRoute,
   StandupsIndexRoute: StandupsIndexRoute,
   SurveysIndexRoute: SurveysIndexRoute,
   TeamsIndexRoute: TeamsIndexRoute,
+  TemplatesIndexRoute: TemplatesIndexRoute,
+  ReportsOrgOrgIdRoute: ReportsOrgOrgIdRoute,
+  ReportsTeamTeamIdRoute: ReportsTeamTeamIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

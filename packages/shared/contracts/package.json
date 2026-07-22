@@ -1,6 +1,8 @@
 {
     "name": "@retro-tool/contracts",
+    "version": "1.0.0",
     "private": true,
+    "license": "UNLICENSED",
     "type": "module",
     "exports": {
         ".": "./src/index.ts"

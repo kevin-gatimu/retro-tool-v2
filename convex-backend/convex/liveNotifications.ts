@@ -1,4 +1,4 @@
-import { mutation, query, internalMutation } from './server'
+import { query, internalMutation } from './server'
 import { v } from 'convex/values'
 import { requireIdentity } from './lib/authz'
 
@@ -163,7 +163,7 @@ export const getUnreadCount = query({
     // Deprecated: identity is derived server-side from the JWT. Ignored.
     userId: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     const identity = await requireIdentity(ctx)
     const unread = await ctx.db
       .query('liveNotifications')

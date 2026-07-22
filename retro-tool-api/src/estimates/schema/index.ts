@@ -208,6 +208,11 @@ export const storyEstimateVote = pgTable(
       table.roundId,
       table.voterId,
     ),
+    // Reports v2: participation lookups per session and voter.
+    index('story_estimate_vote_session_voter_idx').on(
+      table.sessionId,
+      table.voterId,
+    ),
   ],
 );
 

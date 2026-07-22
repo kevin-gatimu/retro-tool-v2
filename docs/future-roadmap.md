@@ -1,29 +1,9 @@
 # Retro Tool — Future Roadmap
 
 > It's Time To RE-THINK How You Do Retrospectives
-
----
-
-## Icebreakers
-
-Enhance collaboration and boost team spirit before every retro session.
-
-- Card-swiping mechanic (swipe left/right on prompts)
-- Multiple flavours: fun, professional, creative, random
-- Seed-based generation for reproducible sessions
-- Dedicated IceBreaker phase at the start of a retro
-
----
-
-## Insightful Surveys, Polls & Health Checks
-
-Simplify feedback collection through easy-to-use tools. Foster collaboration and build stronger teams.
-
-- **Team Health Checks** — visual scorecards per team over time
-- **Surveys** — custom question sets sent before/after retros
-- **Polls** — quick in-session voting on topics or decisions
-- Historical tracking and trend visualization
-- Exportable results per team or organization
+>
+> Scope: forward-looking ideas only. Shipped features (Icebreakers, Surveys, Polls,
+> Standups) have graduated off this list — see [docs/README.md](README.md) for docs on what's built.
 
 ---
 

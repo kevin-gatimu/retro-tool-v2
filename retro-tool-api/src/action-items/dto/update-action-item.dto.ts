@@ -12,7 +12,7 @@ export const updateActionItemSchema = z.object({
   status: z
     .enum(Object.values(ACTION_ITEM_STATUSES) as [string, ...string[]])
     .optional(),
-  dueDate: z.string().datetime().optional(),
+  dueDate: z.iso.datetime().optional(),
 });
 
 export type UpdateActionItemDto = z.infer<typeof updateActionItemSchema>;

@@ -1,6 +1,7 @@
 import { query, internalMutation } from './server'
 import { v } from 'convex/values'
-import { requireIdentity } from './lib/authz'
+import { getCallerTeamIds, isAdminRole, requireIdentity } from './lib/authz'
+import { LIST_PROJECTION_CAP } from './lib/limits'
 
 // ── Lightweight projection (used by the polls list page) ─────────────────────
 //
@@ -68,11 +69,21 @@ export const deletePollProjection = internalMutation({
 export const listPollProjections = query({
   args: {},
   handler: async (ctx) => {
-    await requireIdentity(ctx)
+    const identity = await requireIdentity(ctx)
     const projections = await ctx.db.query('livePolls').collect()
 
+    // Scope to teams the caller belongs to. `null` means "admin — pass all".
+    // This is only an invalidation signal — the UI refetches the REST list which
+    // re-applies per-viewer authorization — but scoping stops cross-tenant
+    // enumeration.
+    const teamIds = isAdminRole(identity.role)
+      ? null
+      : await getCallerTeamIds(ctx, identity.subject)
+
     return projections
+      .filter((projection) => !teamIds || teamIds.has(projection.teamId))
       .sort((left, right) => left.pollId.localeCompare(right.pollId))
+      .slice(0, LIST_PROJECTION_CAP)
       .map((projection) => ({
         pollId: projection.pollId,
         isClosed: projection.isClosed,

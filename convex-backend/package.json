@@ -1,25 +1,30 @@
 {
-    "name": "convex-backend",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "dev": "convex dev",
-        "dev:staging": "dotenv -e .env.staging-local -- convex dev",
-        "dev:prod": "dotenv -e .env.production-local -- convex dev",
-        "codegen": "convex codegen",
-        "deploy": "convex deploy",
-        "build": "node -e \"console.log('convex-backend scaffold created; run pnpm codegen after configuring a Convex deployment')\"",
-        "lint": "node -e \"console.log('convex-backend lint scaffold ready')\"",
-        "type-check": "node -e \"console.log('convex-backend type-check is deferred until Convex generated types are available')\""
-    },
-    "dependencies": {
-        "convex": "^1.18.0",
-        "@convex-dev/rate-limiter": "^0.3.2",
-        "@convex-dev/aggregate": "^0.2.1"
-    },
-    "devDependencies": {
-        "@types/node": "^22.10.7",
-        "dotenv-cli": "^8.0.0",
-        "typescript": "^6.0.2"
-    }
+  "name": "convex-backend",
+  "version": "1.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev",
+    "dev:staging": "dotenv -e .env.staging-local -- convex dev",
+    "dev:prod": "dotenv -e .env.production-local -- convex dev",
+    "codegen": "convex codegen",
+    "deploy": "convex deploy",
+    "build": "pnpm type-check",
+    "lint": "eslint convex",
+    "lint:fix": "eslint convex --fix",
+    "type-check": "tsc --noEmit -p convex/tsconfig.json"
+  },
+  "dependencies": {
+    "convex": "1.42.3",
+    "@convex-dev/rate-limiter": "^0.3.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/node": "^22.10.7",
+    "dotenv-cli": "^8.0.0",
+    "eslint": "^9.18.0",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.20.0"
+  }
 }

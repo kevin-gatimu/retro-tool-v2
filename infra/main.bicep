@@ -185,6 +185,10 @@ resource appService 'Microsoft.Web/sites@2023-12-01' = {
       alwaysOn: true
       http20Enabled: true
       webSocketsEnabled: true
+      // Pin the minimum TLS version and disable FTPS so posture is explicit and
+      // resistant to platform-default drift (SECURITY-ASSESSMENT F12).
+      minTlsVersion: '1.2'
+      ftpsState: 'Disabled'
       appSettings: concat(baseAppSettings, customAppSettings)
     }
   }

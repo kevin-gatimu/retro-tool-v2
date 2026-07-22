@@ -1,0 +1,39 @@
+name: Release Staging
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - "convex-backend/**"
+      - "infra/**"
+      - "packages/shared/contracts/**"
+      - "retro-tool-api/**"
+      - "retro-tool-ui/**"
+      - ".github/workflows/deploy-api.yml"
+      - ".github/workflows/deploy-convex.yml"
+      - ".github/workflows/deploy-ui.yml"
+      - ".github/workflows/release-staging.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: staging-release
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  convex:
+    uses: ./.github/workflows/deploy-convex.yml
+    secrets: inherit
+
+  api:
+    needs: convex
+    uses: ./.github/workflows/deploy-api.yml
+    secrets: inherit
+
+  ui:
+    needs: api
+    uses: ./.github/workflows/deploy-ui.yml
+    secrets: inherit

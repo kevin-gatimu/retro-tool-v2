@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   Clock,
@@ -9,8 +9,10 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
+import { convexApi } from '@/lib/convex-api'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,29 +35,24 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
-import { ESTIMATES_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
+import { ESTIMATES_ENDPOINTS } from '@/lib/api-endpoints'
 import type { EstimateSession } from '@/common/types/estimates'
-import type { Team } from '@/common/types/teams'
 import { usesConvexForEstimates } from '@/lib/realtime-config'
 import { EstimateListConvexSync } from './components/estimate-list-convex-sync'
-import type { HistoryResponse } from './types'
-import { SpaceSwitcher } from '@/components/spaces/space-switcher'
+import type { HistoryResponse, OnlineCount } from './types'
 import { ViewConfigToolbar } from '@/components/spaces/view-config-toolbar'
 import { GroupedSessionView } from '@/components/spaces/grouped-session-view'
 import { LoadMoreFooter } from '@/components/spaces/load-more-footer'
 import type { CompletedPage } from '@/components/spaces/use-session-list'
 import { useSessionList } from '@/components/spaces/use-session-list'
 import type { StatusBucket } from '@/components/spaces/utils'
-import {
-  SPACE_ALL,
-  deriveSpaces,
-  nextCollapsedGroups,
-  toggleFavorite,
-} from '@/components/spaces/utils'
+import { SPACE_ALL, nextCollapsedGroups } from '@/components/spaces/utils'
 import { useSessionViewPreferences } from '@/hooks/use-session-view-preferences'
 import { EstimateListSkeleton } from './skeleton'
 
 const COMPLETED_PAGE_SIZE = 12
+
+const onlineCountsQueryRef = convexApi.liveEstimates.listOnlineCounts
 
 // ─── Normalized list item ─────────────────────────────────────────────────────
 // Ongoing (live session) and completed (history aggregate) have different
@@ -150,14 +147,6 @@ async function fetchCompletedEstimates(
   }
 }
 
-function teamsQueryOptions() {
-  return {
-    queryKey: ['teams'] as const,
-    queryFn: () => api.get<{ teams: Team[] }>(TEAMS_ENDPOINTS.LIST),
-    staleTime: 60_000,
-  }
-}
-
 // ─── Route ───────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute('/estimate/')({
@@ -166,16 +155,42 @@ export const Route = createFileRoute('/estimate/')({
 
 function EstimateIndexPage() {
   const usesConvexRealtime = usesConvexForEstimates()
-  const { view, setView } = useSessionViewPreferences('estimates')
-  const { data: teamsData } = useQuery(teamsQueryOptions())
+  const { view: storedView, setView } = useSessionViewPreferences('estimates')
+  // The space switcher was removed, so `space` is no longer selectable. Force
+  // "All Spaces" so a previously-persisted team filter can't permanently strand
+  // the list (it's still read by teamScope + GroupedSessionView below).
+  const view =
+    storedView.space === SPACE_ALL
+      ? storedView
+      : { ...storedView, space: SPACE_ALL }
 
-  // Debounced search (scoped to completed/history server-side).
+  // Debounced search. Completed/history is searched server-side (in the
+  // fetcher); ongoing is searched client-side below (it's always a small,
+  // fully-loaded list), so a single box covers both buckets.
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput), 350)
     return () => clearTimeout(t)
   }, [searchInput])
+
+  // Live "N online" counts, keyed by sessionId, from a direct Convex presence
+  // subscription — updates instantly on join/leave, unlike the REST list's
+  // `onlineCount` which only refreshes on projection invalidation.
+  const { isAuthenticated: convexAuthed } = useConvexAuth()
+  // Cast is safe: listOnlineCounts returns { sessionId, onlineCount }[] per its
+  // server schema; useConvexQuery is untyped against string refs.
+  const rawOnlineCounts = useConvexQuery(
+    onlineCountsQueryRef,
+    usesConvexRealtime && convexAuthed ? {} : 'skip',
+  ) as OnlineCount[] | undefined
+  const onlineCountBySession = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const row of rawOnlineCounts ?? []) {
+      map.set(row.sessionId, row.onlineCount)
+    }
+    return map
+  }, [rawOnlineCounts])
 
   const teamScope = view.space !== SPACE_ALL ? view.space : undefined
 
@@ -199,13 +214,24 @@ function EstimateIndexPage() {
     completedEnabled: view.showCompleted,
   })
 
-  const items = [...ongoing, ...completed]
-  const totalCount = ongoing.length + completedTotal
-  const spaces = deriveSpaces(teamsData?.teams ?? [], items)
+  // Ongoing sessions are fully loaded client-side, so filter them here by the
+  // same term the history fetcher applies server-side — one box, both buckets.
+  const q = search.trim().toLowerCase()
+  const filteredOngoing = q
+    ? ongoing.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.teamName.toLowerCase().includes(q),
+      )
+    : ongoing
+  const items = [...filteredOngoing, ...completed]
 
   const renderItem = (item: EstimateListItem) =>
     item.kind === 'ongoing' ? (
-      <ActiveSessionCard item={item} />
+      <ActiveSessionCard
+        item={item}
+        liveOnlineCount={onlineCountBySession.get(item.id)}
+      />
     ) : (
       <SessionHistoryCard item={item} />
     )
@@ -241,17 +267,6 @@ function EstimateIndexPage() {
         </Button>
       </div>
 
-      <SpaceSwitcher
-        spaces={spaces}
-        value={view.space}
-        onChange={(space) => setView({ space })}
-        favorites={view.favorites}
-        onToggleFavorite={(teamId) =>
-          setView({ favorites: toggleFavorite(view.favorites, teamId) })
-        }
-        totalCount={totalCount}
-      />
-
       <div className="flex flex-wrap items-center justify-between gap-4">
         <ViewConfigToolbar view={view} setView={setView} />
         <div className="flex items-center gap-2">
@@ -260,7 +275,7 @@ function EstimateIndexPage() {
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search completed…"
+              placeholder="Search sessions…"
               className="pl-9 h-8"
             />
           </div>
@@ -282,7 +297,6 @@ function EstimateIndexPage() {
       <GroupedSessionView
         items={items}
         view={view}
-        spaces={spaces}
         getId={(s) => s.id}
         getTeamId={(s) => s.teamId}
         getTeamName={(s) => s.teamName}
@@ -334,8 +348,17 @@ function EstimateIndexPage() {
 
 // ─── Cards ─────────────────────────────────────────────────────────────────────
 
-function ActiveSessionCard({ item }: { item: EstimateListItem }) {
+function ActiveSessionCard({
+  item,
+  liveOnlineCount,
+}: {
+  item: EstimateListItem
+  liveOnlineCount: number | undefined
+}) {
   const status = item.ongoing?.status
+  // Prefer the live Convex presence count; fall back to the REST snapshot's
+  // count until the subscription resolves (or in socket-io mode).
+  const onlineCount = liveOnlineCount ?? item.ongoing?.onlineCount ?? 0
   return (
     <Card className="hover:border-primary/50 transition-colors h-full">
       <CardHeader>
@@ -360,7 +383,7 @@ function ActiveSessionCard({ item }: { item: EstimateListItem }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="h-4 w-4" />
-            <span>{item.ongoing?.onlineCount ?? 0} online</span>
+            <span>{onlineCount} online</span>
           </div>
           <Button asChild size="sm">
             <Link to="/estimate/$sessionId" params={{ sessionId: item.id }}>

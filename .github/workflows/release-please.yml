@@ -1,0 +1,29 @@
+# Automated lockstep releases.
+#
+# On every push to main, release-please parses the conventional-commit history
+# and maintains a "release PR" that accumulates the changelog and version bump
+# (feat → minor, fix → patch, feat!/BREAKING CHANGE → major). Merging that PR:
+#   - bumps every package.json version (linked-versions keeps them in lockstep)
+#   - updates CHANGELOG.md
+#   - tags vX.Y.Z and creates the GitHub Release
+#
+# The tag push then feeds the deploy workflows, which stamp images/builds with
+# the release version.
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

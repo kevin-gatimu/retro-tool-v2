@@ -15,6 +15,15 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@thallesp/nestjs-better-auth';
 
+/**
+ * These handlers are documentation-only stubs: the `@thallesp/nestjs-better-auth`
+ * middleware intercepts `/auth/*` and Better Auth reads and validates the raw
+ * request body itself (email/password shape, token format, etc.). No `@Body()`
+ * is bound here, so a `ZodValidationPipe` would have nothing to validate and
+ * attaching one would break Better Auth's own body parsing. The `@ApiBody`
+ * schemas below exist purely for Swagger. Validation ownership therefore sits
+ * with Better Auth for this controller (see docs/api-security.md).
+ */
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {

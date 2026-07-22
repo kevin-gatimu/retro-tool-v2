@@ -7,14 +7,14 @@ A collaborative agile retrospective and story-estimation platform. Built for eng
 ## Table of Contents
 
 1. [What It Does](#what-it-does)
-2. [Who Uses It — Roles & Permissions](#who-uses-it--roles--permissions)
+2. [Who Uses It — Roles &amp; Permissions](#who-uses-it--roles--permissions)
 3. [Architecture Overview](#architecture-overview)
 4. [Convex Realtime Layer](#convex-realtime-layer)
 5. [Monorepo Structure](#monorepo-structure)
 6. [Tech Stack](#tech-stack)
 7. [Local Development](#local-development)
 8. [Environment Setup](#environment-setup)
-9. [Database & Seed Workflow](#database--seed-workflow)
+9. [Database &amp; Seed Workflow](#database--seed-workflow)
 10. [Workspace Commands](#workspace-commands)
 11. [Deployment](#deployment)
 12. [Documentation Index](#documentation-index)
@@ -25,16 +25,16 @@ A collaborative agile retrospective and story-estimation platform. Built for eng
 
 Retro Tool provides everything a team needs to run effective agile ceremonies:
 
-| Feature | Description |
-| --- | --- |
-| **Retrospectives** | Phased retro boards (brainstorm → group → vote → discuss → action items) with built-in templates (Start/Stop/Continue, 4Ls, Mad/Sad/Glad, and more) |
-| **Story Estimates** | Real-time story-estimation sessions with reveal mechanics and consensus tracking |
-| **Organizations & Teams** | Hierarchical org → team → member structure with fine-grained RBAC |
-| **Action Items** | Per-retro action items with carry-forward tracking across sessions |
-| **Reports & Analytics** | Live dashboards for retro completion rates, card counts, vote counts, and action item health — powered by Convex aggregates |
-| **Notifications** | In-app notification centre + browser push notifications (VAPID) |
-| **Email Workflows** | Retro reminders, weekly digests, and transactional email via Resend |
-| **Multi-Session Auth** | Email/password + OAuth (Microsoft) via Better Auth with multi-session support |
+| Feature                         | Description                                                                                                                                                |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Retrospectives**        | Phased retro boards (brainstorm → group → vote → discuss → action items) with built-in templates (Start/Stop/Continue, 4Ls, Mad/Sad/Glad, and more)    |
+| **Story Estimates**       | Real-time story-estimation sessions with reveal mechanics and consensus tracking                                                                           |
+| **Organizations & Teams** | Hierarchical org → team → member structure with fine-grained RBAC                                                                                        |
+| **Action Items**          | Per-retro action items with carry-forward tracking across sessions                                                                                         |
+| **Reports & Analytics**   | Dashboards for retro completion rates, card counts, vote counts, and action item health — answered from PostgreSQL via the`/api/reports/v2/*` endpoints |
+| **Notifications**         | In-app notification centre + browser push notifications (VAPID)                                                                                            |
+| **Email Workflows**       | Retro reminders, weekly digests, and transactional email via Resend                                                                                        |
+| **Multi-Session Auth**    | Email/password + OAuth (Microsoft) via Better Auth with multi-session support                                                                              |
 
 ---
 
@@ -100,7 +100,7 @@ The platform has two parallel role dimensions: a **system-level role** on every 
 └────────────────────────────────────────────────────────────────┘
 ```
 
-> Full permission matrices are in [docs/RBAC.md](docs/RBAC.md) and [retro-tool-api/docs/RBAC.md](retro-tool-api/docs/RBAC.md).
+> Full permission matrices are in [docs/security/rbac.md](docs/security/rbac.md).
 
 ---
 
@@ -126,7 +126,6 @@ The platform has two parallel role dimensions: a **system-level role** on every 
 │  Reports · Reminders · Scheduler    │           │
 │                                     │           │
 │  PostgreSQL (system of record)      │           │
-│  Redis (cache / sessions)           │           │                  
 │         │                           │           │
 │         │  HTTP Admin API           │           │
 │         │  (projection sync)        │           │
@@ -137,7 +136,8 @@ The platform has two parallel role dimensions: a **system-level role** on every 
 │                 Convex Realtime Projection Layer              │
 │                                                              │
 │  liveRetros · liveEstimates · liveNotifications              │
-│  liveReports (aggregate B-trees)  · rateLimits               │
+│  liveStandups · liveIcebreakers · liveSurveys/Polls          │
+│  liveTeamMembers · rateLimits                                │
 │                                                              │
 │  Convex embedded DB (backed by its own PostgreSQL)           │
 └──────────────────────────────────────────────────────────────┘
@@ -214,13 +214,18 @@ User casts a vote in browser
 
 ### What Convex Manages
 
-| Module | What it stores | Queries exposed to browser |
-| --- | --- | --- |
-| `liveRetros.ts` | Active retro board snapshot (cards, votes, phase, participants) | `getRetroBoard` |
-| `liveEstimates.ts` | Active estimate session snapshot (stories, votes, reveal state) | `getEstimateBoard` |
-| `liveNotifications.ts` | Per-user notification projection | `getUserNotifications` |
-| `liveReports.ts` | Aggregate B-trees for stats (retros completed, cards, votes, action items) | `getTeamStats`, `getUserStats`, `getSystemStats` |
-| `rateLimits.ts` | Token-bucket and fixed-window guards on every upsert | — |
+| Module                                | What it stores                                                  | Queries exposed to browser |
+| ------------------------------------- | --------------------------------------------------------------- | -------------------------- |
+| `liveRetros.ts`                     | Active retro board snapshot (cards, votes, phase, participants) | `getRetroBoard`          |
+| `liveEstimates.ts`                  | Active estimate session snapshot (stories, votes, reveal state) | `getEstimateBoard`       |
+| `liveStandups.ts`                   | Active standup snapshot (updates, participants)                 | `getStandupBoard`        |
+| `liveIcebreakers.ts`                | Active icebreaker snapshot                                      | `getIcebreakerBoard`     |
+| `liveSurveys.ts` / `livePolls.ts` | Active survey / poll snapshot and live results                  | `getSurvey`, `getPoll` |
+| `liveTeamMembers.ts`                | Team-member presence / roster projection                        | `getTeamMembers`         |
+| `liveNotifications.ts`              | Per-user notification projection                                | `getUserNotifications`   |
+| `rateLimits.ts`                     | Token-bucket and fixed-window guards on every upsert            | —                         |
+
+> Historical/analytical reporting is **not** in Convex — the `@convex-dev/aggregate` counters that once backed a `liveReports` module were retired in the reports v2 redesign. Report dashboards are now answered from PostgreSQL via `/api/reports/v2/*`.
 
 ### Feature Flags
 
@@ -233,7 +238,7 @@ VITE_ESTIMATES_REALTIME_BACKEND=convex   # or: socket-io
 
 Socket.IO remains the fallback transport when either flag is set to `socket-io`.
 
-> Deep dive: [plan-convex-realtime.md](plan-convex-realtime.md) · [docs/convex-components.md](docs/convex-components.md) · [convex-backend/README.md](convex-backend/README.md)
+> Deep dive: [docs/architecture/convex.md](docs/architecture/convex.md) · [docs/security/convex-nestjs-auth.md](docs/security/convex-nestjs-auth.md) · [convex-backend/README.md](convex-backend/README.md)
 
 ---
 
@@ -246,8 +251,11 @@ Socket.IO remains the fallback transport when either flag is set to `socket-io`.
 │       ├── schema.ts         # Convex document schema
 │       ├── liveRetros.ts     # Retro board queries + mutations
 │       ├── liveEstimates.ts  # Estimate board queries + mutations
+│       ├── liveStandups.ts   # Standup board queries + mutations
+│       ├── liveIcebreakers.ts
+│       ├── liveSurveys.ts / livePolls.ts
+│       ├── liveTeamMembers.ts
 │       ├── liveNotifications.ts
-│       ├── liveReports.ts    # Aggregate-powered stats
 │       └── rateLimits.ts     # Write-rate guards
 │
 ├── packages/
@@ -293,7 +301,10 @@ Socket.IO remains the fallback transport when either flag is set to `socket-io`.
 ├── .github/workflows/        # CI/CD pipelines
 │   ├── ci.yml                # Lint + type-check + test
 │   ├── deploy-api.yml        # Docker build → ACR → App Service
-│   └── deploy-ui.yml         # Vite build → Static Web App
+│   ├── deploy-ui.yml         # Vite build → Static Web App
+│   ├── deploy-convex.yml     # Deploy Convex functions to App Service
+│   ├── release-please.yml    # Automated release PRs
+│   └── release-staging.yml   # Staging release automation
 │
 ├── docker/
 │   └── docker-compose.local.yml
@@ -307,58 +318,82 @@ Socket.IO remains the fallback transport when either flag is set to `socket-io`.
 
 ### Frontend — `retro-tool-ui`
 
-| Layer | Technology |
-| --- | --- |
-| Framework | React 19 |
-| Routing | TanStack Router (file-based) |
-| Data fetching | TanStack Query |
-| Forms | TanStack Form |
-| Tables | TanStack Table |
-| Auth client | Better Auth (`better-auth/client`) |
-| UI primitives | Radix UI |
-| Styling | TailwindCSS 4 |
-| Charts | Recharts |
-| Realtime | Socket.IO client + Convex React SDK |
-| Validation | Zod |
+| Layer         | Technology                           |
+| ------------- | ------------------------------------ |
+| Framework     | React 19                             |
+| Routing       | TanStack Router (file-based)         |
+| Data fetching | TanStack Query                       |
+| Forms         | TanStack Form                        |
+| Tables        | TanStack Table                       |
+| Auth client   | Better Auth (`better-auth/client`) |
+| UI primitives | Radix UI                             |
+| Styling       | TailwindCSS 4                        |
+| Charts        | Recharts                             |
+| Realtime      | Socket.IO client + Convex React SDK  |
+| Validation    | Zod                                  |
 
 > Full details: [retro-tool-ui/README.md](retro-tool-ui/README.md)
 
 ### Backend — `retro-tool-api`
 
-| Layer | Technology |
-| --- | --- |
-| Runtime | Node.js + TypeScript |
-| Framework | NestJS 11 |
-| Database | PostgreSQL 16 |
-| ORM | Drizzle ORM |
-| Auth | Better Auth + `@thallesp/nestjs-better-auth` |
-| WebSockets | Socket.IO |
-| Validation | class-validator + Zod |
-| Email | Resend |
-| Push notifications | web-push (VAPID) |
-| Scheduler | `@nestjs/schedule` (cron jobs) |
+| Layer              | Technology                                    |
+| ------------------ | --------------------------------------------- |
+| Runtime            | Node.js + TypeScript                          |
+| Framework          | NestJS 11                                     |
+| Database           | PostgreSQL 16                                 |
+| ORM                | Drizzle ORM                                   |
+| Auth               | Better Auth +`@thallesp/nestjs-better-auth` |
+| WebSockets         | Socket.IO                                     |
+| Validation         | class-validator + Zod                         |
+| Email              | Resend                                        |
+| Push notifications | web-push (VAPID)                              |
+| Scheduler          | `@nestjs/schedule` (cron jobs)              |
 
 > Full details: [retro-tool-api/README.md](retro-tool-api/README.md)
 
 ### Realtime — `convex-backend`
 
-| Layer | Technology |
-| --- | --- |
-| Runtime | Self-hosted Convex |
-| Functions | TypeScript queries + mutations |
-| Rate limiting | `@convex-dev/rate-limiter` |
-| Aggregates | `@convex-dev/aggregate` |
-| Auth bridge | Better Auth JWT |
+| Layer         | Technology                     |
+| ------------- | ------------------------------ |
+| Runtime       | Self-hosted Convex             |
+| Functions     | TypeScript queries + mutations |
+| Rate limiting | `@convex-dev/rate-limiter`   |
+| Aggregates    | `@convex-dev/aggregate`      |
+| Auth bridge   | Better Auth JWT                |
 
-> Full details: [convex-backend/README.md](convex-backend/README.md) · [plan-convex-realtime.md](plan-convex-realtime.md)
+> Full details: [convex-backend/README.md](convex-backend/README.md) · [docs/architecture/convex.md](docs/architecture/convex.md)
 
 ---
 
 ## Local Development
 
-There are two ways to run the project locally.
+### Option 0 — One-command bootstrap (recommended)
 
-### Option 1 — Full Docker stack (fastest start)
+Brings up the self-hosted stack (PostgreSQL + Convex) in Docker, derives the
+Convex admin key from the running container, writes it into the `.env.local`
+files, runs migrations + seeds, and deploys the Convex functions:
+
+```powershell
+pnpm local:bootstrap      # full setup (add --reset via `pnpm local:reset` for a clean slate)
+pnpm local:dev            # then run API + UI + Convex watcher, each reading its own .env.local
+pnpm local:dev:all        # same, plus the VitePress user-guide dev server (retro-tool-ui/docs)
+```
+
+`local:bootstrap` is idempotent — safe to re-run any time creds or the admin key
+drift. It regenerates the admin key (deterministic from `INSTANCE_NAME` +
+`INSTANCE_SECRET`) and re-patches `retro-tool-api/.env.local` and
+`convex-backend/.env.local`. Stop the Docker infra with `pnpm local:down`.
+
+> Dashboard login: after bootstrap the Convex dashboard credentials (Deployment
+> URL `http://localhost:3210` + Admin Key) are written to the git-ignored
+> `convex-dashboard-login.local.txt` at the repo root — paste them into the
+> dashboard at `http://localhost:6791`.
+>
+> The local Postgres publishes on host port **5433** (the container is 5432
+> internally) so it never collides with a host-native Postgres on 5432. Convex
+> reaches it over the Docker network, unaffected.
+
+### Option 1 — Full Docker stack (everything in containers)
 
 ```powershell
 pnpm local:up
@@ -366,15 +401,14 @@ pnpm local:up
 
 Services exposed:
 
-| Service | URL | Notes |
-| --- | --- | --- |
-| UI | `http://localhost:3000` | nginx-served frontend |
-| API | `http://localhost:8000` | NestJS backend |
-| Swagger | `http://localhost:8000/api/docs` | Interactive API docs |
-| PostgreSQL | `localhost:5432` | seeded on first start |
-| Redis | `localhost:6379` | cache layer |
-| Convex API | `http://localhost:3210` | self-hosted Convex backend |
-| Convex dashboard | `http://localhost:6791` | local Convex UI |
+| Service          | URL                                | Notes                                     |
+| ---------------- | ---------------------------------- | ----------------------------------------- |
+| UI               | `http://localhost:3000`          | nginx-served frontend                     |
+| API              | `http://localhost:8000`          | NestJS backend                            |
+| Swagger          | `http://localhost:8000/api/docs` | Interactive API docs                      |
+| PostgreSQL       | `localhost:5433`                 | seeded on first start (5432 in-container) |
+| Convex API       | `http://localhost:3210`          | self-hosted Convex backend                |
+| Convex dashboard | `http://localhost:6791`          | local Convex UI                           |
 
 ### Option 2 — Hybrid pnpm (live reload)
 
@@ -384,7 +418,7 @@ Start infrastructure containers first:
 pnpm local:infra
 ```
 
-Then run each app process:
+Then run each app process (or all at once with `pnpm local:dev`):
 
 ```powershell
 pnpm dev:api       # NestJS with watch mode
@@ -392,19 +426,23 @@ pnpm dev:ui        # Vite dev server
 pnpm dev:convex    # Convex function watcher
 ```
 
+> Note: the Convex admin key only exists once the container is running, so on a
+> fresh checkout run `pnpm local:bootstrap` (Option 0) at least once to populate
+> the `.env.local` keys before using this option.
+
 ### VS Code Tasks
 
 Use `Terminal: Run Task` to launch any of the pre-configured tasks:
 
-| Task | What it starts |
-| --- | --- |
-| `Local Infra` | PostgreSQL + Redis containers only |
-| `API Dev` | NestJS in watch mode |
-| `UI Dev` | Vite dev server |
-| `Convex Dev` | Convex function watcher |
-| `Local App Dev` | Infra + API + UI in parallel |
+| Task                          | What it starts                        |
+| ----------------------------- | ------------------------------------- |
+| `Local Infra`               | PostgreSQL + Convex containers only   |
+| `API Dev`                   | NestJS in watch mode                  |
+| `UI Dev`                    | Vite dev server                       |
+| `Convex Dev`                | Convex function watcher               |
+| `Local App Dev`             | Infra + API + UI in parallel          |
 | `Local App Dev With Convex` | Infra + API + UI + Convex in parallel |
-| `Local Docker Stack` | Full container stack |
+| `Local Docker Stack`        | Full container stack                  |
 
 ---
 
@@ -427,17 +465,17 @@ Copy-Item docker/.env.example docker/.env
 
 ### 3. API environment (`retro-tool-api/.env.local`)
 
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `BETTER_AUTH_SECRET` | Session signing secret |
-| `BETTER_AUTH_URL` | Must match server URL + port |
-| `FRONTEND_URL` | CORS allowed origin |
-| `CONVEX_SYNC_URL` | Convex HTTP Admin API URL |
-| `CONVEX_SYNC_ADMIN_KEY` | Convex admin key for projection sync |
-| `RESEND_API_KEY` | Transactional email |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Browser push notifications |
-| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | OAuth (Microsoft) |
+| Variable                                              | Purpose                              |
+| ----------------------------------------------------- | ------------------------------------ |
+| `DATABASE_URL`                                      | PostgreSQL connection string         |
+| `BETTER_AUTH_SECRET`                                | Session signing secret               |
+| `BETTER_AUTH_URL`                                   | Must match server URL + port         |
+| `FRONTEND_URL`                                      | CORS allowed origin                  |
+| `CONVEX_SYNC_URL`                                   | Convex HTTP Admin API URL            |
+| `CONVEX_SYNC_ADMIN_KEY`                             | Convex admin key for projection sync |
+| `RESEND_API_KEY`                                    | Transactional email                  |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`          | Browser push notifications           |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | OAuth (Microsoft)                    |
 
 ### 4. UI environment (`retro-tool-ui/.env.local`)
 
@@ -451,7 +489,10 @@ VITE_NOTIFICATIONS_REALTIME_BACKEND=convex
 
 ### 5. Convex environment (`convex-backend/.env.local`)
 
-Variables: `CONVEX_URL` (local: `http://localhost:3210`), `CONVEX_DEPLOY_KEY`.
+Self-hosted deploy vars (populated by `pnpm local:bootstrap` for local dev):
+`CONVEX_SELF_HOSTED_URL` (local: `http://127.0.0.1:3210`),
+`CONVEX_SELF_HOSTED_ADMIN_KEY`, plus the JWT bridge (`JWT_ISSUER`,
+`JWT_AUDIENCE`, `JWT_JWKS_URL`).
 
 ### 6. Running against remote environments
 
@@ -534,8 +575,8 @@ The project targets **Azure** with infrastructure provisioned via Bicep (CLI-onl
 │              ┌────────────────────┬┘                        │
 │              ▼                    ▼                         │
 │  ┌─────────────────┐   ┌──────────────────────────────┐    │
-│  │ PostgreSQL      │   │ Convex Cloud                 │    │
-│  │ Flexible Server │   │ (managed, per environment)   │    │
+│  │ PostgreSQL      │   │ Self-hosted Convex           │    │
+│  │ Flexible Server │   │ (App Service, per environment)│   │
 │  └─────────────────┘   └──────────────────────────────┘    │
 │                                                             │
 │  ┌─────────────────┐   ┌──────────────────────────────┐    │
@@ -547,11 +588,11 @@ The project targets **Azure** with infrastructure provisioned via Bicep (CLI-onl
 
 ### Branch model
 
-| Branch | Environment | Resource Group |
-| --- | --- | --- |
-| `main` | Production | `retrotool-prod-rg` |
-| `staging` | Staging | `retrotool-staging-rg` |
-| `develop` | Develop | `retrotool-develop-rg` |
+| Branch      | Environment | Resource Group           |
+| ----------- | ----------- | ------------------------ |
+| `main`    | Production  | `retrotool-prod-rg`    |
+| `staging` | Staging     | `retrotool-staging-rg` |
+| `develop` | Develop     | `retrotool-develop-rg` |
 
 Each environment has its own App Service, ACR, Static Web App, and Managed Identity. PostgreSQL Flexible Server is per-environment.
 
@@ -572,19 +613,22 @@ az deployment sub create --location southafricanorth --template-file infra/deplo
 - [.github/workflows/ci.yml](.github/workflows/ci.yml) — lint, type-check, test on all PRs
 - [.github/workflows/deploy-api.yml](.github/workflows/deploy-api.yml) — builds Docker image, pushes to ACR, deploys to App Service
 - [.github/workflows/deploy-ui.yml](.github/workflows/deploy-ui.yml) — builds Vite, deploys to Azure Static Web App
+- [.github/workflows/deploy-convex.yml](.github/workflows/deploy-convex.yml) — deploys Convex functions to the self-hosted App Service backend
+- [.github/workflows/release-please.yml](.github/workflows/release-please.yml) — automated release PRs / changelog
+- [.github/workflows/release-staging.yml](.github/workflows/release-staging.yml) — staging release automation
 
 ### Deployment checklist
 
 - [ ] Infrastructure provisioned via `infra/deploy.bicep` for the target environment
 - [ ] GitHub environment secrets set (from Bicep outputs): `ACR_LOGIN_SERVER`, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`
 - [ ] App Service application settings configured (auth, DB, Convex, email, VAPID, OAuth)
-- [ ] Database migrations run (`pnpm db:migrate:prod`)
-- [ ] Templates seeded (`pnpm db:seed:prod`)
+- [ ] Database migrations run (`pnpm --dir retro-tool-api db:migrate:prod`)
+- [ ] Prod-safe seeds applied (`pnpm --dir retro-tool-api db:seed:prod`)
 - [ ] OIDC federated credentials configured for GitHub Actions
 - [ ] Custom domains and SSL configured
 - [ ] OAuth redirect URIs updated in App Registration
 
-> Full step-by-step: [infra/README.md](infra/README.md) · Production runbook: [infra/README-prod.md](infra/README-prod.md)
+> Full step-by-step: [infra/README.md](infra/README.md) · OIDC setup: [infra/README-oidc.md](infra/README-oidc.md)
 
 ---
 
@@ -592,48 +636,51 @@ az deployment sub create --location southafricanorth --template-file infra/deplo
 
 ### Project-wide
 
-| Document | Description |
-| --- | --- |
-| [docs/RBAC.md](docs/RBAC.md) | Complete role and permission matrices |
-| [docs/app-flows.md](docs/app-flows.md) | Every major user-facing flow (auth, org, team, retro, estimates) |
-| [docs/invitations.md](docs/invitations.md) | Invitation system (org + team) |
-| [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker (local + production) |
-| [docs/future-roadmap.md](docs/future-roadmap.md) | Planned features: IceBreakers, AI summaries, Jira/ADO export, SAML |
+| Document                                                                                    | Description                                                                        |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [docs/security/rbac.md](docs/security/rbac.md)                                               | Complete role and permission matrices                                              |
+| [docs/workflows/app-flows.md](docs/workflows/app-flows.md)                                   | Every major user-facing flow (auth, org, team, retro, estimates)                   |
+| [docs/workflows/invitations-and-onboarding.md](docs/workflows/invitations-and-onboarding.md) | Invitation system (org + team), accept-invite journey, onboarding & password rules |
+| [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md)             | Running Convex in Docker (local + production)                                      |
+| [docs/future-roadmap.md](docs/future-roadmap.md)                                             | Planned features: IceBreakers, AI summaries, Jira/ADO export, SAML                 |
 
 ### Infrastructure & Deployment
 
-| Document | Description |
-| --- | --- |
-| [infra/README.md](infra/README.md) | Bicep deployment commands, what-if, outputs, post-provisioning checklist |
-| [infra/README-prod.md](infra/README-prod.md) | Production-specific runbook with App Registration details |
-| [docs/Azure Infrastructure Provisioning Guide.md](docs/Azure%20Infrastructure%20Provisioning%20Guide.md) | Full provisioning walkthrough |
-| [docs/Azure Resouces Guide.md](docs/Azure%20Resouces%20Guide.md) | Azure resource inventory and architecture |
+| Document                                                                                              | Description                                                                    |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [infra/README.md](infra/README.md)                                                                     | Bicep deployment commands, what-if, outputs, post-provisioning checklist       |
+| [infra/README-oidc.md](infra/README-oidc.md)                                                           | OIDC federated-credential setup for GitHub Actions                             |
+| [docs/deployment/azure-provisioning.md](docs/deployment/azure-provisioning.md)                         | Full provisioning walkthrough                                                  |
+| [docs/deployment/azure-resources.md](docs/deployment/azure-resources.md)                               | Azure resource inventory and architecture                                      |
+| [docs/deployment/convex-azure-self-hosting-plan.md](docs/deployment/convex-azure-self-hosting-plan.md) | Plan for self-hosting Convex on Azure App Service                              |
+| [docs/deployment/convex-staging-runbook.md](docs/deployment/convex-staging-runbook.md)                 | Staging Convex deployment runbook                                              |
+| [docs/deployment/release-and-branch-strategy.md](docs/deployment/release-and-branch-strategy.md)       | Branch model, release-please versioning, conventional commits, deploy triggers |
 
 ### Backend
 
-| Document | Description |
-| --- | --- |
+| Document                                            | Description                                                  |
+| --------------------------------------------------- | ------------------------------------------------------------ |
 | [retro-tool-api/README.md](retro-tool-api/README.md) | API setup, modules, auth, seed credentials, WebSocket events |
 
 ### Frontend
 
-| Document | Description |
-| --- | --- |
+| Document                                          | Description                                 |
+| ------------------------------------------------- | ------------------------------------------- |
 | [retro-tool-ui/README.md](retro-tool-ui/README.md) | UI setup, route map, RBAC helpers, realtime |
 
 ### Realtime
 
-| Document | Description |
-| --- | --- |
-| [docs/convex-self-hosting.md](docs/convex-self-hosting.md) | Running Convex in Docker (local and production) |
-| [convex-backend/README.md](convex-backend/README.md) | Convex backend setup and modules |
+| Document                                                                        | Description                                     |
+| ------------------------------------------------------------------------------- | ----------------------------------------------- |
+| [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md) | Running Convex in Docker (local and production) |
+| [convex-backend/README.md](convex-backend/README.md)                             | Convex backend setup and modules                |
 
 ---
 
 ## Prerequisites
 
-- Node.js 22
-- pnpm 9
+- Node.js 22 (`engines.node >= 22`)
+- pnpm 11 (repo pins `pnpm@11.13.0` via `packageManager`)
 - Docker Desktop
 - Git
 

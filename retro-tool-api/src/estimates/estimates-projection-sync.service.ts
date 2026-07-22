@@ -1,25 +1,60 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection';
 import type { Config } from '../config/configuration';
 import type { ConvexFunctionResponse } from '../common/types';
+import { ProjectionOutboxService } from '../convex-admin/projection-outbox.service';
 import * as estimatesSchema from './schema';
 import * as teamSchema from '../teams/schema';
 import { EstimatesService } from './estimates.service';
 
 type Database = NodePgDatabase<typeof estimatesSchema & typeof teamSchema>;
 
+const PROJECTION = 'estimates';
+
 @Injectable()
-export class EstimatesProjectionSyncService {
+export class EstimatesProjectionSyncService implements OnModuleInit {
   private readonly logger = new Logger(EstimatesProjectionSyncService.name);
 
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly configService: ConfigService<Config, true>,
+    private readonly outbox: ProjectionOutboxService,
     private readonly estimatesService: EstimatesService,
   ) {}
+
+  onModuleInit(): void {
+    // Deliver outbox intents by recomputing current state from PostgreSQL.
+    this.outbox.registerHandler(PROJECTION, (operation, entityKey) =>
+      operation === 'delete'
+        ? this.deleteSessionProjection(entityKey)
+        : this.syncSessionProjection(entityKey),
+    );
+  }
+
+  /**
+   * Durably enqueue a session (re)projection. Replaces the old fire-and-forget
+   * push at call-sites: the intent commits to the outbox and is delivered
+   * immediately (best-effort) plus guaranteed by the dispatcher.
+   */
+  async enqueueSessionSync(sessionId: string): Promise<void> {
+    await this.outbox.enqueueAndDispatch({
+      projection: PROJECTION,
+      operation: 'sync',
+      entityKey: sessionId,
+    });
+  }
+
+  /** Durably enqueue removal of an estimate session projection. */
+  async enqueueSessionDelete(sessionId: string): Promise<void> {
+    await this.outbox.enqueueAndDispatch({
+      projection: PROJECTION,
+      operation: 'delete',
+      entityKey: sessionId,
+    });
+  }
 
   async syncSessionProjection(sessionId: string): Promise<void> {
     const convexConfig = this.configService.get('convex', { infer: true });
@@ -66,6 +101,40 @@ export class EstimatesProjectionSyncService {
     });
   }
 
+  /**
+   * Rebuild every estimate session projection (session + per-member board
+   * snapshots) from PostgreSQL. Re-uses {@link syncSessionProjection} per
+   * session so the board fan-out logic stays in one place; each upsert stamps
+   * `updatedAt` with a fresh `Date.now()`, which the reconciliation
+   * orchestrator's mark-and-sweep (prune rows older than a timestamp captured
+   * before this pass) relies on. Returns the number of sessions scanned. No-ops
+   * when Convex is unconfigured.
+   */
+  async syncAllSessions(): Promise<{ scanned: number }> {
+    const convexConfig = this.configService.get('convex', { infer: true });
+    if (!convexConfig?.url || !convexConfig.adminKey) {
+      return { scanned: 0 };
+    }
+
+    const sessions = await this.database
+      .select({ id: estimatesSchema.storyEstimateSession.id })
+      .from(estimatesSchema.storyEstimateSession);
+
+    for (const session of sessions) {
+      try {
+        await this.syncSessionProjection(session.id);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'unknown error';
+        this.logger.warn(
+          `Reconcile: estimate session ${session.id} projection failed: ${message}`,
+        );
+      }
+    }
+
+    return { scanned: sessions.length };
+  }
+
   private async syncSessionBoardSnapshots(
     sessionId: string,
     teamId: string,
@@ -80,71 +149,63 @@ export class EstimatesProjectionSyncService {
       return;
     }
 
+    // Push every member's board snapshot. A failure propagates so the outbox
+    // retries the whole (idempotent) delivery — re-pushing all members is safe.
     await Promise.all(
       members.map(async ({ userId }) => {
-        try {
-          const session = await this.estimatesService.getSession(
-            userId,
-            sessionId,
-          );
+        const session = await this.estimatesService.getSession(
+          userId,
+          sessionId,
+        );
 
-          await this.runMutation('liveEstimates:upsertEstimateBoard', {
-            sessionId,
-            userId,
-            snapshot: JSON.stringify({ session }),
-            updatedAt,
-          });
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : 'unknown error';
-          this.logger.warn(
-            `Convex estimate board snapshot sync failed for sessionId=${sessionId} userId=${userId}: ${message}`,
-          );
-        }
+        await this.runMutation('liveEstimates:upsertEstimateBoard', {
+          sessionId,
+          userId,
+          snapshot: JSON.stringify({ session }),
+          updatedAt,
+        });
       }),
     );
   }
 
+  /**
+   * POST a projection mutation to Convex. Throws on any transport or
+   * Convex-side error so the outbox dispatcher (which wraps delivery) can retry;
+   * no-ops silently only when Convex is unconfigured. Reconciliation catches
+   * per-entity so one failure does not abort a full rebuild.
+   */
   private async runMutation(path: string, args: object): Promise<void> {
     const convexConfig = this.configService.get('convex', { infer: true });
     if (!convexConfig?.url || !convexConfig.adminKey) {
       return;
     }
 
-    try {
-      const response = await fetch(
-        `${convexConfig.url.replace(/\/$/, '')}/api/mutation`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Convex ${convexConfig.adminKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            path,
-            args,
-            format: 'json',
-          }),
+    const response = await fetch(
+      `${convexConfig.url.replace(/\/$/, '')}/api/mutation`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Convex ${convexConfig.adminKey}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          path,
+          args,
+          format: 'json',
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Convex estimate projection mutation ${path} failed with status ${response.status}`,
       );
+    }
 
-      if (!response.ok) {
-        this.logger.warn(
-          `Convex estimate projection mutation ${path} failed with status ${response.status}`,
-        );
-        return;
-      }
-
-      const result = (await response.json()) as ConvexFunctionResponse;
-      if (result.status === 'error') {
-        this.logger.warn(
-          `Convex estimate projection mutation ${path} returned an error: ${result.errorMessage ?? 'unknown error'}`,
-        );
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown error';
-      this.logger.warn(
-        `Convex estimate projection mutation ${path} failed: ${message}`,
+    const result = (await response.json()) as ConvexFunctionResponse;
+    if (result.status === 'error') {
+      throw new Error(
+        `Convex estimate projection mutation ${path} returned an error: ${result.errorMessage ?? 'unknown error'}`,
       );
     }
   }

@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export const CreateEstimateSessionSchema = z.object({
   name: z.string().min(1).max(255),
   teamId: z.string().min(1),
-  sprintLink: z.string().url().max(2048).optional(),
+  sprintLink: z.url().max(2048).optional(),
   timerDuration: z.number().int().positive().max(3600).optional(),
   templateId: z.string().optional(),
 });
@@ -34,7 +34,7 @@ export const NewEstimateRoundSchema = z.object({
   ticketNumber: z.string().min(1).max(100),
   storyName: z.string().min(1).max(255).optional(),
   storyDescription: z.string().max(5000).optional(),
-  storyLink: z.string().url().max(2048).optional(),
+  storyLink: z.url().max(2048).optional(),
 });
 
 export type NewEstimateRoundDto = z.infer<typeof NewEstimateRoundSchema>;
@@ -56,6 +56,39 @@ export class NewEstimateRoundBody {
   storyLink?: string;
 }
 
+export const CastVoteSchema = z.object({
+  points: z.string().min(1).max(20),
+});
+
+export type CastVoteDto = z.infer<typeof CastVoteSchema>;
+
+export class CastVoteBody {
+  @ApiProperty({ example: '5' })
+  points: string;
+}
+
+export const UpdateSessionNameSchema = z.object({
+  name: z.string().min(1).max(255),
+});
+
+export type UpdateSessionNameDto = z.infer<typeof UpdateSessionNameSchema>;
+
+export class UpdateSessionNameBody {
+  @ApiProperty({ example: 'Sprint 42 Planning' })
+  name: string;
+}
+
+export const StartTimerSchema = z.object({
+  duration: z.number().int().positive().max(3600),
+});
+
+export type StartTimerDto = z.infer<typeof StartTimerSchema>;
+
+export class EstimateStartTimerBody {
+  @ApiProperty({ example: 120, description: 'Countdown seconds (max 3600)' })
+  duration: number;
+}
+
 export const SetConsensusSchema = z.object({
   agreedPoints: z.string().min(1).max(20),
 });
@@ -71,7 +104,7 @@ export const UpdateEstimateStorySchema = z.object({
   storyName: z.string().min(1).max(255),
   ticketNumber: z.string().min(1).max(100),
   storyDescription: z.string().max(5000).optional(),
-  storyLink: z.string().url().max(2048).optional(),
+  storyLink: z.url().max(2048).optional(),
 });
 
 export type UpdateEstimateStoryDto = z.infer<typeof UpdateEstimateStorySchema>;

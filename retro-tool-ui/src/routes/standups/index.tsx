@@ -22,9 +22,10 @@ import {
 } from '@/components/ui/card'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
-import { STANDUPS_ENDPOINTS } from '@/lib/api-endpoints'
+import { STANDUPS_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
 import { cn } from '@/lib/utils'
 import type { StandupSummary } from '@/common/types/standups'
+import type { Team } from '@/common/types/teams'
 import { StandupCalendar } from './components/standup-calendar'
 import { StandupListSkeleton } from './skeleton'
 import {
@@ -67,7 +68,27 @@ function StandupsIndexPage() {
     queryKey: ['standups'],
     queryFn: () => api.get<StandupSummary[]>(STANDUPS_ENDPOINTS.LIST),
     staleTime: 30_000,
+    // No list-level realtime projection exists for standups, so poll as a
+    // backstop: a standup created by another manager appears here within the
+    // interval instead of requiring a manual reload.
+    refetchInterval: 30_000,
   })
+
+  // Creating a standup is a manager action (team-lead, org owner/admin, or
+  // system-admin). Offer "New Standup" only when the viewer holds that role on
+  // at least one team — mirrors the server's assertCanCreateStandup guard.
+  const { data: teamsData } = useQuery({
+    queryKey: ['teams'],
+    queryFn: () => api.get<{ teams: Team[] }>(TEAMS_ENDPOINTS.LIST),
+    staleTime: 60_000,
+  })
+  const canCreateStandup = (teamsData?.teams ?? []).some(
+    (team) =>
+      team.isSystemAdmin ||
+      team.orgRole === 'org-owner' ||
+      team.orgRole === 'org-admin' ||
+      team.myRole === 'team-lead',
+  )
 
   // Activity (entry dates with submissions) for the visible calendar grid —
   // fetched with a week of padding on both sides for the adjacent-month cells.
@@ -140,12 +161,14 @@ function StandupsIndexPage() {
               Async daily updates that keep your team aligned
             </p>
           </div>
-          <Button asChild>
-            <Link to="/standups/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Standup
-            </Link>
-          </Button>
+          {canCreateStandup && (
+            <Button asChild>
+              <Link to="/standups/new">
+                <Plus className="mr-2 h-4 w-4" />
+                New Standup
+              </Link>
+            </Button>
+          )}
         </div>
 
         {!hasStandups ? (
@@ -156,15 +179,18 @@ function StandupsIndexPage() {
               </div>
               <CardTitle className="mb-2">No standups yet</CardTitle>
               <CardDescription className="text-center max-w-sm">
-                Create a standup with custom questions and a schedule. Your team
-                gets a persistent room for each day — no meetings required.
+                {canCreateStandup
+                  ? 'Create a standup with custom questions and a schedule. Your team gets a persistent room for each day — no meetings required.'
+                  : 'No standups have been set up for your teams yet. A team lead or admin can create one.'}
               </CardDescription>
-              <Button asChild className="mt-4">
-                <Link to="/standups/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Standup
-                </Link>
-              </Button>
+              {canCreateStandup && (
+                <Button asChild className="mt-4">
+                  <Link to="/standups/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Standup
+                  </Link>
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (

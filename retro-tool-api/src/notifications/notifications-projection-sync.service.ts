@@ -1,8 +1,24 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { desc, eq } from 'drizzle-orm';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { DATABASE_CONNECTION } from '../database/database-connection';
 import type { Config } from '../config/configuration';
 import type { ConvexFunctionResponse } from '../common/types';
+import { ProjectionOutboxService } from '../convex-admin/projection-outbox.service';
+import * as notificationSchema from './schema';
 import type { Notification } from './schema';
+
+type Database = NodePgDatabase<typeof notificationSchema>;
+
+const PROJECTION = 'notifications';
+
+// How many most-recent notifications to project PER USER per reconciliation.
+// Mirrors the UI contract (`getNotifications` returns the latest 50 for the
+// caller), so each user's projection holds the same window the client can
+// display. This is per-user, not global: a global limit would prune every
+// user's older-but-still-shown notifications after each reconcile.
+const RECONCILE_NOTIFICATION_LIMIT = 50;
 
 function isConvexFunctionResponse(
   value: unknown,
@@ -26,10 +42,110 @@ function isConvexFunctionResponse(
 }
 
 @Injectable()
-export class NotificationsProjectionSyncService {
+export class NotificationsProjectionSyncService implements OnModuleInit {
   private readonly logger = new Logger(NotificationsProjectionSyncService.name);
 
-  constructor(private readonly configService: ConfigService<Config, true>) {}
+  constructor(
+    private readonly configService: ConfigService<Config, true>,
+    @Inject(DATABASE_CONNECTION) private readonly database: Database,
+    private readonly outbox: ProjectionOutboxService,
+  ) {}
+
+  onModuleInit(): void {
+    // Deliver notification intents. The concrete action lives in the payload
+    // because a notification has three projected changes (upsert, mark-one-read,
+    // mark-all-read) that all map to the outbox 'sync' operation.
+    this.outbox.registerHandler(
+      PROJECTION,
+      async (operation, entityKey, payload) => {
+        if (operation === 'delete') {
+          // Notifications are not individually deleted from the projection
+          // today; they age out of the window and are swept by reconciliation.
+          return;
+        }
+        const action =
+          typeof payload?.action === 'string' ? payload.action : 'upsert';
+        if (action === 'markRead') {
+          const userId =
+            typeof payload?.userId === 'string' ? payload.userId : '';
+          await this.deliverReadState(
+            userId,
+            entityKey,
+            payload?.read === true,
+          );
+          return;
+        }
+        if (action === 'markAllRead') {
+          await this.deliverAllRead(entityKey);
+          return;
+        }
+        await this.deliverUpsert(entityKey);
+      },
+    );
+  }
+
+  /** Durably enqueue projection of a newly created/updated notification. */
+  async enqueueNotificationSync(notificationId: string): Promise<void> {
+    await this.outbox.enqueueAndDispatch({
+      projection: PROJECTION,
+      operation: 'sync',
+      entityKey: notificationId,
+      payload: { action: 'upsert' },
+    });
+  }
+
+  /** Durably enqueue a single notification's read-state change. */
+  async enqueueReadState(
+    userId: string,
+    notificationId: string,
+    read: boolean,
+  ): Promise<void> {
+    await this.outbox.enqueueAndDispatch({
+      projection: PROJECTION,
+      operation: 'sync',
+      entityKey: notificationId,
+      payload: { action: 'markRead', userId, read },
+    });
+  }
+
+  /** Durably enqueue "mark all read" for a user (entityKey is the userId). */
+  async enqueueAllRead(userId: string): Promise<void> {
+    await this.outbox.enqueueAndDispatch({
+      projection: PROJECTION,
+      operation: 'sync',
+      entityKey: userId,
+      payload: { action: 'markAllRead' },
+    });
+  }
+
+  /**
+   * Deliver an upsert by re-reading the notification from PostgreSQL (the
+   * source row may have changed between enqueue and delivery). No-ops if the
+   * notification no longer exists.
+   */
+  private async deliverUpsert(notificationId: string): Promise<void> {
+    const [row] = await this.database
+      .select()
+      .from(notificationSchema.notification)
+      .where(eq(notificationSchema.notification.id, notificationId))
+      .limit(1);
+    if (!row) {
+      return;
+    }
+    await this.syncNotificationProjection(row);
+  }
+
+  private async deliverReadState(
+    userId: string,
+    notificationId: string,
+    read: boolean,
+  ): Promise<void> {
+    await this.syncNotificationReadState(userId, notificationId, read);
+  }
+
+  private async deliverAllRead(userId: string): Promise<void> {
+    await this.syncAllNotificationsRead(userId);
+  }
 
   async syncNotificationProjection(notification: Notification): Promise<void> {
     await this.runMutation('liveNotifications:upsertNotificationProjection', {
@@ -68,54 +184,109 @@ export class NotificationsProjectionSyncService {
     );
   }
 
+  /**
+   * Rebuild the notification projection from PostgreSQL for the reconciliation
+   * flow. Projects the most-recent {@link RECONCILE_NOTIFICATION_LIMIT}
+   * notifications (the window the UI can display) and stamps each with a single
+   * `reconcileAt` timestamp so the orchestrator's mark-and-sweep can prune
+   * projections whose source row is gone or has aged out of the window.
+   *
+   * Note: unlike {@link syncNotificationProjection} (which stamps `updatedAt`
+   * with the notification's own `createdAt`), this passes a monotonic
+   * `reconcileAt` as `updatedAt` — the sweep prunes rows older than a timestamp
+   * captured before this pass, so freshly reprojected rows must carry it.
+   * Returns the number of notifications scanned. No-ops when Convex is unset.
+   */
+  async syncAllNotifications(): Promise<{ scanned: number }> {
+    const convexConfig = this.configService.get('convex', { infer: true });
+    if (!convexConfig?.url || !convexConfig.adminKey) {
+      return { scanned: 0 };
+    }
+
+    // Reproject the most-recent N notifications PER USER. A single global
+    // `.limit(N)` would only reproject the newest N across all users, so the
+    // orchestrator's `updatedAt < reconcileAt` sweep would delete every other
+    // user's projections — silently breaking their realtime notifications.
+    const users = await this.database
+      .selectDistinct({ userId: notificationSchema.notification.userId })
+      .from(notificationSchema.notification);
+
+    const reconcileAt = Date.now();
+    let scanned = 0;
+
+    for (const { userId } of users) {
+      const rows = await this.database
+        .select()
+        .from(notificationSchema.notification)
+        .where(eq(notificationSchema.notification.userId, userId))
+        .orderBy(desc(notificationSchema.notification.createdAt))
+        .limit(RECONCILE_NOTIFICATION_LIMIT);
+
+      for (const row of rows) {
+        await this.runMutation(
+          'liveNotifications:upsertNotificationProjection',
+          {
+            notificationId: row.id,
+            userId: row.userId,
+            type: row.type,
+            title: row.title,
+            message: row.message,
+            link: row.link ?? undefined,
+            read: row.read,
+            createdAt: row.createdAt.getTime(),
+            updatedAt: reconcileAt,
+          },
+        );
+        scanned += 1;
+      }
+    }
+
+    return { scanned };
+  }
+
+  /**
+   * POST a projection mutation to Convex. Throws on any transport or
+   * Convex-side error so the outbox dispatcher can retry; no-ops silently only
+   * when Convex is unconfigured. Reconciliation catches per-entity.
+   */
   private async runMutation(path: string, args: object): Promise<void> {
     const convexConfig = this.configService.get('convex', { infer: true });
     if (!convexConfig?.url || !convexConfig.adminKey) {
       return;
     }
 
-    try {
-      const response = await fetch(
-        `${convexConfig.url.replace(/\/$/, '')}/api/mutation`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Convex ${convexConfig.adminKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            path,
-            args,
-            format: 'json',
-          }),
+    const response = await fetch(
+      `${convexConfig.url.replace(/\/$/, '')}/api/mutation`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Convex ${convexConfig.adminKey}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          path,
+          args,
+          format: 'json',
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Convex notification projection mutation ${path} failed with status ${response.status}`,
       );
+    }
 
-      if (!response.ok) {
-        this.logger.warn(
-          `Convex notification projection mutation ${path} failed with status ${response.status}`,
-        );
-        return;
-      }
+    const parsed: unknown = await response.json();
+    if (!isConvexFunctionResponse(parsed)) {
+      throw new Error(
+        `Convex notification projection mutation ${path} returned an unexpected response payload`,
+      );
+    }
 
-      const parsed: unknown = await response.json();
-      if (!isConvexFunctionResponse(parsed)) {
-        this.logger.warn(
-          `Convex notification projection mutation ${path} returned an unexpected response payload`,
-        );
-        return;
-      }
-
-      const result = parsed;
-      if (result.status === 'error') {
-        this.logger.warn(
-          `Convex notification projection mutation ${path} returned an error: ${result.errorMessage ?? 'unknown error'}`,
-        );
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown error';
-      this.logger.warn(
-        `Convex notification projection mutation ${path} failed: ${message}`,
+    if (parsed.status === 'error') {
+      throw new Error(
+        `Convex notification projection mutation ${path} returned an error: ${parsed.errorMessage ?? 'unknown error'}`,
       );
     }
   }

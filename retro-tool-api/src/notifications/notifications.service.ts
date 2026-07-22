@@ -12,7 +12,6 @@ import * as notificationSchema from './schema';
 import * as authSchema from '../auth/schema';
 import * as teamSchema from '../teams/schema';
 import { Notification, NewNotification } from './schema';
-import { NotificationsGateway } from './notifications.gateway';
 import { PushService } from './push.service';
 import { NotificationsProjectionSyncService } from './notifications-projection-sync.service';
 import {
@@ -32,7 +31,6 @@ export class NotificationsService {
 
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
-    private readonly gateway: NotificationsGateway,
     private readonly pushService: PushService,
     private readonly notificationsProjectionSyncService: NotificationsProjectionSyncService,
   ) {}
@@ -76,7 +74,7 @@ export class NotificationsService {
       .where(eq(notificationSchema.notification.id, notificationId));
 
     void this.notificationsProjectionSyncService
-      .syncNotificationReadState(userId, notificationId, true)
+      .enqueueReadState(userId, notificationId, true)
       .catch(() => undefined);
 
     return { success: true };
@@ -89,7 +87,7 @@ export class NotificationsService {
       .where(eq(notificationSchema.notification.userId, userId));
 
     void this.notificationsProjectionSyncService
-      .syncAllNotificationsRead(userId)
+      .enqueueAllRead(userId)
       .catch(() => undefined);
 
     return { success: true };
@@ -104,10 +102,8 @@ export class NotificationsService {
       .values({ id, ...data })
       .returning();
 
-    this.gateway.emitToUser(data.userId, 'notification', created);
-
     void this.notificationsProjectionSyncService
-      .syncNotificationProjection(created)
+      .enqueueNotificationSync(created.id)
       .catch(() => undefined);
 
     // Also send a browser push notification (fire-and-forget, non-blocking)

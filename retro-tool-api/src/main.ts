@@ -7,9 +7,15 @@ import helmet from 'helmet';
 import type { Express } from 'express';
 import { Config } from './config/configuration';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { SocketIoAdapter } from './adapters/socket-io.adapter';
+import { APP_VERSION } from './lib/app-version';
+import { configureHttpDispatcher } from './lib/http-dispatcher';
 
 async function bootstrap() {
+  // Install a bounded keep-alive HTTP dispatcher before anything makes outbound
+  // requests, so the projection-sync fan-out to Convex reuses pooled
+  // connections instead of opening an unbounded number of fresh sockets.
+  configureHttpDispatcher();
+
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
   // Trust the reverse proxy (Azure App Service = one hop) so Express populates
@@ -155,7 +161,7 @@ async function bootstrap() {
       .setDescription(
         'API documentation for the Retro Tool application (Handles authentication, retrospective board management, story estimate session management, in-app notifications, analytics reporting, and automated email workflows.)',
       )
-      .setVersion('1.0')
+      .setVersion(APP_VERSION)
       .addBearerAuth(
         {
           type: 'http',
@@ -187,9 +193,17 @@ async function bootstrap() {
     });
   }
 
-  app.useWebSocketAdapter(new SocketIoAdapter(app));
   app.use(cookieParser());
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      // Strip unknown properties and reject payloads that carry them so
+      // class-validator DTO routes can't be mass-assigned (Zod-piped routes
+      // already parse strictly).
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   const port = configService.get('port', { infer: true }) ?? 8000;
   await app.listen(port);

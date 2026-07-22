@@ -48,14 +48,22 @@ export const Route = createFileRoute('/admin/convex')({
 
 // ─── Tables ────────────────────────────────────────────────────────────────
 
+// Mirrors the CLEARABLE_TABLES allowlist in convex-backend/convex/admin.ts.
+// liveTeamMembers is deliberately excluded: it is the security/membership
+// projection all Convex authz depends on, so it must not be one-click or
+// schedule-cleared (it is kept fresh by reconciliation + the nightly self-heal).
 const CONVEX_TABLES = [
   { name: 'liveRetroSessions', label: 'Live Retro Sessions' },
   { name: 'liveEstimateSessions', label: 'Live Estimate Sessions' },
+  { name: 'liveIcebreakerSessions', label: 'Live Icebreaker Sessions' },
   { name: 'liveRetroBoards', label: 'Live Retro Boards' },
   { name: 'liveEstimateBoards', label: 'Live Estimate Boards' },
+  { name: 'liveIcebreakerBoards', label: 'Live Icebreaker Boards' },
   { name: 'liveStandupEntries', label: 'Live Standup Entries' },
   { name: 'liveStandupBoards', label: 'Live Standup Boards' },
   { name: 'liveNotifications', label: 'Live Notifications' },
+  { name: 'livePolls', label: 'Live Polls' },
+  { name: 'liveSurveys', label: 'Live Surveys' },
   { name: 'livePresence', label: 'Live Presence' },
   { name: 'liveTyping', label: 'Live Typing' },
   { name: 'liveReadyStatus', label: 'Live Ready Status' },

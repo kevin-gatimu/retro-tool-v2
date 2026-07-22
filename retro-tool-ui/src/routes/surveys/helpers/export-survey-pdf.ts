@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf'
 import { SURVEY_QUESTION_TYPES } from '@/common/enums/survey.enums'
 import type { SurveyDetail } from '@/common/types/surveys'
 import { savePdf } from '@/lib/save-pdf'
@@ -43,6 +42,9 @@ function stripUnsupportedGlyphs(text: string): string {
 export async function exportSurveyPdf(
   survey: SurveyDetail,
 ): Promise<string | null> {
+  // Load jsPDF on demand so the ~380 kB library stays out of the route chunk
+  // and only downloads when the user actually exports.
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
 
   const pageWidth = doc.internal.pageSize.getWidth()

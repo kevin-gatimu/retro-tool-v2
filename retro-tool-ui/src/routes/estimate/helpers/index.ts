@@ -2,6 +2,26 @@
  * Estimate route helper functions
  */
 import type { EstimateSession } from '@/common/types/estimates'
+import type { VoteOption } from '../types'
+
+/**
+ * Fallback point scale used when a session has no template attached.
+ */
+export const DEFAULT_POINT_VALUES: VoteOption[] = [
+  { label: '0', value: '0', color: null },
+  { label: '½', value: '0.5', color: null },
+  { label: '1', value: '1', color: null },
+  { label: '2', value: '2', color: null },
+  { label: '3', value: '3', color: null },
+  { label: '5', value: '5', color: null },
+  { label: '8', value: '8', color: null },
+  { label: '13', value: '13', color: null },
+  { label: '20', value: '20', color: null },
+  { label: '40', value: '40', color: null },
+  { label: '100', value: '100', color: null },
+  { label: '?', value: '?', color: null },
+  { label: '☕', value: '☕', color: null },
+]
 
 /**
  * Format a raw stored point value into a display string, mapping it to its
@@ -126,4 +146,31 @@ export function getVoteStats(votes: (number | string)[] | undefined): {
 export function isValidUrl(url: string): boolean {
   if (!url.trim()) return true // empty is allowed
   return /^https?:\/\//.test(url.trim())
+}
+
+/**
+ * Compute average / min / max for a session's revealed votes. Returns `null`
+ * unless the session is `revealed` and at least one numeric vote exists.
+ */
+export function getRevealedVoteStats(
+  session: EstimateSession,
+): { avg: string; min: number; max: number } | null {
+  if (session.status !== 'revealed') return null
+
+  const numericVotes = session.votes
+    .map((v) => {
+      if (v.points === '½') return 0.5
+      const num = Number.parseFloat(v.points)
+      return Number.isNaN(num) ? null : num
+    })
+    .filter((v): v is number => v !== null)
+
+  if (numericVotes.length === 0) return null
+
+  const avg = numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length
+  const sorted = [...numericVotes].sort((a, b) => a - b)
+  const min = sorted[0]
+  const max = sorted[sorted.length - 1]
+
+  return { avg: avg.toFixed(1), min, max }
 }

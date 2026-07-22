@@ -15,20 +15,19 @@ import {
   eq,
   ne,
   and,
-  asc,
+  or,
   desc,
   inArray,
   count,
-  lt,
-  or,
   ilike,
+  lt,
   type SQL,
 } from 'drizzle-orm';
 import * as retroSchema from './schema';
 import * as teamSchema from '../teams/schema';
 import * as authSchema from '../auth/schema';
 import * as orgSchema from '../organizations/schema';
-import { ActionItem, CardComment, Template, TemplateColumn } from './schema';
+import { ActionItem, CardComment } from './schema';
 import {
   CreateRetroDto,
   CreateCardDto,
@@ -36,9 +35,6 @@ import {
   CreateCommentDto,
   SendRetroReportDto,
 } from './dtos';
-import { CreateTemplateDto } from './dtos/create-template.dto';
-import { UpdateTemplateDto } from './dtos/update-template.dto';
-import { BUILT_IN_TEMPLATES } from '../common/data/built-in-templates';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   ACTION_ITEM_STATUSES,
@@ -55,9 +51,6 @@ import type {
   MergeMetadata,
   MergeSourceCardSnapshot,
   RetroDetailResponse,
-  TemplateDeleteResult,
-  TemplateMutationResult,
-  TemplateSeedResult,
 } from './types';
 import { MERGED_FROM_LINE_REGEX, MERGE_METADATA_REGEX } from '../common/regex';
 
@@ -116,530 +109,9 @@ export class RetrosService {
     await Promise.resolve();
   }
 
-  private async invalidateTemplateCaches(templateId?: string): Promise<void> {
-    void templateId;
-    await Promise.resolve();
-  }
-
   // ============================================================================
-  // Template Methods
+  // Template Methods — moved to RetrosTemplatesService (retros-templates.service.ts)
   // ============================================================================
-
-  async getTemplates(
-    userId: string,
-  ): Promise<(Template & { organizationName: string | null })[]> {
-    const [fullUser] = await this.database
-      .select({ role: authSchema.user.role })
-      .from(authSchema.user)
-      .where(eq(authSchema.user.id, userId))
-      .limit(1);
-
-    const isSystemAdmin =
-      fullUser?.role === USER_ROLES.SuperAdmin ||
-      fullUser?.role === USER_ROLES.SystemAdmin;
-
-    if (isSystemAdmin) {
-      return this.database
-        .select({
-          id: retroSchema.template.id,
-          name: retroSchema.template.name,
-          description: retroSchema.template.description,
-          isBuiltIn: retroSchema.template.isBuiltIn,
-          organizationId: retroSchema.template.organizationId,
-          createdAt: retroSchema.template.createdAt,
-          updatedAt: retroSchema.template.updatedAt,
-          organizationName: orgSchema.organization.name,
-        })
-        .from(retroSchema.template)
-        .leftJoin(
-          orgSchema.organization,
-          eq(retroSchema.template.organizationId, orgSchema.organization.id),
-        );
-    }
-
-    const memberships = await this.database
-      .select({ organizationId: orgSchema.organizationMember.organizationId })
-      .from(orgSchema.organizationMember)
-      .where(eq(orgSchema.organizationMember.userId, userId));
-
-    const orgIds = memberships.map((m) => m.organizationId);
-
-    const templates = await this.database
-      .select({
-        id: retroSchema.template.id,
-        name: retroSchema.template.name,
-        description: retroSchema.template.description,
-        isBuiltIn: retroSchema.template.isBuiltIn,
-        organizationId: retroSchema.template.organizationId,
-        createdAt: retroSchema.template.createdAt,
-        updatedAt: retroSchema.template.updatedAt,
-        organizationName: orgSchema.organization.name,
-      })
-      .from(retroSchema.template)
-      .leftJoin(
-        orgSchema.organization,
-        eq(retroSchema.template.organizationId, orgSchema.organization.id),
-      )
-      .where(eq(retroSchema.template.isBuiltIn, true));
-
-    const orgTemplates =
-      orgIds.length > 0
-        ? await this.database
-            .select({
-              id: retroSchema.template.id,
-              name: retroSchema.template.name,
-              description: retroSchema.template.description,
-              isBuiltIn: retroSchema.template.isBuiltIn,
-              organizationId: retroSchema.template.organizationId,
-              createdAt: retroSchema.template.createdAt,
-              updatedAt: retroSchema.template.updatedAt,
-              organizationName: orgSchema.organization.name,
-            })
-            .from(retroSchema.template)
-            .leftJoin(
-              orgSchema.organization,
-              eq(
-                retroSchema.template.organizationId,
-                orgSchema.organization.id,
-              ),
-            )
-            .where(inArray(retroSchema.template.organizationId, orgIds))
-        : [];
-
-    return [...templates, ...orgTemplates];
-  }
-
-  async getTemplatesPaginated(
-    userId: string,
-    page: number,
-    limit: number,
-    type?: 'built-in' | 'organization',
-    search?: string,
-    sort?: string,
-    sortOrder?: 'asc' | 'desc',
-  ): Promise<{
-    templates: (Template & {
-      columns: TemplateColumn[];
-      organizationName: string | null;
-    })[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
-    const [fullUser] = await this.database
-      .select({ role: authSchema.user.role })
-      .from(authSchema.user)
-      .where(eq(authSchema.user.id, userId))
-      .limit(1);
-
-    const isAdmin =
-      fullUser?.role === USER_ROLES.SuperAdmin ||
-      fullUser?.role === USER_ROLES.SystemAdmin;
-
-    const conditions: SQL[] = [];
-    const normalizedSearch = search?.trim();
-
-    // Type filter
-    if (type === 'built-in') {
-      conditions.push(eq(retroSchema.template.isBuiltIn, true));
-    } else if (type === 'organization') {
-      conditions.push(eq(retroSchema.template.isBuiltIn, false));
-    }
-
-    // Access control: non-admins can only see built-in + their own orgs
-    if (!isAdmin) {
-      const memberships = await this.database
-        .select({ organizationId: orgSchema.organizationMember.organizationId })
-        .from(orgSchema.organizationMember)
-        .where(eq(orgSchema.organizationMember.userId, userId));
-
-      const orgIds = memberships.map((m) => m.organizationId);
-
-      if (type === 'built-in') {
-        // Already filtered to built-in above, no extra condition needed
-      } else if (type === 'organization') {
-        // Only show org templates from user's orgs
-        if (orgIds.length > 0) {
-          conditions.push(inArray(retroSchema.template.organizationId, orgIds));
-        } else {
-          // User has no orgs — return empty
-          return { templates: [], total: 0, page, limit };
-        }
-      } else {
-        // No type filter — show built-in + user's org templates
-        if (orgIds.length > 0) {
-          conditions.push(
-            or(
-              eq(retroSchema.template.isBuiltIn, true),
-              inArray(retroSchema.template.organizationId, orgIds),
-            )!,
-          );
-        } else {
-          conditions.push(eq(retroSchema.template.isBuiltIn, true));
-        }
-      }
-    }
-
-    if (normalizedSearch) {
-      conditions.push(
-        ilike(retroSchema.template.name, `%${normalizedSearch}%`),
-      );
-    }
-
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const [totalRow] = await this.database
-      .select({ total: count() })
-      .from(retroSchema.template)
-      .where(whereClause);
-
-    const rows = await this.database
-      .select({
-        id: retroSchema.template.id,
-        name: retroSchema.template.name,
-        description: retroSchema.template.description,
-        isBuiltIn: retroSchema.template.isBuiltIn,
-        organizationId: retroSchema.template.organizationId,
-        createdAt: retroSchema.template.createdAt,
-        updatedAt: retroSchema.template.updatedAt,
-        organizationName: orgSchema.organization.name,
-      })
-      .from(retroSchema.template)
-      .leftJoin(
-        orgSchema.organization,
-        eq(retroSchema.template.organizationId, orgSchema.organization.id),
-      )
-      .where(whereClause)
-      .orderBy(
-        sortOrder === 'desc'
-          ? desc(
-              sort === 'createdAt'
-                ? retroSchema.template.createdAt
-                : retroSchema.template.name,
-            )
-          : asc(
-              sort === 'createdAt'
-                ? retroSchema.template.createdAt
-                : retroSchema.template.name,
-            ),
-      )
-      .limit(limit)
-      .offset((page - 1) * limit);
-
-    const ids = rows.map((r) => r.id);
-    const columns =
-      ids.length > 0
-        ? await this.database
-            .select()
-            .from(retroSchema.templateColumn)
-            .where(inArray(retroSchema.templateColumn.templateId, ids))
-            .orderBy(retroSchema.templateColumn.order)
-        : [];
-
-    return {
-      templates: rows.map((r) => ({
-        ...r,
-        columns: columns.filter((c) => c.templateId === r.id),
-      })),
-      total: totalRow?.total ?? 0,
-      page,
-      limit,
-    };
-  }
-
-  async getTemplateById(
-    templateId: string,
-  ): Promise<(Template & { columns: TemplateColumn[] }) | null> {
-    const [tmpl] = await this.database
-      .select()
-      .from(retroSchema.template)
-      .where(eq(retroSchema.template.id, templateId))
-      .limit(1);
-
-    if (!tmpl) return null;
-
-    const columns = await this.database
-      .select()
-      .from(retroSchema.templateColumn)
-      .where(eq(retroSchema.templateColumn.templateId, templateId))
-      .orderBy(retroSchema.templateColumn.order);
-
-    return { ...tmpl, columns };
-  }
-
-  private async assertTemplateAccess(
-    userId: string,
-    organizationId: string | null | undefined,
-  ): Promise<void> {
-    const [fullUser] = await this.database
-      .select({ role: authSchema.user.role })
-      .from(authSchema.user)
-      .where(eq(authSchema.user.id, userId))
-      .limit(1);
-
-    const isSystemAdmin =
-      fullUser?.role === USER_ROLES.SuperAdmin ||
-      fullUser?.role === USER_ROLES.SystemAdmin;
-
-    if (organizationId) {
-      if (isSystemAdmin) return;
-
-      const [membership] = await this.database
-        .select({ role: orgSchema.organizationMember.role })
-        .from(orgSchema.organizationMember)
-        .where(
-          and(
-            eq(orgSchema.organizationMember.organizationId, organizationId),
-            eq(orgSchema.organizationMember.userId, userId),
-          ),
-        )
-        .limit(1);
-
-      if (
-        membership?.role === ORG_MEMBER_ROLES.Owner ||
-        membership?.role === ORG_MEMBER_ROLES.Admin
-      ) {
-        return;
-      }
-
-      // Team leads within this org can also manage org retro templates
-      const [teamLeadship] = await this.database
-        .select({ tag: teamSchema.teamMember.tag })
-        .from(teamSchema.teamMember)
-        .innerJoin(
-          teamSchema.team,
-          eq(teamSchema.teamMember.teamId, teamSchema.team.id),
-        )
-        .where(
-          and(
-            eq(teamSchema.teamMember.userId, userId),
-            eq(teamSchema.teamMember.tag, TEAM_MEMBER_TAGS.Lead),
-            eq(teamSchema.team.organizationId, organizationId),
-          ),
-        )
-        .limit(1);
-
-      if (!teamLeadship) {
-        throw new ForbiddenException(
-          'Only organization admins or team leads can manage organization templates',
-        );
-      }
-    } else {
-      if (!isSystemAdmin) {
-        throw new ForbiddenException(
-          'Only system admins can manage global templates',
-        );
-      }
-    }
-  }
-
-  async createTemplate(
-    userId: string,
-    data: CreateTemplateDto,
-  ): Promise<TemplateMutationResult> {
-    await this.assertTemplateAccess(userId, data.organizationId);
-
-    const id = generateId();
-
-    await this.database.insert(retroSchema.template).values({
-      id,
-      name: data.name,
-      description: data.description ?? null,
-      organizationId: data.organizationId ?? null,
-      isBuiltIn: false,
-    });
-
-    await this.database.insert(retroSchema.templateColumn).values(
-      data.columns.map((column, index) => ({
-        id: generateId(),
-        templateId: id,
-        name: column.name,
-        emoji: column.emoji ?? null,
-        prompt: column.prompt ?? null,
-        order: column.order ?? index,
-      })),
-    );
-
-    await this.invalidateTemplateCaches(id);
-
-    return { id };
-  }
-
-  async updateTemplate(
-    userId: string,
-    templateId: string,
-    data: UpdateTemplateDto,
-  ): Promise<TemplateMutationResult> {
-    const [existing] = await this.database
-      .select({
-        id: retroSchema.template.id,
-        organizationId: retroSchema.template.organizationId,
-        isBuiltIn: retroSchema.template.isBuiltIn,
-      })
-      .from(retroSchema.template)
-      .where(eq(retroSchema.template.id, templateId))
-      .limit(1);
-
-    if (!existing) throw new NotFoundException('Template not found');
-
-    await this.assertTemplateAccess(userId, existing.organizationId);
-
-    await this.database
-      .update(retroSchema.template)
-      .set({
-        ...(data.name !== undefined && { name: data.name }),
-        ...(data.description !== undefined && {
-          description: data.description ?? null,
-        }),
-        ...(data.organizationId !== undefined && {
-          organizationId: data.organizationId ?? null,
-        }),
-        updatedAt: new Date(),
-      })
-      .where(eq(retroSchema.template.id, templateId));
-
-    if (data.columns) {
-      const existingColumns = await this.database
-        .select()
-        .from(retroSchema.templateColumn)
-        .where(eq(retroSchema.templateColumn.templateId, templateId))
-        .orderBy(retroSchema.templateColumn.order);
-
-      for (let i = 0; i < data.columns.length; i++) {
-        const col = data.columns[i];
-        const existing = existingColumns[i];
-
-        if (existing) {
-          await this.database
-            .update(retroSchema.templateColumn)
-            .set({
-              name: col.name,
-              emoji: col.emoji ?? null,
-              prompt: col.prompt ?? null,
-              order: col.order ?? i,
-            })
-            .where(eq(retroSchema.templateColumn.id, existing.id));
-        } else {
-          await this.database.insert(retroSchema.templateColumn).values({
-            id: generateId(),
-            templateId,
-            name: col.name,
-            emoji: col.emoji ?? null,
-            prompt: col.prompt ?? null,
-            order: col.order ?? i,
-          });
-        }
-      }
-
-      if (existingColumns.length > data.columns.length) {
-        const toDeleteIds = existingColumns
-          .slice(data.columns.length)
-          .map((c) => c.id);
-
-        const [referenced] = await this.database
-          .select({ count: count() })
-          .from(retroSchema.card)
-          .where(inArray(retroSchema.card.columnId, toDeleteIds));
-
-        if ((referenced?.count ?? 0) > 0) {
-          throw new BadRequestException(
-            'Cannot remove columns that still have cards. Delete the cards first.',
-          );
-        }
-
-        await this.database
-          .delete(retroSchema.templateColumn)
-          .where(inArray(retroSchema.templateColumn.id, toDeleteIds));
-      }
-    }
-
-    await this.invalidateTemplateCaches(templateId);
-    return { id: templateId };
-  }
-
-  async deleteTemplate(
-    userId: string,
-    templateId: string,
-  ): Promise<TemplateDeleteResult> {
-    const [existing] = await this.database
-      .select({
-        id: retroSchema.template.id,
-        organizationId: retroSchema.template.organizationId,
-        isBuiltIn: retroSchema.template.isBuiltIn,
-      })
-      .from(retroSchema.template)
-      .where(eq(retroSchema.template.id, templateId))
-      .limit(1);
-
-    if (!existing) throw new NotFoundException('Template not found');
-
-    await this.assertTemplateAccess(userId, existing.organizationId);
-
-    const [inUse] = await this.database
-      .select({ count: count() })
-      .from(retroSchema.retrospective)
-      .where(eq(retroSchema.retrospective.templateId, templateId));
-
-    if ((inUse?.count ?? 0) > 0) {
-      throw new BadRequestException(
-        'Cannot delete a template that is used by retrospectives',
-      );
-    }
-
-    await this.database
-      .delete(retroSchema.template)
-      .where(eq(retroSchema.template.id, templateId));
-
-    await this.invalidateTemplateCaches(templateId);
-
-    return { success: true };
-  }
-
-  async seedBuiltInTemplates(): Promise<TemplateSeedResult> {
-    const existing = await this.database
-      .select({ id: retroSchema.template.id, name: retroSchema.template.name })
-      .from(retroSchema.template);
-
-    const existingIds = new Set(existing.map((t) => t.id));
-    const existingNames = new Set(existing.map((t) => t.name.toLowerCase()));
-
-    let added = 0;
-
-    for (const tmpl of BUILT_IN_TEMPLATES) {
-      if (
-        existingIds.has(tmpl.id) ||
-        existingNames.has(tmpl.name.toLowerCase())
-      ) {
-        continue;
-      }
-
-      await this.database.insert(retroSchema.template).values({
-        id: tmpl.id,
-        name: tmpl.name,
-        description: tmpl.description,
-        isBuiltIn: true,
-      });
-
-      for (const col of tmpl.columns) {
-        await this.database.insert(retroSchema.templateColumn).values({
-          id: generateId(),
-          templateId: tmpl.id,
-          ...col,
-        });
-      }
-
-      added++;
-    }
-
-    await this.invalidateTemplateCaches();
-
-    return {
-      message:
-        added > 0
-          ? `Seeded ${added} template(s) successfully`
-          : 'All templates already exist',
-    };
-  }
 
   // ============================================================================
   // Retrospective Methods
@@ -651,6 +123,7 @@ export class RetrosService {
     limit = 12,
     status?: 'ongoing' | 'completed',
     teamId?: string,
+    search?: string,
   ): Promise<{
     retros: {
       id: string;
@@ -705,11 +178,26 @@ export class RetrosService {
       conditions.push(ne(retroSchema.retrospective.status, 'completed'));
     }
 
+    const normalizedSearch = search?.trim();
+    if (normalizedSearch) {
+      conditions.push(
+        or(
+          ilike(retroSchema.retrospective.name, `%${normalizedSearch}%`),
+          ilike(teamSchema.team.name, `%${normalizedSearch}%`),
+        )!,
+      );
+    }
+
     const whereClause = conditions.length ? and(...conditions) : undefined;
 
+    // Join team in the count too — the search predicate references team.name.
     const [totalRow] = await this.database
       .select({ total: count() })
       .from(retroSchema.retrospective)
+      .leftJoin(
+        teamSchema.team,
+        eq(retroSchema.retrospective.teamId, teamSchema.team.id),
+      )
       .where(whereClause);
 
     const retros = await this.database
@@ -799,6 +287,36 @@ export class RetrosService {
     await this.invalidateRetroCache(retroId, { invalidateLists: true });
 
     return { id: retroId };
+  }
+
+  /**
+   * Whether the user belongs to the retro's team. The WebSocket `join-retro`
+   * handler calls this before joining the room — handshake auth only proves
+   * identity, not membership, so without this any authenticated socket could
+   * join any retro by ID and receive its realtime board updates
+   * (SECURITY-ASSESSMENT F2). Mirrors the membership gate in the REST getRetro path.
+   */
+  async isRetroMember(retroId: string, userId: string): Promise<boolean> {
+    const [retro] = await this.database
+      .select({ teamId: retroSchema.retrospective.teamId })
+      .from(retroSchema.retrospective)
+      .where(eq(retroSchema.retrospective.id, retroId))
+      .limit(1);
+
+    if (!retro) return false;
+
+    const [membership] = await this.database
+      .select({ id: teamSchema.teamMember.id })
+      .from(teamSchema.teamMember)
+      .where(
+        and(
+          eq(teamSchema.teamMember.teamId, retro.teamId),
+          eq(teamSchema.teamMember.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    return Boolean(membership);
   }
 
   async getRetro(
@@ -1489,13 +1007,41 @@ export class RetrosService {
         )
         .limit(1);
 
-      if (
-        !membership ||
-        (membership.tag !== TEAM_MEMBER_TAGS.Lead &&
-          retro.createdById !== userId)
-      ) {
+      const isCreator = retro.createdById === userId;
+      const isTeamLead = membership?.tag === TEAM_MEMBER_TAGS.Lead;
+
+      // Org owners/admins for the retro's org may also end a retro, matching
+      // the deleteRetro permission set (creator/team-lead/org-admin/sys-admin).
+      const [teamRecord] = await this.database
+        .select({ organizationId: teamSchema.team.organizationId })
+        .from(teamSchema.team)
+        .where(eq(teamSchema.team.id, retro.teamId))
+        .limit(1);
+
+      const isOrgAdmin = teamRecord
+        ? await this.database
+            .select({ role: orgSchema.organizationMember.role })
+            .from(orgSchema.organizationMember)
+            .where(
+              and(
+                eq(orgSchema.organizationMember.userId, userId),
+                eq(
+                  orgSchema.organizationMember.organizationId,
+                  teamRecord.organizationId,
+                ),
+              ),
+            )
+            .limit(1)
+            .then(
+              ([m]) =>
+                m?.role === ORG_MEMBER_ROLES.Owner ||
+                m?.role === ORG_MEMBER_ROLES.Admin,
+            )
+        : false;
+
+      if (!isCreator && !isTeamLead && !isOrgAdmin) {
         throw new ForbiddenException(
-          'Only the creator or team lead can complete the retrospective',
+          'Only system admins, org admins, team leads, and the retro creator can complete the retrospective',
         );
       }
     }

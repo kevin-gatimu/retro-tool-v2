@@ -1,6 +1,7 @@
 import { query, internalMutation } from './server'
 import { v } from 'convex/values'
-import { requireIdentity } from './lib/authz'
+import { getCallerTeamIds, isAdminRole, requireIdentity } from './lib/authz'
+import { LIST_PROJECTION_CAP } from './lib/limits'
 
 // ── Lightweight projection (used by the surveys list + active-count badge) ───
 //
@@ -76,11 +77,25 @@ export const deleteSurveyProjection = internalMutation({
 export const listSurveyProjections = query({
   args: {},
   handler: async (ctx) => {
-    await requireIdentity(ctx)
+    const identity = await requireIdentity(ctx)
     const projections = await ctx.db.query('liveSurveys').collect()
 
+    // Team-scoped surveys are filtered to the caller's teams (`null` = admin,
+    // pass all). Org/system-scoped surveys stay visible: Convex holds no
+    // org-membership data, and this projection is only an invalidation signal —
+    // the REST list the UI refetches re-applies full per-viewer authorization.
+    // Documented F1 residual.
+    const teamIds = isAdminRole(identity.role)
+      ? null
+      : await getCallerTeamIds(ctx, identity.subject)
+
     return projections
+      .filter((projection) => {
+        if (!teamIds || projection.scope !== 'team') return true
+        return projection.teamId !== undefined && teamIds.has(projection.teamId)
+      })
       .sort((left, right) => left.surveyId.localeCompare(right.surveyId))
+      .slice(0, LIST_PROJECTION_CAP)
       .map((projection) => ({
         surveyId: projection.surveyId,
         scope: projection.scope,

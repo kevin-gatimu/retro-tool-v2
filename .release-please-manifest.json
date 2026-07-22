@@ -1,0 +1,7 @@
+{
+  ".": "1.0.0",
+  "retro-tool-api": "1.0.0",
+  "retro-tool-ui": "1.0.0",
+  "convex-backend": "1.0.0",
+  "packages/shared/contracts": "1.0.0"
+}

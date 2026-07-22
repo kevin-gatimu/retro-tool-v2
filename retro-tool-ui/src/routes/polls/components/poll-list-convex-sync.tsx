@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
-import type { FunctionReference } from 'convex/server'
+import { convexApi } from '@/lib/convex-api'
 
 interface PollProjection {
   pollId: string
@@ -9,8 +9,7 @@ interface PollProjection {
   updatedAt: string
 }
 
-const pollProjectionsQuery =
-  'livePolls:listPollProjections' as unknown as FunctionReference<'query'>
+const pollProjectionsQuery = convexApi.livePolls.listPollProjections
 
 /**
  * Headless subscriber to the Convex poll projection. On any change it

@@ -6,12 +6,14 @@ import {
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { BookOpen } from 'lucide-react'
 import { useEffect } from 'react'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { NotificationBell } from '@/components/notification-bell'
 import { ThemeProvider } from '@/components/theme-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import {
   SidebarInset,
@@ -33,7 +35,7 @@ interface MyRouterContext {
 }
 
 // Routes that should not show the sidebar (auth pages and public landing pages)
-const publicRoutes = ['/', '/termsofservice', '/privacystatement']
+const publicRoutes = ['/', '/termsofservice', '/privacy-statement']
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   head: () => ({
@@ -124,6 +126,20 @@ function AuthenticatedLayout() {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex-1" />
+          {/* The user guide is the VitePress site served at /docs — outside the
+              SPA router, so use a plain anchor (not TanStack Link) and open it
+              in a new tab. */}
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <a href="/docs/" target="_blank" rel="noreferrer">
+              <BookOpen className="h-4 w-4" />
+              <span className="hidden sm:inline">User Guide</span>
+            </a>
+          </Button>
           <NotificationBell />
           <ThemeToggle />
         </header>

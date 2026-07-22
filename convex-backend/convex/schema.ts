@@ -182,4 +182,49 @@ export default defineSchema({
   })
     .index('by_retro', ['retroId'])
     .index('by_retro_user', ['retroId', 'userId']),
+
+  // Ephemeral "great answer" reactions during an icebreaker's presenting
+  // phase (celebrate / applause / fire). A high-frequency, low-value, transient
+  // signal — like typing indicators — so it takes a direct Convex path instead
+  // of the projection-outbox. Each click inserts one row; every participant
+  // subscribes and fires the confetti burst. Rows are pruned by age so the
+  // table stays bounded (nothing here is durable — PostgreSQL never sees it).
+  liveIcebreakerReactions: defineTable({
+    sessionId: v.string(),
+    userId: v.string(),
+    kind: v.union(
+      v.literal('celebrate'),
+      v.literal('applause'),
+      v.literal('fire'),
+    ),
+    createdAt: v.number(),
+  }).index('by_session_id', ['sessionId']),
+
+  // Per-user online presence for estimate sessions. A high-frequency,
+  // low-value signal (join/leave flaps), so it gets its own direct Convex path
+  // — clients call `setPresence` and subscribe to `getSessionPresence` — instead
+  // of riding the coalesced projection-outbox → board fan-out. Mirrors the retro
+  // `liveReadyStatus` shape.
+  liveEstimatePresence: defineTable({
+    sessionId: v.string(),
+    userId: v.string(),
+    displayName: v.string(),
+    online: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index('by_session', ['sessionId'])
+    .index('by_session_user', ['sessionId', 'userId']),
+
+  // Team-membership projection (userId → teamId) pushed from NestJS after each
+  // membership mutation. Convex has no team data of its own, so team-scoped
+  // read queries (list projections, team stats) use this table to filter results
+  // to teams the authenticated caller actually belongs to — closing the
+  // cross-tenant read gap. PostgreSQL remains the source of truth.
+  liveTeamMembers: defineTable({
+    userId: v.string(),
+    teamId: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_user_id', ['userId'])
+    .index('by_team_user', ['teamId', 'userId']),
 })

@@ -6,18 +6,30 @@ Provisions all Azure resources for Retro Tool via CLI. Each environment gets an 
 
 1. **Azure CLI** (v2.20+): `winget install -e --id Microsoft.AzureCLI`
 2. **Bicep CLI** (bundled): `az bicep upgrade`
-3. **Azure subscription** with permissions to create resources
+3. **Azure subscription** with **Owner** or **User Access Administrator** at subscription scope — both `main.bicep` and `convex-staging.bicep` create role assignments (AcrPull, Key Vault Secrets User), which Contributor cannot grant. The **CI deploy principal** (GitHub OIDC) does not need subscription Owner: grant it **Role Based Access Control Administrator** scoped to the target resource group so `convex-staging.bicep` can re-assert its role assignments on every run (see [Troubleshooting](#troubleshooting))
 
 ## File Structure
 
 ```
 infra/
-├── deploy.bicep              # Entry point (subscription scope — creates resource group)
-├── main.bicep                # All resources (resource group scope)
+├── deploy.bicep              # Core stack entry point (subscription scope — creates resource group)
+├── main.bicep                # Core resources: ACR, identity, PostgreSQL, API App Service, Static Web App
+├── main.json                 # Compiled ARM template for main.bicep
+├── convex-staging.bicep      # Self-hosted Convex on App Service (resource-group scope, staging only)
+├── modules/
+│   ├── convex-app-service.bicep  # Linux Web App for Containers running the Convex backend
+│   ├── convex-storage.bicep      # Azure Files share mounted at /convex/data
+│   ├── convex-key-vault.bicep    # Key Vault + role assignments for Convex secrets
+│   └── convex-monitoring.bicep   # Log Analytics workspace for Convex diagnostics
 ├── setup-oidc-credentials.ps1  # OIDC federated credential automation
 ├── README.md                 # This file
 └── README-oidc.md            # OIDC setup guide
 ```
+
+Two independent stacks live here:
+
+- **Core app stack** (`deploy.bicep` → `main.bicep`) — provisioned per environment (`prod`, `staging`, `develop`).
+- **Self-hosted Convex stack** (`convex-staging.bicep` + `modules/`) — **staging only**, deployed into the existing `retrotool-staging-rg`. See [Self-hosted Convex (staging)](#self-hosted-convex-staging).
 
 ## Commands
 
@@ -68,38 +80,10 @@ az deployment sub show --name deploy --location southafricanorth `
 az group delete --name retrotool-<env>-rg --yes --no-wait
 ```
 
----
-
-## Provision via GitHub Actions (manual trigger)
-
-Instead of running the CLI locally, you can provision any environment from the
-**Provision Infrastructure** workflow (`.github/workflows/provision-infra.yml`).
-It authenticates with the same Azure OIDC trust used by the deploy workflows — no
-local `az login` required.
-
-**How to run it:**
-
-1. GitHub → **Actions** → **Provision Infrastructure** → **Run workflow**.
-2. Pick the **environment** (`production`, `staging`, or `develop`) and a **mode**:
-   - `what-if` (default) — dry run that prints the resource diff and changes nothing.
-   - `deploy` — provisions for real, then writes the Bicep outputs to the run summary.
-3. Recommended flow: run `what-if` first, review the diff, then re-run with `deploy`.
-
-The workflow maps the GitHub environment name `production` to the Bicep parameter
-`environment=prod` automatically (`staging`/`develop` map 1:1).
-
-### Prerequisites for the workflow
-
-Provisioning targets a **separate Azure account / tenant / subscription** from the app
-deploy workflows, so it uses its own `PROVISION_AZURE_*` credentials. The deploy workflows'
-`AZURE_*` secrets are left untouched and continue to point at the original account.
-
-| Requirement | Why |
-| --- | --- |
-| App Registration + OIDC federated credential in the **provisioning tenant** | A distinct registration from the deploy account. Credential subject must be `repo:<owner>/<repo>:environment:<env>`. See [README-oidc.md](README-oidc.md). |
-| `PROVISION_AZURE_CLIENT_ID` / `PROVISION_AZURE_TENANT_ID` / `PROVISION_AZURE_SUBSCRIPTION_ID` per GitHub environment | The new account's client/tenant/subscription IDs. Kept separate from the deploy workflows' `AZURE_*`. |
-| `POSTGRES_ADMIN_PASSWORD` secret in each GitHub environment | Supplies the required `postgresAdminPassword` Bicep parameter (it has no default). |
-| Provisioning service principal holds **Owner** or **User Access Administrator** at subscription scope | `main.bicep` creates an AcrPull **role assignment**, which Contributor cannot grant. |
+> The core app stack is provisioned from the CLI only — there is no
+> infrastructure-provisioning GitHub workflow. GitHub Actions handle app
+> **deployment** (`deploy-api.yml`, `deploy-ui.yml`) and the self-hosted Convex
+> stack (`deploy-convex.yml`), not core-resource provisioning.
 
 ---
 
@@ -116,6 +100,38 @@ deploy workflows, so it uses its own `PROVISION_AZURE_*` credentials. The deploy
 ## GitHub Environment Configuration
 
 Each GitHub environment (`production`, `staging`, `develop`) needs secrets and variables. The deploy workflow (`deploy-api.yml`) reads these to build, push, and configure the App Service.
+
+> **GitHub is the source of truth for App Service config.** `deploy-api.yml` rewrites
+> the API's App Service settings from these GitHub secrets/variables on **every**
+> deploy (e.g. `CONVEX_SYNC_URL: ${{ vars.CONVEX_SYNC_URL || secrets.CONVEX_SYNC_URL }}`).
+> Editing an App Service setting by hand in the Azure Portal is **transient** — the
+> next deploy overwrites it with the GitHub value. Always change the value in GitHub,
+> then redeploy.
+
+### Bulk-sync GitHub env config (recommended)
+
+Setting keys one at a time in the GitHub UI is how config drifts (a stale
+`CONVEX_SYNC_URL` secret silently reverted an App Service change). Instead, keep
+all values in one git-ignored file and push them together:
+
+```powershell
+# 1. Copy the template and fill in real values (git-ignored — never committed):
+cp .github-env.example .github-env.staging.local
+
+# 2. Preview, then apply, then redeploy so App Service picks them up:
+pnpm gh:env:sync staging -- --dry-run          # show what would change
+pnpm gh:env:sync staging                        # apply to the GitHub 'staging' environment
+pnpm gh:env:sync staging -- --only CONVEX_SYNC_URL,VITE_CONVEX_URL   # sync a subset
+pnpm gh:env:sync staging -- --prune             # report GitHub keys missing from the manifest
+```
+
+- **`scripts/github-env-manifest.json`** (committed) classifies every key as a
+  `secret` (encrypted, set via stdin so it never hits the process list) or a
+  `variable` (plain). When a workflow starts reading a new `secrets.X` / `vars.X`,
+  add it here.
+- **`.github-env.<env>.local`** (git-ignored) holds the values. Keys you omit are
+  left untouched, so you can safely sync just the few that changed.
+- Requires the `gh` CLI authenticated with repo admin rights.
 
 ### Secrets (sensitive — you must add these manually)
 
@@ -140,7 +156,7 @@ Each GitHub environment (`production`, `staging`, `develop`) needs secrets and v
 | `ACR_LOGIN_SERVER` | ACR login server URL | `retrotoolstagingacr.azurecr.io` |
 | `API_WEBAPP_NAME` | App Service name | `retrotool-staging-api` |
 | `AZURE_RESOURCE_GROUP` | Resource group name | `retrotool-staging-rg` |
-| `CONVEX_SYNC_URL` | Convex deployment URL | `https://neat-cod-843.eu-west-1.convex.cloud` |
+| `CONVEX_SYNC_URL` | Convex deployment URL (self-hosted App Service for staging) | `https://retrotool-staging-convex.azurewebsites.net` |
 | `EMAIL_FROM` | Sender address for emails | `Retro-Tool <info@retro-tool.com>` |
 | `FRONTEND_URL` | UI URL (for CORS + redirects) | `https://calm-sky-095099503.7.azurestaticapps.net` |
 | `MICROSOFT_TENANT_ID` | OAuth tenant (if different from infra tenant) | Same as `AZURE_TENANT_ID` unless multi-tenant |
@@ -154,7 +170,7 @@ Each GitHub environment (`production`, `staging`, `develop`) needs secrets and v
 | `VITE_API_URL` | API base URL for the frontend | `https://retrotool-staging-api.azurewebsites.net` |
 | `VITE_APP_ENV` | Environment label | `staging` |
 | `VITE_APP_TITLE` | Browser tab title | `Retro Tool (Staging)` |
-| `VITE_CONVEX_URL` | Convex URL for realtime | `https://neat-cod-843.eu-west-1.convex.cloud` |
+| `VITE_CONVEX_URL` | Convex URL for realtime (self-hosted App Service for staging) | `https://retrotool-staging-convex.azurewebsites.net` |
 | `VITE_ESTIMATES_REALTIME_BACKEND` | Realtime backend for estimates | `convex` |
 | `VITE_NOTIFICATIONS_REALTIME_BACKEND` | Realtime backend for notifications | `convex` |
 | `VITE_RETROS_REALTIME_BACKEND` | Realtime backend for retros | `convex` |
@@ -276,6 +292,11 @@ convex env list   # verify
 > `BETTER_AUTH_URL` and `BETTER_AUTH_JWT_AUDIENCE` defaults to `convex`. Only set
 > those overrides if you change the values here.
 >
+> **Staging (self-hosted Convex):** the `deploy-convex.yml` workflow sets
+> `JWT_ISSUER` / `JWT_AUDIENCE` / `JWT_JWKS_URL` on the self-hosted deployment
+> automatically on every run, so this manual step is only needed for any Convex
+> deployment provisioned outside that workflow.
+>
 > **Verify:** open the app signed-in and confirm a board/notifications load with
 > no `Unauthenticated` errors in the Convex logs. If every query throws
 > `Unauthenticated`, re-check `JWT_ISSUER` against a decoded token's `iss`.
@@ -299,12 +320,67 @@ az staticwebapp hostname set --name retrotool-prod-ui --hostname app.yourdomain.
 
 ## Resources Created (per environment)
 
+Core stack (`deploy.bicep` → `main.bicep`):
+
 - **Container Registry** — Standard, admin disabled
 - **User-Assigned Managed Identity** — with AcrPull role on ACR
-- **PostgreSQL Flexible Server** — Burstable B1ms, 32 GiB, PostgreSQL 17
-- **App Service Plan** — P0v3, Linux
-- **App Service (Container)** — WebSockets, HTTPS-only, Always On
+- **PostgreSQL Flexible Server** — Burstable B1ms, 32 GiB, PostgreSQL 17 (database `retro_tool_db`, `AllowAzureServices` firewall rule)
+- **App Service Plan** — P0v3 (PremiumV3), Linux
+- **App Service (Container)** — WebSockets, HTTPS-only, Always On, min TLS 1.2, FTPS disabled
 - **Static Web App** — Standard (West Europe)
+
+---
+
+## Self-hosted Convex (staging)
+
+Staging additionally runs a **self-hosted Convex backend on Azure App Service**
+(the open-source Convex binary in a container). Self-hosting is scoped to
+**staging only** (plus local Docker for development) — this plan deliberately
+provisions no other Azure Convex deployment. This stack is defined by
+`convex-staging.bicep` + the `modules/` files and deploys **into the existing
+`retrotool-staging-rg`**, reusing the staging ACR and PostgreSQL server.
+
+> Full design: [docs/deployment/convex-azure-self-hosting-plan.md](../docs/deployment/convex-azure-self-hosting-plan.md).
+> Step-by-step runbook (one-time bootstrap + rollback): [docs/deployment/convex-staging-runbook.md](../docs/deployment/convex-staging-runbook.md).
+
+### Resources created
+
+- **App Service Plan + Web App for Containers** (`retrotool-staging-convex`) — Linux container running the Convex backend on `WEBSITES_PORT=3210`, HTTPS-only, WebSockets on, `/version` health check, **exactly one worker**. B1 (Basic) plan by default (`planSkuName`/`planSkuTier` params) to keep cost low. Convex secrets (`INSTANCE_SECRET`, `POSTGRES_URL`) are injected as `@Microsoft.KeyVault(...)` references resolved by the runtime managed identity.
+- **User-Assigned Managed Identity** (`retrotool-staging-convex-identity`) — holds AcrPull on the ACR and Key Vault Secrets User on the vault.
+- **Storage account + Azure Files share** (`convex-data`) — mounted at `/convex/data` for durable Convex state (survives restarts, image swaps, plan resizes).
+- **Key Vault** (`retrotool-staging-cvx-<hash>`) — stores the Convex instance secret and Postgres URL; RBAC-authorized, soft-delete on.
+- **Convex PostgreSQL database** (`retrotool_convex_staging`) — a separate database on the existing staging Flexible Server, with its own dedicated role scoped to that database only (never `retro_tool_db`).
+- **Log Analytics workspace** (`retrotool-staging-convex-logs`) — App Service diagnostic logs/metrics, PerGB2018, 30-day retention.
+
+### Design constraints
+
+- **Single instance only.** The open-source Convex backend is single-instance, so there is **no scale-out, autoscale, or deployment slots** — the plan is pinned to one worker and the deploy workflow refuses to proceed if it finds more than one.
+- **No VNet / private endpoints on day one.** The Web App, Storage, and Key Vault are public + TLS-protected; VNet integration and private endpoints are deferred as future work.
+- **Image is digest-pinned.** The backend image must be referenced by `@sha256:` digest (enforced by the deploy workflow and the `convex-backend/compatibility.json` manifest).
+
+### Deploy
+
+Deployed by the **Deploy Convex (App Service)** workflow
+(`.github/workflows/deploy-convex.yml`), which is called by
+`release-staging.yml` and can also be run via **workflow_dispatch**. It performs
+a stop-first upgrade (export → pause outbox → stop → deploy → start → verify
+`/version` → set Convex `JWT_*` env → `convex deploy` → resume + reconcile).
+
+To deploy manually with the CLI (after the one-time bootstrap in the runbook):
+
+```powershell
+az deployment group create --resource-group retrotool-staging-rg `
+  --template-file infra/convex-staging.bicep `
+  --parameters `
+    environment=staging `
+    convexImage='retrotoolstagingacr.azurecr.io/convex-backend@sha256:<digest>' `
+    convexInstanceSecret='<high-entropy-secret>' `
+    convexPostgresUrl='<dedicated-convex-role-url>'
+```
+
+> `convexImage`, `convexInstanceSecret`, and `convexPostgresUrl` are required (no
+> defaults). The pinned image must first be mirrored into ACR and the dedicated
+> Convex Postgres role created — see the runbook for both one-time steps.
 
 ---
 
@@ -321,3 +397,5 @@ az staticwebapp hostname set --name retrotool-prod-ui --hostname app.yourdomain.
 | OAuth callback fails | Check redirect URI matches exactly in App Registration |
 | Static Web App 404 | Ensure `staticwebapp.config.json` has `navigationFallback` set |
 | ACR pull fails (503) | Verify Bicep was deployed: `az webapp config show --name <name> --query acrUseManagedIdentityCreds` must be `true` |
+| `convex / deploy` fails at "Deploy staging Convex infrastructure" with `InvalidTemplateDeployment … does not have permission to perform action 'Microsoft.Authorization/roleAssignments/write'` | The CI OIDC principal has only Contributor, which cannot write the role assignments `convex-staging.bicep` declares (re-asserted every run, even when unchanged). Grant it **Role Based Access Control Administrator** on `retrotool-staging-rg`: `az role assignment create --assignee-object-id <sp-object-id> --assignee-principal-type ServicePrincipal --role "Role Based Access Control Administrator" --scope /subscriptions/<sub>/resourceGroups/retrotool-staging-rg`. Object id is in the error message, or `az ad sp show --id <AZURE_CLIENT_ID> --query id -o tsv`. |
+| `convex / validate` fails at "Validate Bicep" with `azure/login … Not all values are present. Ensure 'client-id' and 'tenant-id' are supplied` | The validate job runs only `az bicep build` (a **local** compile that needs no Azure auth). Do **not** add `azure/login` to it — the OIDC creds live only in the `staging` environment, which validate intentionally does not use. Install the CLI standalone with `az bicep install` instead. |

@@ -9,6 +9,7 @@ import {
   Body,
   Query,
   UseGuards,
+  UsePipes,
 } from '@nestjs/common';
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import {
@@ -18,9 +19,16 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
+  ApiBody,
 } from '@nestjs/swagger';
 import { OrgInvitationsService } from './invitations.service';
 import type { SessionUser } from '../../common/types';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import {
+  inviteOrgMemberSchema,
+  InviteOrgMemberDto,
+  InviteOrgMemberDtoClass,
+} from './dto';
 
 @ApiTags('organizations')
 @Controller('organizations')
@@ -107,19 +115,20 @@ export class OrgInvitationsController {
       'Always sends an invitation email with a token link. Use POST /:id/members for a direct add without email.',
   })
   @ApiParam({ name: 'id', type: String, description: 'Organization ID' })
+  @ApiBody({ type: InviteOrgMemberDtoClass })
   @ApiResponse({ status: 201, description: 'Invitation sent' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @UsePipes(new ZodValidationPipe(inviteOrgMemberSchema))
   async inviteOrganizationMember(
     @Param('id') id: string,
-    @Body('email') email: string,
-    @Body('role') role: 'member' | 'org-admin' | 'org-owner' = 'member',
+    @Body() body: InviteOrgMemberDto,
     @Session() session: SessionUser,
   ) {
     return this.orgInvitationsService.inviteOrganizationMember(
       session.user.id,
       id,
-      email,
-      role,
+      body.email,
+      body.role,
     );
   }
 

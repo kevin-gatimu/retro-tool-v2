@@ -1,4 +1,5 @@
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Sector } from 'recharts'
+import type { PieSectorShapeProps } from 'recharts'
 
 type ActionPieDataItem = {
   name: string
@@ -33,7 +34,7 @@ export function ActionItemsPieChart({
             outerRadius={85}
             paddingAngle={2}
             dataKey="value"
-            shape={(props: any) => {
+            shape={(props: PieSectorShapeProps) => {
               const color = data[props.index]?.color || '#ccc'
               return <Sector {...props} fill={color} />
             }}

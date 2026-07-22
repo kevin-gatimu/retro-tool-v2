@@ -7,13 +7,10 @@ import type {
   EstimateRoundInput,
   EstimateSession,
 } from '@/common/types/estimates'
-import { getEstimateSocket } from '@/lib/socket'
-import { usesConvexForEstimates } from '@/lib/realtime-config'
 
 export function useSessionMutations(sessionId: string) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const usesConvexRealtime = usesConvexForEstimates()
 
   const refetchSession = () => {
     void queryClient.refetchQueries({
@@ -21,26 +18,9 @@ export function useSessionMutations(sessionId: string) {
     })
   }
 
-  const invalidate = () => {
-    if (usesConvexRealtime) {
-      return
-    }
-    refetchSession()
-  }
-
   const castVoteMutation = useMutation({
-    mutationFn: async (points: string) => {
-      // Hybrid approach: HTTP for persistence + WebSocket for instant broadcast
-      const httpPromise = api.post(ESTIMATES_ENDPOINTS.VOTES(sessionId), {
-        points,
-      })
-      // Emit via WebSocket only when Socket.IO is still the active realtime backend.
-      if (!usesConvexRealtime) {
-        getEstimateSocket().emit('cast-vote', { sessionId, points })
-      }
-      // Wait for HTTP to ensure persistence
-      return httpPromise
-    },
+    mutationFn: (points: string) =>
+      api.post(ESTIMATES_ENDPOINTS.VOTES(sessionId), { points }),
     onMutate: (points: string) => {
       // Broad optimistic update: reflect the vote in both userVote and the votes
       // array so the Participants panel reacts immediately and survives a stale
@@ -78,8 +58,8 @@ export function useSessionMutations(sessionId: string) {
       )
     },
     onSuccess: () => {
-      // Don't refetch - WebSocket session-changed will handle it
-      // HTTP guarantees persistence, WebSocket gives instant broadcast
+      // Don't refetch — the Convex subscription (plus the backstop poll) will
+      // deliver the updated session. The REST POST guarantees persistence.
     },
     onError: (error: Error) => {
       // Revert optimistic update on error
@@ -104,7 +84,7 @@ export function useSessionMutations(sessionId: string) {
       )
     },
     onSuccess: () => {
-      // Don't refetch - WebSocket session-changed will handle it
+      // Don't refetch — the Convex subscription will deliver the update.
     },
     onError: (error: Error) => {
       // Revert optimistic update on error
@@ -116,7 +96,7 @@ export function useSessionMutations(sessionId: string) {
   const revealVotesMutation = useMutation({
     mutationFn: () => api.post(ESTIMATES_ENDPOINTS.REVEAL(sessionId)),
     onSuccess: () => {
-      invalidate()
+      // The Convex subscription delivers the revealed votes; no manual refetch.
       toast.success('Votes revealed')
     },
     onError: (error: Error) =>
@@ -132,34 +112,6 @@ export function useSessionMutations(sessionId: string) {
     },
     onError: (error: Error) =>
       toast.error(error.message || 'Failed to start round'),
-  })
-
-  const startTimerMutation = useMutation({
-    mutationFn: (seconds: number) =>
-      api.post(ESTIMATES_ENDPOINTS.TIMER(sessionId), { duration: seconds }),
-    onMutate: (seconds: number) => {
-      // Optimistic update so the creator sees the countdown start immediately
-      queryClient.setQueryData<EstimateSession>(
-        ['estimate-session', sessionId],
-        (prev) =>
-          prev
-            ? {
-                ...prev,
-                timerDuration: seconds,
-                timerEndsAt: new Date(Date.now() + seconds * 1000),
-              }
-            : prev,
-      )
-    },
-    onSuccess: (_, seconds) => {
-      // Always refetch to get the accurate server-side timerEndsAt (bypasses Convex lag)
-      refetchSession()
-      toast.success(`Timer started — ${seconds / 60} min`)
-    },
-    onError: (error: Error) => {
-      refetchSession()
-      toast.error(error.message || 'Failed to start timer')
-    },
   })
 
   const endSessionMutation = useMutation({
@@ -198,7 +150,6 @@ export function useSessionMutations(sessionId: string) {
     removeVoteMutation,
     revealVotesMutation,
     startRoundMutation,
-    startTimerMutation,
     endSessionMutation,
     setConsensusMutation,
     revoteMutation,

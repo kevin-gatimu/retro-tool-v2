@@ -7,13 +7,9 @@ import { TEMPLATES_ENDPOINTS } from '@/lib/api-endpoints'
 export function useAdminTemplateMutations({
   onCreateSuccess,
   onUpdateSuccess,
-  onCreateError,
-  onUpdateError,
 }: {
   onCreateSuccess?: () => void
   onUpdateSuccess?: () => void
-  onCreateError?: (message: string) => void
-  onUpdateError?: (message: string) => void
 } = {}) {
   const queryClient = useQueryClient()
 
@@ -40,7 +36,7 @@ export function useAdminTemplateMutations({
       void invalidate()
     },
     onError: (error: Error) => {
-      onCreateError?.(error.message || 'Failed to create template')
+      toast.error(error.message || 'Failed to create template')
     },
   })
 
@@ -58,7 +54,7 @@ export function useAdminTemplateMutations({
       void invalidate()
     },
     onError: (error: Error) => {
-      onUpdateError?.(error.message || 'Failed to update template')
+      toast.error(error.message || 'Failed to update template')
     },
   })
 

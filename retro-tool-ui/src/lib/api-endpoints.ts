@@ -162,6 +162,14 @@ export const ESTIMATES_ENDPOINTS = {
   CONSENSUS: (id: string) => `/api/estimates/${id}/consensus`,
   REVOTE: (id: string) => `/api/estimates/${id}/revote`,
   SEND_REPORT: (id: string) => `/api/estimates/${id}/send-report`,
+
+  // Convex-only live write path (socket-io-elimination-plan Phase 2). These
+  // mirror the Socket.IO gateway commands 1:1 and are wired into the hook in
+  // Phase 3; the socket path above stays active until then.
+  PARTICIPANT: (id: string) => `/api/estimates/${id}/participant`,
+  VOTE: (id: string) => `/api/estimates/${id}/vote`,
+  ROUND: (id: string) => `/api/estimates/${id}/round`,
+  END: (id: string) => `/api/estimates/${id}/end`,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -170,10 +178,8 @@ export const ESTIMATES_ENDPOINTS = {
 export const ICEBREAKERS_ENDPOINTS = {
   LIST: '/api/icebreakers',
   ACTIVE: '/api/icebreakers/active',
-  HISTORY: '/api/icebreakers/history',
 
   BY_ID: (id: string) => `/api/icebreakers/${id}`,
-  PERMANENT_DELETE: (id: string) => `/api/icebreakers/${id}/permanent`,
   JOIN: (id: string) => `/api/icebreakers/${id}/join`,
   SWIPE: (id: string) => `/api/icebreakers/${id}/swipe`,
   ADVANCE: (id: string) => `/api/icebreakers/${id}/advance`,
@@ -256,18 +262,16 @@ export const NOTIFICATIONS_ENDPOINTS = {
 // Reports
 // ---------------------------------------------------------------------------
 export const REPORTS_ENDPOINTS = {
-  ME: '/api/reports/me',
-  TEAM_METRICS: (teamId: string) => `/api/reports/teams/${teamId}/metrics`,
-  TEAM_HEALTH: (teamId: string) => `/api/reports/teams/${teamId}/health`,
-  TEAM_ACTION_ITEMS: (teamId: string) =>
-    `/api/reports/teams/${teamId}/action-items`,
-  TEAM_ESTIMATE_KPIS: (teamId: string) =>
-    `/api/reports/teams/${teamId}/estimate-kpis`,
-  ORG_TEMPLATES: (orgId: string) =>
-    `/api/reports/organizations/${orgId}/templates`,
-  ORG_OVERVIEW: (orgId: string) =>
-    `/api/reports/organizations/${orgId}/overview`,
-  SYSTEM: '/api/reports/system',
+  // v2 role dashboards (REPORTS-REDESIGN-PLAN) — composite chart-ready payloads
+  V2_ME: '/api/reports/v2/me',
+  V2_TEAM: (teamId: string) => `/api/reports/v2/teams/${teamId}`,
+  V2_TEAM_MEMBERS: (teamId: string) =>
+    `/api/reports/v2/teams/${teamId}/members`,
+  V2_ORG: (orgId: string) => `/api/reports/v2/organizations/${orgId}`,
+  V2_ORG_TEAMS: (orgId: string) =>
+    `/api/reports/v2/organizations/${orgId}/teams`,
+  V2_PLATFORM: '/api/reports/v2/platform',
+  V2_PLATFORM_ORGS: '/api/reports/v2/platform/organizations',
 } as const
 
 // ---------------------------------------------------------------------------
@@ -351,7 +355,7 @@ export const TEAM_ROLES_ENDPOINTS = {
 } as const
 
 // ---------------------------------------------------------------------------
-// Convex Admin
+// Convex admin (operational metrics, cron config, table maintenance)
 // ---------------------------------------------------------------------------
 export const CONVEX_ADMIN_ENDPOINTS = {
   METRICS_OPERATIONAL: '/api/convex-admin/metrics/operational',
@@ -359,3 +363,5 @@ export const CONVEX_ADMIN_ENDPOINTS = {
   CRON_CONFIG: '/api/convex-admin/cron-config',
   CLEAR_TABLES: '/api/convex-admin/clear-tables',
 } as const
+
+// -

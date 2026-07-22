@@ -61,6 +61,10 @@ lerna-debug.log*
 !**/.env.example
 !**/.env.*.example
 
+# Local Convex dashboard login (contains the admin key — DO NOT COMMIT).
+# Auto-generated/refreshed by `pnpm local:bootstrap`.
+convex-dashboard-login.local.txt
+
 # SSL certificates (DO NOT COMMIT)
 infra/ssl-certs/
 *.pfx
@@ -85,3 +89,13 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+.convex-cutover-rollback.txt
+
+# GitHub Actions env values for scripts/sync-github-env.mjs — real values, never commit.
+# The .example template IS committed.
+.github-env.*.local
+
+# Ignore all plain-text files by default (often contain local secrets/scratch notes).
+# Negate any that must stay tracked (e.g. the served robots.txt web asset).
+*.txt
+!retro-tool-ui/public/robots.txt

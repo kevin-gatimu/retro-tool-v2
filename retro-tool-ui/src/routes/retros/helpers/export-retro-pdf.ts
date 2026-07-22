@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf'
 import type { RetroDetail } from '@/common/types/retros'
 import { savePdf } from '@/lib/save-pdf'
 import type { CarriedForwardItem } from '../types'
@@ -37,10 +36,13 @@ function stripUnsupportedGlyphs(text: string): string {
  * discussion notes, and carried-forward items from the previous retro. Pure
  * client-side via jsPDF — no server round-trip.
  */
-export function exportRetroPdf(
+export async function exportRetroPdf(
   retro: RetroDetail,
   previousCarriedItems: CarriedForwardItem[],
 ): Promise<string | null> {
+  // Load jsPDF on demand so the ~380 kB library stays out of the route chunk
+  // and only downloads when the user actually exports.
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
 
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -213,11 +215,16 @@ export function exportRetroPdf(
     gapAfter: 6,
   })
   if (undiscussedCards.length === 0) {
-    writeWrapped('All cards were discussed.', {
-      size: 10,
-      style: 'italic',
-      color: [148, 163, 184],
-    })
+    writeWrapped(
+      carriedForwardCards.length > 0
+        ? 'No cards left undiscussed — the rest were carried forward.'
+        : 'All cards were discussed!',
+      {
+        size: 10,
+        style: 'italic',
+        color: [148, 163, 184],
+      },
+    )
   } else {
     writeCardGroup(undiscussedCards, [245, 158, 11])
   }

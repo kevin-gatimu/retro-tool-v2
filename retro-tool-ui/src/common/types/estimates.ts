@@ -48,6 +48,17 @@ export interface CreateEstimateTemplateInput {
   }[]
 }
 
+/**
+ * Editable draft row for an estimate template value in create/edit forms.
+ * All fields are strings (color/description default to empty string when unset).
+ */
+export interface EstimateValueDraft {
+  label: string
+  value: string
+  color: string
+  description: string
+}
+
 export interface UpdateEstimateTemplateInput {
   name?: string
   description?: string | null
@@ -122,6 +133,7 @@ export interface EstimateSession {
   createdById: string
   isCreator: boolean
   canEndSession?: boolean
+  canControl?: boolean
   userVote?: string | null
   template: SessionTemplateInfo | null
   templateId: string | null

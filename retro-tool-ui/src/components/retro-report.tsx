@@ -441,11 +441,13 @@ export function RetroReport({ retro, previousCarriedItems }: RetroReportProps) {
               ))}
           </section>
 
-          {undiscussedCards.length === 0 && discussedCards.length > 0 && (
+          {undiscussedCards.length === 0 && allCards.length > 0 && (
             <div className="rounded-lg border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30 px-4 py-3 text-center">
               <CheckCircle2 className="h-6 w-6 text-green-500 mx-auto mb-1" />
               <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                All cards were discussed!
+                {carriedForwardCards.length > 0
+                  ? 'No cards left undiscussed — the rest were carried forward.'
+                  : 'All cards were discussed!'}
               </p>
             </div>
           )}

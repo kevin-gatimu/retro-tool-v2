@@ -176,6 +176,14 @@ export class EmailService {
     )}&email=${encodeURIComponent(email)}`;
   }
 
+  /**
+   * Renders the shared invite email shell. `heading` and `invitedEmail` are
+   * escaped here; `greeting` and `leadHtml` are trusted HTML fragments — callers
+   * MUST pre-escape any user-controlled value (org/inviter/team names) with
+   * `this.esc(...)` before embedding it, which every `build*InviteHtml` caller
+   * does. `acceptUrl` is built from server config with URL-encoded params
+   * (no user-controlled HTML). See SECURITY-ASSESSMENT F8.
+   */
   private renderInviteEmail(params: {
     heading: string;
     greeting?: string;
@@ -799,12 +807,18 @@ export class EmailService {
 </html>`;
   }
 
+  /**
+   * HTML-escape a user-controlled string before interpolating it into an email
+   * template. Escapes both quote styles so the value is safe in text nodes and in
+   * either single- or double-quoted attributes (SECURITY-ASSESSMENT F8).
+   */
   private esc(str: string): string {
     return str
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   /** Strip [MERGE_META:...] annotations left on merged card content. */

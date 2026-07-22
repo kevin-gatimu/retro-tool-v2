@@ -38,14 +38,14 @@ function AuthLayout() {
             </Link>
             <nav className="ml-auto flex items-center gap-1">
               <Link
-                to="/termsofservice"
+                to="/terms-of-service"
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all duration-200"
               >
                 <FileText className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Terms</span>
               </Link>
               <Link
-                to="/privacystatement"
+                to="/privacy-statement"
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all duration-200"
               >
                 <Lock className="h-3.5 w-3.5" />

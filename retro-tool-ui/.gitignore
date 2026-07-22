@@ -17,3 +17,12 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# VitePress (user guide under docs/). Built output goes to dist/docs (ignored
+# via `dist` above); these are the generator's local scratch dirs.
+docs/.vitepress/cache
+docs/.vitepress/dist
+
+# Ignore all plain-text files (local secrets/scratch notes); keep the served robots.txt
+*.txt
+!public/robots.txt

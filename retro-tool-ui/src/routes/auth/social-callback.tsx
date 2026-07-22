@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { Sparkles } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
 import { USERS_ENDPOINTS } from '@/lib/api-endpoints'
@@ -13,6 +14,7 @@ export const Route = createFileRoute('/auth/social-callback')({
 
 function SocialCallbackPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -26,7 +28,7 @@ function SocialCallbackPage() {
         // Sign out after bootstrap so the next login gets a fresh session with the correct role.
         try {
           await api.post(USERS_ENDPOINTS.ADMIN_BOOTSTRAP)
-          await signOutWithCleanup()
+          await signOutWithCleanup(queryClient)
           navigate({
             to: '/auth/sign-in',
             search: { status: 'bootstrapped' as never },
@@ -47,13 +49,13 @@ function SocialCallbackPage() {
         }
 
         if (user.status === 'pending') {
-          await signOutWithCleanup()
+          await signOutWithCleanup(queryClient)
           navigate({ to: '/auth/sign-in', search: { status: 'pending' } })
           return
         }
 
         if (user.status === 'rejected') {
-          await signOutWithCleanup()
+          await signOutWithCleanup(queryClient)
           navigate({ to: '/auth/sign-in', search: { status: 'rejected' } })
           return
         }

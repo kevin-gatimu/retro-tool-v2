@@ -43,4 +43,19 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     rate: 50,
     period: MINUTE,
   },
+
+  /**
+   * Per-identity limit on client-callable live-collaboration mutations
+   * (typing indicators, ready status) — keyed by the caller's `identity.subject`.
+   * These are the only mutations a browser can invoke directly, so without a
+   * per-user cap an authenticated client could spam them (SECURITY-ASSESSMENT F9).
+   * Generous enough for rapid typing/toggling, tight enough to stop abuse.
+   */
+  liveInteraction: {
+    kind: 'token bucket',
+    rate: 20,
+    period: SECOND,
+    capacity: 40,
+    shards: 2,
+  },
 })

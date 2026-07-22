@@ -30,19 +30,19 @@ export const env = createEnv({
     VITE_CONVEX_URL: z.url().optional(),
     VITE_ESTIMATES_REALTIME_BACKEND: z
       .enum(['socket-io', 'convex'])
-      .default('socket-io'),
+      .default('convex'),
     VITE_RETROS_REALTIME_BACKEND: z
       .enum(['socket-io', 'convex'])
-      .default('socket-io'),
+      .default('convex'),
     VITE_ICEBREAKERS_REALTIME_BACKEND: z
       .enum(['socket-io', 'convex'])
-      .default('socket-io'),
+      .default('convex'),
     VITE_STANDUPS_REALTIME_BACKEND: z
       .enum(['socket-io', 'convex'])
-      .default('socket-io'),
+      .default('convex'),
     VITE_NOTIFICATIONS_REALTIME_BACKEND: z
       .enum(['socket-io', 'convex'])
-      .default('socket-io'),
+      .default('convex'),
     // Polls and surveys are Convex-only (no Socket.IO backend), so they have no
     // per-feature backend flag — they use Convex whenever VITE_CONVEX_URL is set.
   },

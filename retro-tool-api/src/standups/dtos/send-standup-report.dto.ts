@@ -6,7 +6,7 @@ export const sendStandupReportSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
-  recipients: z.array(z.string().email()).max(100).optional(),
+  recipients: z.array(z.email()).max(100).optional(),
 });
 export type SendStandupReportDto = z.infer<typeof sendStandupReportSchema>;
 

@@ -8,9 +8,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - '${POSTGRES_PORT}:5432'
+      - "${POSTGRES_PORT}:5432"
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -18,11 +18,6 @@ services:
     volumes:
       - retro-tool-postgres-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
-
-  redis:
-    image: redis:7
-    ports:
-      - '${REDIS_PORT}:6379'
 
   nest-api:
     build:
@@ -37,7 +32,6 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       LOCAL_SERVER_URL: ${LOCAL_SERVER_URL}
       DEPLOYED_SERVER_URL: ${DEPLOYED_SERVER_URL}
-      REDIS_URL: ${REDIS_URL}
       CONVEX_SYNC_URL: ${CONVEX_SYNC_URL}
       CONVEX_SYNC_ADMIN_KEY: ${CONVEX_SYNC_ADMIN_KEY}
       ENABLE_CRON_JOBS: ${ENABLE_CRON_JOBS}
@@ -55,13 +49,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_started
     ports:
-      - '${PORT}:8000'
+      - "${PORT}:8000"
 
   convex-backend:
-    image: ghcr.io/get-convex/convex-backend:latest
+    image: ghcr.io/get-convex/convex-backend@sha256:1738f1673f8d63161043a7859710d2301b1e9d6271e06afbb7af31594ea3a58f
     environment:
       INSTANCE_NAME: ${CONVEX_INSTANCE_NAME}
       INSTANCE_SECRET: ${CONVEX_INSTANCE_SECRET}
@@ -70,19 +62,29 @@ services:
       DISABLE_BEACON: ${DISABLE_BEACON:-1}
       CONVEX_BETTER_AUTH_URL: ${CONVEX_BETTER_AUTH_URL}
     restart: on-failure
+    stop_signal: SIGINT
+    stop_grace_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - '${CONVEX_API_PORT}:3210'
-      - '${CONVEX_SITE_PORT}:3211'
+      - "${CONVEX_API_PORT}:3210"
+      - "${CONVEX_SITE_PORT}:3211"
+    volumes:
+      - retro-tool-convex-data:/convex/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3210/version"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   convex-dashboard:
     image: ghcr.io/get-convex/convex-dashboard:latest
     depends_on:
       - convex-backend
     ports:
-      - '${CONVEX_DASHBOARD_PORT}:6791'
+      - "${CONVEX_DASHBOARD_PORT}:6791"
 
   ui:
     build:
@@ -95,11 +97,14 @@ services:
         VITE_CONVEX_URL: ${VITE_CONVEX_URL}
         VITE_ESTIMATES_REALTIME_BACKEND: ${VITE_ESTIMATES_REALTIME_BACKEND}
         VITE_RETROS_REALTIME_BACKEND: ${VITE_RETROS_REALTIME_BACKEND}
+        VITE_ICEBREAKERS_REALTIME_BACKEND: ${VITE_ICEBREAKERS_REALTIME_BACKEND}
+        VITE_STANDUPS_REALTIME_BACKEND: ${VITE_STANDUPS_REALTIME_BACKEND}
         VITE_NOTIFICATIONS_REALTIME_BACKEND: ${VITE_NOTIFICATIONS_REALTIME_BACKEND}
     depends_on:
       - nest-api
     ports:
-      - '${UI_PORT}:80'
+      - "${UI_PORT}:80"
 
 volumes:
   retro-tool-postgres-data:
+  retro-tool-convex-data:

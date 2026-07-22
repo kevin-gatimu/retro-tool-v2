@@ -4,26 +4,26 @@ import { ApiProperty } from '@nestjs/swagger';
 // ── Zod schemas (validated by ZodValidationPipe) ───────────────────────────
 
 export const sendOtpSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   type: z.enum(['sign-in', 'email-verification', 'forget-password']),
 });
 
 export const signInOtpSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   otp: z.string().min(1),
 });
 
 export const verifyEmailOtpSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   otp: z.string().min(1),
 });
 
 export const requestPasswordResetOtpSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
 });
 
 export const resetPasswordOtpSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   otp: z.string().min(1),
   password: z.string().min(6),
 });

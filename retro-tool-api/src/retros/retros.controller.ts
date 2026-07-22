@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard, Roles, Session } from '@thallesp/nestjs-better-auth';
 import { RetrosService } from './retros.service';
-import { RetrosGateway } from './retros.gateway';
+import { RetrosTemplatesService } from './retros-templates.service';
 import { RetrosProjectionSyncService } from './retros-projection-sync.service';
 import {
   createRetroSchema,
@@ -30,6 +30,12 @@ import {
   createCommentSchema,
   CreateCommentDto,
   CreateCommentDtoClass,
+  updateCommentSchema,
+  UpdateCommentDto,
+  UpdateCommentDtoClass,
+  carryForwardCardsSchema,
+  CarryForwardCardsDto,
+  CarryForwardCardsDtoClass,
   mergeCardsSchema,
   MergeCardsDto,
   MergeCardsDtoClass,
@@ -65,7 +71,7 @@ import type { SessionUser } from '../common/types';
 export class RetrosController {
   constructor(
     private readonly retrosService: RetrosService,
-    private readonly retrosGateway: RetrosGateway,
+    private readonly retrosTemplatesService: RetrosTemplatesService,
     private readonly retrosProjectionSyncService: RetrosProjectionSyncService,
   ) {}
 
@@ -95,7 +101,7 @@ export class RetrosController {
     const validSortOrder =
       sortOrder === 'asc' || sortOrder === 'desc' ? sortOrder : 'asc';
 
-    return this.retrosService.getTemplatesPaginated(
+    return this.retrosTemplatesService.getTemplatesPaginated(
       session.user.id,
       page ? Math.max(1, parseInt(page, 10)) : 1,
       limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 12,
@@ -112,7 +118,7 @@ export class RetrosController {
   @ApiResponse({ status: 200, description: 'Returns template with columns' })
   @ApiResponse({ status: 404, description: 'Template not found' })
   async getTemplateById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.retrosService.getTemplateById(id);
+    return this.retrosTemplatesService.getTemplateById(id);
   }
 
   @Post('templates')
@@ -130,7 +136,7 @@ export class RetrosController {
     @Body() body: CreateTemplateDto,
     @Session() session: SessionUser,
   ) {
-    return this.retrosService.createTemplate(session.user.id, body);
+    return this.retrosTemplatesService.createTemplate(session.user.id, body);
   }
 
   @Patch('templates/:id')
@@ -149,7 +155,11 @@ export class RetrosController {
     @Body() body: UpdateTemplateDto,
     @Session() session: SessionUser,
   ) {
-    return this.retrosService.updateTemplate(session.user.id, id, body);
+    return this.retrosTemplatesService.updateTemplate(
+      session.user.id,
+      id,
+      body,
+    );
   }
 
   @Delete('templates/:id')
@@ -165,7 +175,7 @@ export class RetrosController {
     @Param('id', ParseUUIDPipe) id: string,
     @Session() session: SessionUser,
   ) {
-    return this.retrosService.deleteTemplate(session.user.id, id);
+    return this.retrosTemplatesService.deleteTemplate(session.user.id, id);
   }
 
   @Post('templates/seed')
@@ -178,7 +188,7 @@ export class RetrosController {
     description: 'Forbidden - Admin access required',
   })
   async seedBuiltInTemplates() {
-    return this.retrosService.seedBuiltInTemplates();
+    return this.retrosTemplatesService.seedBuiltInTemplates();
   }
 
   // ============================================================================
@@ -205,6 +215,7 @@ export class RetrosController {
     @Query('limit') limit?: string,
     @Query('status') status?: string,
     @Query('teamId') teamId?: string,
+    @Query('search') search?: string,
   ) {
     const normalizedStatus =
       status === 'ongoing' || status === 'completed' ? status : undefined;
@@ -214,6 +225,7 @@ export class RetrosController {
       limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 12,
       normalizedStatus,
       teamId,
+      search,
     );
   }
 
@@ -228,8 +240,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.createRetro(session.user.id, body);
-    this.retrosGateway.emitRetroChanged(result.id);
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(result.id);
     return result;
   }
 
@@ -258,8 +269,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.deleteRetro(session.user.id, id);
-    await this.retrosProjectionSyncService.deleteRetroProjection(id);
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroDelete(id);
     return result;
   }
 
@@ -275,8 +285,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.startLobby(session.user.id, id);
-    this.retrosGateway.emitRetroStatusChanged(id, 'waiting');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -292,8 +301,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.startRetro(session.user.id, id);
-    this.retrosGateway.emitRetroStatusChanged(id, 'active');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -309,8 +317,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.moveToGrouping(session.user.id, id);
-    this.retrosGateway.emitRetroStatusChanged(id, 'grouping');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -326,8 +333,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.moveToVoting(session.user.id, id);
-    this.retrosGateway.emitRetroStatusChanged(id, 'voting');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -346,8 +352,7 @@ export class RetrosController {
       session.user.id,
       id,
     );
-    this.retrosGateway.emitRetroStatusChanged(id, 'discussing');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -363,8 +368,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.completeRetro(session.user.id, id);
-    this.retrosGateway.emitRetroStatusChanged(id, 'completed');
-    this.retrosGateway.emitRetroListChanged();
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -396,7 +400,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.joinRetro(session.user.id, id);
-    this.retrosGateway.emitRetroChanged(id);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -417,7 +421,7 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.createCard(session.user.id, body);
-    this.retrosGateway.emitRetroChanged(body.retroId);
+    await this.retrosProjectionSyncService.enqueueRetroSync(body.retroId);
     return result;
   }
 
@@ -441,7 +445,7 @@ export class RetrosController {
       id,
       body,
     );
-    this.retrosGateway.emitRetroChanged(id);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -464,7 +468,7 @@ export class RetrosController {
       id,
       cardId,
     );
-    this.retrosGateway.emitRetroChanged(id);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -487,7 +491,8 @@ export class RetrosController {
       id,
       body,
     );
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -503,7 +508,8 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.deleteCard(session.user.id, id);
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -527,7 +533,8 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.voteForCard(session.user.id, id);
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -543,7 +550,8 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.removeVote(session.user.id, id);
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -569,7 +577,8 @@ export class RetrosController {
       id,
       body,
     );
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -585,27 +594,31 @@ export class RetrosController {
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.deleteComment(session.user.id, id);
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
   @Patch('comments/:id')
   @ApiOperation({ summary: 'Update a comment' })
   @ApiParam({ name: 'id', type: String, description: 'Comment ID' })
+  @ApiBody({ type: UpdateCommentDtoClass })
   @ApiResponse({ status: 200, description: 'Comment updated' })
   @ApiResponse({ status: 403, description: 'Not the comment author' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
+  @UsePipes(new ZodValidationPipe(updateCommentSchema))
   async updateComment(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('content') content: string,
+    @Body() body: UpdateCommentDto,
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.updateComment(
       session.user.id,
       id,
-      content,
+      body.content,
     );
-    if (result.retroId) this.retrosGateway.emitRetroChanged(result.retroId);
+    if (result.retroId)
+      await this.retrosProjectionSyncService.enqueueRetroSync(result.retroId);
     return result;
   }
 
@@ -638,7 +651,7 @@ export class RetrosController {
       id,
       body,
     );
-    this.retrosGateway.emitRetroChanged(id);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -664,7 +677,7 @@ export class RetrosController {
       id,
       cardId,
     );
-    this.retrosGateway.emitDiscussionCardChanged(id, cardId);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -695,7 +708,7 @@ export class RetrosController {
       id,
       actionItemId,
     );
-    this.retrosGateway.emitDiscussionActionItemChanged(id, actionItemId);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -717,7 +730,7 @@ export class RetrosController {
       id,
       cardId,
     );
-    this.retrosGateway.emitRetroChanged(id);
+    await this.retrosProjectionSyncService.enqueueRetroSync(id);
     return result;
   }
 
@@ -727,28 +740,23 @@ export class RetrosController {
     summary: 'Create action items for undiscussed cards (carry forward)',
   })
   @ApiParam({ name: 'id', type: String, description: 'Retrospective ID' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: { cardIds: { type: 'array', items: { type: 'string' } } },
-      required: ['cardIds'],
-    },
-  })
+  @ApiBody({ type: CarryForwardCardsDtoClass })
   @ApiResponse({ status: 200, description: '{ created: number }' })
   @ApiResponse({ status: 400, description: 'Retro not completed' })
   @ApiResponse({ status: 403, description: 'Not a team member' })
+  @UsePipes(new ZodValidationPipe(carryForwardCardsSchema))
   async carryForwardCards(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('cardIds') cardIds: string[],
+    @Body() body: CarryForwardCardsDto,
     @Session() session: SessionUser,
   ) {
     const result = await this.retrosService.carryForwardCards(
       session.user.id,
       id,
-      cardIds,
+      body.cardIds,
     );
     if (result.created > 0) {
-      this.retrosGateway.emitRetroChanged(id);
+      await this.retrosProjectionSyncService.enqueueRetroSync(id);
     }
     return result;
   }

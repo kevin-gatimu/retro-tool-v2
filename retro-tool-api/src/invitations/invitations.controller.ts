@@ -21,6 +21,8 @@ import {
 } from '@nestjs/swagger';
 import { InvitationsService } from './invitations.service';
 import type { SessionUser } from '../common/types';
+import { ZodParamPipe } from '../common/pipes/zod-param.pipe';
+import { invitationTokenSchema } from './dto';
 
 @ApiTags('invitations')
 @Controller('invitations')
@@ -52,7 +54,10 @@ export class InvitationsController {
   @ApiResponse({ status: 403, description: 'Expired or wrong email' })
   @ApiResponse({ status: 404, description: 'Invitation not found' })
   @ApiResponse({ status: 409, description: 'Already accepted' })
-  async accept(@Param('token') token: string, @Session() session: SessionUser) {
+  async accept(
+    @Param('token', new ZodParamPipe(invitationTokenSchema)) token: string,
+    @Session() session: SessionUser,
+  ) {
     return this.invitationsService.accept(token, session.user.id);
   }
 }

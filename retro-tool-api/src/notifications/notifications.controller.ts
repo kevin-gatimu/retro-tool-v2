@@ -8,18 +8,26 @@ import {
   Body,
   ParseUUIDPipe,
   UseGuards,
+  UsePipes,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
+  ApiBody,
 } from '@nestjs/swagger';
 import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from './notifications.service';
 import { PushService } from './push.service';
 import type { SessionUser } from '../common/types';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import {
+  pushSubscribeSchema,
+  PushSubscribeDto,
+  PushSubscribeDtoClass,
+} from './dto';
 
 @ApiTags('notifications')
 @Controller('notifications')
@@ -76,10 +84,12 @@ export class NotificationsController {
 
   @Post('push-subscribe')
   @ApiOperation({ summary: 'Save a browser push subscription' })
+  @ApiBody({ type: PushSubscribeDtoClass })
   @ApiResponse({ status: 201, description: '{ success: true }' })
+  @UsePipes(new ZodValidationPipe(pushSubscribeSchema))
   pushSubscribe(
     @Session() session: SessionUser,
-    @Body() body: { endpoint: string; p256dh: string; auth: string },
+    @Body() body: PushSubscribeDto,
   ) {
     return this.pushService.subscribe(session.user.id, body);
   }

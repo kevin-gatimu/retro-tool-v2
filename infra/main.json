@@ -4,8 +4,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.41.2.15936",
-      "templateHash": "10890415209388774291"
+      "version": "0.43.8.12551",
+      "templateHash": "9546675503070487713"
     }
   },
   "parameters": {
@@ -215,7 +215,9 @@
           "alwaysOn": true,
           "http20Enabled": true,
           "webSocketsEnabled": true,
-          "appSettings": "[concat(createArray(createObject('name', 'DOCKER_REGISTRY_SERVER_URL', 'value', format('https://{0}', reference(resourceId('Microsoft.ContainerRegistry/registries', variables('acrName')), '2023-07-01').loginServer)), createObject('name', 'WEBSITES_ENABLE_APP_SERVICE_STORAGE', 'value', 'false'), createObject('name', 'WEBSITES_PORT', 'value', '8080')), variables('customAppSettings'))]"
+          "minTlsVersion": "1.2",
+          "ftpsState": "Disabled",
+          "appSettings": "[concat(createArray(createObject('name', 'DOCKER_REGISTRY_SERVER_URL', 'value', format('https://{0}', reference(resourceId('Microsoft.ContainerRegistry/registries', variables('acrName')), '2023-07-01').loginServer)), createObject('name', 'WEBSITES_ENABLE_APP_SERVICE_STORAGE', 'value', 'false')), variables('customAppSettings'))]"
         }
       },
       "dependsOn": [
@@ -244,44 +246,58 @@
     "acrLoginServer": {
       "type": "string",
       "metadata": {
-        "description": "ACR login server"
+        "description": "ACR login server — use in GitHub Actions to push images"
       },
       "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', variables('acrName')), '2023-07-01').loginServer]"
     },
-    "apiHostname": {
+    "acrName": {
       "type": "string",
       "metadata": {
-        "description": "API App Service hostname"
+        "description": "ACR name — needed for `az acr login` and role assignments"
       },
-      "value": "[reference(resourceId('Microsoft.Web/sites', format('{0}-api', variables('prefix'))), '2023-12-01').defaultHostName]"
+      "value": "[variables('acrName')]"
     },
-    "uiHostname": {
+    "staticWebAppName": {
       "type": "string",
       "metadata": {
-        "description": "Static Web App hostname"
+        "description": "Static Web App name — use to retrieve deployment token: az staticwebapp secrets list --name <this>"
       },
-      "value": "[reference(resourceId('Microsoft.Web/staticSites', format('{0}-ui', variables('prefix'))), '2023-12-01').defaultHostname]"
+      "value": "[format('{0}-ui', variables('prefix'))]"
     },
-    "postgresFqdn": {
+    "apiUrl": {
       "type": "string",
       "metadata": {
-        "description": "PostgreSQL FQDN"
+        "description": "API URL — use as BETTER_AUTH_URL and for CORS"
       },
-      "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', format('{0}-db', variables('prefix'))), '2023-12-01-preview').fullyQualifiedDomainName]"
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', format('{0}-api', variables('prefix'))), '2023-12-01').defaultHostName)]"
     },
-    "postgresConnectionString": {
+    "uiUrl": {
       "type": "string",
       "metadata": {
-        "description": "PostgreSQL connection string (without password)"
+        "description": "UI URL — use as FRONTEND_URL in API env vars"
       },
-      "value": "[format('postgresql://{0}@{1}:5432/retro_tool_db?sslmode=require', parameters('postgresAdminLogin'), reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', format('{0}-db', variables('prefix'))), '2023-12-01-preview').fullyQualifiedDomainName)]"
+      "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/staticSites', format('{0}-ui', variables('prefix'))), '2023-12-01').defaultHostname)]"
+    },
+    "databaseUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "DATABASE_URL template — replace <password> with the actual admin password"
+      },
+      "value": "[format('postgresql://{0}:<password>@{1}:5432/retro_tool_db?sslmode=require', parameters('postgresAdminLogin'), reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', format('{0}-db', variables('prefix'))), '2023-12-01-preview').fullyQualifiedDomainName)]"
     },
     "managedIdentityClientId": {
       "type": "string",
       "metadata": {
-        "description": "Managed Identity Client ID"
+        "description": "Managed Identity Client ID (already configured on App Service)"
       },
       "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('{0}-identity', variables('prefix'))), '2023-01-31').clientId]"
+    },
+    "appServiceName": {
+      "type": "string",
+      "metadata": {
+        "description": "App Service name — needed for `az webapp deploy` or restart commands"
+      },
+      "value": "[format('{0}-api', variables('prefix'))]"
     }
   }
 }

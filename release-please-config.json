@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "separate-pull-requests": false,
+  "pull-request-title-pattern": "chore: release v${version}",
+  "packages": {
+    ".": {
+      "component": "retro-tool",
+      "include-component-in-tag": false
+    },
+    "retro-tool-api": {
+      "component": "retro-tool-api"
+    },
+    "retro-tool-ui": {
+      "component": "retro-tool-ui"
+    },
+    "convex-backend": {
+      "component": "convex-backend"
+    },
+    "packages/shared/contracts": {
+      "component": "contracts"
+    }
+  },
+  "plugins": [
+    {
+      "type": "linked-versions",
+      "groupName": "retro-tool",
+      "components": [
+        "retro-tool",
+        "retro-tool-api",
+        "retro-tool-ui",
+        "convex-backend",
+        "contracts"
+      ]
+    }
+  ]
+}

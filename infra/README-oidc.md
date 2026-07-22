@@ -52,7 +52,7 @@ That's it. The script will find the App Registration, check for existing credent
 | Parameter         | Default                        | Description                                                             |
 | ----------------- | ------------------------------ | ----------------------------------------------------------------------- |
 | `-AppName`      | `retro-tool`                 | Display name of the App Registration in Entra ID                        |
-| `-RepoFullName` | `kevin-gatimu/retro-tool-v2` | GitHub repository in `owner/repo` format                              |
+| `-RepoFullName` | `kevin-gatimu/retro-tool-v2` | GitHub repository in`owner/repo` format                               |
 | `-Environment`  | `all`                        | Target environment:`production`, `staging`, `develop`, or `all` |
 | `-Force`        | (switch)                       | Delete and recreate credentials that already exist                      |
 | `-Delete`       | (switch)                       | Remove federated credentials instead of creating them                   |
@@ -156,6 +156,49 @@ The issuer URL is wrong. The script uses the correct value (`https://token.actio
 ```powershell
 az ad app federated-credential list --id <OBJECT_ID> --query "[].{name:name, issuer:issuer}" -o table
 ```
+
+### Known CLI bug: `MissingSubscription` on `az role assignment create/list`
+
+If your account is the subscription's classic **Account Admin** (common on
+Visual Studio Enterprise or legacy CSP subscriptions), the `az role assignment`
+subcommand can fail with:
+
+```text
+(MissingSubscription) The request did not have a subscription or a valid
+tenant level resource provider.
+```
+
+This happens on **every** scope — even a plain read-only `az role assignment
+list` — regardless of whether `--role` is a name or a GUID. It reproduces while
+other ARM calls (`az group show`, `az acr show`, `az postgres ... show`) work
+fine, and survives `az account clear && az login`. This is a bug in the CLI's
+role-assignment code path, not a real permission gap.
+
+**Workaround:** call the same ARM REST endpoint directly with `az rest`, which
+uses the identical token but bypasses the broken command:
+
+```bash
+SUB="<subscription-id>"
+SCOPE="/subscriptions/${SUB}/resourceGroups/<resource-group>"
+ROLE_ID="b24988ac-6180-42a0-ab88-20f7382dd24c"   # Contributor
+ASSIGNMENT_ID=$(node -e "console.log(require('crypto').randomUUID())")
+
+az rest --method put \
+  --url "https://management.azure.com${SCOPE}/providers/Microsoft.Authorization/roleAssignments/${ASSIGNMENT_ID}?api-version=2022-04-01" \
+  --body "{\"properties\":{\"roleDefinitionId\":\"/subscriptions/${SUB}/providers/Microsoft.Authorization/roleDefinitions/${ROLE_ID}\",\"principalId\":\"<SP_OBJECT_ID>\",\"principalType\":\"ServicePrincipal\"}}"
+```
+
+Common role definition GUIDs:
+
+| Role | GUID |
+| --- | --- |
+| Contributor | `b24988ac-6180-42a0-ab88-20f7382dd24c` |
+| Role Based Access Control Administrator | `f58310d9-a9f6-439a-9e8d-f62e7b41a168` |
+| AcrPull | `7f951dda-4ed3-4680-a7ca-43fe172d538d` |
+| Key Vault Secrets User | `4633458b-17de-408a-b874-0445c86b69e6` |
+
+Verify a grant landed with a read-side `az rest --method get` against the same
+URL (list form, no assignment ID) rather than `az role assignment list`.
 
 ### App Registration not found
 

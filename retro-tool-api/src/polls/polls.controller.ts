@@ -24,7 +24,7 @@ import { AuthGuard, Session } from '@thallesp/nestjs-better-auth';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { PollsService } from './polls.service';
 import { PollsProjectionSyncService } from './polls-projection-sync.service';
-import { StandupsGateway } from '../standups/standups.gateway';
+import { StandupsProjectionSyncService } from '../standups/standups-projection-sync.service';
 import type { SessionUser } from '../common/types';
 import {
   createPollSchema,
@@ -36,6 +36,12 @@ import {
   votePollSchema,
   VotePollDto,
   VotePollDtoClass,
+  emailPollResultsSchema,
+  EmailPollResultsDto,
+  EmailPollResultsDtoClass,
+  setPollClosedSchema,
+  SetPollClosedDto,
+  SetPollClosedDtoClass,
 } from './dtos';
 
 @ApiTags('polls')
@@ -46,16 +52,19 @@ export class PollsController {
   constructor(
     private readonly pollsService: PollsService,
     private readonly pollsProjectionSync: PollsProjectionSyncService,
-    private readonly standupsGateway: StandupsGateway,
+    private readonly standupsProjectionSync: StandupsProjectionSyncService,
   ) {}
 
   /** Standup-attached polls live inside the daily room's realtime feed. */
-  private emitIfAttached(result: {
+  private async resyncStandupIfAttached(result: {
     standupId: string | null;
     entryDate: string | null;
-  }): void {
+  }): Promise<void> {
     if (result.standupId && result.entryDate) {
-      this.standupsGateway.emitEntryChanged(result.standupId, result.entryDate);
+      await this.standupsProjectionSync.enqueueEntrySync(
+        result.standupId,
+        result.entryDate,
+      );
     }
   }
 
@@ -87,8 +96,8 @@ export class PollsController {
     @Session() session: SessionUser,
   ) {
     const result = await this.pollsService.createPoll(session.user.id, body);
-    this.emitIfAttached(result);
-    void this.pollsProjectionSync.syncPollProjection(result.id);
+    void this.resyncStandupIfAttached(result);
+    void this.pollsProjectionSync.enqueuePollSync(result.id);
     return { id: result.id };
   }
 
@@ -120,8 +129,8 @@ export class PollsController {
       id,
       body.optionId,
     );
-    this.emitIfAttached(result);
-    void this.pollsProjectionSync.syncPollProjection(id);
+    void this.resyncStandupIfAttached(result);
+    void this.pollsProjectionSync.enqueuePollSync(id);
     return { success: true };
   }
 
@@ -135,8 +144,8 @@ export class PollsController {
     @Session() session: SessionUser,
   ) {
     const result = await this.pollsService.retractVote(session.user.id, id);
-    this.emitIfAttached(result);
-    void this.pollsProjectionSync.syncPollProjection(id);
+    void this.resyncStandupIfAttached(result);
+    void this.pollsProjectionSync.enqueuePollSync(id);
     return { success: true };
   }
 
@@ -159,8 +168,8 @@ export class PollsController {
       id,
       body,
     );
-    this.emitIfAttached(result);
-    void this.pollsProjectionSync.syncPollProjection(id);
+    void this.resyncStandupIfAttached(result);
+    void this.pollsProjectionSync.enqueuePollSync(id);
     return { success: true };
   }
 
@@ -171,32 +180,36 @@ export class PollsController {
       'Email the poll results to its team (manager only). Recipients, if given, are restricted to team members.',
   })
   @ApiParam({ name: 'id', type: String, description: 'Poll ID' })
+  @ApiBody({ type: EmailPollResultsDtoClass })
   @ApiResponse({ status: 200, description: '{ sent: number }' })
+  @UsePipes(new ZodValidationPipe(emailPollResultsSchema))
   emailResults(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('recipients') recipients: string[] | undefined,
+    @Body() body: EmailPollResultsDto,
     @Session() session: SessionUser,
   ) {
-    return this.pollsService.emailResults(session.user.id, id, recipients);
+    return this.pollsService.emailResults(session.user.id, id, body.recipients);
   }
 
   @Patch(':id/closed')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Close or reopen a poll (manager only)' })
   @ApiParam({ name: 'id', type: String, description: 'Poll ID' })
+  @ApiBody({ type: SetPollClosedDtoClass })
   @ApiResponse({ status: 200, description: '{ success: true }' })
+  @UsePipes(new ZodValidationPipe(setPollClosedSchema))
   async setClosed(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('isClosed') isClosed: boolean,
+    @Body() body: SetPollClosedDto,
     @Session() session: SessionUser,
   ) {
     const result = await this.pollsService.setClosed(
       session.user.id,
       id,
-      isClosed === true,
+      body.isClosed,
     );
-    this.emitIfAttached(result);
-    void this.pollsProjectionSync.syncPollProjection(id);
+    void this.resyncStandupIfAttached(result);
+    void this.pollsProjectionSync.enqueuePollSync(id);
     return { success: true };
   }
 
@@ -210,8 +223,8 @@ export class PollsController {
     @Session() session: SessionUser,
   ) {
     const result = await this.pollsService.deletePoll(session.user.id, id);
-    this.emitIfAttached(result);
-    void this.pollsProjectionSync.deletePollProjection(id);
+    void this.resyncStandupIfAttached(result);
+    void this.pollsProjectionSync.enqueuePollDelete(id);
     return { success: true };
   }
 }

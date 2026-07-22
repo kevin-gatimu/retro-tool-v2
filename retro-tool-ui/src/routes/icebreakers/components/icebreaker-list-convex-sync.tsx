@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useConvexAuth, useQuery as useConvexQuery } from 'convex/react'
-import type { FunctionReference } from 'convex/server'
+import { convexApi } from '@/lib/convex-api'
 
 interface ActiveIcebreakerProjection {
   sessionId: string
@@ -10,7 +10,7 @@ interface ActiveIcebreakerProjection {
 }
 
 const activeIcebreakerProjectionQuery =
-  'liveIcebreakers:listActiveSessionProjections' as unknown as FunctionReference<'query'>
+  convexApi.liveIcebreakers.listActiveSessionProjections
 
 export function IcebreakerListConvexSync() {
   const queryClient = useQueryClient()
@@ -41,7 +41,6 @@ export function IcebreakerListConvexSync() {
       void queryClient.invalidateQueries({
         queryKey: ['active-icebreaker-sessions'],
       })
-      void queryClient.invalidateQueries({ queryKey: ['icebreaker-history'] })
     } else if (lastSnapshotRef.current === null) {
       // First snapshot after (re)mount: the cached ongoing list may already be
       // stale (e.g. a session was ended on the detail page or by another
@@ -61,9 +60,6 @@ export function IcebreakerListConvexSync() {
         if (cachedIds !== liveIds) {
           void queryClient.invalidateQueries({
             queryKey: ['active-icebreaker-sessions'],
-          })
-          void queryClient.invalidateQueries({
-            queryKey: ['icebreaker-history'],
           })
         }
       }

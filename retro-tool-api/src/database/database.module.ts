@@ -17,6 +17,7 @@ import * as standupsSchema from '../standups/schema';
 import * as pollsSchema from '../polls/schema';
 import * as surveysSchema from '../surveys/schema';
 import * as emailSchema from '../email/schema';
+import * as convexAdminSchema from '../convex-admin/schema';
 
 @Module({
   providers: [
@@ -57,6 +58,7 @@ import * as emailSchema from '../email/schema';
             ...pollsSchema,
             ...surveysSchema,
             ...emailSchema,
+            ...convexAdminSchema,
           },
         });
       },
