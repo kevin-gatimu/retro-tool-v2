@@ -17,7 +17,7 @@ conventions on `staging`. Read alongside [CLAUDE.md](../../CLAUDE.md), [AGENTS.m
 retro-tool/
 ├── convex-backend/          # Convex realtime projection layer (read-only projections)
 ├── packages/shared/contracts/  # Shared TS contracts (UI ↔ Convex)
-├── retro-tool-api/          # NestJS 11 REST + Socket.IO backend
+├── retro-tool-api/          # NestJS 11 REST backend (Convex is the sole realtime transport)
 ├── retro-tool-ui/           # React 19 + TanStack Router frontend
 ├── infra/                   # Azure Bicep (CLI-only)
 ├── docker/                  # Local compose stack
@@ -189,9 +189,10 @@ Full reference: [docs/file-naming-conventions.md](file-naming-conventions.md). S
   targeted `invalidateQueries`, `staleTime` tuned per data class. Server state lives in Query,
   not in `useState`.
 - Use TanStack Form for forms and Zod for client-side validation, mirroring API schemas.
-- Gate realtime subscriptions on `isAuthenticated` (Convex) and keep the
-  Socket.IO-vs-Convex choice behind the `VITE_*_REALTIME_BACKEND` env switches — components
-  shouldn't know which backend is live.
+- Gate realtime subscriptions on `isAuthenticated` (Convex) and keep the per-feature
+  `VITE_*_REALTIME_BACKEND` env switch behind `lib/realtime-config.ts` — components shouldn't
+  hardcode the backend. (Convex is the only implemented backend today; Socket.IO gateways were
+  removed, so the flag's `socket-io` value has no live code path.)
 
 **Don't**
 - Don't fetch in `useEffect` — that's what Query is for.

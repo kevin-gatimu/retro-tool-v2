@@ -140,7 +140,7 @@ Authorization is **entirely application-layer**. Be explicit about what the data
 - **No row-level security (RLS).** No `CREATE POLICY` / `ENABLE ROW LEVEL SECURITY` exists. The
   database will return any row the query asks for; it enforces no tenancy or ownership rules.
 - **All isolation is in code.** Org/team/retro scoping and the RBAC matrices are enforced by NestJS
-  guards and service-layer checks, documented in [./rbac.md](./rbac.md). A missing check in the app
+  guards and service-layer checks, documented in [./authorization-rbac.md](./authorization-rbac.md). A missing check in the app
   layer is **not** backstopped by the database.
 
 Network exposure: the Flexible Server has `publicNetworkAccess: Enabled` with an `AllowAzureServices`
@@ -188,11 +188,11 @@ posture for the current scale, not an oversight to document as more than it is.
 | --- | --- | --- |
 | `rejectUnauthorized: false` | TLS encrypts but the server cert is not verified → no MITM protection at the cert layer | Bounded (both endpoints in Azure). Fix: pin Azure CA + `verify-full`. |
 | Single admin DB user | Every query runs with full privileges; a compromised API connection has total DB access | No least-privilege app role. |
-| No row-level security | DB enforces no tenancy/ownership; a missing app-layer check is not backstopped | All isolation is in NestJS guards ([./rbac.md](./rbac.md)). |
+| No row-level security | DB enforces no tenancy/ownership; a missing app-layer check is not backstopped | All isolation is in NestJS guards ([./authorization-rbac.md](./authorization-rbac.md)). |
 | Shared staging DB | Local `dev:*:staging` and the deployed staging API mutate the same instance; laptop migrations hit live staging | No per-developer DB. |
 | `DATABASE_URL` as plain App Service setting | The API's connection string is not a Key Vault reference (Convex's `POSTGRES_URL` is) | Move behind `@Microsoft.KeyVault`. |
 | No HA / no geo-redundant backup | No automatic failover; recovery limited to 7-day PITR in-region | Accepted for current scale. |
 | Public network access | Server reachable from Azure services (not VNet-isolated) | `AllowAzureServices` firewall rule. |
 
-For the app-layer authorization model these gaps rely on, see [./rbac.md](./rbac.md); for the schema
+For the app-layer authorization model these gaps rely on, see [./authorization-rbac.md](./authorization-rbac.md); for the schema
 itself see [../database/schema.md](../database/schema.md).

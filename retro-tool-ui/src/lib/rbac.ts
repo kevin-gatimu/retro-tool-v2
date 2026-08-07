@@ -2,7 +2,7 @@
  * Role-Based Access Control (RBAC) Utility
  *
  * Mirrors the backend implementation in retro-tool-api/src/lib/rbac.ts.
- * See APP-RBAC.md for the full specification.
+ * See docs/security/authorization-rbac.md for the full specification.
  *
  * Role Hierarchy:
  * ===============

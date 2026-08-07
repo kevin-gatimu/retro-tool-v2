@@ -45,18 +45,6 @@
 
 ---
 
-## Team Spaces
-
-Spaces are a way to manage all sessions for your organisation or team in one place.
-
-- Create a Space and invite your team
-- Create Rooms within a Space for Story Estimate and Sprint Retrospective sessions
-- Shared tags, teams, and permissions across all rooms in a Space
-- Easier session management — everything stays in sync
-- Better insights per team gathered across all spaces
-- Org-level overview of all active and past spaces
-
----
 
 ## Enterprise Features
 
@@ -64,4 +52,3 @@ Spaces are a way to manage all sessions for your organisation or team in one pla
 - **Public API Access** — programmatic access to retro data and actions
 - Fine-grained permissions and audit logging
 - Org-wide policy controls and compliance exports
-

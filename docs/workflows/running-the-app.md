@@ -82,7 +82,7 @@ with local env files configured to **share** these staging resources:
 | Resource | Value (shared by everyone) |
 |---|---|
 | PostgreSQL | `retrotool-staging-db.postgres.database.azure.com` / `retro_tool_db` — the **same DB the deployed staging API uses** |
-| Convex | The staging Convex Cloud deployment (`CONVEX_SYNC_URL` / `VITE_CONVEX_URL`) |
+| Convex | The self-hosted staging Convex deployment on Azure App Service (`retrotool-staging-convex`), via `CONVEX_SYNC_URL` / `VITE_CONVEX_URL` |
 | `BETTER_AUTH_SECRET` | Identical to the deployed staging App Service setting |
 | `BETTER_AUTH_JWT_ISSUER` | `https://retrotool-staging-api.azurewebsites.net` (see [below](#why-convex-realtime-needs-three-things-to-line-up)) |
 
@@ -99,7 +99,7 @@ backing data is shared.
 ```bash
 pnpm dev:api:prod         # NestJS on :8000, loads retro-tool-api/.env.production-local
 pnpm dev:ui:prod          # Vite on :3000, loads retro-tool-ui/.env.production-local
-pnpm dev:convex:prod      # Convex watcher against production Cloud
+pnpm dev:convex:prod      # Convex watcher against the self-hosted production deployment
 ```
 
 `.env.production-local` shares the production resources the same way staging does, but with production
@@ -109,7 +109,7 @@ values:
 |---|---|
 | PostgreSQL | `retro-tool-db-server…` / `retro_tool_db` |
 | API host (JWT issuer) | `https://retrotool-prod-api.azurewebsites.net` |
-| Convex | The production Convex Cloud deployment |
+| Convex | The self-hosted production Convex deployment on Azure App Service (`retrotool-prod-convex`) |
 | `BETTER_AUTH_SECRET` | Identical to the deployed **production** App Service setting |
 
 The same three-way JWT alignment applies — substitute the production API host for the staging one in
@@ -120,9 +120,10 @@ The same three-way JWT alignment applies — substitute the production API host 
 
 ## Why Convex realtime needs three things to line up
 
-*(Applies to staging and production modes — local uses self-hosted Convex where this is automatic.)*
+*(Applies when running locally against the shared staging/production Convex deployments — plain
+`.env.local` dev is automatic, since its JWKS URL points at your own local container.)*
 
-Convex Cloud verifies browser JWTs with a `customJwt` provider configured (staging example) as:
+Convex verifies browser JWTs with a `customJwt` provider configured (staging example) as:
 
 ```
 issuer  = https://retrotool-staging-api.azurewebsites.net
@@ -150,9 +151,9 @@ A locally-minted token is only accepted when **all three** hold:
    (Use the production API host in `.env.production-local`.) This only changes the JWT `iss` claim used
    by Convex; cookies, redirects, and OAuth still use the localhost `BETTER_AUTH_URL`.
 
-3. **Publicly reachable JWKS** — Convex Cloud fetches keys from the *deployed* API's `/api/auth/jwks`,
-   which it can reach. Your local JWKS never needs to be exposed because it serves the same keys (shared
-   DB).
+3. **Publicly reachable JWKS** — the self-hosted Convex deployment fetches keys from the *deployed*
+   API's `/api/auth/jwks`, which it can reach. Your local JWKS never needs to be exposed because it
+   serves the same keys (shared DB).
 
 With those in place, `useConvexAuth()` authenticates locally, `*ConvexSync` components hydrate from
 projections, and updates you make appear live in every other developer's browser. For the full JWT
@@ -166,7 +167,7 @@ issue/verify design see [convex-nestjs-auth.md](../security/convex-nestjs-auth.m
 |---|---|---|
 | `No auth provider found matching the given token … issuer=…azurewebsites.net` | Local token has `iss=http://localhost:8000` | Set `BETTER_AUTH_JWT_ISSUER` (recipe above) |
 | `The JWT's 'kid' … does this key match any key in the provider's JWKS?` | Local API signs with a different key than the deployed JWKS serves — usually a **different DB** or different `BETTER_AUTH_SECRET` | Point `DATABASE_URL` at the shared DB and copy the matching secret; restart the local API |
-| No error, but no realtime updates | `VITE_*_REALTIME_BACKEND=convex` while Convex auth is broken — the Socket.IO fallback and REST polling are disabled when Convex is enabled | Fix Convex auth, or set the feature's flag to `socket-io` in the local env file |
+| No error, but no realtime updates | `VITE_*_REALTIME_BACKEND=convex` while Convex auth is broken — REST polling is disabled for most features whenever `isConvexConfigured()` is true, even if the Convex connection itself is failing | Fix Convex auth. There is no working `socket-io` flag value to fall back to anymore (Socket.IO gateways were removed) — to force REST polling instead, unset `VITE_CONVEX_URL` and rebuild the UI |
 
 > The deployed API caches JWKS keys in memory at startup. If the `jwks` table changes (e.g. someone
 > connected with a wrong secret and generated a new key), restart the App Service so the public JWKS
@@ -187,10 +188,10 @@ issue/verify design see [convex-nestjs-auth.md](../security/convex-nestjs-auth.m
   schema, so coordinate before applying breaking changes. Use the per-environment scripts (see
   [next section](#database--convex-operations-per-environment)).
 - **Convex function changes are shared.** A schema/function push affects everyone on that environment.
-- **Socket.IO events are per-API-instance.** Your local API only emits socket events to browsers
-  connected to *your* localhost. Convex is the cross-instance realtime channel: the projection lives in
-  Convex Cloud, so pushes from any API instance (yours, a teammate's, or the deployed one) reach all
-  browsers.
+- **Convex is the cross-instance realtime channel.** There's no Socket.IO layer anymore (it was
+  removed entirely — no gateways, no per-instance broadcast to worry about). The projection lives in
+  the shared Convex deployment (self-hosted on Azure App Service for staging/production), so pushes
+  from any API instance (yours, a teammate's, or the deployed one) reach all browsers.
 - **Sign-in state is shared through the DB**, but cookies are per-origin, so you sign in once per origin
   (localhost vs azurewebsites.net).
 

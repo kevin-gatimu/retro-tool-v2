@@ -152,7 +152,7 @@ The frontend mirrors all backend RBAC types and helpers in `src/lib/rbac.ts`. Us
 
 ### `convex-backend` — Convex realtime layer
 
-- **Self-hosted port:** 3210 (local); Convex Cloud in production
+- **Self-hosted port:** 3210 (local); also self-hosted on Azure App Service for staging & production — no environment uses Convex Cloud (`develop` isn't a deployed environment at all; it runs locally)
 - **Dashboard:** `http://localhost:6791` (local)
 
 Convex modules:
@@ -196,7 +196,7 @@ Team: team-lead > member
 
 The first user to sign up is auto-bootstrapped as `super-admin`. All subsequent users start `pending` and require admin approval before they can access the platform.
 
-Full permission matrices → [docs/security/rbac.md](docs/security/rbac.md)
+Full permission matrices → [docs/security/authorization-rbac.md](docs/security/authorization-rbac.md)
 
 ---
 
@@ -273,7 +273,7 @@ pnpm --dir retro-tool-api db:seed
 
 | Document | What it covers |
 |---|---|
-| [docs/security/rbac.md](docs/security/rbac.md) | Full permission matrices, helper functions, user status lifecycle |
+| [docs/security/authorization-rbac.md](docs/security/authorization-rbac.md) | Full permission matrices, helper functions, user status lifecycle |
 | [docs/security/backend-api.md](docs/security/backend-api.md) | API hardening: Helmet, rate limiting, CORS, CSRF posture/residual risk |
 | [docs/guidelines/file-naming-conventions.md](docs/guidelines/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
 | [docs/workflows/app-flows.md](docs/workflows/app-flows.md) | Every major user-facing flow end-to-end |
@@ -282,11 +282,11 @@ pnpm --dir retro-tool-api db:seed
 | [docs/security/database.md](docs/security/database.md) | DB security: TLS, credential injection, SQL-injection posture, no-RLS reality |
 | [docs/database/schema.md](docs/database/schema.md) | Tables by domain (columns, keys, FKs, indexes), enums, ER diagram |
 | [docs/architecture/overview.md](docs/architecture/overview.md) | System architecture — components, data flow, tech stack |
-| [docs/deployment/azure-provisioning.md](docs/deployment/azure-provisioning.md) | Azure deployment step-by-step (Bicep) |
-| [docs/deployment/azure-resources.md](docs/deployment/azure-resources.md) | Azure resource inventory |
+| [docs/infra/provisioning.md](docs/infra/provisioning.md) | Azure deployment step-by-step (Bicep), incl. the self-hosted Convex stack |
+| [docs/deployment/azure-resources.md](docs/deployment/azure-resources.md) | Azure resource inventory (legacy-named production snapshot) |
 | [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md) | Running Convex in Docker |
 | [docs/workflows/running-the-app.md](docs/workflows/running-the-app.md) | Running locally / against staging / against production |
-| [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: IceBreakers, AI summaries, Jira/ADO export, SAML |
+| [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: AI summaries, Jira/ADO export, SAML, Team Spaces |
 | [docs/README.md](docs/README.md) | Documentation index — all docs by domain |
 | [retro-tool-api/README.md](retro-tool-api/README.md) | API setup, seed credentials |
 | [retro-tool-ui/README.md](retro-tool-ui/README.md) | UI setup, route map |
@@ -297,7 +297,7 @@ pnpm --dir retro-tool-api db:seed
 
 ## Deployment
 
-- **Platform:** Azure (Static Web App for UI, App Service for API, Convex Cloud for realtime)
+- **Platform:** Azure (Static Web App for UI, App Service for API, self-hosted Convex on its own App Service for realtime — staging & production only; `develop` has no Azure deployment and runs entirely locally)
 - **Branches:** `staging` → staging environment; `main` → production
 - **CI/CD:** GitHub Actions (`.github/workflows/deploy-api.yml`, `deploy-ui.yml`)
 - **Prerequisites:** run `db:migrate` + `db:seed:templates` before first start in any environment

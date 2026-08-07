@@ -113,7 +113,11 @@ export class NotificationsService {
         body: data.message,
         url: data.link ?? undefined,
       })
-      .catch(() => undefined);
+      .catch((err: unknown) =>
+        this.logger.error(
+          `Push send failed for user ${data.userId}: ${(err as Error)?.message}`,
+        ),
+      );
 
     return created;
   }
