@@ -11,20 +11,23 @@
     "codegen": "convex codegen",
     "deploy": "convex deploy",
     "build": "pnpm type-check",
+    "test": "vitest run",
     "lint": "eslint convex",
     "lint:fix": "eslint convex --fix",
     "type-check": "tsc --noEmit -p convex/tsconfig.json"
   },
   "dependencies": {
-    "convex": "1.42.3",
-    "@convex-dev/rate-limiter": "^0.3.2"
+    "@convex-dev/rate-limiter": "^0.3.2",
+    "convex": "1.42.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
     "@types/node": "^22.10.7",
+    "convex-test": "0.0.54",
     "dotenv-cli": "^8.0.0",
     "eslint": "^9.18.0",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^3.2.7"
   }
 }

@@ -93,7 +93,7 @@ The auth integration (Convex verifies the RS256 JWTs the NestJS API issues) need
 > for local Docker: the issuer is `http://localhost:8000` (what the API stamps into the
 > token) while the JWKS URL is `http://host.docker.internal:8000/...` (how the container
 > reaches that same API). For deployed environments both use the public API host. See
-> [infra/README.md](../../infra/README.md) step 7 and the `convex-backend/.env*.example` files.
+> [docs/infra/provisioning.md](../infra/provisioning.md) step 7 and the `convex-backend/.env*.example` files.
 
 ---
 

@@ -26,7 +26,7 @@ type Database = NodePgDatabase<
  * admin cascade (org admin+/system admin+), and attaches
  * `request.reportAccess.isLead` so the controller can shape lead-only fields
  * server-side. Lead status comes from `teamMember.tag` (authoritative per
- * docs/RBAC.md) — never from the legacy `user.role` values.
+ * docs/security/authorization-rbac.md) — never from the legacy `user.role` values.
  */
 @Injectable()
 export class TeamReportAccessGuard implements CanActivate {

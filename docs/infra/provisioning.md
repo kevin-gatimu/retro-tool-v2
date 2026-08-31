@@ -1,35 +1,52 @@
 # Retro Tool — Azure Infrastructure (Bicep)
 
-Provisions all Azure resources for Retro Tool via CLI. Each environment gets an isolated set of resources — the Bicep `environment` parameter takes `prod`, `staging`, or `develop`, while the corresponding GitHub environments are named `production`, `staging`, and `develop` (these names must match exactly for environment secrets/vars and OIDC federated credentials).
+> Command reference for the [`infra/`](../../infra/) Bicep templates and scripts: provisioning,
+> GitHub environment config, post-provisioning checklist, and the self-hosted Convex stacks.
+
+Provisions all Azure resources for Retro Tool via CLI. The Bicep `environment` parameter *accepts* `prod`, `staging`, or `develop` as a value, and the matching GitHub environment names would be `production`, `staging`, and `develop` (these names must match exactly for environment secrets/vars and OIDC federated credentials) — but **only `prod` and `staging` have ever actually been deployed**. Nobody has run this Bicep with `environment=develop`: there is no `retrotool-develop-rg`, no develop ACR, Postgres server, App Service, Static Web App, or Convex deployment. All `develop`-branch work happens locally, the same as any other branch (`pnpm local:up`, `pnpm dev:api`, `pnpm dev:ui`, `pnpm dev:convex`).
+
+> **Live production predates this Bicep convention.** The commands and examples below use the
+> convention the templates compute (`retrotool-<env>-rg`, `retrotool<env>acr`,
+> `retrotool-<env>-api`). This repo's actual **production** resources were created before the
+> Bicep rewrite and keep their original legacy names instead: resource group `retro_tool`, ACR
+> `retrotool`, API App Service `retro-tool-api`, App Service plan `ASP-retrotoolproductionrg-be95`.
+> Staging follows the `retrotool-<env>-*` convention (`develop` would too, if it were ever
+> provisioned — it currently isn't; see the callout in
+> [Environment → Branch Mapping](#environment---branch-mapping) below). See
+> [`../deployment/azure-resources.md`](../deployment/azure-resources.md) for the full legacy
+> inventory and [`../deployment/new-azure-subscription.md`](../deployment/new-azure-subscription.md)
+> for a from-scratch provision that uses the convention throughout.
 
 ## Prerequisites
 
 1. **Azure CLI** (v2.20+): `winget install -e --id Microsoft.AzureCLI`
 2. **Bicep CLI** (bundled): `az bicep upgrade`
-3. **Azure subscription** with **Owner** or **User Access Administrator** at subscription scope — both `main.bicep` and `convex-staging.bicep` create role assignments (AcrPull, Key Vault Secrets User), which Contributor cannot grant. The **CI deploy principal** (GitHub OIDC) does not need subscription Owner: grant it **Role Based Access Control Administrator** scoped to the target resource group so `convex-staging.bicep` can re-assert its role assignments on every run (see [Troubleshooting](#troubleshooting))
+3. **Azure subscription** with **Owner** or **User Access Administrator** at subscription scope — `main.bicep`, `convex-staging.bicep`, and `convex-production.bicep` all create role assignments (AcrPull, Key Vault Secrets User), which Contributor cannot grant. The **CI deploy principal** (GitHub OIDC) does not need subscription Owner: grant it **Role Based Access Control Administrator** scoped to the target resource group so the Convex templates can re-assert their role assignments on every run (see [Troubleshooting](#troubleshooting))
 
 ## File Structure
 
 ```
 infra/
-├── deploy.bicep              # Core stack entry point (subscription scope — creates resource group)
-├── main.bicep                # Core resources: ACR, identity, PostgreSQL, API App Service, Static Web App
-├── main.json                 # Compiled ARM template for main.bicep
-├── convex-staging.bicep      # Self-hosted Convex on App Service (resource-group scope, staging only)
+├── deploy.bicep                 # Core stack entry point (subscription scope — creates resource group)
+├── main.bicep                   # Core resources: ACR, identity, PostgreSQL, API App Service, Static Web App
+├── main.json                    # Compiled ARM template for main.bicep
+├── convex-staging.bicep         # Self-hosted Convex on App Service (resource-group scope, staging)
+├── convex-production.bicep      # Self-hosted Convex on App Service (resource-group scope, production)
 ├── modules/
 │   ├── convex-app-service.bicep  # Linux Web App for Containers running the Convex backend
 │   ├── convex-storage.bicep      # Azure Files share mounted at /convex/data
 │   ├── convex-key-vault.bicep    # Key Vault + role assignments for Convex secrets
 │   └── convex-monitoring.bicep   # Log Analytics workspace for Convex diagnostics
-├── setup-oidc-credentials.ps1  # OIDC federated credential automation
-├── README.md                 # This file
-└── README-oidc.md            # OIDC setup guide
+└── setup-oidc-credentials.ps1  # OIDC federated credential automation
 ```
+
+> The docs that used to live here as `infra/README.md` and `infra/README-oidc.md` moved to
+> [`docs/infra/`](./provisioning.md) — this file and [`oidc.md`](./oidc.md).
 
 Two independent stacks live here:
 
-- **Core app stack** (`deploy.bicep` → `main.bicep`) — provisioned per environment (`prod`, `staging`, `develop`).
-- **Self-hosted Convex stack** (`convex-staging.bicep` + `modules/`) — **staging only**, deployed into the existing `retrotool-staging-rg`. See [Self-hosted Convex (staging)](#self-hosted-convex-staging).
+- **Core app stack** (`deploy.bicep` → `main.bicep`) — accepts `prod`, `staging`, or `develop` as the `environment` parameter, but **only `prod` and `staging` have ever been deployed**; `develop` has zero Azure footprint (see the [Environment → Branch Mapping](#environment---branch-mapping) callout below).
+- **Self-hosted Convex stack** (`convex-staging.bicep` / `convex-production.bicep` + `modules/`) — **staging and production only**, each deployed into its own existing resource group. There is no Convex deployment — self-hosted or Cloud — for `develop`. See [Self-hosted Convex](#self-hosted-convex).
 
 ## Commands
 
@@ -83,17 +100,26 @@ az group delete --name retrotool-<env>-rg --yes --no-wait
 > The core app stack is provisioned from the CLI only — there is no
 > infrastructure-provisioning GitHub workflow. GitHub Actions handle app
 > **deployment** (`deploy-api.yml`, `deploy-ui.yml`) and the self-hosted Convex
-> stack (`deploy-convex.yml`), not core-resource provisioning.
+> stacks (`deploy-convex.yml` for staging, `deploy-convex-production.yml` for
+> production), not core-resource provisioning.
 
 ---
 
 ## Environment -> Branch Mapping
 
-| Environment | Parameter              | Branch    | Resource Group          |
-| ----------- | ---------------------- | --------- | ----------------------- |
-| Production  | `environment=prod`     | `main`    | `retrotool-prod-rg`    |
-| Staging     | `environment=staging`  | `staging` | `retrotool-staging-rg` |
-| Development | `environment=develop`  | `develop` | `retrotool-develop-rg` |
+| Environment | Parameter              | Branch    | Resource Group (Bicep convention) | Resource Group (live in this subscription) |
+| ----------- | ---------------------- | --------- | ----------------------- | ----------------------- |
+| Production  | `environment=prod`     | `main`    | `retrotool-prod-rg`    | `retro_tool` (legacy, pre-Bicep) |
+| Staging     | `environment=staging`  | `staging` | `retrotool-staging-rg` | `retrotool-staging-rg` |
+| Development | `environment=develop`  | `develop` | `retrotool-develop-rg` | *(none — never provisioned)* |
+
+> Staging was provisioned by this Bicep and matches the convention. Production predates it and
+> keeps its original resource-group/ACR/App-Service names — see the callout at the top of this
+> document. **`develop` has never been provisioned.** Nobody has run `az deployment sub create`
+> with `environment=develop` — there is no `retrotool-develop-rg`, no develop ACR, PostgreSQL
+> server, App Service, Static Web App, or Convex deployment (Cloud or self-hosted). All
+> `develop`-branch work happens locally, the same Docker Compose / self-hosted Convex workflow used
+> for any other branch (`pnpm local:up`, `pnpm dev:api`, `pnpm dev:ui`, `pnpm dev:convex`).
 
 ---
 
@@ -212,9 +238,12 @@ Create (or verify) an App Registration in **Entra ID -> App Registrations** with
 ```
 https://retrotool-prod-api.azurewebsites.net/api/auth/callback/microsoft
 https://retrotool-staging-api.azurewebsites.net/api/auth/callback/microsoft
-https://retrotool-develop-api.azurewebsites.net/api/auth/callback/microsoft
 http://localhost:8000/api/auth/callback/microsoft
 ```
+
+> No `retrotool-develop-api` entry exists — `develop` has never been provisioned, so there is no
+> develop App Service host to register a redirect URI for. Add one only if `develop` is ever
+> actually deployed via `environment=develop`.
 
 **Client secret** (under Certificates & secrets):
 
@@ -227,7 +256,7 @@ http://localhost:8000/api/auth/callback/microsoft
 
 ### 2. OIDC Federated Credentials
 
-See [README-oidc.md](README-oidc.md) for the full guide, or run:
+See [oidc.md](./oidc.md) for the full guide, or run:
 
 ```powershell
 .\infra\setup-oidc-credentials.ps1
@@ -286,16 +315,20 @@ convex env list   # verify
 | --- | --- | --- |
 | `JWT_ISSUER` | the API's `BETTER_AUTH_URL` (`https://{API_WEBAPP_NAME}.azurewebsites.net`, computed by `deploy-api.yml`) | **Byte-for-byte** identity match against the token `iss`. A trailing-slash / scheme / port mismatch silently breaks all Convex auth. Not fetched over the network. |
 | `JWT_AUDIENCE` | the API's `BETTER_AUTH_JWT_AUDIENCE` (default `convex`) | Matched against the token `aud`. |
-| `JWT_JWKS_URL` | `${JWT_ISSUER}/api/auth/jwks` | **Fetched** by Convex Cloud over the public internet, so the API host must be publicly reachable. |
+| `JWT_JWKS_URL` | `${JWT_ISSUER}/api/auth/jwks` | **Fetched** by the Convex deployment over the network (self-hosted App Service for staging/production, or the local container via `host.docker.internal`), so the API host must be reachable from wherever Convex runs. |
 
 > The API side needs no extra config: `BETTER_AUTH_JWT_ISSUER` defaults to
 > `BETTER_AUTH_URL` and `BETTER_AUTH_JWT_AUDIENCE` defaults to `convex`. Only set
 > those overrides if you change the values here.
 >
-> **Staging (self-hosted Convex):** the `deploy-convex.yml` workflow sets
-> `JWT_ISSUER` / `JWT_AUDIENCE` / `JWT_JWKS_URL` on the self-hosted deployment
-> automatically on every run, so this manual step is only needed for any Convex
-> deployment provisioned outside that workflow.
+> **Self-hosted Convex (staging and production):** `deploy-convex.yml` and
+> `deploy-convex-production.yml` both set `JWT_ISSUER` / `JWT_AUDIENCE` /
+> `JWT_JWKS_URL` on their respective self-hosted deployment automatically on
+> every run, so this manual step is only needed for a Convex deployment
+> provisioned outside those workflows (e.g. a fresh subscription's first manual
+> bring-up, or local self-hosted Docker — see
+> [convex-self-hosting.md](../deployment/convex-self-hosting.md)). There is no
+> Convex deployment for `develop` at all — it isn't a deployed environment.
 >
 > **Verify:** open the app signed-in and confirm a board/notifications load with
 > no `Unauthenticated` errors in the Convex logs. If every query throws
@@ -326,49 +359,73 @@ Core stack (`deploy.bicep` → `main.bicep`):
 - **User-Assigned Managed Identity** — with AcrPull role on ACR
 - **PostgreSQL Flexible Server** — Burstable B1ms, 32 GiB, PostgreSQL 17 (database `retro_tool_db`, `AllowAzureServices` firewall rule)
 - **App Service Plan** — P0v3 (PremiumV3), Linux
-- **App Service (Container)** — WebSockets, HTTPS-only, Always On, min TLS 1.2, FTPS disabled
+- **App Service (Container)** — HTTPS-only, Always On, min TLS 1.2, FTPS disabled (`webSocketsEnabled: true` is set but vestigial — the API has no WebSocket gateways; Convex is the sole realtime transport)
 - **Static Web App** — Standard (West Europe)
+
+> **P0v3 is the Bicep default, not what's actually running.** The live staging and production App
+> Service plans have both been manually scaled down to **B1 Basic** so the API can share its plan
+> with self-hosted Convex at no extra cost (see [Self-hosted Convex](#self-hosted-convex) below and
+> [`../deployment/new-azure-subscription.md`](../deployment/new-azure-subscription.md#resource-inventory-per-environment)).
+> Re-provisioning from a clean `main.bicep` gets you P0v3 again unless you override the SKU or
+> scale down afterwards.
 
 ---
 
-## Self-hosted Convex (staging)
+## Self-hosted Convex
 
-Staging additionally runs a **self-hosted Convex backend on Azure App Service**
-(the open-source Convex binary in a container). Self-hosting is scoped to
-**staging only** (plus local Docker for development) — this plan deliberately
-provisions no other Azure Convex deployment. This stack is defined by
-`convex-staging.bicep` + the `modules/` files and deploys **into the existing
-`retrotool-staging-rg`**, reusing the staging ACR and PostgreSQL server.
+Staging and production each run a **self-hosted Convex backend on Azure App
+Service** (the open-source Convex binary in a container) instead of Convex
+Cloud. Staging is defined by `convex-staging.bicep`, production by
+`convex-production.bicep` — both share the `modules/` files and each deploys
+**into its environment's existing resource group** (`retrotool-staging-rg` /
+`retro_tool`, see the legacy-naming callout at the top of this doc), reusing
+that environment's ACR and PostgreSQL server. `develop` is not part of this
+stack, or of any Convex deployment — it has no Azure footprint at all; all
+`develop`-branch work happens locally against the self-hosted Docker Convex
+container, same as any other branch.
 
-> Full design: [docs/deployment/convex-azure-self-hosting-plan.md](../docs/deployment/convex-azure-self-hosting-plan.md).
-> Step-by-step runbook (one-time bootstrap + rollback): [docs/deployment/convex-staging-runbook.md](../docs/deployment/convex-staging-runbook.md).
+> Full design: [convex-azure-self-hosting-plan.md](../deployment/convex-azure-self-hosting-plan.md).
+> Step-by-step runbooks (one-time bootstrap + rollback):
+> [convex-staging-runbook.md](../deployment/convex-staging-runbook.md) (staging),
+> [convex-production-runbook.md](../deployment/convex-production-runbook.md) (production).
+> Fresh-subscription walkthrough covering both:
+> [new-azure-subscription.md](../deployment/new-azure-subscription.md).
 
 ### Resources created
 
-- **Web App for Containers** (`retrotool-staging-convex`) — Linux container running the Convex backend on `WEBSITES_PORT=3210`, HTTPS-only, WebSockets on, `/version` health check, **exactly one worker**. Runs on the API's existing App Service plan (`retrotool-staging-plan`, B1 Basic) rather than a dedicated plan — both are the same tier, so sharing costs nothing extra (`existingPlanResourceId` param in `modules/convex-app-service.bicep`; pass empty to provision a dedicated plan instead). Convex secrets (`INSTANCE_SECRET`, `POSTGRES_URL`) are injected as `@Microsoft.KeyVault(...)` references resolved by the runtime managed identity.
-- **User-Assigned Managed Identity** (`retrotool-staging-convex-identity`) — holds AcrPull on the ACR and Key Vault Secrets User on the vault.
+- **Web App for Containers** (`retrotool-staging-convex` / `retrotool-prod-convex`) — Linux container running the Convex backend on `WEBSITES_PORT=3210`, HTTPS-only, WebSockets on, `/version` health check, **exactly one worker**. Runs on the API's existing App Service plan (`retrotool-staging-plan` in staging, `ASP-retrotoolproductionrg-be95` in production — both B1 Basic) rather than a dedicated plan — both are the same tier, so sharing costs nothing extra (`existingPlanResourceId` param in `modules/convex-app-service.bicep`; pass empty to provision a dedicated plan instead). Convex secrets (`INSTANCE_SECRET`, `POSTGRES_URL`) are injected as `@Microsoft.KeyVault(...)` references resolved by the runtime managed identity.
+- **User-Assigned Managed Identity** (`retrotool-<env>-convex-identity`) — holds AcrPull on the ACR and Key Vault Secrets User on the vault.
 - **Storage account + Azure Files share** (`convex-data`) — mounted at `/convex/data` for durable Convex state (survives restarts, image swaps, plan resizes).
-- **Key Vault** (`retrotool-staging-cvx-<hash>`) — stores the Convex instance secret and Postgres URL; RBAC-authorized, soft-delete on.
-- **Convex PostgreSQL database** (`retrotool_convex_staging`) — a separate database on the existing staging Flexible Server, with its own dedicated role scoped to that database only (never `retro_tool_db`).
-- **Log Analytics workspace** (`retrotool-staging-convex-logs`) — App Service diagnostic logs/metrics, PerGB2018, 30-day retention.
+- **Key Vault** (`retrotool-<env>-cvx-<hash>`) — stores the Convex instance secret and Postgres URL; RBAC-authorized, soft-delete on.
+- **Convex PostgreSQL database** (`retrotool_convex_staging` / `retrotool_convex_prod`) — a separate database on the environment's existing Flexible Server, with its own dedicated role scoped to that database only (never the application database).
+- **Log Analytics workspace** (`retrotool-<env>-convex-logs`) — App Service diagnostic logs/metrics, PerGB2018, 30-day retention.
 
 ### Design constraints
 
-- **Single instance only.** The open-source Convex backend is single-instance, so there is **no scale-out, autoscale, or deployment slots** — the plan is pinned to one worker and the deploy workflow refuses to proceed if it finds more than one.
+- **Single instance only.** The open-source Convex backend is single-instance, so there is **no scale-out, autoscale, or deployment slots** — each plan is pinned to one worker and the deploy workflows refuse to proceed if either finds more than one.
 - **No VNet / private endpoints on day one.** The Web App, Storage, and Key Vault are public + TLS-protected; VNet integration and private endpoints are deferred as future work.
-- **Image is digest-pinned.** The backend image must be referenced by `@sha256:` digest (enforced by the deploy workflow and the `convex-backend/compatibility.json` manifest).
+- **Image is digest-pinned.** The backend image must be referenced by `@sha256:` digest (enforced by the deploy workflows and the `convex-backend/compatibility.json` manifest — separate `stagingImage`/`productionImage` fields, promoted independently).
 
 ### Deploy
 
-Deployed by the **Deploy Convex (App Service)** workflow
-(`.github/workflows/deploy-convex.yml`), which is called by
-`release-staging.yml` and can also be run via **workflow_dispatch**. It performs
-a stop-first upgrade (export → pause outbox → stop → deploy → start → verify
-`/version` → set Convex `JWT_*` env → `convex deploy` → resume + reconcile).
+**Staging** — the **Deploy Convex (App Service)** workflow
+(`.github/workflows/deploy-convex.yml`) is called automatically by
+`release-staging.yml` on every push to `staging`, and can also be run via
+**workflow_dispatch**.
 
-To deploy manually with the CLI (after the one-time bootstrap in the runbook):
+**Production** — the **Deploy Convex Production (App Service)** workflow
+(`.github/workflows/deploy-convex-production.yml`) is **`workflow_dispatch`
+only** — there is no automated production release pipeline. Trigger it
+deliberately after `deploy-api`/`deploy-ui` have already gone out to `main`.
+
+Both perform the same stop-first upgrade sequence (export → pause outbox →
+stop → deploy → start → verify `/version` → set Convex `JWT_*` env → `convex
+deploy` → resume + reconcile).
+
+To deploy manually with the CLI (after the one-time bootstrap in the relevant runbook):
 
 ```powershell
+# Staging
 az deployment group create --resource-group retrotool-staging-rg `
   --template-file infra/convex-staging.bicep `
   --parameters `
@@ -376,11 +433,21 @@ az deployment group create --resource-group retrotool-staging-rg `
     convexImage='retrotoolstagingacr.azurecr.io/convex-backend@sha256:<digest>' `
     convexInstanceSecret='<high-entropy-secret>' `
     convexPostgresUrl='<dedicated-convex-role-url>'
+
+# Production
+az deployment group create --resource-group retro_tool `
+  --template-file infra/convex-production.bicep `
+  --parameters `
+    environment=production `
+    convexImage='retrotool.azurecr.io/convex-backend@sha256:<digest>' `
+    convexInstanceSecret='<high-entropy-secret>' `
+    convexPostgresUrl='<dedicated-convex-role-url>'
 ```
 
 > `convexImage`, `convexInstanceSecret`, and `convexPostgresUrl` are required (no
-> defaults). The pinned image must first be mirrored into ACR and the dedicated
-> Convex Postgres role created — see the runbook for both one-time steps.
+> defaults) on both templates. The pinned image must first be mirrored into the
+> environment's ACR and the dedicated Convex Postgres role created — see the
+> matching runbook for both one-time steps.
 
 ---
 
@@ -397,5 +464,6 @@ az deployment group create --resource-group retrotool-staging-rg `
 | OAuth callback fails | Check redirect URI matches exactly in App Registration |
 | Static Web App 404 | Ensure `staticwebapp.config.json` has `navigationFallback` set |
 | ACR pull fails (503) | Verify Bicep was deployed: `az webapp config show --name <name> --query acrUseManagedIdentityCreds` must be `true` |
-| `convex / deploy` fails at "Deploy staging Convex infrastructure" with `InvalidTemplateDeployment … does not have permission to perform action 'Microsoft.Authorization/roleAssignments/write'` | The CI OIDC principal has only Contributor, which cannot write the role assignments `convex-staging.bicep` declares (re-asserted every run, even when unchanged). Grant it **Role Based Access Control Administrator** on `retrotool-staging-rg`: `az role assignment create --assignee-object-id <sp-object-id> --assignee-principal-type ServicePrincipal --role "Role Based Access Control Administrator" --scope /subscriptions/<sub>/resourceGroups/retrotool-staging-rg`. Object id is in the error message, or `az ad sp show --id <AZURE_CLIENT_ID> --query id -o tsv`. |
-| `convex / validate` fails at "Validate Bicep" with `azure/login … Not all values are present. Ensure 'client-id' and 'tenant-id' are supplied` | The validate job runs only `az bicep build` (a **local** compile that needs no Azure auth). Do **not** add `azure/login` to it — the OIDC creds live only in the `staging` environment, which validate intentionally does not use. Install the CLI standalone with `az bicep install` instead. |
+| `convex / deploy` fails at "Deploy staging/production Convex infrastructure" with `InvalidTemplateDeployment … does not have permission to perform action 'Microsoft.Authorization/roleAssignments/write'` | The CI OIDC principal has only Contributor, which cannot write the role assignments `convex-staging.bicep` / `convex-production.bicep` declare (re-asserted every run, even when unchanged). Grant it **Role Based Access Control Administrator** on the environment's resource group: `az role assignment create --assignee-object-id <sp-object-id> --assignee-principal-type ServicePrincipal --role "Role Based Access Control Administrator" --scope /subscriptions/<sub>/resourceGroups/<rg>` (`retrotool-staging-rg` for staging, `retro_tool` for production). Object id is in the error message, or `az ad sp show --id <AZURE_CLIENT_ID> --query id -o tsv`. |
+| `convex / validate` fails at "Validate Bicep" with `azure/login … Not all values are present. Ensure 'client-id' and 'tenant-id' are supplied` | The validate job runs only `az bicep build` (a **local** compile that needs no Azure auth). Do **not** add `azure/login` to it — the OIDC creds live only in the `staging`/`production` environment, which validate intentionally does not use. Install the CLI standalone with `az bicep install` instead. |
+| Convex's AcrPull role assignment fails to update after the runtime identity was deleted and recreated | `RoleAssignmentUpdateNotPermitted` — the assignment is named from the identity's resource-ID path (stable across redeploys), not its principal ID, so a recreated identity's new principal ID can't update the old assignment name. Delete the stale assignment first (find it via `az rest --method get` on the ACR's `roleAssignments` list, then `az rest --method delete`), then redeploy. See the inline comment on `acrPullAssignment` in `infra/convex-staging.bicep` / `infra/convex-production.bicep` for the full tradeoff. |

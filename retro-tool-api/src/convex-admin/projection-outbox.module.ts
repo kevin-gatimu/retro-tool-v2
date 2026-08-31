@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
+import { ConvexMutationClientService } from './convex-mutation-client.service';
 import { ProjectionOutboxService } from './projection-outbox.service';
 
 /**
@@ -10,7 +11,7 @@ import { ProjectionOutboxService } from './projection-outbox.service';
  */
 @Module({
   imports: [DatabaseModule],
-  providers: [ProjectionOutboxService],
-  exports: [ProjectionOutboxService],
+  providers: [ConvexMutationClientService, ProjectionOutboxService],
+  exports: [ConvexMutationClientService, ProjectionOutboxService],
 })
 export class ProjectionOutboxModule {}

@@ -4,6 +4,14 @@
 > Scope: local Docker development and one Azure staging deployment
 > Research date: 2026-07-17
 > Decision owner: engineering/platform
+>
+> **Update (2026-07-28):** Socket.IO has since been removed entirely from the codebase — no
+> gateway files, no `socket.io`/`socket.io-client` dependency, no `WsAuthService`. Every
+> "Socket.IO fallback" mention below describes a transport that no longer exists. The only
+> realtime fallback actually in code is TanStack Query REST polling, which every feature already
+> falls back to whenever Convex is unconfigured (`VITE_CONVEX_URL` unset). Read "Socket.IO/REST
+> fallback" throughout this plan as "REST-polling fallback" — a maintenance-window runtime switch
+> would have to be (re)built around that, not Socket.IO.
 
 ## Executive decision
 
@@ -52,7 +60,6 @@ The fit has four important limits:
 
 ```text
 Browser -- REST/HTTP --> NestJS API -- durable writes --> PostgreSQL
-Browser -- Socket.IO --> NestJS API -- room events ----> browsers
 NestJS  -- mutation ---> Convex ------ subscriptions --> browsers
 ```
 
@@ -78,16 +85,22 @@ Best-effort pushes are also a blocker to a transparent Convex restart: mutations
 
 | Feature       | Primary when enabled | Existing fallback                        |
 | ------------- | -------------------- | ---------------------------------------- |
-| Retros        | Convex subscription  | Socket.IO                                |
-| Estimates     | Convex subscription  | Socket.IO                                |
-| Icebreakers   | Convex subscription  | Socket.IO                                |
-| Standups      | Convex subscription  | Socket.IO                                |
-| Notifications | Convex subscription  | Socket.IO                                |
+| Retros        | Convex subscription  | REST polling when Convex is unconfigured |
+| Estimates     | Convex subscription  | REST polling (always-on 15s backstop)    |
+| Icebreakers   | Convex subscription  | REST polling when Convex is unconfigured |
+| Standups      | Convex subscription  | REST polling when Convex is unconfigured |
+| Notifications | Convex subscription  | REST polling when Convex is unconfigured |
 | Polls         | Convex subscription  | REST polling when Convex is unconfigured |
 | Surveys       | Convex subscription  | REST polling when Convex is unconfigured |
 | Reports       | PostgreSQL/API       | Not dependent on Convex                  |
 
-The UI environment schema has five backend switches: retros, estimates, icebreakers, standups, and notifications. Polls and surveys infer their behavior from whether a Convex URL is configured.
+The UI environment schema has five backend switches: retros, estimates, icebreakers, standups, and
+notifications. Polls and surveys infer their behavior from whether a Convex URL is configured. **No
+feature has a Socket.IO fallback anymore** — the per-feature `VITE_*_REALTIME_BACKEND=socket-io`
+value is still accepted by the env schema but has no live code path behind it (see the update note
+at the top of this document); the real fallback for every feature is TanStack Query REST polling,
+which (outside estimates' always-on backstop) only re-activates when `isConvexConfigured()` is
+false, i.e. `VITE_CONVEX_URL` unset.
 
 ### Environment findings
 
@@ -154,7 +167,6 @@ The repo declares Convex SDK `^1.18.0`, which permits drift and is far behind cu
 The following diagram is the desired end state for the **single Azure staging deployment**. Start with the default Azure Static Web Apps and App Service hostnames and their platform-managed HTTPS certificates. Custom domains, Azure DNS, and a centralized edge/WAF are optional future changes that require their own routing, cookie/CORS, and WebSocket validation; they are not required for this migration.
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 flowchart TB
   PEOPLE["Retro Tool users"]
   BROWSER["Browser<br/>React SPA and service worker"]
@@ -170,7 +182,7 @@ flowchart TB
 
     subgraph PUBLIC["Public application services"]
       UI["Azure Static Web Apps<br/>React 19 and TanStack Router"]
-      API["Linux App Service<br/>NestJS REST and Socket.IO API"]
+      API["Linux App Service<br/>NestJS REST API"]
       CONVEX["Dedicated Linux custom-container Web App<br/>Convex backend - one fixed worker<br/>443 to container port 3210"]
     end
 
@@ -220,7 +232,6 @@ flowchart TB
 
   EDGE -->|"UI hostname - HTTPS"| UI
   EDGE -->|"API hostname - REST, auth and reports"| API
-  EDGE -->|"API hostname - Socket.IO WSS fallback"| API
   EDGE -->|"realtime hostname - Convex subscriptions WSS"| CONVEX
   UI -->|"versioned SPA bundle"| BROWSER
 
@@ -295,7 +306,11 @@ flowchart TB
 
 The browser calls the API and Convex endpoints directly; Static Web Apps serves the compiled SPA and its build-time origin configuration. The public arrows describe browser traffic; VNet integration is an outbound path from App Service and does not by itself make either Web App private. If inbound App Service private endpoints or a centralized edge are later required, validate Convex WebSocket behavior before removing public ingress. Application Insights is target-state observability in this plan, not a claim that it is already provisioned by the repository.
 
-No cross-worker Socket.IO fan-out exists in the current API. Keep the API at one active staging worker while it provides the maintenance fallback. That avoids another paid service but is a deliberate availability ceiling; any later API scale-out needs a separately designed and load-tested coordination mechanism.
+There is no cross-worker realtime fan-out in the current API — Socket.IO, which would have needed
+one, has been removed entirely; the only fallback transport (REST polling) is stateless per-request
+and has no fan-out problem. Keep the API at one active staging worker regardless, since the
+projection outbox's advisory-locked cron still assumes a single serving instance; any later API
+scale-out needs a separately designed and load-tested coordination mechanism.
 
 Only these two execution targets exist:
 
@@ -550,7 +565,6 @@ For a backend image upgrade, take a logical export first and use the upgrade run
 The pipeline runs directly from the `staging` branch without a second cloud stage. It builds each artifact once, serializes all changes with one staging lock, and makes health/rollback decisions from machine-readable gates. The following target flow covers the whole application:
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 flowchart TD
   CHANGE["Merge or push to staging branch"]
   CI["CI quality gates<br/>type-check, lint, tests, Bicep validation,<br/>secret scan and dependency policy"]
@@ -563,7 +577,7 @@ flowchart TD
   FUNCTIONS["Deploy backward-compatible Convex functions online<br/>verify authenticated query and projection write"]
   FALLBACK_READY{"Runtime fallback is implemented<br/>and parity tests pass?"}
   MAINT["Declare a bounded maintenance window<br/>Convex service will be briefly unavailable"]
-  FALLBACK["Switch clients to Socket.IO or REST fallback<br/>wait for Convex sessions to drain<br/>keep one active API worker"]
+  FALLBACK["Switch clients to the REST-polling fallback<br/>wait for Convex sessions to drain<br/>keep one active API worker"]
   OUTBOX_PAUSE["Pause Convex outbox dispatch only<br/>API writes continue and commit projection events<br/>record the ordered release checkpoint"]
   SNAPSHOT["Verify PostgreSQL PITR and Azure Files backup<br/>create protected Convex logical export"]
   STOP["Stop the sole staging Convex Web App<br/>never start a second slot or worker on live state"]
@@ -578,11 +592,11 @@ flowchart TD
   SINGLETON["Verify active staging slot only<br/>ENABLE_CRON_JOBS=true, Postgres lock held<br/>and all scheduled operations are idempotent"]
   UI_PREVIEW["Deploy versioned UI artifact to SWA preview<br/>run browser smoke and configuration checks"]
   UI_RELEASE["Deploy the same artifact to staging SWA<br/>retain the previous artifact for redeploy"]
-  CANARY{"Staging canaries and SLO gates pass?<br/>REST, reports, Socket.IO, Convex WSS,<br/>email stub, Web Push stub and reconciliation"}
+  CANARY{"Staging canaries and SLO gates pass?<br/>REST, reports, Convex WSS,<br/>email stub, Web Push stub and reconciliation"}
   RETURN_CONVEX["Progressively return runtime flags to Convex<br/>watch reconnect rate, errors and latency"]
   COMPLETE["Release complete<br/>retain restore points and defer contract migration"]
 
-  AUTO_ROLLBACK["Automated application rollback<br/>swap API slot back, redeploy prior UI artifact,<br/>keep clients on Socket.IO or REST fallback"]
+  AUTO_ROLLBACK["Automated application rollback<br/>swap API slot back, redeploy prior UI artifact,<br/>keep clients on the REST-polling fallback"]
   FALLBACK_ACTIVE{"Is application fallback active?"}
   BINARY_ACTIVE{"Was a Convex backend<br/>image upgrade started?"}
   CONVEX_RECOVERY{"Did the Convex image upgrade<br/>change persistent state?"}
@@ -624,7 +638,7 @@ This design is **close to zero user-visible downtime**, not a claim of zero Conv
 - UI releases deploy the workflow-built staging artifact and retain the immediately previous artifact. A URL or realtime-backend change is a new UI artifact because the current `VITE_*` settings are compiled into the bundle.
 - Backward-compatible Convex function-only releases can remain online, subject to automated staging health gates.
 - A Convex **backend image** upgrade cannot be made zero-downtime with this topology. The backend is one fixed worker, and no slot or second worker may attach to the live Convex database and file share. Automation minimizes the stop/start window and verifies recovery, while a tested application fallback preserves feature availability.
-- The proposed automatic fallback is not present today. It requires runtime-controlled realtime flags and Socket.IO/REST feature parity. With no cross-worker fan-out, keep exactly one active API worker during fallback; this avoids added infrastructure cost but does not provide API worker HA. Until the fallback passes fault-injection tests, the image-upgrade branch must use the bounded maintenance path.
+- The proposed automatic fallback is not present today. It requires runtime-controlled realtime flags and REST-polling feature parity (Socket.IO is no longer an option — see the update note at the top of this document). With no cross-worker fan-out, keep exactly one active API worker during fallback; this avoids added infrastructure cost but does not provide API worker HA. Until the fallback passes fault-injection tests, the image-upgrade branch must use the bounded maintenance path.
 - Replace best-effort projection pushes with a transactional PostgreSQL outbox before automated image upgrades. Each authoritative mutation writes its ordered, versioned projection event in the same transaction. The deployment pauses only dispatch, not API writes; after Convex restarts it replays pending events idempotently, reaches zero lag, runs full reconciliation, and verifies drift before clients return to Convex.
 - An older container digest is not automatically a safe Convex rollback after persistent migrations. The pipeline may restart it only when compatibility is proven; otherwise it restores a coordinated PostgreSQL/Azure Files/export recovery point into isolated state, verifies it, and then cuts traffic back.
 - Use expand/migrate/contract database changes. Run expand before the release; delay destructive contract work until the new release has completed its stabilization window and can no longer be rolled back.
@@ -689,7 +703,7 @@ Capture p50/p95/p99 latency, error rate, WebSocket disconnects, CPU, memory, res
 
 Rollback triggers include sustained subscription failures, authorization leakage/denials, unexplained drift, database saturation, repeated backend restarts, filesystem/module loss, or a failed reconciliation.
 
-1. Keep clients on the tested Socket.IO/REST fallback while the workflow assesses Convex state.
+1. Keep clients on the tested REST-polling fallback while the workflow assesses Convex state.
 2. Swap the API slot back and redeploy the immediately previous staging UI artifact when the application release caused the failure.
 3. Restart the prior Convex digest only when persistent-state compatibility is proven; otherwise restore coordinated isolated state and verify it before reconnecting clients.
 4. During the initial stabilization period only, the workflow may restore the retained staging Convex Cloud settings/artifact if self-hosted recovery exceeds the staging RTO.
@@ -799,7 +813,7 @@ The first automated staging deployment is allowed only when all items pass:
 | P0       | Return HTTP 503 from `/health/ready` on dependency failure and require it in the slot gate                                                        | `retro-tool-api/src/health.controller.ts`, API deployment smoke tests                                                                   |
 | P0       | Make `ENABLE_CRON_JOBS` gate every static/dynamic job; add PostgreSQL locks and idempotency before creating an API slot                           | `retro-tool-api/src/config/configuration.ts`, `retro-tool-api/src/convex-admin/convex-admin-cron.service.ts`, all future scheduled jobs |
 | P0       | Pass all five realtime flags in UI workflow                                                                                                       | `.github/workflows/deploy-ui.yml`                                                                                                       |
-| P1       | Add runtime-controlled realtime fallback and verify single-worker Socket.IO/REST parity before claiming close-to-zero image upgrades              | `retro-tool-ui/src/env.ts`, UI realtime providers, API gateways/controllers                                                             |
+| P1       | Add runtime-controlled realtime fallback and verify single-worker REST-polling parity before claiming close-to-zero image upgrades                | `retro-tool-ui/src/env.ts`, `retro-tool-ui/src/lib/realtime-config.ts`, API controllers                                                 |
 | P1       | Create least-privilege database/role bootstrap                                                                                                    | replace/extend `retro-tool-api/src/ensure-convex-database.ts` or an infra-owned job                                                     |
 | P1       | Synthetic authenticated WebSocket and drift checks                                                                                                | deployment smoke-test scripts                                                                                                           |
 | P1       | App Service/PostgreSQL/storage dashboards and alerts                                                                                              | Bicep monitoring module                                                                                                                 |
@@ -828,7 +842,7 @@ The first automated staging deployment is allowed only when all items pass:
 3. Add App Service/private-data-plane/Key Vault/Azure Files/monitoring Bicep.
 4. Add immutable image mirroring and protected Convex deployment/backup workflows.
 5. Make `ENABLE_CRON_JOBS` effective, add PostgreSQL job locks/idempotency, then add the orchestrated release workflow, prewarmed API slot, explicit swap, singleton cron guard, machine-readable SLO gates, and automatic application rollback.
-6. Fix UI flag propagation and archive rollback artifacts. Implement runtime flags and validate the single-worker Socket.IO/REST fallback before enabling the automated Convex fallback branch.
+6. Fix UI flag propagation and archive rollback artifacts. Implement runtime flags and validate the single-worker REST-polling fallback before enabling the automated Convex fallback branch.
 7. Deploy the staging target, then complete functional, load, lifecycle, fault-injection, and recovery tests.
 8. Switch staging traffic through the automated workflow and monitor through peak usage.
 9. Complete the stabilization period, two upgrades, and restore drill before removing the old staging Cloud settings.

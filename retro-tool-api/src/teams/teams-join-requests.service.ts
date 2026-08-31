@@ -1,3 +1,4 @@
+import { reportBestEffortFailure } from '../common/best-effort';
 import {
   Injectable,
   Inject,
@@ -127,7 +128,7 @@ export class TeamsJoinRequestsService {
         userId,
         requester?.name ?? 'Someone',
       )
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Team join-request notification'));
 
     return request;
   }
@@ -272,7 +273,7 @@ export class TeamsJoinRequestsService {
 
     void this.notificationsService
       .notifyUserOfJoinApproval(request.userId, teamId, team.name)
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Team join-request notification'));
 
     return {
       request: { ...request, status: TEAM_JOIN_REQUEST_STATUSES.Approved },
@@ -332,7 +333,7 @@ export class TeamsJoinRequestsService {
 
     void this.notificationsService
       .notifyUserOfJoinRejection(request.userId, team?.name ?? 'the team')
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Team join-request notification'));
 
     return updated;
   }

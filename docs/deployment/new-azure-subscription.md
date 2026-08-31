@@ -19,7 +19,8 @@ prior knowledge of the project's history.
 
 PostgreSQL is the **system of record** — all durable state lives there, written
 only by the NestJS API. The React UI (Azure Static Web App) talks to the API
-(Azure App Service container) over REST + Socket.IO, and subscribes to a
+(Azure App Service container) over **REST only** — there are no WebSocket gateways in the
+API, Socket.IO having been removed entirely — and subscribes directly to a
 **self-hosted Convex** backend (a second App Service container) for realtime
 projections. After every business mutation the API pushes a projection intent to
 Convex; Convex never owns business logic. Convex authenticates each subscription
@@ -37,7 +38,7 @@ Core stack — `infra/deploy.bicep` → `infra/main.bicep` (subscription scope, 
 | User-Assigned Managed Identity | `retrotool-<env>-identity` | AcrPull on the ACR |
 | PostgreSQL Flexible Server | `retrotool-<env>-db` | Burstable B1ms, 32 GiB, PG **17**, DB `retro_tool_db`, `AllowAzureServices` firewall rule |
 | API App Service Plan | `retrotool-<env>-plan` | Bicep default is P0v3 (PremiumV3), Linux — safe to scale down to B1 Basic post-provision if you intend to share it with Convex (see below); the live staging/production plans both run B1 Basic today |
-| API App Service (container) | `retrotool-<env>-api` | WebSockets, HTTPS-only, Always On, min TLS 1.2 |
+| API App Service (container) | `retrotool-<env>-api` | WebSockets (vestigial — `webSocketsEnabled: true` in `infra/main.bicep`, but the API has no gateways to use it), HTTPS-only, Always On, min TLS 1.2 |
 | Static Web App (UI) | `retrotool-<env>-ui` | Standard, deployed to **westeurope** |
 
 Self-hosted Convex stack — `infra/convex-staging.bicep` / `infra/convex-production.bicep` + `infra/modules/*` (resource-group scope, deploys **into the existing RG**, reuses the ACR + PostgreSQL server):
@@ -134,7 +135,7 @@ az bicep upgrade
 ## 2. One-time: GitHub OIDC federated identity
 
 So the workflows can deploy without stored credentials. Full guide:
-[infra/README-oidc.md](../../infra/README-oidc.md).
+[docs/infra/oidc.md](../infra/oidc.md).
 
 1. Create (or reuse) an **App Registration** in Entra ID (the OIDC guide defaults
    to display name `retro-tool`).
@@ -221,7 +222,7 @@ az role assignment create \
 > ```
 >
 > Full writeup and common role-definition GUIDs:
-> [infra/README-oidc.md](../../infra/README-oidc.md#known-cli-bug-missingsubscription-on-az-role-assignment).
+> [docs/infra/oidc.md](../infra/oidc.md#known-cli-bug-missingsubscription-on-az-role-assignment).
 
 **Capture the outputs** — you'll need them repeatedly:
 
@@ -519,7 +520,9 @@ a Variable of the same name via `secrets.X || vars.X`).
 > `deploy-ui.yml` requires **all five** `VITE_*_REALTIME_BACKEND` flags to be set
 > and validates each is `socket-io|convex`; if any is `convex`, `VITE_CONVEX_URL`
 > is mandatory. `VITE_*` values are **baked into the bundle at build time** — a
-> change only takes effect on a UI rebuild.
+> change only takes effect on a UI rebuild. **`socket-io` is accepted by the
+> workflow's validation but has no live code path** — Socket.IO gateways were
+> removed from the API — so set every flag to `convex` in practice.
 >
 > Do **not** add `PORT`, `NODE_ENV`, `ENABLE_CRON_JOBS`, `WEEKLY_DIGEST_SEND_HOUR`,
 > `BETTER_AUTH_SESSION_EXPIRES_IN`, `ALLOWED_ORIGINS`, `BETTER_AUTH_URL`,
@@ -683,8 +686,8 @@ a failed reconciliation**. See the runbook's
 
 - Design & rationale: [convex-azure-self-hosting-plan.md](./convex-azure-self-hosting-plan.md)
 - Convex phase-by-phase bootstrap + rollback: [convex-staging-runbook.md](./convex-staging-runbook.md)
-- Core infra commands + GitHub env config: [../infra/README.md](../../infra/README.md)
-- OIDC federated identity: [../infra/README-oidc.md](../../infra/README-oidc.md)
+- Core infra commands + GitHub env config: [provisioning.md](../infra/provisioning.md)
+- OIDC federated identity: [oidc.md](../infra/oidc.md)
 - Convex ↔ NestJS JWT auth deep dive: [convex-nestjs-auth.md](../security/convex-nestjs-auth.md)
 - Convex architecture (topology, secrets, sync layer): [convex.md](../architecture/convex.md)
 ```

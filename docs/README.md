@@ -8,6 +8,7 @@ one-line summary. When a doc and the code disagree, trust the code — and pleas
 
 | Doc | What it covers |
 |---|---|
+| [ai-agent-guidelines.md](guidelines/ai-agent-guidelines.md) | Vendor-neutral workflow and safety checklist for AI-assisted changes |
 | [coding-guidelines.md](guidelines/coding-guidelines.md) | The numbered rulebook: folders, naming, TypeScript, readability, React, NestJS, checks, scripts, versioning |
 | [file-naming-conventions.md](guidelines/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
 
@@ -30,7 +31,7 @@ one-line summary. When a doc and the code disagree, trust the code — and pleas
 | [database.md](security/database.md) | DB security: TLS/SSL to Azure Postgres, credential injection, SQL-injection posture, no-RLS reality, residual risk |
 | [authentication.md](security/authentication.md) | Every sign-in method (password, email-OTP, passkey, Microsoft OAuth), the credential model, and the file-level flow map |
 | [convex-nestjs-auth.md](security/convex-nestjs-auth.md) | The Convex↔NestJS trust relationship: RS256 JWT issue/verify, JWKS, config that must line up |
-| [rbac.md](security/rbac.md) | Full permission matrices (system / org / team / retro), helper signatures, user-status lifecycle |
+| [authorization-rbac.md](security/authorization-rbac.md) | Full permission matrices (system / org / team / retro), helper signatures, user-status lifecycle |
 
 ## database/ — tables, keys, schemas, relationships
 
@@ -38,14 +39,21 @@ one-line summary. When a doc and the code disagree, trust the code — and pleas
 |---|---|
 | [schema.md](database/schema.md) | Every table by domain (columns, keys, FKs, indexes), all enums, and the core entity-relationship diagram |
 
+## infra/ — Azure Bicep IaC (raw templates & commands)
+
+| Doc | What it covers |
+|---|---|
+| [provisioning.md](infra/provisioning.md) | Command reference for the [`infra/`](../infra/) Bicep templates: login/deploy/what-if/destroy, GitHub environment secrets & variables, post-provisioning checklist, resources created, self-hosted Convex (staging + production) |
+| [oidc.md](infra/oidc.md) | GitHub Actions OIDC federated-credential setup (`setup-oidc-credentials.ps1`), troubleshooting |
+
 ## deployment/ — Azure & Convex self-hosting
 
 | Doc | What it covers |
 |---|---|
-| [azure-provisioning.md](deployment/azure-provisioning.md) | Bicep provisioning walkthrough, environment→branch mapping, outputs, post-provisioning steps |
-| [azure-resources.md](deployment/azure-resources.md) | Azure resource inventory and architecture |
+| [azure-resources.md](deployment/azure-resources.md) | Azure resource inventory and architecture snapshot (legacy pre-Bicep production names); cross-links to [infra/provisioning.md](infra/provisioning.md) for the Bicep commands |
 | [convex-self-hosting.md](deployment/convex-self-hosting.md) | Running Convex in Docker (local + production): env vars, admin key, ports, troubleshooting |
 | [convex-staging-runbook.md](deployment/convex-staging-runbook.md) | Phase-by-phase staging Convex self-hosting deploy + rollback runbook |
+| [convex-production-runbook.md](deployment/convex-production-runbook.md) | Phase-by-phase production Convex self-hosting deploy + rollback runbook |
 | [convex-azure-self-hosting-plan.md](deployment/convex-azure-self-hosting-plan.md) | Architecture & decision plan for self-hosting Convex on Azure App Service |
 | [new-azure-subscription.md](deployment/new-azure-subscription.md) | End-to-end deploy of Retro Tool to a brand-new Azure subscription |
 | [release-and-branch-strategy.md](deployment/release-and-branch-strategy.md) | Branch model, release-please lockstep versioning, conventional commits, and deployment triggers (including the staging-only gap for production) |

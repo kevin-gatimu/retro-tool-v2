@@ -30,8 +30,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v6
-        with:
-          version: 11.13.0
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -66,8 +64,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v6
-        with:
-          version: 11.13.0
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}

@@ -92,7 +92,7 @@ az role assignment create --assignee-object-id "$SP_ID" --assignee-principal-typ
 >
 > Repeat with role GUID `f58310d9-a9f6-439a-9e8d-f62e7b41a168` (Role Based
 > Access Control Administrator). See
-> [infra/README-oidc.md](../../infra/README-oidc.md#known-cli-bug-missingsubscription-on-az-role-assignment)
+> [docs/infra/oidc.md](../infra/oidc.md#known-cli-bug-missingsubscription-on-az-role-assignment)
 > for the same note in the OIDC setup guide.
 
 ### A2. Mirror the pinned backend image into the production ACR

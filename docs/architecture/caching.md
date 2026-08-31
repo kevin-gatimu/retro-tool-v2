@@ -17,12 +17,14 @@ API Server
 └── NestJS service → Drizzle → PostgreSQL (direct read, no intermediate cache)
 ```
 
-**There is no Redis cache layer.** The Socket.IO adapter in
-`retro-tool-api/src/adapters/socket-io.adapter.ts` logs `"Redis adapter disabled"` at startup —
-no `@socket.io/redis-adapter` is wired in. The throttler (`ThrottlerModule.forRoot`) uses
-in-memory storage; there is no shared throttler state across instances. No Redis container is
-defined in `docker/docker-compose.local.yml` and no Redis resource is provisioned in the Azure
-Bicep infra.
+**There is no Redis cache layer.** Socket.IO (and the Redis adapter that would have fanned its
+events out across instances) has been removed from the codebase entirely — no gateway files, no
+`socket.io`/`socket.io-client` dependency. Convex is the sole realtime transport (see
+[overview.md §3.2](./overview.md#32-realtime-convex-only)) and the self-hosted Convex deployment
+handles its own WebSocket fan-out (no environment uses Convex Cloud). The throttler
+(`ThrottlerModule.forRoot`) uses in-memory storage; there is
+no shared throttler state across instances. No Redis container is defined in
+`docker/docker-compose.local.yml` and no Redis resource is provisioned in the Azure Bicep infra.
 
 ---
 
@@ -90,42 +92,25 @@ See [`docs/architecture/convex.md`](./convex.md) for the full projection topolog
 
 ---
 
-## WebSocket real-time cache invalidation
+## Convex-driven cache hydration
 
-Three Socket.IO namespaces (used when `VITE_*_REALTIME_BACKEND=socket-io`) trigger
-`queryClient.invalidateQueries()` on incoming events.
+There are no Socket.IO namespaces or event handlers anymore. Instead, per-domain `*ConvexSync`
+components (e.g. [`retro-convex-sync.tsx`](../../retro-tool-ui/src/routes/retros/components/retro-convex-sync.tsx),
+[`estimate-convex-sync.tsx`](../../retro-tool-ui/src/routes/estimate/components/estimate-convex-sync.tsx),
+[`notification-convex-sync.tsx`](../../retro-tool-ui/src/components/notification-convex-sync.tsx))
+subscribe to a Convex projection query and call `queryClient.setQueryData()` directly with the
+parsed snapshot whenever Convex pushes an update — writing the cache in place rather than
+invalidating and triggering a REST refetch. One exception:
+`notification-convex-sync.tsx` also calls `queryClient.invalidateQueries({ queryKey: ['teams'] })`
+when a `team_join_approved` notification arrives, since membership isn't part of the notification
+snapshot itself.
 
-### `/notifications`
+### Convex + polling redundancy
 
-| Event                  | Action                     | Query invalidated                    |
-| ---------------------- | -------------------------- | ------------------------------------ |
-| `notification`       | New notification received  | `['notifications']`                |
-| `team_join_approved` | Team join request approved | `['notifications']`, `['teams']` |
-
-### `/retros`
-
-| Event                       | Action                      | Query invalidated      |
-| --------------------------- | --------------------------- | ---------------------- |
-| `retro-changed`           | Card / vote / comment added | `['retro', retroId]` |
-| `retro-status-changed`    | Retro phase changed         | `['retro', retroId]` |
-| `discussion-card-changed` | Discussion focus changed    | `['retro', retroId]` |
-
-### `/estimates`
-
-| Event                       | Action             | Query invalidated                                             |
-| --------------------------- | ------------------ | ------------------------------------------------------------- |
-| `vote-cast`               | Participant voted  | `['estimate', sessionId]`                                   |
-| `votes-revealed`          | Votes revealed     | `['estimate', sessionId]`                                   |
-| `votes-cleared`           | Votes cleared      | `['estimate', sessionId]`                                   |
-| `participant-joined/left` | Participant change | `['estimate', sessionId]`                                   |
-| `session-ended`           | Session completed  | `['estimate', sessionId]`, `['active-estimate-sessions']` |
-
-### WebSocket + polling redundancy
-
-For retro boards and estimate sessions, both WebSocket events and polling run simultaneously.
-WebSocket provides near-instant updates; polling is the safety net if a WebSocket event is missed
-(connection drop, reconnection delay). No Redis is involved — invalidation flows directly through
-TanStack Query.
+For retro boards and estimate sessions, both the Convex subscription and REST polling run
+simultaneously. Convex provides near-instant updates via `setQueryData`; polling is the safety net
+if a snapshot is missed or Convex is unreachable (see [Known gaps](#known-gaps)). No Redis is
+involved — hydration flows directly through TanStack Query.
 
 ---
 
@@ -151,4 +136,4 @@ When a mutation succeeds, the frontend invalidates related queries to keep the U
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **No server-side cache**      | Every API request hits PostgreSQL directly. High-frequency polling (retro board at 3 s × N participants) generates proportional DB load. Convex realtime is the architectural answer when`convex` backends are configured. |
 | **In-memory throttler**       | `ThrottlerModule.forRoot` stores counters in-process — per-IP limits are per-instance and loosen under horizontal scale.                                                                                                   |
-| **Single-instance Socket.IO** | The Redis adapter is disabled; broadcast events only reach clients connected to the same API instance. Convex-backed features mask this in staging/production.                                                                |
+| **REST-only fallback if Convex is unreachable** | Socket.IO (and its cross-instance broadcast question) no longer exists, so there's no other realtime transport to fall back to — if a feature's Convex subscription can't connect, that feature drops to plain REST polling (or, for the always-on estimates backstop, stays on its 15 s poll) until Convex recovers. |
