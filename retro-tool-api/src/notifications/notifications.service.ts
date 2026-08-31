@@ -1,3 +1,4 @@
+import { reportBestEffortFailure } from '../common/best-effort';
 import {
   Injectable,
   Inject,
@@ -75,7 +76,7 @@ export class NotificationsService {
 
     void this.notificationsProjectionSyncService
       .enqueueReadState(userId, notificationId, true)
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Notification projection sync'));
 
     return { success: true };
   }
@@ -88,7 +89,7 @@ export class NotificationsService {
 
     void this.notificationsProjectionSyncService
       .enqueueAllRead(userId)
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Notification projection sync'));
 
     return { success: true };
   }
@@ -104,7 +105,7 @@ export class NotificationsService {
 
     void this.notificationsProjectionSyncService
       .enqueueNotificationSync(created.id)
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Notification projection sync'));
 
     // Also send a browser push notification (fire-and-forget, non-blocking)
     void this.pushService

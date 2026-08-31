@@ -1,3 +1,4 @@
+import { reportBestEffortFailure } from '../common/best-effort';
 import {
   Injectable,
   Inject,
@@ -745,7 +746,7 @@ export class RetrosService {
         retro.teamId,
         autoStartsAt,
       )
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Retro notification'));
 
     return { success: true, autoStartsAt };
   }
@@ -816,7 +817,7 @@ export class RetrosService {
     // Notify team members in real-time
     void this.notificationsService
       .notifyTeamOfRetroStarted(retroId, retro.name, retro.teamId)
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Retro notification'));
 
     return { success: true };
   }

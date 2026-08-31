@@ -12,6 +12,7 @@ Before editing files for a substantial task:
 # AGENTS.md — Retro Tool
 
 Orientation guide for AI agents working in this codebase. Read this before making any changes.
+The canonical execution workflow is [docs/guidelines/ai-agent-guidelines.md](docs/guidelines/ai-agent-guidelines.md).
 
 ---
 
@@ -50,7 +51,7 @@ pnpm --filter retro-tool-ui  lint
 retro-tool/
 ├── convex-backend/        # Convex realtime projection layer (TypeScript)
 ├── packages/shared/contracts/  # Shared type contracts (UI ↔ Convex)
-├── retro-tool-api/        # NestJS 11 REST + Socket.IO backend
+├── retro-tool-api/        # NestJS 11 REST backend
 ├── retro-tool-ui/         # React 19 + TanStack Router frontend
 ├── docker/                # docker-compose for local stack
 └── docs/                  # Project-wide documentation (see References below)
@@ -64,8 +65,7 @@ retro-tool/
 
 ```
 Browser  ──REST/HTTP──►  NestJS API  ──writes──►  PostgreSQL
-Browser  ──Socket.IO──►  NestJS API  ──emits──►   Socket.IO rooms
-NestJS   ──HTTP POST──►  Convex      ──pushes──►  all subscribed browsers (WebSocket)
+NestJS   ──HTTP POST──►  Convex      ──pushes──►  subscribed browsers (WebSocket)
 ```
 
 Convex is a **read-only projection layer** from the perspective of the application. The NestJS `*-projection-sync.service.ts` files are the only thing that should write to Convex.
@@ -80,7 +80,7 @@ Convex is a **read-only projection layer** from the perspective of the applicati
 - **Swagger:** `http://localhost:8000/api/docs`
 - **Database:** PostgreSQL 16 via Drizzle ORM (`drizzle/` migrations)
 - **Auth:** Better Auth + `@thallesp/nestjs-better-auth` (cookie sessions + OAuth)
-- **Realtime server:** Socket.IO (rooms: `user:{id}`, `session:{id}`)
+- **Realtime projection:** Self-hosted Convex; the API pushes snapshots after mutations
 
 Key NestJS modules:
 
@@ -90,7 +90,7 @@ Key NestJS modules:
 | `organizations` | Org CRUD, member management |
 | `teams` | Team CRUD, join requests, membership |
 | `retros` | Retro lifecycle, phases, cards, votes, merging |
-| `estimates` | Poker estimation sessions, rounds, votes |
+| `estimates` | Story estimate sessions, rounds, votes |
 | `notifications` | In-app notifications, push (VAPID) |
 | `email` | Transactional email via Resend |
 | `reports` | Analytics endpoint (aggregate stats) |
@@ -135,8 +135,8 @@ Route layout (mirrors the sidebar):
 **Realtime feature flags** (set in `.env`):
 
 ```env
-VITE_RETROS_REALTIME_BACKEND=convex       # or: socket-io
-VITE_ESTIMATES_REALTIME_BACKEND=convex    # or: socket-io
+VITE_RETROS_REALTIME_BACKEND=convex
+VITE_ESTIMATES_REALTIME_BACKEND=convex
 VITE_NOTIFICATIONS_REALTIME_BACKEND=convex
 ```
 
@@ -175,7 +175,7 @@ Convex modules:
 draft → waiting → active → grouping → voting → discussing → completed
 ```
 
-Phase transitions are driven by separate API endpoints, each emitting Socket.IO events (`retro-status-changed`) to all participants. Only the retro creator or a team-lead/admin can advance phases.
+Phase transitions are driven by separate API endpoints, followed by projection updates for participants. Only the retro creator or a team-lead/admin can advance phases.
 
 ---
 
@@ -236,7 +236,7 @@ Detailed step-by-step flows for every major feature are in [docs/workflows/app-f
 |---|---|
 | `VITE_API_URL` | NestJS API base URL |
 | `VITE_CONVEX_URL` | Convex backend URL |
-| `VITE_*_REALTIME_BACKEND` | `convex` or `socket-io` per feature |
+| `VITE_*_REALTIME_BACKEND` | Use `convex`; the legacy `socket-io` value disables Convex but has no API Socket.IO server |
 
 ### `convex-backend/.env`
 

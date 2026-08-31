@@ -86,8 +86,8 @@ login and password. It is **never committed**; each environment sources it diffe
 
 | Context | Where `DATABASE_URL` comes from |
 | --- | --- |
-| Local | `retro-tool-api/.env.local` (git-ignored; copied from `.env.example`) |
-| Staging-local / prod-local | `.env.staging-local` / `.env.production-local`, preloaded by `dotenv-cli` in the `:staging`/`:prod` scripts |
+| Local | `retro-tool-api/.env` (git-ignored; copied from `.env.example`) |
+| Staging-local / prod-local | `.env.staging.local` / `.env.production.local`, preloaded by `dotenv-cli` in the `:staging`/`:prod` scripts |
 | Deployed API (staging/prod) | Azure **App Service application setting**, fed from the GitHub Actions `DATABASE_URL` secret at deploy time |
 
 The full env-file strategy (which file loads when, and why mixing staging/prod is dangerous) is in

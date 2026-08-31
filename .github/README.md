@@ -25,8 +25,9 @@ feature/* ──PR──▶ staging ──────────────�
 | [Deploy UI](#deploy-ui)              | `workflows/deploy-ui.yml`           | `workflow_call`; manual                              | Azure Static Web App            |
 | [Release Please](#release-please)    | `workflows/release-please.yml`      | Push to `main`                                       | GitHub Release + version tags   |
 
-All jobs run on **Node 24** with **pnpm 11.13.0**. Deploy jobs authenticate to
-Azure with **OIDC federated credentials** — no stored passwords.
+All jobs run on **Node 24** and use the pnpm version declared by the root
+`package.json` `packageManager` field. Deploy jobs authenticate to Azure with
+**OIDC federated credentials** — no stored passwords.
 
 ---
 

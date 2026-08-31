@@ -204,7 +204,9 @@ function RetroDetailPage() {
   useEffect(() => {
     if (joinedRef.current) return
     joinedRef.current = true
-    api.post(RETROS_ENDPOINTS.JOIN(retroId)).catch(() => {})
+    api.post(RETROS_ENDPOINTS.JOIN(retroId)).catch((error: unknown) => {
+      console.warn('Failed to join the retrospective session', error)
+    })
   }, [retroId])
 
   const {

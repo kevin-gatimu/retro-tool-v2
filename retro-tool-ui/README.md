@@ -417,10 +417,10 @@ See [docs/security/authorization-rbac.md](../docs/security/authorization-rbac.md
 Copy the example env file:
 
 ```powershell
-Copy-Item .env.example .env.local
+Copy-Item .env.example .env
 ```
 
-Key variables in `.env.local`:
+Key variables in `.env`:
 
 ```env
 VITE_APP_TITLE=Retro Tool
@@ -446,12 +446,13 @@ Additional env files exist for local development against Azure resources:
 
 | File                    | Purpose                                                      |
 | ----------------------- | ------------------------------------------------------------ |
-| `.env.staging-local`    | Points at staging Convex + local API (which hits staging DB) |
-| `.env.production-local` | Points at production Convex + local API (which hits prod DB) |
+| `.env`                  | Local Docker-backed development                              |
+| `.env.staging.local`    | Points at staging Convex + local API (which hits staging DB) |
+| `.env.production.local` | Points at production Convex + local API (which hits prod DB) |
 
 ```powershell
-pnpm dev:staging   # Loads .env.staging-local     (vite --mode staging-local)
-pnpm dev:prod      # Loads .env.production-local   (vite --mode production-local)
+pnpm dev:staging   # Loads .env plus .env.staging.local (vite --mode staging)
+pnpm dev:prod      # Loads .env plus .env.production.local (vite --mode production)
 ```
 
 ---
@@ -476,8 +477,8 @@ Package-level scripts (run from `retro-tool-ui/`):
 
 ```bash
 pnpm dev                # dev server on :3000
-pnpm dev:staging        # against staging resources (--mode staging-local)
-pnpm dev:prod           # against production resources (--mode production-local)
+pnpm dev:staging        # against staging resources (--mode staging)
+pnpm dev:prod           # against production resources (--mode production)
 pnpm build              # production build
 pnpm preview            # preview the production build
 pnpm lint               # ESLint

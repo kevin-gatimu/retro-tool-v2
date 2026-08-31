@@ -35,11 +35,8 @@ import { join } from 'path';
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
-      // Resolve .env relative to the package root for both src and dist runtime.
-      envFilePath: [
-        join(__dirname, '../.env.local'),
-        join(__dirname, '../.env'),
-      ],
+      // Remote modes preload .env.<mode>.local; local development reads .env.
+      envFilePath: join(__dirname, '../.env'),
     }),
     ScheduleModule.forRoot(),
     // Global per-IP rate limiting (~100 requests / minute). Better Auth applies

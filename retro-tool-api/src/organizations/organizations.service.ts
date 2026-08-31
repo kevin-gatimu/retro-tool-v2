@@ -1,3 +1,4 @@
+import { reportBestEffortFailure } from '../common/best-effort';
 import {
   Injectable,
   ForbiddenException,
@@ -653,7 +654,7 @@ export class OrganizationsService {
 
     void this.notificationsService
       .notifyUserOfOrgInvite(data.userId, orgId, org.name)
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Organization notification'));
 
     return member;
   }
