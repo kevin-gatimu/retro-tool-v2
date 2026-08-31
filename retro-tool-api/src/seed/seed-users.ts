@@ -10,8 +10,7 @@
  */
 import { config as loadDotenv } from 'dotenv';
 import { join } from 'path';
-loadDotenv({ path: join(__dirname, '../../.env'), override: true });
-loadDotenv({ path: join(__dirname, '../../.env.local'), override: true });
+loadDotenv({ path: join(__dirname, '../../.env'), override: false });
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';

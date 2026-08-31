@@ -42,6 +42,12 @@ export type ConvexCronConfigResponse = {
   updatedByUserId: string | null;
 };
 
+export type ConvexMutationResponse = {
+  status?: unknown;
+  errorMessage?: unknown;
+  value?: unknown;
+};
+
 // ── Projection outbox ────────────────────────────────────────────────────────
 
 /**

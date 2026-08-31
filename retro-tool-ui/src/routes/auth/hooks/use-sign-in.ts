@@ -6,8 +6,8 @@ import {
   clearBearerToken,
   getBearerToken,
   storeBearerToken,
-  detectPrivateWindow,
 } from '@/lib/auth-client'
+import { isBrowserStorageAvailable } from '@/lib/browser-storage'
 import { api } from '@/lib/api'
 import { USERS_ENDPOINTS, OTP_ENDPOINTS } from '@/lib/api-endpoints'
 import { env } from '#/env'
@@ -35,19 +35,18 @@ async function resolveSignInOutcome(): Promise<SignInOutcome> {
   // Wait a tick for the session to settle (cookie set / token captured).
   await new Promise((resolve) => setTimeout(resolve, 100))
 
-  // Informational only: in a private window cookies are blocked, so warn that
-  // the session won't persist after the window closes. The app still works
-  // fully on the bearer token, which we keep either way.
+  // Storage failures can be caused by browser policy, quotas, or privacy mode;
+  // report the observable limitation without guessing which mode is active.
   const cookiesWorking = testCookiesWorking()
   const hasBearerToken = !!getBearerToken()
   if (!cookiesWorking && hasBearerToken) {
-    const isPrivateWindow = await detectPrivateWindow()
-    if (isPrivateWindow) {
-      toast.info(
-        'Private browsing detected. Session will not persist after closing this window.',
-        { duration: 5000 },
-      )
-    }
+    const sessionStorageAvailable = isBrowserStorageAvailable('sessionStorage')
+    toast.info(
+      sessionStorageAvailable
+        ? 'Cookies are unavailable. This session may not persist after closing the window.'
+        : 'Browser session storage is unavailable. Sign-in persistence may be limited.',
+      { duration: 5000 },
+    )
   }
 
   const user = await api.get<User>(USERS_ENDPOINTS.ME)

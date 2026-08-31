@@ -1,10 +1,8 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection';
-import type { Config } from '../config/configuration';
-import type { ConvexFunctionResponse } from '../common/types';
+import { ConvexMutationClientService } from '../convex-admin/convex-mutation-client.service';
 import { ProjectionOutboxService } from '../convex-admin/projection-outbox.service';
 import * as notificationSchema from './schema';
 import type { Notification } from './schema';
@@ -20,33 +18,10 @@ const PROJECTION = 'notifications';
 // user's older-but-still-shown notifications after each reconcile.
 const RECONCILE_NOTIFICATION_LIMIT = 50;
 
-function isConvexFunctionResponse(
-  value: unknown,
-): value is ConvexFunctionResponse {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-
-  const candidate = value as {
-    status?: unknown;
-    errorMessage?: unknown;
-  };
-
-  const hasValidStatus =
-    candidate.status === 'success' || candidate.status === 'error';
-  const hasValidErrorMessage =
-    candidate.errorMessage === undefined ||
-    typeof candidate.errorMessage === 'string';
-
-  return hasValidStatus && hasValidErrorMessage;
-}
-
 @Injectable()
 export class NotificationsProjectionSyncService implements OnModuleInit {
-  private readonly logger = new Logger(NotificationsProjectionSyncService.name);
-
   constructor(
-    private readonly configService: ConfigService<Config, true>,
+    private readonly convexClient: ConvexMutationClientService,
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
     private readonly outbox: ProjectionOutboxService,
   ) {}
@@ -148,17 +123,20 @@ export class NotificationsProjectionSyncService implements OnModuleInit {
   }
 
   async syncNotificationProjection(notification: Notification): Promise<void> {
-    await this.runMutation('liveNotifications:upsertNotificationProjection', {
-      notificationId: notification.id,
-      userId: notification.userId,
-      type: notification.type,
-      title: notification.title,
-      message: notification.message,
-      link: notification.link ?? undefined,
-      read: notification.read,
-      createdAt: notification.createdAt.getTime(),
-      updatedAt: notification.createdAt.getTime(),
-    });
+    await this.convexClient.runMutation(
+      'liveNotifications:upsertNotificationProjection',
+      {
+        notificationId: notification.id,
+        userId: notification.userId,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        link: notification.link ?? undefined,
+        read: notification.read,
+        createdAt: notification.createdAt.getTime(),
+        updatedAt: notification.createdAt.getTime(),
+      },
+    );
   }
 
   async syncNotificationReadState(
@@ -166,16 +144,19 @@ export class NotificationsProjectionSyncService implements OnModuleInit {
     notificationId: string,
     read: boolean,
   ): Promise<void> {
-    await this.runMutation('liveNotifications:markNotificationReadProjection', {
-      notificationId,
-      userId,
-      read,
-      updatedAt: Date.now(),
-    });
+    await this.convexClient.runMutation(
+      'liveNotifications:markNotificationReadProjection',
+      {
+        notificationId,
+        userId,
+        read,
+        updatedAt: Date.now(),
+      },
+    );
   }
 
   async syncAllNotificationsRead(userId: string): Promise<void> {
-    await this.runMutation(
+    await this.convexClient.runMutation(
       'liveNotifications:markAllNotificationsReadProjection',
       {
         userId,
@@ -198,8 +179,7 @@ export class NotificationsProjectionSyncService implements OnModuleInit {
    * Returns the number of notifications scanned. No-ops when Convex is unset.
    */
   async syncAllNotifications(): Promise<{ scanned: number }> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
+    if (!this.convexClient.isConfigured()) {
       return { scanned: 0 };
     }
 
@@ -223,7 +203,7 @@ export class NotificationsProjectionSyncService implements OnModuleInit {
         .limit(RECONCILE_NOTIFICATION_LIMIT);
 
       for (const row of rows) {
-        await this.runMutation(
+        await this.convexClient.runMutation(
           'liveNotifications:upsertNotificationProjection',
           {
             notificationId: row.id,
@@ -242,52 +222,5 @@ export class NotificationsProjectionSyncService implements OnModuleInit {
     }
 
     return { scanned };
-  }
-
-  /**
-   * POST a projection mutation to Convex. Throws on any transport or
-   * Convex-side error so the outbox dispatcher can retry; no-ops silently only
-   * when Convex is unconfigured. Reconciliation catches per-entity.
-   */
-  private async runMutation(path: string, args: object): Promise<void> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
-      return;
-    }
-
-    const response = await fetch(
-      `${convexConfig.url.replace(/\/$/, '')}/api/mutation`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Convex ${convexConfig.adminKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          path,
-          args,
-          format: 'json',
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Convex notification projection mutation ${path} failed with status ${response.status}`,
-      );
-    }
-
-    const parsed: unknown = await response.json();
-    if (!isConvexFunctionResponse(parsed)) {
-      throw new Error(
-        `Convex notification projection mutation ${path} returned an unexpected response payload`,
-      );
-    }
-
-    if (parsed.status === 'error') {
-      throw new Error(
-        `Convex notification projection mutation ${path} returned an error: ${parsed.errorMessage ?? 'unknown error'}`,
-      );
-    }
   }
 }

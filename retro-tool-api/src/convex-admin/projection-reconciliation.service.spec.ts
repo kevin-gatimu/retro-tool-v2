@@ -1,7 +1,6 @@
-import type { ConfigService } from '@nestjs/config';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { Config } from '../config/configuration';
 import { ProjectionReconciliationService } from './projection-reconciliation.service';
+import type { ConvexMutationClientService } from './convex-mutation-client.service';
 import type { TeamsMembersProjectionSyncService } from '../teams/teams-members-projection-sync.service';
 import type { RetrosProjectionSyncService } from '../retros/retros-projection-sync.service';
 import type { EstimatesProjectionSyncService } from '../estimates/estimates-projection-sync.service';
@@ -16,6 +15,7 @@ describe('ProjectionReconciliationService', () => {
   const build = (over?: {
     convexConfigured?: boolean;
     retrosThrows?: boolean;
+    pruneThrows?: boolean;
   }) => {
     const order: string[] = [];
     const scanned = (name: string) =>
@@ -54,15 +54,13 @@ describe('ProjectionReconciliationService', () => {
       syncAllNotifications: scanned('notifications'),
     } as unknown as NotificationsProjectionSyncService;
 
-    const configService = {
-      get: jest
-        .fn()
-        .mockReturnValue(
-          over?.convexConfigured === false
-            ? { url: undefined, adminKey: undefined }
-            : { url: 'https://convex.example', adminKey: 'k' },
-        ),
-    } as unknown as ConfigService<Config, true>;
+    const runMutationForResult = over?.pruneThrows
+      ? jest.fn().mockRejectedValue(new Error('prune failed'))
+      : jest.fn().mockResolvedValue({ deleted: 0, done: true });
+    const convexClient = {
+      isConfigured: jest.fn().mockReturnValue(over?.convexConfigured !== false),
+      runMutationForResult,
+    } as unknown as ConvexMutationClientService;
 
     const database = {} as unknown as NodePgDatabase;
 
@@ -77,7 +75,7 @@ describe('ProjectionReconciliationService', () => {
 
     const service = new ProjectionReconciliationService(
       database,
-      configService,
+      convexClient,
       teamsMembers,
       retros,
       estimates,
@@ -89,7 +87,13 @@ describe('ProjectionReconciliationService', () => {
       outbox,
     );
 
-    return { service, order, setPaused, replayAll };
+    return {
+      service,
+      order,
+      setPaused,
+      replayAll,
+      runMutationForResult,
+    };
   };
 
   afterEach(() => jest.restoreAllMocks());
@@ -105,17 +109,6 @@ describe('ProjectionReconciliationService', () => {
   });
 
   it('reconciles membership/security first, then all projections, and prunes each', async () => {
-    // Every Convex prune call succeeds and reports done immediately.
-    jest.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          status: 'success',
-          value: { deleted: 0, done: true },
-        }),
-        { status: 200 },
-      ),
-    );
-
     const { service, order } = build();
     const report = await service.reconcileAll();
 
@@ -133,23 +126,40 @@ describe('ProjectionReconciliationService', () => {
     ]);
   });
 
-  it('marks the run not-ok when a projection rebuild throws', async () => {
-    jest.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          status: 'success',
-          value: { deleted: 0, done: true },
-        }),
-        { status: 200 },
-      ),
-    );
-
-    const { service } = build({ retrosThrows: true });
+  it('marks the run not-ok and skips pruning when a rebuild throws', async () => {
+    const { service, runMutationForResult } = build({ retrosThrows: true });
     const report = await service.reconcileAll();
 
     expect(report.ok).toBe(false);
     const retrosReport = report.reports.find((r) => r.projection === 'retros');
     expect(retrosReport?.failed).toBe(1);
     expect(retrosReport?.error).toContain('boom');
+    expect(runMutationForResult).not.toHaveBeenCalledWith(
+      'admin:pruneStaleByUpdatedAt',
+      expect.objectContaining({ tableName: 'liveRetroSessions' }),
+    );
+    expect(runMutationForResult).not.toHaveBeenCalledWith(
+      'admin:pruneStaleByUpdatedAt',
+      expect.objectContaining({ tableName: 'liveRetroBoards' }),
+    );
+  });
+
+  it('marks prune failures as reconciliation failures and resumes the outbox', async () => {
+    const { service, setPaused, replayAll } = build({ pruneThrows: true });
+
+    const report = await service.reconcileAll();
+
+    expect(report.ok).toBe(false);
+    const retrosReport = report.reports.find((r) => r.projection === 'retros');
+    expect(retrosReport).toEqual(
+      expect.objectContaining({
+        failed: 1,
+        deletedStale: 0,
+        error: 'prune failed',
+      }),
+    );
+    expect(setPaused).toHaveBeenNthCalledWith(1, true);
+    expect(setPaused).toHaveBeenLastCalledWith(false);
+    expect(replayAll).toHaveBeenCalledTimes(1);
   });
 });

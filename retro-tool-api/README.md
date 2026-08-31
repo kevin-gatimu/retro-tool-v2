@@ -43,10 +43,10 @@ pnpm install
 ### 2. Configure environment
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-Edit `.env.local`:
+Edit `.env`:
 
 ```env
 PORT=8000
@@ -108,12 +108,12 @@ openssl rand -base64 32
 
 | File | Purpose |
 | --- | --- |
-| `.env.local` | Local dev with Docker infra — **not committed** |
-| `.env.staging-local` | Local dev against staging Azure resources |
-| `.env.production-local` | Local dev against production Azure resources |
+| `.env` | Local dev with Docker infra — **not committed** |
+| `.env.staging.local` | Local dev against staging Azure resources |
+| `.env.production.local` | Local dev against production Azure resources |
 | `.env.example` | Template for local development |
 
-The API uses `ConfigModule.forRoot` with `envFilePath: ['.env.local', '.env']`. When running `dev:staging` or `dev:prod`, `dotenv-cli` pre-loads the environment-specific file — `ConfigModule` won't overwrite existing `process.env` vars.
+The API uses `ConfigModule.forRoot` with `envFilePath: '.env'`. When running `dev:staging` or `dev:prod`, `dotenv-cli` preloads the environment-specific file; `ConfigModule` does not overwrite existing `process.env` values.
 
 ### 3. Start the database
 
@@ -174,7 +174,7 @@ Server runs at `http://localhost:8000` by default. Swagger UI at `http://localho
 
 Migrations and seeds run through `scripts/db.mjs`, a single task runner that
 keeps local/staging/prod behavior identical. Local tasks execute the TypeScript
-sources via `ts-node` against `.env.local`; staging/prod build once then run the
+sources via `ts-node` against `.env`; staging/prod build once then run the
 compiled `dist/` output with `dotenv` preloading the environment-specific file.
 
 ```bash

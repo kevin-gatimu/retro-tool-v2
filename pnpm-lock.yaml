@@ -54,6 +54,9 @@ importers:
       '@types/node':
         specifier: ^22.10.7
         version: 22.19.17
+      convex-test:
+        specifier: 0.0.54
+        version: 0.0.54(convex@1.42.3(react@19.2.5))
       dotenv-cli:
         specifier: ^8.0.0
         version: 8.0.0
@@ -66,6 +69,9 @@ importers:
       typescript-eslint:
         specifier: ^8.20.0
         version: 8.58.1(eslint@9.39.4(jiti@2.6.1)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.2)
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@22.19.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1)(supports-color@8.1.1))(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/shared/contracts:
     devDependencies:
@@ -5043,6 +5049,11 @@ packages:
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+
+  convex-test@0.0.54:
+    resolution: {integrity: sha512-C0v2SQcuxrELAJRNzE6fQ686XDPor7UFoC22jcoJXeCRqhLo8ZIMZ4jyUHoo1UdAL2enCb0AbiprCVpLDN8u9Q==}
+    peerDependencies:
+      convex: ^1.32.0
 
   convex@1.35.1:
     resolution: {integrity: sha512-g23KrTjBiXqRHzWIN0PVFagKjrmFxWUaOSiBsAWPTpXX2rXl0L1F4PR0YpAcMJEzMgfZR9AGymJvLTM+KA6lsQ==}
@@ -12867,6 +12878,10 @@ snapshots:
       meow: 13.2.0
 
   convert-source-map@2.0.0: {}
+
+  convex-test@0.0.54(convex@1.42.3(react@19.2.5)):
+    dependencies:
+      convex: 1.42.3(react@19.2.5)
 
   convex@1.35.1(react@19.2.5):
     dependencies:

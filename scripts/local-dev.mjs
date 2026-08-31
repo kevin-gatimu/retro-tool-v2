@@ -4,10 +4,9 @@
  *
  * Brings up PostgreSQL + the self-hosted Convex backend (+ dashboard) in Docker,
  * derives the Convex admin key from the running container, writes it into the
- * API and Convex `.env.local` files, runs DB migrations + seeds, and deploys the
- * Convex functions. After this, `pnpm local:dev` runs the API, UI, and Convex
- * watcher natively against the Docker infra — every process reading its own
- * `.env.local`.
+ * API `.env` and Convex `.env.local` files, runs DB migrations + seeds, and
+ * deploys the Convex functions. After this, `pnpm local:dev` runs the API, UI,
+ * and Convex watcher natively against the Docker infra.
  *
  * Idempotent: safe to re-run. Usage:
  *   node scripts/local-dev.mjs            # full bootstrap
@@ -56,12 +55,12 @@ function ensureDockerRunning() {
 }
 
 function ensureEnvFiles() {
-  // docker/.env drives the compose stack; the per-app .env.local files drive the
-  // native dev servers. Seed any missing file from its committed example.
+  // docker/.env drives the compose stack; each app env file drives its native
+  // dev server. Seed any missing file from its committed example.
   const pairs = [
     ['docker/.env', 'docker/.env.example'],
-    ['retro-tool-api/.env.local', 'retro-tool-api/.env.example'],
-    ['retro-tool-ui/.env.local', 'retro-tool-ui/.env.example'],
+    ['retro-tool-api/.env', 'retro-tool-api/.env.example'],
+    ['retro-tool-ui/.env', 'retro-tool-ui/.env.example'],
     ['convex-backend/.env.local', 'convex-backend/.env.example'],
   ];
   for (const [target, example] of pairs) {
@@ -144,10 +143,10 @@ function generateAdminKey() {
 }
 
 function writeAdminKey(key) {
-  log('Writing the admin key + local Convex config into .env.local files');
+  log('Writing the admin key + local Convex config into app env files');
   // API: runtime projection pushes use the sync URL + admin key.
-  setEnv('retro-tool-api/.env.local', 'CONVEX_SYNC_URL', CONVEX_URL);
-  setEnv('retro-tool-api/.env.local', 'CONVEX_SYNC_ADMIN_KEY', key);
+  setEnv('retro-tool-api/.env', 'CONVEX_SYNC_URL', CONVEX_URL);
+  setEnv('retro-tool-api/.env', 'CONVEX_SYNC_ADMIN_KEY', key);
   // Convex CLI: deploy functions against the self-hosted backend.
   setEnv('convex-backend/.env.local', 'CONVEX_SELF_HOSTED_URL', 'http://127.0.0.1:3210');
   setEnv('convex-backend/.env.local', 'CONVEX_SELF_HOSTED_ADMIN_KEY', key);
@@ -155,7 +154,7 @@ function writeAdminKey(key) {
   // the self-hosted vars, so clear the Cloud pointers for local self-hosting.
   setEnv('convex-backend/.env.local', 'CONVEX_DEPLOYMENT', '');
   setEnv('convex-backend/.env.local', 'CONVEX_DEPLOY_KEY', '');
-  ok('.env.local files updated (API + Convex)');
+  ok('API .env and Convex .env.local updated');
 }
 
 const CREDS_FILE = 'convex-dashboard-login.local.txt';
@@ -175,7 +174,7 @@ Admin Key:       ${key}
 
 This key is a signed token from INSTANCE_SECRET (docker/.env), not a fixed value:
 \`pnpm local:bootstrap\` mints a NEW valid key each run and rewrites this file and
-the .env.local files. Older keys keep working; only changing INSTANCE_SECRET (or
+the app env files. Older keys keep working; only changing INSTANCE_SECRET (or
 \`pnpm local:reset\`) invalidates them. After a re-bootstrap, restart \`pnpm dev:api\`
 so it uses the refreshed key.
 `;
@@ -249,5 +248,5 @@ console.log(`
   Dashboard login:  see \x1b[36m${CREDS_FILE}\x1b[0m (Deployment URL + Admin Key)
   Next:             \x1b[36mpnpm local:dev\x1b[0m   (API :8000 · UI :3000 · Convex watcher)
 
-  Each dev server reads its own .env.local. Stop infra with \x1b[36mpnpm local:down\x1b[0m.
+  API/UI read .env; Convex reads .env.local. Stop infra with \x1b[36mpnpm local:down\x1b[0m.
 `);

@@ -8,6 +8,7 @@ one-line summary. When a doc and the code disagree, trust the code — and pleas
 
 | Doc | What it covers |
 |---|---|
+| [ai-agent-guidelines.md](guidelines/ai-agent-guidelines.md) | Vendor-neutral workflow and safety checklist for AI-assisted changes |
 | [coding-guidelines.md](guidelines/coding-guidelines.md) | The numbered rulebook: folders, naming, TypeScript, readability, React, NestJS, checks, scripts, versioning |
 | [file-naming-conventions.md](guidelines/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
 

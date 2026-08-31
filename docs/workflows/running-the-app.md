@@ -4,11 +4,11 @@ How to run the API + UI (+ Convex) against each of the three environments. In ev
 runs locally** (`http://localhost:8000` / `http://localhost:3000`) and hot-reloads; what changes is
 **which backing resources** (Postgres, Convex, secrets) it talks to.
 
-| Mode | Backing resources | Env file loaded | Isolation |
-|---|---|---|---|
-| **Local** | Docker: Postgres + self-hosted Convex | `.env.local` | Fully isolated — your own DB & Convex |
-| **Staging** | Deployed staging Azure resources (shared) | `.env.staging-local` | Shared with every dev + the deployed staging API |
-| **Production** | Deployed production Azure resources | `.env.production-local` | **Live user data — read the warnings** |
+| Mode | Backing resources | API/UI env file | Convex env file | Isolation |
+|---|---|---|---|---|
+| **Local** | Docker: Postgres + self-hosted Convex | `.env` | `.env.local` | Fully isolated — your own DB & Convex |
+| **Staging** | Deployed staging Azure resources (shared) | `.env.staging.local` | `.env.staging-local` | Shared with every dev + the deployed staging API |
+| **Production** | Deployed production Azure resources | `.env.production.local` | `.env.production-local` | **Live user data — read the warnings** |
 
 ---
 
@@ -36,11 +36,13 @@ All commands run from the repo root.
 | **Convex watcher** | `pnpm dev:convex` | `pnpm dev:convex:staging` | `pnpm dev:convex:prod` |
 | **API + UI together** | `pnpm local:dev` | `pnpm dev:staging` | — |
 | **API + UI + Convex + docs** | `pnpm local:dev:all` | — | — |
-| **Env file** | `.env.local` | `.env.staging-local` | `.env.production-local` |
+| **API/UI env file** | `.env` | `.env.staging.local` | `.env.production.local` |
+| **Convex env file** | `.env.local` | `.env.staging-local` | `.env.production-local` |
 
-Under the hood the `:staging` / `:prod` scripts use `dotenv-cli` to pre-load the environment-specific
-file (Vite uses `--mode staging-local` / `--mode production-local`). `ConfigModule` won't overwrite
-already-set `process.env`, so those values take precedence.
+Under the hood, API `:staging` / `:prod` scripts use `dotenv-cli` to preload their environment-specific
+file. Vite uses `--mode staging` / `--mode production`, which selects `.env.staging.local` /
+`.env.production.local`. `ConfigModule` does not overwrite already-set `process.env`, so preloaded API
+values take precedence.
 
 ---
 
@@ -51,8 +53,8 @@ gymnastics.
 
 ```bash
 pnpm local:infra   # Postgres + self-hosted Convex + dashboard in Docker
-pnpm dev:api       # NestJS on :8000, loads .env.local
-pnpm dev:ui        # Vite on :3000
+pnpm dev:api       # NestJS on :8000, loads retro-tool-api/.env
+pnpm dev:ui        # Vite on :3000, loads retro-tool-ui/.env
 pnpm dev:convex    # Convex function watcher (self-hosted)
 ```
 
@@ -60,7 +62,7 @@ Or start the full stack in Docker with `pnpm local:up`, and run all three app pr
 `pnpm local:dev` (add the VitePress user-guide dev server too with `pnpm local:dev:all`). Stop infra
 with `pnpm local:down`; tail logs with `pnpm local:logs`.
 
-`.env.local` points at the **self-hosted** Convex, whose JWKS URL is your own localhost — so the
+The local API/UI `.env` files point at the **self-hosted** Convex, whose JWKS URL is your own localhost — so the
 three-way JWT alignment described below is automatic. First run: `pnpm local:bootstrap` (seed) /
 `pnpm local:reset` (wipe + reseed).
 
@@ -73,8 +75,8 @@ including working **Convex realtime**. Useful for reproducing staging-only issue
 real shared data.
 
 ```bash
-pnpm dev:api:staging      # NestJS on :8000, loads retro-tool-api/.env.staging-local
-pnpm dev:ui:staging       # Vite on :3000, loads retro-tool-ui/.env.staging-local
+pnpm dev:api:staging      # NestJS on :8000, loads retro-tool-api/.env.staging.local
+pnpm dev:ui:staging       # Vite on :3000, loads retro-tool-ui/.env.staging.local
 ```
 
 with local env files configured to **share** these staging resources:
@@ -97,12 +99,12 @@ backing data is shared.
 > or a deliberate, coordinated operation — never for routine development. Prefer local or staging.
 
 ```bash
-pnpm dev:api:prod         # NestJS on :8000, loads retro-tool-api/.env.production-local
-pnpm dev:ui:prod          # Vite on :3000, loads retro-tool-ui/.env.production-local
+pnpm dev:api:prod         # NestJS on :8000, loads retro-tool-api/.env.production.local
+pnpm dev:ui:prod          # Vite on :3000, loads retro-tool-ui/.env.production.local
 pnpm dev:convex:prod      # Convex watcher against the self-hosted production deployment
 ```
 
-`.env.production-local` shares the production resources the same way staging does, but with production
+The API/UI `.env.production.local` files share production resources the same way staging does, but with production
 values:
 
 | Resource | Production value |
@@ -121,7 +123,7 @@ The same three-way JWT alignment applies — substitute the production API host 
 ## Why Convex realtime needs three things to line up
 
 *(Applies when running locally against the shared staging/production Convex deployments — plain
-`.env.local` dev is automatic, since its JWKS URL points at your own local container.)*
+local `.env` development is automatic, since its JWKS URL points at your own local container.)*
 
 Convex verifies browser JWTs with a `customJwt` provider configured (staging example) as:
 
@@ -148,7 +150,7 @@ A locally-minted token is only accepted when **all three** hold:
    BETTER_AUTH_JWT_AUDIENCE=convex
    ```
 
-   (Use the production API host in `.env.production-local`.) This only changes the JWT `iss` claim used
+   (Use the production API host in `.env.production.local`.) This only changes the JWT `iss` claim used
    by Convex; cookies, redirects, and OAuth still use the localhost `BETTER_AUTH_URL`.
 
 3. **Publicly reachable JWKS** — the self-hosted Convex deployment fetches keys from the *deployed*
@@ -179,8 +181,8 @@ issue/verify design see [convex-nestjs-auth.md](../security/convex-nestjs-auth.m
 
 ## Rules for sharing staging/production safely
 
-- **Never cross environments in an env file.** Keep `.env.staging-local` pointed only at staging
-  resources and `.env.production-local` only at production. Prod DB is `retro-tool-db-server…/retro_tool_db`;
+- **Never cross environments in an env file.** Keep API/UI `.env.staging.local` files pointed only at staging
+  resources and `.env.production.local` files only at production. Prod DB is `retro-tool-db-server…/retro_tool_db`;
   staging is `retrotool-staging-db…/retro_tool_db`. Mixing them corrupts JWKS trust and scatters data.
   Verify with:
   `Select-String retro-tool-api/.env.*-local -Pattern '^DATABASE_URL='`

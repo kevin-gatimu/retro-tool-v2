@@ -1,6 +1,6 @@
 # CLAUDE.md — Retro Tool
 
-This is a **pnpm monorepo** containing three applications and one shared package. Read this file before touching any code.
+This is a **pnpm monorepo** containing three applications and one shared package. Read this file before touching any code. Follow the vendor-neutral workflow in [docs/guidelines/ai-agent-guidelines.md](docs/guidelines/ai-agent-guidelines.md).
 
 ---
 
@@ -27,11 +27,11 @@ module-name/
 ├── module-name.module.ts
 ├── module-name.controller.ts
 ├── module-name.service.ts
-├── module-name.gateway.ts       # (if WebSocket events)
 ├── dto/                         # Request/response DTOs
 ├── types/
 │   └── index.ts                 # All module-specific TypeScript types
-├── schema.ts                    # Drizzle table definitions
+├── schema/
+│   └── index.ts                 # Drizzle table definitions
 └── guards/                      # (if module-specific guards)
 ```
 
@@ -166,7 +166,7 @@ retro-tool/
 │       └── rateLimits.ts
 ├── packages/
 │   └── shared/contracts/  # Shared TypeScript contracts (UI ↔ Convex)
-├── retro-tool-api/        # NestJS REST + Socket.IO backend
+├── retro-tool-api/        # NestJS REST backend
 │   ├── src/
 │   │   ├── auth/
 │   │   ├── organizations/
@@ -184,7 +184,7 @@ retro-tool/
 │   │   ├── sessions/
 │   │   ├── team-roles/
 │   │   ├── convex-admin/
-│   │   ├── adapters/      # Socket.IO adapter
+│   │   ├── adapters/      # Projection sync adapters
 │   │   ├── common/        # Shared guards, interceptors, types
 │   │   ├── config/
 │   │   ├── database/
@@ -255,8 +255,8 @@ Each package has multiple env files for different contexts:
 ```env
 VITE_API_URL=http://localhost:8000
 VITE_CONVEX_URL=http://localhost:3210
-VITE_RETROS_REALTIME_BACKEND=convex       # or: socket-io
-VITE_ESTIMATES_REALTIME_BACKEND=convex    # or: socket-io
+VITE_RETROS_REALTIME_BACKEND=convex
+VITE_ESTIMATES_REALTIME_BACKEND=convex
 VITE_NOTIFICATIONS_REALTIME_BACKEND=convex
 ```
 
@@ -273,11 +273,11 @@ The API uses `ConfigModule.forRoot` with `envFilePath: ['.env.local', '.env']`. 
 | Frontend | React 19, TanStack Router (file-based), TanStack Query/Form/Table |
 | Styling | TailwindCSS 4, Radix UI primitives, shadcn/ui pattern |
 | Auth client | Better Auth |
-| Realtime (UI) | Socket.IO client + Convex React SDK |
+| Realtime (UI) | Convex React SDK |
 | API | NestJS 11, TypeScript |
 | Database | PostgreSQL 16 via Drizzle ORM |
 | Auth server | Better Auth + `@thallesp/nestjs-better-auth` |
-| WebSockets | Socket.IO |
+| WebSockets | Self-hosted Convex subscriptions |
 | Realtime projection | Self-hosted Convex everywhere it's deployed — Docker locally, Azure App Service for staging & production (`develop` has no deployment; local-only). No environment uses Convex Cloud. |
 | Email | Resend |
 | Push notifications | web-push (VAPID) |
@@ -354,7 +354,7 @@ GitHub Actions handle app deployment (not infra):
 
 | Package | README | What it covers |
 | --- | --- | --- |
-| NestJS API | [retro-tool-api/README.md](retro-tool-api/README.md) | Module list, auth setup, seed credentials, Socket.IO events, all API endpoints |
+| NestJS API | [retro-tool-api/README.md](retro-tool-api/README.md) | Module list, auth setup, seed credentials, projection sync, all API endpoints |
 | React UI | [retro-tool-ui/README.md](retro-tool-ui/README.md) | Route map, RBAC helpers, TanStack Query cache strategy, UI component conventions |
 | Convex backend | [convex-backend/README.md](convex-backend/README.md) | Deployment setup, code generation steps, Convex module overview |
 

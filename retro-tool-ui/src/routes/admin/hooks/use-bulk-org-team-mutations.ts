@@ -1,7 +1,8 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { ORGANIZATIONS_ENDPOINTS, TEAMS_ENDPOINTS } from '@/lib/api-endpoints'
+import { BulkMutationError, runBulkMutation } from './bulk-mutation'
 
 interface BulkOrgTeamMutationOptions {
   selectedUserIds: string[]
@@ -21,39 +22,71 @@ export function useBulkOrgTeamMutations({
   onBulkAddOrgSuccess,
   onBulkAddTeamSuccess,
 }: BulkOrgTeamMutationOptions) {
+  const queryClient = useQueryClient()
+
+  const invalidateMembershipQueries = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-user-details'] }),
+      queryClient.invalidateQueries({
+        queryKey: ['organization', bulkTargetOrgId],
+      }),
+      queryClient.invalidateQueries({ queryKey: ['organizations'] }),
+      queryClient.invalidateQueries({ queryKey: ['teams'] }),
+      queryClient.invalidateQueries({ queryKey: ['team', bulkTargetTeamId] }),
+      queryClient.invalidateQueries({
+        queryKey: ['team-members', bulkTargetTeamId],
+      }),
+    ])
+
   const bulkAddToOrgMutation = useMutation({
     mutationFn: () =>
-      Promise.all(
-        selectedUserIds.map((userId) =>
-          api.post(ORGANIZATIONS_ENDPOINTS.MEMBERS(bulkTargetOrgId), {
-            userId,
-            role: 'member',
-          }),
+      runBulkMutation(
+        selectedUserIds.map(
+          (userId) => () =>
+            api.post(ORGANIZATIONS_ENDPOINTS.MEMBERS(bulkTargetOrgId), {
+              userId,
+              role: 'member',
+            }),
         ),
       ),
-    onSuccess: () => {
-      toast.success(`${selectedUserIds.length} user(s) added to organisation`)
+    onSuccess: ({ succeeded }) => {
+      toast.success(`${succeeded} user(s) added to organisation`)
       onBulkAddOrgSuccess?.()
     },
-    onError: (e: Error) =>
-      toast.error(e.message || 'Failed to add to organisation'),
+    onError: (error: Error) => {
+      toast.error(
+        error instanceof BulkMutationError
+          ? `Organisation update incomplete: ${error.message}`
+          : error.message || 'Failed to add users to organisation',
+      )
+    },
+    onSettled: invalidateMembershipQueries,
   })
 
   const bulkAddToTeamMutation = useMutation({
     mutationFn: () =>
-      Promise.all(
-        selectedUserIds.map((userId) =>
-          api.post(TEAMS_ENDPOINTS.MEMBERS(bulkTargetTeamId), {
-            userId,
-            tag: 'member',
-          }),
+      runBulkMutation(
+        selectedUserIds.map(
+          (userId) => () =>
+            api.post(TEAMS_ENDPOINTS.MEMBERS(bulkTargetTeamId), {
+              userId,
+              tag: 'member',
+            }),
         ),
       ),
-    onSuccess: () => {
-      toast.success(`${selectedUserIds.length} user(s) added to team`)
+    onSuccess: ({ succeeded }) => {
+      toast.success(`${succeeded} user(s) added to team`)
       onBulkAddTeamSuccess?.()
     },
-    onError: (e: Error) => toast.error(e.message || 'Failed to add to team'),
+    onError: (error: Error) => {
+      toast.error(
+        error instanceof BulkMutationError
+          ? `Team update incomplete: ${error.message}`
+          : error.message || 'Failed to add users to team',
+      )
+    },
+    onSettled: invalidateMembershipQueries,
   })
 
   return { bulkAddToOrgMutation, bulkAddToTeamMutation }

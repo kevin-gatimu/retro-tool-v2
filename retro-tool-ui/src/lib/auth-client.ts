@@ -39,22 +39,6 @@ export function testCookiesWorking(): boolean {
   return cookies.includes('better-auth') || cookies.includes('session')
 }
 
-/**
- * Reliably detect private/incognito window by attempting a localStorage write.
- * Private windows in all major browsers block or quota-limit localStorage,
- * which causes the write to throw or silently fail.
- */
-export async function detectPrivateWindow(): Promise<boolean> {
-  try {
-    const testKey = '__retro_private_test__'
-    localStorage.setItem(testKey, '1')
-    localStorage.removeItem(testKey)
-    return false // localStorage works — not a private window
-  } catch {
-    return true // localStorage blocked — private/incognito window
-  }
-}
-
 export const authClient = createAuthClient({
   baseURL: env.VITE_API_URL + '/api/auth',
   // Passkey (WebAuthn) support: exposes authClient.signIn.passkey() and

@@ -1,10 +1,8 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection';
-import type { Config } from '../config/configuration';
-import type { ConvexFunctionResponse } from '../common/types';
+import { ConvexMutationClientService } from '../convex-admin/convex-mutation-client.service';
 import { ProjectionOutboxService } from '../convex-admin/projection-outbox.service';
 import * as surveysSchema from './schema';
 
@@ -21,11 +19,9 @@ const PROJECTION = 'surveys';
  */
 @Injectable()
 export class SurveysProjectionSyncService implements OnModuleInit {
-  private readonly logger = new Logger(SurveysProjectionSyncService.name);
-
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
-    private readonly configService: ConfigService<Config, true>,
+    private readonly convexClient: ConvexMutationClientService,
     private readonly outbox: ProjectionOutboxService,
   ) {}
 
@@ -61,8 +57,7 @@ export class SurveysProjectionSyncService implements OnModuleInit {
   }
 
   async syncSurveyProjection(surveyId: string): Promise<void> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
+    if (!this.convexClient.isConfigured()) {
       return;
     }
 
@@ -82,7 +77,7 @@ export class SurveysProjectionSyncService implements OnModuleInit {
       return;
     }
 
-    await this.runMutation('liveSurveys:upsertSurveyProjection', {
+    await this.convexClient.runMutation('liveSurveys:upsertSurveyProjection', {
       surveyId: record.id,
       scope: record.scope,
       teamId: record.teamId ?? undefined,
@@ -93,12 +88,13 @@ export class SurveysProjectionSyncService implements OnModuleInit {
   }
 
   async deleteSurveyProjection(surveyId: string): Promise<void> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
+    if (!this.convexClient.isConfigured()) {
       return;
     }
 
-    await this.runMutation('liveSurveys:deleteSurveyProjection', { surveyId });
+    await this.convexClient.runMutation('liveSurveys:deleteSurveyProjection', {
+      surveyId,
+    });
   }
 
   /**
@@ -110,8 +106,7 @@ export class SurveysProjectionSyncService implements OnModuleInit {
    * the number of surveys scanned. No-ops when Convex is unconfigured.
    */
   async syncAllSurveys(): Promise<{ scanned: number }> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
+    if (!this.convexClient.isConfigured()) {
       return { scanned: 0 };
     }
 
@@ -120,59 +115,9 @@ export class SurveysProjectionSyncService implements OnModuleInit {
       .from(surveysSchema.survey);
 
     for (const survey of surveys) {
-      try {
-        await this.syncSurveyProjection(survey.id);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'unknown error';
-        this.logger.warn(
-          `Reconcile: survey ${survey.id} projection failed: ${message}`,
-        );
-      }
+      await this.syncSurveyProjection(survey.id);
     }
 
     return { scanned: surveys.length };
-  }
-
-  /**
-   * POST a projection mutation to Convex. Throws on any transport or
-   * Convex-side error so the outbox dispatcher (which wraps delivery) can retry;
-   * no-ops silently only when Convex is unconfigured. Reconciliation catches
-   * per-entity so one failure does not abort a full rebuild.
-   */
-  private async runMutation(path: string, args: object): Promise<void> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
-      return;
-    }
-
-    const response = await fetch(
-      `${convexConfig.url.replace(/\/$/, '')}/api/mutation`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Convex ${convexConfig.adminKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          path,
-          args,
-          format: 'json',
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Convex survey projection mutation ${path} failed with status ${response.status}`,
-      );
-    }
-
-    const result = (await response.json()) as ConvexFunctionResponse;
-    if (result.status === 'error') {
-      throw new Error(
-        `Convex survey projection mutation ${path} returned an error: ${result.errorMessage ?? 'unknown error'}`,
-      );
-    }
   }
 }
