@@ -57,7 +57,8 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5433/retro_tool_db
 
 BETTER_AUTH_SECRET=your-secret-here
 BETTER_AUTH_URL=http://localhost:8000
-BETTER_AUTH_SESSION_EXPIRES_IN=604800
+BETTER_AUTH_SESSION_EXPIRES_IN=1800
+BETTER_AUTH_SESSION_UPDATE_AGE=300
 
 # JWT for Convex customJwt verification (RS256) — both OPTIONAL.
 # Issuer defaults to the API origin, audience to 'convex'. Only set to override,

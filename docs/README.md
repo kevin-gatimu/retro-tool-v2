@@ -30,6 +30,7 @@ one-line summary. When a doc and the code disagree, trust the code — and pleas
 | [backend-api.md](security/backend-api.md) | API hardening: Helmet, rate limiting, CORS, CSRF posture |
 | [database.md](security/database.md) | DB security: TLS/SSL to Azure Postgres, credential injection, SQL-injection posture, no-RLS reality, residual risk |
 | [authentication.md](security/authentication.md) | Every sign-in method (password, email-OTP, passkey, Microsoft OAuth), the credential model, and the file-level flow map |
+| [inactivity-logout.md](security/inactivity-logout.md) | Browser inactivity timeout, 2-minute warning, cross-tab logout, single-flight 401 handling, and the limits of client-side idle enforcement |
 | [convex-nestjs-auth.md](security/convex-nestjs-auth.md) | The Convex↔NestJS trust relationship: RS256 JWT issue/verify, JWKS, config that must line up |
 | [authorization-rbac.md](security/authorization-rbac.md) | Full permission matrices (system / org / team / retro), helper signatures, user-status lifecycle |
 
@@ -63,6 +64,7 @@ one-line summary. When a doc and the code disagree, trust the code — and pleas
 | Doc | What it covers |
 |---|---|
 | [running-the-app.md](workflows/running-the-app.md) | Running the app locally, against staging, and against production |
+| [inactivity-logout.md](workflows/inactivity-logout.md) | Inactivity logout flow: warning, cross-tab activity sync, redirect to sign-in, and acceptance/testing notes |
 | [invitations-and-onboarding.md](workflows/invitations-and-onboarding.md) | Invitation system (org + team), accept-invite journey, acceptance logic, onboarding & password rules |
 | [app-flows.md](workflows/app-flows.md) | Every major user-facing flow (auth, org, team, retro, estimates, notifications) |
 | [email.md](workflows/email.md) | Email-triggered UI flows: verification, password reset, org invite, team join request, retro report |

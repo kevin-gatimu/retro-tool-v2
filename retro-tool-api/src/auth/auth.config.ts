@@ -34,6 +34,9 @@ export function createAuth(configService: ConfigService<Config>) {
   const sessionExpiresIn = configService.get('auth.sessionExpiresIn', {
     infer: true,
   });
+  const sessionUpdateAge = configService.get('auth.sessionUpdateAge', {
+    infer: true,
+  });
   const cookieSecure = configService.get('auth.cookieSecure', { infer: true });
   const databaseUrl = configService.get('database.url', { infer: true });
   const frontendUrl = configService.get('frontend.url', { infer: true });
@@ -268,8 +271,8 @@ export function createAuth(configService: ConfigService<Config>) {
     ],
     // Configure session settings
     session: {
-      expiresIn: sessionExpiresIn, // 7 days default
-      updateAge: 60 * 60 * 24, // 1 day
+      expiresIn: sessionExpiresIn,
+      updateAge: sessionUpdateAge,
       // Store session token in cookie
       cookieCache: {
         enabled: true,

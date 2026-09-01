@@ -9,7 +9,7 @@ import type { TUserStatus } from '@/common/enums/user.enums'
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type SignInSearch = {
-  status?: Extract<TUserStatus, 'pending' | 'rejected'>
+  status?: Extract<TUserStatus, 'pending' | 'rejected'> | 'session-expired'
   redirect?: string
   inviteToken?: string
   email?: string
