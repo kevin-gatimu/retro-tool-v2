@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Post,
   Put,
+  Query,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
@@ -44,8 +45,15 @@ export class ConvexAdminController {
     status: 200,
     description: 'Operational metrics from Convex admin API',
   })
-  getOperationalMetrics(@Session() session: SessionUser) {
-    return this.convexAdminService.getOperationalMetrics(session.user.id);
+  getOperationalMetrics(
+    @Session() session: SessionUser,
+    @Query('rangeMinutes') rangeMinutes?: string,
+  ) {
+    const parsedRange = rangeMinutes ? Number.parseInt(rangeMinutes, 10) : 60;
+    return this.convexAdminService.getOperationalMetrics(
+      session.user.id,
+      parsedRange,
+    );
   }
 
   @Get('metrics/usage')
