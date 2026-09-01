@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
 import {
+  AlertCircle,
   Clock,
   Eye,
   EyeOff,
@@ -443,6 +444,13 @@ function SignInPage() {
           Sign in to your account to continue
         </p>
       </div>
+
+      {status === 'session-expired' && (
+        <div className="mb-5 flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>Your session expired due to inactivity. Sign in to continue.</p>
+        </div>
+      )}
 
       {inviteToken && emailFromInvite && (
         <div className="mb-5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">

@@ -27,6 +27,16 @@ export const env = createEnv({
       .default('local')
       .describe('The current application environment'),
     VITE_API_URL: z.url(),
+    VITE_AUTH_IDLE_TIMEOUT_MINUTES: z.coerce
+      .number()
+      .positive()
+      .max(10_080)
+      .default(30),
+    VITE_AUTH_IDLE_WARNING_MINUTES: z.coerce
+      .number()
+      .nonnegative()
+      .max(60)
+      .default(2),
     VITE_CONVEX_URL: z.url().optional(),
     VITE_ESTIMATES_REALTIME_BACKEND: z
       .enum(['socket-io', 'convex'])

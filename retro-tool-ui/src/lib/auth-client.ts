@@ -82,14 +82,21 @@ export const authClient = createAuthClient({
  * `clear()` wipes the whole cache rather than just user-scoped keys —
  * deliberate: auditing every query key in the app for which ones are
  * user-derived-but-unkeyed is its own project, and a full clear on sign-out
- * (a rare, not-perf-sensitive event) is the safe default. Runs after
- * `signOut()` resolves so no in-flight refetch races the credential being
- * cleared.
+ * (a rare, not-perf-sensitive event) is the safe default. Cleanup runs in a
+ * `finally` block so local credentials and cached data are removed even when
+ * server-side sign-out fails.
  */
+export function clearClientAuthState(queryClient: QueryClient): void {
+  clearBearerToken()
+  queryClient.clear()
+}
+
 export async function signOutWithCleanup(
   queryClient: QueryClient,
 ): Promise<void> {
-  clearBearerToken()
-  await authClient.signOut()
-  queryClient.clear()
+  try {
+    await authClient.signOut()
+  } finally {
+    clearClientAuthState(queryClient)
+  }
 }
