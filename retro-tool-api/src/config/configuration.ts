@@ -8,29 +8,43 @@ const configSchema = z.object({
   database: z.object({
     url: z.string(),
   }),
-  auth: z.object({
-    secret: z.string(),
-    url: z.string().optional(),
-    sessionExpiresIn: z.number().default(60 * 60 * 24 * 7), // 7 days
-    cookieSecure: z.boolean().default(false),
-    // WebAuthn relying-party identity. rpId is the registrable UI domain
-    // (no scheme/port); passkeys are bound to it, so it must be stable.
-    rpId: z.string(),
-    rpName: z.string().default('Retro-Tool'),
-    // JWT (for Convex customJwt verification). `iss` must be byte-stable across
-    // deploys (Convex matches it exactly) and `aud` must equal Convex's
-    // applicationID. Issuer defaults to the API origin; audience to 'convex'.
-    jwtIssuer: z.string().optional(),
-    jwtAudience: z.string().default('convex'),
-    microsoft: z
-      .object({
-        clientId: z.string().optional(),
-        clientSecret: z.string().optional(),
-        tenantId: z.string().optional(),
-        authority: z.string().optional(),
-      })
-      .optional(),
-  }),
+  auth: z
+    .object({
+      secret: z.string(),
+      url: z.string().optional(),
+      sessionExpiresIn: z
+        .number()
+        .int()
+        .positive()
+        .default(30 * 60),
+      sessionUpdateAge: z
+        .number()
+        .int()
+        .positive()
+        .default(5 * 60),
+      cookieSecure: z.boolean().default(false),
+      // WebAuthn relying-party identity. rpId is the registrable UI domain
+      // (no scheme/port); passkeys are bound to it, so it must be stable.
+      rpId: z.string(),
+      rpName: z.string().default('Retro-Tool'),
+      // JWT (for Convex customJwt verification). `iss` must be byte-stable across
+      // deploys (Convex matches it exactly) and `aud` must equal Convex's
+      // applicationID. Issuer defaults to the API origin; audience to 'convex'.
+      jwtIssuer: z.string().optional(),
+      jwtAudience: z.string().default('convex'),
+      microsoft: z
+        .object({
+          clientId: z.string().optional(),
+          clientSecret: z.string().optional(),
+          tenantId: z.string().optional(),
+          authority: z.string().optional(),
+        })
+        .optional(),
+    })
+    .refine((auth) => auth.sessionUpdateAge < auth.sessionExpiresIn, {
+      message: 'Session update age must be shorter than session expiration',
+      path: ['sessionUpdateAge'],
+    }),
   frontend: z.object({
     url: z.string(),
   }),
@@ -80,6 +94,9 @@ export default (): Config => {
       url: process.env.BETTER_AUTH_URL,
       sessionExpiresIn: process.env.BETTER_AUTH_SESSION_EXPIRES_IN
         ? parseInt(process.env.BETTER_AUTH_SESSION_EXPIRES_IN, 10)
+        : undefined,
+      sessionUpdateAge: process.env.BETTER_AUTH_SESSION_UPDATE_AGE
+        ? parseInt(process.env.BETTER_AUTH_SESSION_UPDATE_AGE, 10)
         : undefined,
       // Derived from NODE_ENV — true only in production
       cookieSecure: nodeEnv === 'production',
