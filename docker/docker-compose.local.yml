@@ -21,8 +21,8 @@ services:
 
   nest-api:
     build:
-      context: ../retro-tool-api
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: retro-tool-api/Dockerfile
     environment:
       DATABASE_URL: ${DATABASE_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
@@ -49,8 +49,22 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      convex-backend:
+        condition: service_healthy
     ports:
       - "${PORT}:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8000/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
 
   convex-backend:
     image: ghcr.io/get-convex/convex-backend@sha256:1738f1673f8d63161043a7859710d2301b1e9d6271e06afbb7af31594ea3a58f
@@ -82,7 +96,8 @@ services:
   convex-dashboard:
     image: ghcr.io/get-convex/convex-dashboard:latest
     depends_on:
-      - convex-backend
+      convex-backend:
+        condition: service_healthy
     ports:
       - "${CONVEX_DASHBOARD_PORT}:6791"
 
@@ -101,9 +116,16 @@ services:
         VITE_STANDUPS_REALTIME_BACKEND: ${VITE_STANDUPS_REALTIME_BACKEND}
         VITE_NOTIFICATIONS_REALTIME_BACKEND: ${VITE_NOTIFICATIONS_REALTIME_BACKEND}
     depends_on:
-      - nest-api
+      nest-api:
+        condition: service_healthy
     ports:
       - "${UI_PORT}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
 volumes:
   retro-tool-postgres-data:

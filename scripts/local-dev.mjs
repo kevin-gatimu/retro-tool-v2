@@ -14,6 +14,7 @@
  *   node scripts/local-dev.mjs --reset    # tear volumes down first (clean slate)
  */
 import { execSync, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +24,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const COMPOSE = ['-f', join(root, 'docker/docker-compose.local.yml')];
 const ENV_FILE = join(root, 'docker/.env');
 const CONVEX_CONTAINER = 'retro-tool-local-convex-backend-1';
+const POSTGRES_CONTAINER = 'retro-tool-local-postgres-1';
 const CONVEX_URL = 'http://localhost:3210';
 
 const args = new Set(process.argv.slice(2));
@@ -82,6 +84,41 @@ function setEnv(file, key, value) {
   const re = new RegExp(`^${key}=.*$`, 'm');
   content = re.test(content) ? content.replace(re, line) : `${content.trimEnd()}\n${line}\n`;
   writeFileSync(path, content);
+}
+
+function envValue(content, key) {
+  return content
+    .match(new RegExp(`^${key}=(.*)$`, 'm'))?.[1]
+    .trim()
+    .replace(/^['"]|['"]$/g, '');
+}
+
+function ensureLocalSecrets() {
+  const content = readFileSync(ENV_FILE, 'utf8');
+  const convexSecret = envValue(content, 'CONVEX_INSTANCE_SECRET');
+  const betterAuthSecret = envValue(content, 'BETTER_AUTH_SECRET');
+  let betterAuthSecretChanged = false;
+
+  if (!convexSecret || !/^[0-9a-f]{64}$/i.test(convexSecret)) {
+    setEnv('docker/.env', 'CONVEX_INSTANCE_SECRET', randomBytes(32).toString('hex'));
+    warn('generated a valid local Convex instance secret in docker/.env');
+  }
+
+  if (
+    !betterAuthSecret ||
+    betterAuthSecret.startsWith('replace-with-') ||
+    betterAuthSecret.length < 32
+  ) {
+    const generatedSecret = randomBytes(32).toString('base64url');
+    setEnv('docker/.env', 'BETTER_AUTH_SECRET', generatedSecret);
+    setEnv('retro-tool-api/.env', 'BETTER_AUTH_SECRET', generatedSecret);
+    betterAuthSecretChanged = true;
+    warn('generated and synchronized the local Better Auth secret');
+  } else {
+    setEnv('retro-tool-api/.env', 'BETTER_AUTH_SECRET', betterAuthSecret);
+  }
+
+  return betterAuthSecretChanged;
 }
 
 // ── Steps ────────────────────────────────────────────────────────────────────
@@ -147,6 +184,11 @@ function writeAdminKey(key) {
   // API: runtime projection pushes use the sync URL + admin key.
   setEnv('retro-tool-api/.env', 'CONVEX_SYNC_URL', CONVEX_URL);
   setEnv('retro-tool-api/.env', 'CONVEX_SYNC_ADMIN_KEY', key);
+  // Dockerized API: use Compose service discovery and the same generated key.
+  setEnv('docker/.env', 'CONVEX_SYNC_URL', 'http://convex-backend:3210');
+  setEnv('docker/.env', 'CONVEX_SYNC_ADMIN_KEY', key);
+  setEnv('docker/.env', 'CONVEX_SELF_HOSTED_ADMIN_KEY', key);
+  setEnv('docker/.env', 'CONVEX_BETTER_AUTH_URL', 'http://nest-api:8000/api/auth');
   // Convex CLI: deploy functions against the self-hosted backend.
   setEnv('convex-backend/.env.local', 'CONVEX_SELF_HOSTED_URL', 'http://127.0.0.1:3210');
   setEnv('convex-backend/.env.local', 'CONVEX_SELF_HOSTED_ADMIN_KEY', key);
@@ -196,6 +238,34 @@ function migrateAndSeed() {
   ok('seed complete');
 }
 
+function clearStaleLocalJwks() {
+  log('Removing JWT keys encrypted with the previous local auth secret');
+  const content = readFileSync(ENV_FILE, 'utf8');
+  const user = envValue(content, 'POSTGRES_USER') ?? 'postgres';
+  const database = envValue(content, 'POSTGRES_DB') ?? 'retro_tool_db';
+  const result = spawnSync(
+    'docker',
+    [
+      'exec',
+      POSTGRES_CONTAINER,
+      'psql',
+      '-U',
+      user,
+      '-d',
+      database,
+      '-c',
+      'DELETE FROM jwks;',
+    ],
+    { stdio: 'inherit' },
+  );
+
+  if (result.status !== 0) {
+    console.error('\x1b[31mCould not remove stale local JWT keys.\x1b[0m');
+    process.exit(1);
+  }
+  ok('local JWT keys will be regenerated with the current auth secret');
+}
+
 function deployConvexFunctions() {
   // The backend's convex/auth.config.ts reads these function env vars to verify
   // the API's RS256 JWTs. They are Convex *function* env (set via the CLI), not
@@ -233,12 +303,16 @@ function deployConvexFunctions() {
 
 ensureDockerRunning();
 ensureEnvFiles();
+const betterAuthSecretChanged = ensureLocalSecrets();
 startInfra();
 waitForConvex();
 const adminKey = generateAdminKey();
 writeAdminKey(adminKey);
 writeCredsFile(adminKey);
 migrateAndSeed();
+if (betterAuthSecretChanged) {
+  clearStaleLocalJwks();
+}
 deployConvexFunctions();
 
 console.log(`

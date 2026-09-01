@@ -1,6 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { RefreshCw, Zap, AlertCircle } from 'lucide-react'
+import {
+  Activity,
+  AlertCircle,
+  HeartPulse,
+  Lightbulb,
+  RefreshCw,
+  Zap,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,11 +37,11 @@ import { isSuperAdmin } from '@/lib/rbac'
 
 import {
   useConvexOperationalMetrics,
-  useConvexUsageMetrics,
   useConvexCronConfig,
   useUpdateCronConfig,
   useClearConvexTables,
 } from './hooks'
+import { ConvexMetricsChart } from './components/convex-metrics-chart'
 import { ConvexAdminSkeleton } from './skeleton'
 
 export const Route = createFileRoute('/admin/convex')({
@@ -91,323 +98,392 @@ function cronToPreset(cron: string): SchedulePreset {
   return found ? found.value : 'custom'
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
+// ─── Metrics, health, and insights ───────────────────────────────────────────
 
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+function formatMetric(value: number | null, suffix = '') {
+  return value == null
+    ? '—'
+    : `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}${suffix}`
 }
 
-function pct(used: number, quota: number) {
-  if (quota === 0) return 0
-  return Math.min(100, Math.round((used / quota) * 100))
-}
-
-// ─── Metrics Tab ───────────────────────────────────────────────────────────
-
-function MetricsTab() {
-  const opQuery = useConvexOperationalMetrics()
-  const usageQuery = useConvexUsageMetrics()
-
-  const op = opQuery.data
-  const usage = usageQuery.data
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Operational Metrics</h3>
-          <p className="text-sm text-muted-foreground">
-            Real-time Convex backend metrics
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => opQuery.refetch()}
-          disabled={opQuery.isFetching}
-        >
-          <RefreshCw
-            className={`h-4 w-4 mr-2 ${opQuery.isFetching ? 'animate-spin' : ''}`}
-          />
-          Refresh
-        </Button>
-      </div>
-
-      {opQuery.isError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Failed to load operational metrics. Ensure the Convex backend is
-            reachable.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {op && (
-        <>
-          {/* Summary stats */}
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Cache Hit %</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {op.cacheHitPercentage != null
-                    ? `${op.cacheHitPercentage.toFixed(1)}%`
-                    : '—'}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>P50 Latency</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {op.latencyPercentiles != null
-                    ? `${op.latencyPercentiles.p50.toFixed(0)} ms`
-                    : '—'}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>P95 Latency</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {op.latencyPercentiles != null
-                    ? `${op.latencyPercentiles.p95.toFixed(0)} ms`
-                    : '—'}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Concurrency</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {op.functionConcurrency != null
-                    ? op.functionConcurrency
-                    : '—'}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Top functions */}
-          {op.topFunctions.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">
-                  Top Functions (by calls)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {op.topFunctions.slice(0, 10).map((fn) => (
-                    <div
-                      key={fn.identifier}
-                      className="flex items-center justify-between text-sm"
-                    >
-                      <span className="font-mono text-xs truncate max-w-[70%]">
-                        {fn.identifier}
-                      </span>
-                      <Badge variant="secondary">
-                        {fn.calls.toLocaleString()} calls
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Table I/O rates */}
-          {op.tableRates.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Table I/O Rates</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y">
-                  {op.tableRates.map((t) => (
-                    <div
-                      key={t.tableName}
-                      className="flex items-center justify-between py-2 text-sm"
-                    >
-                      <span className="font-mono text-xs">{t.tableName}</span>
-                      <div className="flex gap-4 text-muted-foreground">
-                        <span>↑ {t.reads.toLocaleString()} reads</span>
-                        <span>↓ {t.writes.toLocaleString()} writes</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Scheduled job lag */}
-          {op.scheduledJobLag != null && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Scheduled Job Lag</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {op.scheduledJobLag.toFixed(0)} ms
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
-
-      {/* Billing / Cloud usage */}
-      {usage && (
-        <>
-          <Separator />
-          <div>
-            <h3 className="text-lg font-semibold">Convex Cloud Usage</h3>
-            <p className="text-sm text-muted-foreground">
-              Billing metrics from Convex Cloud
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {usage.functionCalls && (
-              <UsageCard
-                label="Function Calls"
-                used={usage.functionCalls.used}
-                quota={usage.functionCalls.quota}
-                format={(n) => n.toLocaleString()}
-              />
-            )}
-            {usage.actionCompute && (
-              <UsageCard
-                label="Action Compute"
-                used={usage.actionCompute.used}
-                quota={usage.actionCompute.quota}
-                format={(n) => `${n.toLocaleString()} ms`}
-              />
-            )}
-            {usage.databaseStorage && (
-              <UsageCard
-                label="Database Storage"
-                used={usage.databaseStorage.used}
-                quota={usage.databaseStorage.quota}
-                format={formatBytes}
-              />
-            )}
-            {usage.databaseBandwidth && (
-              <UsageCard
-                label="Database Bandwidth"
-                used={usage.databaseBandwidth.used}
-                quota={usage.databaseBandwidth.quota}
-                format={formatBytes}
-              />
-            )}
-            {usage.fileStorage && (
-              <UsageCard
-                label="File Storage"
-                used={usage.fileStorage.used}
-                quota={usage.fileStorage.quota}
-                format={formatBytes}
-              />
-            )}
-            {usage.fileBandwidth && (
-              <UsageCard
-                label="File Bandwidth"
-                used={usage.fileBandwidth.used}
-                quota={usage.fileBandwidth.quota}
-                format={formatBytes}
-              />
-            )}
-            {usage.vectorStorage && (
-              <UsageCard
-                label="Vector Storage"
-                used={usage.vectorStorage.used}
-                quota={usage.vectorStorage.quota}
-                format={formatBytes}
-              />
-            )}
-            {usage.vectorBandwidth && (
-              <UsageCard
-                label="Vector Bandwidth"
-                used={usage.vectorBandwidth.used}
-                quota={usage.vectorBandwidth.quota}
-                format={formatBytes}
-              />
-            )}
-            {usage.deployments && (
-              <UsageCard
-                label="Deployments"
-                used={usage.deployments.used}
-                quota={usage.deployments.quota}
-                format={(n) => n.toLocaleString()}
-              />
-            )}
-            {usage.chefTokens && (
-              <UsageCard
-                label="Chef Tokens"
-                used={usage.chefTokens.used}
-                quota={usage.chefTokens.quota}
-                format={(n) => n.toLocaleString()}
-              />
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-function UsageCard({
-  label,
-  used,
-  quota,
-  format,
-}: {
-  label: string
-  used: number
-  quota: number
-  format: (n: number) => string
-}) {
-  const percentage = pct(used, quota)
-  const isHigh = percentage >= 80
-
+function MetricSummaryCard({ label, value }: { label: string; value: string }) {
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardDescription>{label}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex items-end justify-between">
-          <div className="text-xl font-bold">{format(used)}</div>
-          <Badge variant={isHigh ? 'destructive' : 'secondary'}>
-            {percentage}%
-          </Badge>
-        </div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          of {format(quota)} quota
-        </div>
-        <div className="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${isHigh ? 'bg-destructive' : 'bg-primary'}`}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
+        <div className="text-2xl font-bold">{value}</div>
       </CardContent>
     </Card>
   )
 }
 
+function MetricsTab() {
+  const [rangeMinutes, setRangeMinutes] = useState(60)
+  const [pollingEnabled, setPollingEnabled] = useState(true)
+  const query = useConvexOperationalMetrics(rangeMinutes, pollingEnabled)
+  const metrics = query.data
+  const lagSeries = metrics
+    ? [{ name: 'Scheduled job lag', points: metrics.scheduledJobLag }]
+    : []
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold">Operational Metrics</h3>
+          <p className="text-sm text-muted-foreground">
+            Deployment metrics proxied securely through the API
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Select
+            value={String(rangeMinutes)}
+            onValueChange={(value) => setRangeMinutes(Number(value))}
+          >
+            <SelectTrigger className="w-32" aria-label="Metrics time range">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="15">Last 15 min</SelectItem>
+              <SelectItem value="60">Last hour</SelectItem>
+              <SelectItem value="360">Last 6 hours</SelectItem>
+              <SelectItem value="1440">Day</SelectItem>
+              <SelectItem value="10080">Week</SelectItem>
+              <SelectItem value="43200">Month</SelectItem>
+              <SelectItem value="129600">Quarter</SelectItem>
+              <SelectItem value="525600">Year</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="metrics-polling"
+              checked={pollingEnabled}
+              onCheckedChange={setPollingEnabled}
+            />
+            <Label htmlFor="metrics-polling" className="text-xs">
+              Auto-refresh
+            </Label>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => query.refetch()}
+            disabled={query.isFetching}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${query.isFetching ? 'animate-spin' : ''}`}
+            />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {query.isError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load operational metrics. Ensure the Convex deployment is
+            reachable.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {metrics?.status === 'partial' && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Some metric series are unavailable:{' '}
+            {metrics.errors.map((error) => error.metric).join(', ')}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {metrics && (
+        <>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-8">
+            <MetricSummaryCard
+              label="Function calls"
+              value={formatMetric(metrics.summaries.totalCalls)}
+            />
+            <MetricSummaryCard
+              label="Avg calls / min"
+              value={formatMetric(metrics.summaries.averageCallsPerMinute)}
+            />
+            <MetricSummaryCard
+              label="Peak failure rate"
+              value={formatMetric(metrics.summaries.maxFailurePercentage, '%')}
+            />
+            <MetricSummaryCard
+              label="Average cache hits"
+              value={formatMetric(
+                metrics.summaries.averageCacheHitPercentage,
+                '%',
+              )}
+            />
+            <MetricSummaryCard
+              label="Peak scheduler lag"
+              value={formatMetric(
+                metrics.summaries.maxScheduledJobLagSeconds,
+                ' s',
+              )}
+            />
+            <MetricSummaryCard
+              label="Peak running (observed)"
+              value={formatMetric(metrics.summaries.peakRunning)}
+            />
+            <MetricSummaryCard
+              label="Peak queued"
+              value={formatMetric(metrics.summaries.peakQueued)}
+            />
+            <MetricSummaryCard
+              label="Buckets w/ queueing"
+              value={formatMetric(
+                metrics.summaries.queuedBucketPercentage,
+                '%',
+              )}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            &quot;Peak running&quot; reflects the highest concurrency{' '}
+            <em>observed</em> in this window — it is not a configured capacity
+            limit, so it should not be read as a hard ceiling.
+          </p>
+
+          <div className="grid gap-6 xl:grid-cols-2">
+            <ConvexMetricsChart
+              title="Function calls"
+              description="Calls per function and time bucket"
+              series={metrics.functionCalls}
+              rangeMinutes={rangeMinutes}
+            />
+            <ConvexMetricsChart
+              title="Failure percentage"
+              description="Peak error rate by function"
+              series={metrics.failurePercentages}
+              valueSuffix="%"
+              rangeMinutes={rangeMinutes}
+            />
+            <ConvexMetricsChart
+              title="Cache hit percentage"
+              description="Query cache efficiency by function"
+              series={metrics.cacheHitPercentages}
+              valueSuffix="%"
+              rangeMinutes={rangeMinutes}
+            />
+            <ConvexMetricsChart
+              title="Scheduled job lag"
+              description="Delay before scheduled functions start"
+              series={lagSeries}
+              valueSuffix=" s"
+              rangeMinutes={rangeMinutes}
+            />
+            <ConvexMetricsChart
+              title="Running functions (observed concurrency)"
+              description="Concurrent executions by function type — reflects observed load, not a configured capacity limit"
+              series={metrics.concurrency.running}
+              rangeMinutes={rangeMinutes}
+            />
+            <ConvexMetricsChart
+              title="Queued functions"
+              description="Executions waiting for capacity"
+              series={metrics.concurrency.queued}
+              rangeMinutes={rangeMinutes}
+            />
+            <ConvexMetricsChart
+              title="Subscription invalidations"
+              description="Reactive query invalidations by function"
+              series={metrics.subscriptionInvalidations}
+              rangeMinutes={rangeMinutes}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Updated {new Date(metrics.generatedAt).toLocaleString()} ·{' '}
+            {metrics.bucketCount} buckets of {metrics.bucketMinutes} min each
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
+function HealthTab() {
+  const query = useConvexOperationalMetrics()
+  const health = query.data?.health
+
+  if (query.isError) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>Unable to evaluate Convex health.</AlertDescription>
+      </Alert>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <HeartPulse className="h-5 w-5" />
+        <div>
+          <h3 className="text-lg font-semibold">Deployment Health</h3>
+          <p className="text-sm text-muted-foreground">
+            Connectivity, metric availability, scheduler, queue, and failure
+            signals
+          </p>
+        </div>
+        {health && (
+          <Badge
+            className="ml-auto"
+            variant={health.status === 'healthy' ? 'default' : 'destructive'}
+          >
+            {health.status}
+          </Badge>
+        )}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {health?.checks.map((check) => (
+          <Card key={check.name}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base">{check.name}</CardTitle>
+                <Badge
+                  variant={
+                    check.status === 'healthy' ? 'secondary' : 'destructive'
+                  }
+                >
+                  {check.status}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {check.message}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function formatRangeLabel(rangeMinutes: number) {
+  if (rangeMinutes < 60) return `Last ${rangeMinutes} min`
+  if (rangeMinutes === 60) return 'Last hour'
+  if (rangeMinutes < 1440) return `Last ${Math.round(rangeMinutes / 60)} hours`
+  if (rangeMinutes === 1440) return 'Day'
+  if (rangeMinutes === 10_080) return 'Week'
+  if (rangeMinutes === 43_200) return 'Month'
+  if (rangeMinutes === 129_600) return 'Quarter'
+  if (rangeMinutes === 525_600) return 'Year'
+  return `Last ${Math.round(rangeMinutes / 1440)} days`
+}
+
+const SEVERITY_BADGE_VARIANT: Record<
+  'info' | 'warning' | 'critical',
+  'secondary' | 'default' | 'destructive'
+> = {
+  info: 'secondary',
+  warning: 'default',
+  critical: 'destructive',
+}
+
+function InsightsTab() {
+  const [rangeMinutes, setRangeMinutes] = useState(1440)
+  const query = useConvexOperationalMetrics(rangeMinutes)
+  const insights = query.data?.insights ?? []
+  const windowLabel = formatRangeLabel(rangeMinutes)
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Lightbulb className="h-5 w-5" />
+          <div>
+            <h3 className="text-lg font-semibold">Deployment Insights</h3>
+            <p className="text-sm text-muted-foreground">
+              Deterministic observations derived from the selected metrics
+              window
+            </p>
+          </div>
+        </div>
+        <Select
+          value={String(rangeMinutes)}
+          onValueChange={(value) => setRangeMinutes(Number(value))}
+        >
+          <SelectTrigger className="w-32" aria-label="Insights time range">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1440">Day</SelectItem>
+            <SelectItem value="10080">Week</SelectItem>
+            <SelectItem value="43200">Month</SelectItem>
+            <SelectItem value="129600">Quarter</SelectItem>
+            <SelectItem value="525600">Year</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {insights.map((insight) => (
+          <Card key={`${insight.category}-${insight.title}`}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  {insight.severity === 'info' ? (
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4" />
+                  )}
+                  {insight.title}
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="capitalize">
+                    {insight.category}
+                  </Badge>
+                  <Badge variant={SEVERITY_BADGE_VARIANT[insight.severity]}>
+                    {insight.severity}
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="text-foreground">{insight.description}</p>
+              <div>
+                <span className="font-medium text-muted-foreground">
+                  Evidence:{' '}
+                </span>
+                <span className="text-muted-foreground">
+                  {insight.evidence}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium text-muted-foreground">
+                  Impact:{' '}
+                </span>
+                <span className="text-muted-foreground">{insight.impact}</span>
+              </div>
+              <div>
+                <span className="font-medium text-muted-foreground">
+                  Recommendation:{' '}
+                </span>
+                <span className="text-muted-foreground">
+                  {insight.recommendation}
+                </span>
+              </div>
+              <p className="pt-1 text-xs text-muted-foreground">
+                Window: {windowLabel}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+        {!query.isLoading && insights.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No insights are available.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
 // ─── Table Management Tab ──────────────────────────────────────────────────
 
 function TableManagementTab() {
@@ -708,11 +784,21 @@ function ConvexAdminPage() {
       <Tabs defaultValue="metrics">
         <TabsList>
           <TabsTrigger value="metrics">Metrics</TabsTrigger>
+          <TabsTrigger value="health">Health</TabsTrigger>
+          <TabsTrigger value="insights">Insights</TabsTrigger>
           <TabsTrigger value="table-management">Table Management</TabsTrigger>
         </TabsList>
 
         <TabsContent value="metrics" className="mt-6">
           <MetricsTab />
+        </TabsContent>
+
+        <TabsContent value="health" className="mt-6">
+          <HealthTab />
+        </TabsContent>
+
+        <TabsContent value="insights" className="mt-6">
+          <InsightsTab />
         </TabsContent>
 
         <TabsContent value="table-management" className="mt-6">
