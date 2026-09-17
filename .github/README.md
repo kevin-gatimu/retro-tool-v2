@@ -1,425 +1,275 @@
-# CI/CD Workflows
+# Retro Tool
 
-This directory contains all GitHub Actions workflows for the Retro Tool monorepo.
+**Retro Tool** brings every recurring team ceremony into one place: retrospectives, story estimates,
+async standups, icebreakers, polls, and surveys.
 
-## Overview
+Every board is live — add a card, cast a vote, or advance a phase and all participants see it
+immediately, with no refresh. Unresolved action items carry forward into the next retro, and reports
+track completion rates and action-item health over time. Access is scoped end to end by system,
+organization, and team roles.
 
-Deploys currently target a single **staging** environment on Azure. Pushing to the
-`staging` branch runs the orchestrator (`release-staging.yml`), which chains the
-Convex, API, and UI deploy workflows in order. Pushing to `main` runs
-release-please, which maintains the release PR and tags versions.
-
-```
-feature/* ──PR──▶ staging ──────────────▶ deploy (Convex → API → UI)
-                    (release-staging.yml orchestrator)
-
-              main ─────────────────────▶ release-please (changelog + version tags)
-```
-
-| Workflow                             | File                                | Trigger                                              | Target                          |
-| ------------------------------------ | ----------------------------------- | ---------------------------------------------------- | ------------------------------- |
-| [CI](#ci)                            | `workflows/ci.yml`                  | PR to `develop` / `staging` / `main`; manual         | Validate workspace              |
-| [Release Staging](#release-staging)  | `workflows/release-staging.yml`     | Push to `staging` (path-filtered); manual            | Orchestrates the three deploys  |
-| [Deploy Convex](#deploy-convex)      | `workflows/deploy-convex.yml`       | `workflow_call`; manual                              | Azure App Service (self-hosted) |
-| [Deploy API](#deploy-api)            | `workflows/deploy-api.yml`          | `workflow_call`; manual                              | Azure App Service               |
-| [Deploy UI](#deploy-ui)              | `workflows/deploy-ui.yml`           | `workflow_call`; manual                              | Azure Static Web App            |
-| [Release Please](#release-please)    | `workflows/release-please.yml`      | Push to `main`                                       | GitHub Release + version tags   |
-
-All jobs run on **Node 24** and use the pnpm version declared by the root
-`package.json` `packageManager` field. Deploy jobs authenticate to Azure with
-**OIDC federated credentials** — no stored passwords.
+It runs on infrastructure you control: PostgreSQL as the system of record, self-hosted Convex for
+realtime. Convex Cloud is not used in any environment.
 
 ---
 
-## CI
+## Features
 
-**File:** `workflows/ci.yml`
+The table structure mirrors the app's sidebar navigation groups.
 
-Runs on every pull request targeting `develop`, `staging`, or `main`. Can also be
-triggered manually via `workflow_dispatch`.
+### Dashboard
 
-### What it does
+| Feature | What it does | Convex live function | Route |
+|---|---|---|---|
+| **Dashboard** | Home screen: stat cards (total retros, teams, cards created, total votes), recent retros list, active survey and poll counts, quick-action links. | — | `/dashboard` |
 
-Two jobs run in parallel:
+### Ceremonies
 
-- **`audit`** — `pnpm audit --prod --audit-level high`, failing the build on known
-  High/Critical advisories in production dependencies (scoped to `--prod` so
-  devDependency-only advisories don't block merges).
-- **`validate`** — installs with `--frozen-lockfile`, then lints, type-checks, and
-  tests the workspace.
+| Feature | What it does | Convex live function | Route |
+|---|---|---|---|
+| **Retrospectives** | Phased boards moving through `draft → waiting → active → grouping → voting → discussing → completed`. Cards, threaded comments, voting, carry-forward across sessions, templates (Start/Stop/Continue, 4Ls, Mad/Sad/Glad, and more), action items, emailed reports. | `liveRetros` | `/retros` |
+| **Story Estimate** | Real-time story estimate sessions: rounds, participant votes, reveal, consensus tracking, per-story revote, built-in timer, emailed reports. Fully templated (Fibonacci, T-shirt sizes, and custom). | `liveEstimates` | `/estimate` |
+| **Standups** | Async daily standup cadence per team: entries and submissions by date, skip days, comments on submissions, emoji reactions, send-report, team activity view. | `liveStandups` | `/standups` |
 
-### Concurrency
+### Engagement
 
-Grouped by branch/PR ref (`ci-<head_ref|ref_name>`). A new push to the same PR
-branch cancels any in-progress run to save runner minutes.
+| Feature | What it does | Convex live function | Route |
+|---|---|---|---|
+| **Icebreakers** | Facilitated icebreaker sessions: prompt-based swipe/advance flow with a built-in timer. A session either picks an icebreaker template or uses host-authored one-off prompts. Icebreaker templates are managed in the Admin Panel (`/admin/templates`), not `/templates`. | `liveIcebreakers` | `/icebreakers` |
+| **Polls** | Quick-vote polls with a voting lifecycle (open → voted → closed) and email distribution. | `livePolls` | `/polls` |
+| **Surveys** | Team or org-scoped surveys with typed questions (multiple-choice, open text). Create, distribute, collect responses, close, and email results. | `liveSurveys` | `/surveys` |
 
-### Permissions
+### Library
 
-Read-only (`contents: read`). No secrets needed.
+| Feature | What it does | Convex live function | Route |
+|---|---|---|---|
+| **Templates** | Browse and manage retro templates and estimate templates — both built-in and org-custom. Retro templates define card columns; estimate templates define point scales. Icebreaker templates live in the Admin Panel (`/admin/templates`) instead. | — | `/templates` |
+| **Reports** | Analytics dashboards: retro completion rates, card/vote counts, action-item health, and more. | — | `/reports` |
 
----
+### Account
 
-## Release Staging
+| Feature | What it does | Convex live function | Route |
+|---|---|---|---|
+| **Organizations** | Top-level multi-tenant boundary. Org-owners and org-admins manage members and settings. | — | `/organizations` |
+| **Teams** | Teams within an org. Team-leads and members; fine-grained team roles. | `liveTeamMembers` | `/teams` |
+| **Profile** | User profile, password/security settings, notification preferences, and active session management. | — | `/profile` |
 
-**File:** `workflows/release-staging.yml`
+### Admin Panel
 
-The staging deploy orchestrator. It is the only workflow with a branch push
-trigger for deploys — the three `deploy-*` workflows are reusable and are called
-from here (or run manually).
-
-### Trigger
-
-- **Automatic:** push to `staging` when files change in `convex-backend/**`,
-  `infra/**`, `packages/shared/contracts/**`, `retro-tool-api/**`,
-  `retro-tool-ui/**`, or any of the `deploy-*.yml` / `release-staging.yml`
-  workflow files.
-- **Manual:** `workflow_dispatch`.
-
-### Jobs
-
-Reusable workflows called in strict order (`secrets: inherit`):
-
-```
-convex ──▶ api ──▶ ui
-```
-
-- `convex` → `deploy-convex.yml`
-- `api` → `deploy-api.yml` (needs `convex`)
-- `ui` → `deploy-ui.yml` (needs `api`)
-
-### Concurrency
-
-Group `staging-release`, `cancel-in-progress: false` — overlapping staging
-releases queue rather than cancel, so a deploy is never interrupted mid-flight.
+Visible only to `super-admin` and `system-admin` roles. Route `/admin`. Includes the Convex projection health tools described in Platform Capabilities below.
 
 ---
 
-## Deploy Convex
+### Platform Capabilities
 
-**File:** `workflows/deploy-convex.yml`
+Supporting modules that power the nav features above — not direct sidebar entries.
 
-Provisions and updates the **single self-hosted Convex staging backend on Azure
-App Service** (not Convex Cloud, not Azure Container Apps), then deploys the
-Convex functions. The open-source Convex backend is single-instance, so backend
-image changes are applied **stop-first** — scale-out/slots against live Convex
-state are unsafe.
-
-### Trigger
-
-`workflow_call` (from Release Staging) or `workflow_dispatch`.
-
-### Fixed environment constants
-
-Defined in the workflow `env`: resource group `retrotool-staging-rg`, ACR
-`retrotoolstagingacr`, web app `retrotool-staging-convex`, API base
-`https://retrotool-staging-api.azurewebsites.net`.
-
-### Jobs
-
-```
-validate ──▶ deploy
-```
-
-#### 1. Validate
-
-- Type-checks and lints `convex-backend`.
-- Validates `convex-backend/compatibility.json`: the staging image must be pinned
-  by `@sha256:` digest, and the manifest's `convexSdkVersion` must match the
-  `convex` dependency in `convex-backend/package.json`.
-- Logs into Azure (OIDC) and validates `infra/convex-staging.bicep`
-  (`az bicep build`).
-
-#### 2. Deploy
-
-Runs in the `staging` GitHub environment. Key steps:
-
-1. Verifies the required staging secrets are present (`CONVEX_INSTANCE_SECRET`,
-   `CONVEX_POSTGRES_URL`, `CONVEX_SELF_HOSTED_ADMIN_KEY`).
-2. Resolves the desired digest-pinned image from `compatibility.json`.
-3. Enforces the single-instance invariant — refuses to deploy if the app has more
-   than one worker.
-4. Detects whether the backend image is changing by comparing the app's
-   `linuxFxVersion` to the desired `DOCKER|<image>`.
-5. **When the image is changing:** takes a verified `convex export` (uploaded as a
-   30-day retained artifact), then pauses the projection outbox (via the API,
-   using `API_ADMIN_TOKEN`) and stops the web app (stop-first upgrade).
-6. Provisions `infra/convex-staging.bicep` (`az deployment group create`) with the
-   image, instance secret, and Postgres URL.
-7. Starts the web app and waits for `/version` readiness (up to 60 attempts).
-8. Verifies exactly one running instance.
-9. Sets the Convex function env for JWT auth (`JWT_ISSUER`, `JWT_AUDIENCE=convex`,
-   `JWT_JWKS_URL=<API_URL>/api/auth/jwks`) and runs `convex deploy`.
-10. Re-checks `/version` health.
-11. **After an image change:** resumes the projection outbox (replaying buffered
-    events) and triggers a full projection reconciliation, both via the API's
-    `/api/convex-admin` endpoints.
-
-The outbox pause/resume and reconcile calls hit
-`POST /api/convex-admin/outbox/pause`, `.../outbox/resume`, and
-`.../reconcile-projections`. They require a super-admin bearer token
-(`API_ADMIN_TOKEN`); if it is unset the steps warn and continue (events still
-buffer durably).
-
-### Concurrency
-
-Group `deploy-convex-staging`, `cancel-in-progress: false`.
+| Capability | What it does | Notes |
+|---|---|---|
+| **Action Items** | Per-retro action items with carry-forward so unresolved items surface in the next session. | Surfaces inside `/retros/:id`; tracked via `liveRetros` |
+| **Notifications** | In-app notification centre + browser push notifications (VAPID via `web-push`). | Bell icon in header; `liveNotifications` |
+| **Email** | Transactional email via Resend: invites, OTP verification, password reset, weekly digest, retro / standup reports. | — |
+| **Auth & Sessions** | Email + password, email OTP, passkey, and Microsoft OAuth — all via Better Auth with multi-session support. | `/auth` |
+| **Invitations** | Org and team invitations by email; accept-invite journey with onboarding. | — |
+| **User Preferences** | Per-user notification preferences and appearance settings. | Accessible from `/profile` |
+| **Convex Admin** | Projection outbox management (pause / resume / replay), full reconciliation, cron config, usage metrics. Super-admin only. | Under `/admin` (Admin Panel) |
 
 ---
 
-## Deploy API
-
-**File:** `workflows/deploy-api.yml`
-
-Builds and pushes the API image to ACR, migrates and seeds the database, then
-deploys the container to **Azure App Service**.
-
-### Trigger
-
-`workflow_call` (from Release Staging) or `workflow_dispatch`. There is no branch
-push trigger here — the push trigger lives in `release-staging.yml`.
-
-### Environment
-
-The `set-env` job hard-codes the target to `staging`; all deploy jobs run in the
-`staging` GitHub environment.
-
-### Jobs
+## Monorepo Layout
 
 ```
-validate → set-env → build → migrate → seed → deploy
+retro-tool/
+├── retro-tool-api/        # NestJS 11 REST backend (all durable state)
+│   ├── src/               # One subfolder per module (controller, service, schema, dto, types)
+│   └── drizzle/           # Postgres migrations
+├── retro-tool-ui/         # React 19 + TanStack Router SPA
+│   ├── src/routes/        # File-based routing
+│   └── docs/              # VitePress end-user guide (served at /docs)
+├── convex-backend/        # Self-hosted Convex realtime projection layer
+│   └── convex/            # live*.ts functions + schema + rateLimits
+├── packages/
+│   └── shared/contracts/  # Shared TypeScript contracts (UI ↔ Convex)
+├── infra/                 # Azure Bicep templates (CLI-only; not in CI)
+├── docker/                # docker-compose.local.yml for local dev
+├── .github/workflows/     # CI/CD (see workflows/README.md)
+└── docs/                  # Internal maintainer documentation (this tree)
 ```
-
-#### 1. Validate
-
-Lint, type-check, `test:ci`, and build for `retro-tool-api`.
-
-#### 2. Set Environment
-
-Emits `environment=staging`.
-
-#### 3. Build
-
-- Azure login (OIDC), then `az acr login`.
-- Builds the API image from `retro-tool-api/Dockerfile` (workspace-root context).
-- Tags with `staging-<sha8>`, `staging-latest`, and `staging-v<package.json version>`
-  (the version tag makes rollbacks read as `v1.1.0 → v1.0.3` instead of SHA
-  archaeology), and pushes all three.
-
-#### 4. Migrate
-
-- Installs and builds the API, verifies `dist/main.js` exists.
-- Runs a DNS preflight against the `DATABASE_URL` host (fails early with guidance
-  if the Flexible Server FQDN doesn't resolve from GitHub-hosted runners).
-- Runs `pnpm db:migrate` against `DATABASE_URL`.
-
-#### 5. Seed
-
-Runs the idempotent seeders from `dist/seed/`: retro templates, estimate
-templates, and team roles.
-
-#### 6. Deploy
-
-- Validates required deploy config (resource group, web app name, ACR, image tag,
-  frontend URL, Convex sync URL, email-from, `DATABASE_URL`, `BETTER_AUTH_SECRET`)
-  and warns on commonly-missing optional secrets (Convex admin key, VAPID keys).
-  Also validates that the Microsoft OAuth client-id/secret pair is complete.
-- Azure login (OIDC), then sets App Service app settings (non-secret env such as
-  `NODE_ENV`, `PORT=8080`, CORS origins, `CONVEX_SYNC_URL`, cron flags,
-  `MICROSOFT_TENANT_ID`, `EMAIL_FROM`) and secret app settings (`DATABASE_URL`,
-  `BETTER_AUTH_SECRET`/`_URL`, Microsoft client id/secret, `RESEND_API_KEY`,
-  `CONVEX_SYNC_ADMIN_KEY`, VAPID keys).
-- Verifies the web app pulls from ACR via managed identity
-  (`acrUseManagedIdentityCreds`), failing with a pointer to the Bicep
-  provisioning command if not.
-- Sets the container image (`az webapp config container set`) and restarts the app.
-- Polls `/health/ready` until HTTP 200 (up to 60 attempts).
-- On failure, collects Kudu Docker logs (with Azure CLI log fallbacks).
-
-### Concurrency
-
-Group `deploy-api-<ref_name>`, `cancel-in-progress: false` — deploys queue rather
-than cancel to avoid mid-deploy conflicts.
 
 ---
 
-## Deploy UI
+## Architecture in Brief
 
-**File:** `workflows/deploy-ui.yml`
-
-Builds the Vite SPA and deploys it to an **Azure Static Web App**.
-
-### Trigger
-
-`workflow_call` (from Release Staging) or `workflow_dispatch`.
-
-### Environment
-
-`set-env` hard-codes `staging`; the deploy job runs in the `staging` GitHub
-environment.
-
-### Jobs
+**PostgreSQL is the system of record.** All durable writes go to Postgres via the NestJS API.
+Convex holds only active collaboration snapshots — the API pushes a projection after each mutation.
+No business logic lives in Convex mutations; Convex is purely a real-time read layer.
 
 ```
-validate → set-env → deploy
+Browser ──REST──▶ NestJS API ──Drizzle──▶ PostgreSQL
+           │                     │
+     Convex SDK              projection
+           │                   push
+           └──subscribe──▶  Convex (snapshot)
 ```
 
-#### 1. Validate
+Every deployed environment (staging, production, and local Docker) runs its own self-hosted Convex
+instance — Convex Cloud is not used anywhere.
 
-Lint, type-check, and test for `retro-tool-ui`.
-
-#### 2. Deploy (build + upload)
-
-- Validates the required UI build variables (see below), including that every
-  realtime backend flag is `socket-io` or `convex`, that `VITE_APP_ENV` is one of
-  `local|development|staging|production`, and — if any realtime backend is
-  `convex` — that `VITE_CONVEX_URL` is set. URLs are parsed to confirm validity.
-- Resolves the app version from `retro-tool-ui/package.json`.
-- Builds with `pnpm --filter retro-tool-ui build`, passing all Vite build-time env.
-- Deploys the built `retro-tool-ui/dist` via `Azure/static-web-apps-deploy@v1`
-  (`skip_app_build` / `skip_api_build` — the build already ran).
-
-#### Vite build variables (all required)
-
-| Variable                                | Source (GitHub Actions variable)      |
-| --------------------------------------- | ------------------------------------- |
-| `VITE_APP_VERSION`                      | `v<retro-tool-ui package version>`    |
-| `VITE_APP_TITLE`                        | `vars.VITE_APP_TITLE`                 |
-| `VITE_APP_ENV`                          | `vars.VITE_APP_ENV`                   |
-| `VITE_API_URL`                          | `vars.VITE_API_URL`                   |
-| `VITE_CONVEX_URL`                       | `vars.VITE_CONVEX_URL`                |
-| `VITE_ESTIMATES_REALTIME_BACKEND`       | `vars.VITE_ESTIMATES_REALTIME_BACKEND`      |
-| `VITE_RETROS_REALTIME_BACKEND`          | `vars.VITE_RETROS_REALTIME_BACKEND`         |
-| `VITE_ICEBREAKERS_REALTIME_BACKEND`     | `vars.VITE_ICEBREAKERS_REALTIME_BACKEND`    |
-| `VITE_STANDUPS_REALTIME_BACKEND`        | `vars.VITE_STANDUPS_REALTIME_BACKEND`       |
-| `VITE_NOTIFICATIONS_REALTIME_BACKEND`   | `vars.VITE_NOTIFICATIONS_REALTIME_BACKEND`  |
-
-> **Note — no migration step.** The UI is a static SPA; there's no database to migrate.
-
-### Concurrency
-
-Group `deploy-ui-<ref_name>`, `cancel-in-progress: false`.
+Full detail: [`../docs/architecture/overview.md`](../docs/architecture/overview.md) and
+[`../docs/architecture/convex.md`](../docs/architecture/convex.md).
 
 ---
 
-## Release Please
+## Tech Stack
 
-**File:** `workflows/release-please.yml`
-
-Automated lockstep releases. On every push to `main`, `release-please` parses the
-conventional-commit history and maintains a "release PR" that accumulates the
-changelog and version bump (`feat` → minor, `fix` → patch, `feat!`/`BREAKING
-CHANGE` → major). Merging that PR bumps every `package.json` version in lockstep,
-updates `CHANGELOG.md`, tags `vX.Y.Z`, and creates the GitHub Release.
-
-Uses `googleapis/release-please-action@v4` with `release-please-config.json` and
-`.release-please-manifest.json`. Needs `contents: write` and
-`pull-requests: write`; authenticates with the default `GITHUB_TOKEN`.
-
----
-
-## Required GitHub Configuration
-
-### Environments
-
-Deploys run in a single GitHub Environment: **staging**. Add a required reviewer
-gate on it if you want manual approval before staging deploys.
-
-### Azure OIDC (all deploy workflows)
-
-| Name (secret or variable) | Description               |
-| ------------------------- | ------------------------- |
-| `AZURE_CLIENT_ID`         | App registration client ID (OIDC login) |
-| `AZURE_TENANT_ID`         | Azure AD tenant ID        |
-| `AZURE_SUBSCRIPTION_ID`   | Azure subscription ID     |
-
-### Deploy API
-
-| Name                        | Kind          | Description                                   |
-| --------------------------- | ------------- | --------------------------------------------- |
-| `ACR_LOGIN_SERVER`          | var/secret    | ACR login server (`<name>.azurecr.io`)        |
-| `API_IMAGE_REPOSITORY`      | var/secret    | Image repo (default `retro-tool-api`)         |
-| `AZURE_RESOURCE_GROUP`      | var/secret    | Resource group of the API web app             |
-| `API_WEBAPP_NAME`           | var/secret    | API App Service name                          |
-| `FRONTEND_URL` / `SWA_URL`  | var/secret    | Frontend origin (CORS + Better Auth)          |
-| `CONVEX_SYNC_URL`           | var/secret    | Convex admin URL for projection writes        |
-| `EMAIL_FROM`                | var/secret    | Sender address                                |
-| `DATABASE_URL`              | secret/var    | Postgres connection string (migrate + deploy) |
-| `BETTER_AUTH_SECRET`        | secret/var    | Session signing secret                        |
-| `MICROSOFT_CLIENT_ID`       | secret/var    | Better Auth Microsoft provider (falls back to `AZURE_CLIENT_ID`) |
-| `MICROSOFT_CLIENT_SECRET`   | secret/var    | Better Auth Microsoft provider                |
-| `MICROSOFT_TENANT_ID`       | var/secret    | Falls back to `AZURE_TENANT_ID`               |
-| `RESEND_API_KEY`            | secret/var    | Transactional email                           |
-| `CONVEX_SYNC_ADMIN_KEY`     | secret/var    | Convex admin key (warns if unset)             |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | var/secret | Web push (warns if unset) |
-
-### Deploy Convex
-
-| Name                          | Kind   | Description                                          |
-| ----------------------------- | ------ | ---------------------------------------------------- |
-| `CONVEX_INSTANCE_SECRET`      | secret | Convex backend instance secret                       |
-| `CONVEX_POSTGRES_URL`         | secret | Postgres URL backing the Convex backend              |
-| `CONVEX_SELF_HOSTED_ADMIN_KEY`| secret | Admin key for `convex export` / `convex deploy`      |
-| `API_ADMIN_TOKEN`             | secret | Super-admin bearer for outbox pause/resume + reconcile (optional; warns if unset) |
-
-> Resource group, ACR name, web app name, and API base URL for Convex are fixed
-> constants in the workflow `env`, not repo configuration.
-
-### Deploy UI
-
-| Name                    | Kind   | Description                                    |
-| ----------------------- | ------ | ---------------------------------------------- |
-| `SWA_DEPLOYMENT_TOKEN`  | secret | Azure Static Web App deployment token          |
-| `VITE_*` (table above)  | var    | Build-time Vite variables                      |
-
-`GITHUB_TOKEN` (auto-provided) is used by both the UI deploy action and
-release-please.
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TanStack Router (file-based), TanStack Query / Form / Table |
+| Styling | TailwindCSS 4, Radix UI, shadcn/ui pattern |
+| Auth client | Better Auth |
+| Realtime (UI) | Convex React SDK (self-hosted) |
+| API | NestJS 11, TypeScript |
+| Database | PostgreSQL 16 via Drizzle ORM |
+| Auth server | Better Auth + `@thallesp/nestjs-better-auth` |
+| Realtime projection | Self-hosted Convex (Docker locally, Azure App Service for staging + production) |
+| Email | Resend |
+| Push notifications | `web-push` (VAPID) |
+| Scheduler | `@nestjs/schedule` |
+| Validation | `class-validator` + Zod |
+| Infrastructure | Azure Bicep (CLI-only; no IaC in CI) |
+| CI/CD | GitHub Actions |
 
 ---
 
-## Path Filters
+## Quick Start
 
-Only `release-staging.yml` filters by path; the reusable `deploy-*` workflows have
-no push trigger of their own. CI runs on any PR.
+```bash
+# Install all workspace dependencies
+pnpm install
 
-| Workflow        | Monitored paths                                                                 |
-| --------------- | ------------------------------------------------------------------------------- |
-| CI              | All PRs to `develop` / `staging` / `main`                                        |
-| Release Staging | `convex-backend/**`, `infra/**`, `packages/shared/contracts/**`, `retro-tool-api/**`, `retro-tool-ui/**`, the `deploy-*.yml` + `release-staging.yml` files |
-| Deploy Convex / API / UI | Reusable (`workflow_call`) or manual — no path filter                   |
-| Release Please  | Push to `main` — no path filter                                                  |
+# Full local stack (Docker: Postgres + self-hosted Convex + apps)
+pnpm local:up
+
+# Or: start only infra, then run apps natively
+pnpm local:infra
+pnpm dev:api       # NestJS on :8000
+pnpm dev:ui        # Vite on :3000
+pnpm dev:convex    # Convex function watcher
+```
+
+Local service URLs:
+
+| Service | URL |
+|---|---|
+| UI | `http://localhost:3000` |
+| API | `http://localhost:8000` |
+| Swagger | `http://localhost:8000/api/docs` |
+| Convex Admin API | `http://localhost:3210` |
+| Convex Dashboard | `http://localhost:6791` |
+| PostgreSQL | `localhost:5432` |
+
+Full instructions (env files, staging/prod local dev, seed workflow):
+[`../docs/workflows/running-the-app.md`](../docs/workflows/running-the-app.md).
 
 ---
 
-## Visual Pipeline Flow
+## CI/CD
 
-### Pull request (CI only)
+| Branch | Automatic deploy | Manual dispatch available |
+|---|---|---|
+| `staging` | Convex → API → UI to staging (via `release-staging.yml`) | Yes |
+| `main` | Release Please only (changelog + version tag) | `deploy-api`, `deploy-ui`, `deploy-convex-production` → production |
 
-```
-┌──────────────────────────────────────────┐
-│                 ci.yml                     │
-│  audit (pnpm audit --prod)                 │
-│  validate (install → lint → type-check     │
-│            → test)                         │
-└──────────────────────────────────────────┘
-```
+Full workflow reference (all jobs, secrets, environment constants, path filters):
+[`workflows/README.md`](workflows/README.md).
 
-### Push to staging (staging deploy)
+---
 
-```
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│    convex    │──▶ │     api      │──▶ │      ui      │
-│ (App Service │    │ (App Service │    │ (Static Web  │
-│  stop-first) │    │  + migrate/  │    │  App build   │
-│              │    │  seed)       │    │  + upload)   │
-└──────────────┘    └──────────────┘    └──────────────┘
-```
+## Documentation Index
 
-### Push to main (release automation)
+### Guidelines
 
-```
-┌───────────────────────────────────────────────┐
-│               release-please.yml                │
-│  parse commits → maintain release PR →          │
-│  (on merge) bump versions, changelog, tag       │
-└───────────────────────────────────────────────┘
-```
+| Doc | What it covers |
+|---|---|
+| [`../docs/guidelines/ai-agent-guidelines.md`](../docs/guidelines/ai-agent-guidelines.md) | Vendor-neutral workflow and safety checklist for AI-assisted changes |
+| [`../docs/guidelines/coding-guidelines.md`](../docs/guidelines/coding-guidelines.md) | Numbered rulebook: folders, naming, TypeScript, readability, React, NestJS, checks, scripts, versioning |
+| [`../docs/guidelines/file-naming-conventions.md`](../docs/guidelines/file-naming-conventions.md) | UI file naming: kebab-case files, idiomatic export names, route-file exception |
+| [`../docs/guidelines/user-guide-docs.md`](../docs/guidelines/user-guide-docs.md) | How the VitePress end-user guide (`retro-tool-ui/docs/`) is built and run |
+
+### Architecture
+
+| Doc | What it covers |
+|---|---|
+| [`../docs/architecture/overview.md`](../docs/architecture/overview.md) | System architecture: components, data flow, tech stack, module tree |
+| [`../docs/architecture/cloud.md`](../docs/architecture/cloud.md) | Azure cloud architecture: every resource by environment, topology, SKUs, cost posture, deploy workflows |
+| [`../docs/architecture/convex.md`](../docs/architecture/convex.md) | Convex topology, keys/secrets, projection schema, NestJS→Convex sync, UI consumption, deploy workflow |
+| [`../docs/architecture/convex-concurrency.md`](../docs/architecture/convex-concurrency.md) | How the projection layer stays correct under concurrent writes (OCC, point reads, idempotency) |
+| [`../docs/architecture/caching.md`](../docs/architecture/caching.md) | TanStack Query config/invalidation; Convex as the realtime read-reduction layer; no server-side cache |
+
+### Security
+
+| Doc | What it covers |
+|---|---|
+| [`../docs/security/frontend.md`](../docs/security/frontend.md) | UI security: token storage, what's in the browser, XSS/CSP posture, route/RBAC gating, residual risk |
+| [`../docs/security/backend-api.md`](../docs/security/backend-api.md) | API hardening: Helmet, rate limiting (throttler + Better Auth), CORS, CSRF posture |
+| [`../docs/security/database.md`](../docs/security/database.md) | DB security: TLS to Azure Postgres, credential injection, SQL-injection posture, no-RLS reality |
+| [`../docs/security/authentication.md`](../docs/security/authentication.md) | Every sign-in method (password, email-OTP, passkey, Microsoft OAuth), credential model, flow map |
+| [`../docs/security/convex-nestjs-auth.md`](../docs/security/convex-nestjs-auth.md) | Convex↔NestJS trust: RS256 JWT issue/verify, JWKS exchange, config alignment |
+| [`../docs/security/authorization-rbac.md`](../docs/security/authorization-rbac.md) | Full permission matrices (system / org / team / retro), helper signatures, user-status lifecycle |
+
+### Database
+
+| Doc | What it covers |
+|---|---|
+| [`../docs/database/schema.md`](../docs/database/schema.md) | Every table by domain (columns, keys, FKs, indexes), all enums, entity-relationship diagram |
+
+### Infrastructure (Azure Bicep)
+
+| Doc | What it covers |
+|---|---|
+| [`../docs/infra/provisioning.md`](../docs/infra/provisioning.md) | Command reference for `infra/` Bicep templates: login/deploy/what-if/destroy, secrets checklist |
+| [`../docs/infra/oidc.md`](../docs/infra/oidc.md) | GitHub Actions OIDC federated-credential setup, troubleshooting |
+
+### Deployment
+
+| Doc | What it covers |
+|---|---|
+| [`../docs/deployment/azure-resources.md`](../docs/deployment/azure-resources.md) | Azure resource inventory (legacy pre-Bicep production names); links to provisioning commands |
+| [`../docs/deployment/convex-self-hosting.md`](../docs/deployment/convex-self-hosting.md) | Running Convex in Docker (local + production): env vars, admin key, ports, troubleshooting |
+| [`../docs/deployment/convex-staging-runbook.md`](../docs/deployment/convex-staging-runbook.md) | Phase-by-phase staging Convex self-hosting deploy and rollback runbook |
+| [`../docs/deployment/convex-production-runbook.md`](../docs/deployment/convex-production-runbook.md) | Phase-by-phase production Convex self-hosting deploy and rollback runbook |
+| [`../docs/deployment/convex-azure-self-hosting-plan.md`](../docs/deployment/convex-azure-self-hosting-plan.md) | Architecture and decision plan for self-hosting Convex on Azure App Service |
+| [`../docs/deployment/new-azure-subscription.md`](../docs/deployment/new-azure-subscription.md) | End-to-end deploy of Retro Tool to a brand-new Azure subscription |
+| [`../docs/deployment/release-and-branch-strategy.md`](../docs/deployment/release-and-branch-strategy.md) | Branch model, release-please lockstep versioning, conventional commits, deployment triggers |
+| [`../docs/deployment/scaling-self-hosted-convex.md`](../docs/deployment/scaling-self-hosted-convex.md) | Options when a single self-hosted Convex instance becomes the throughput ceiling (proposed) |
+
+### Workflows
+
+| Doc | What it covers |
+|---|---|
+| [`../docs/workflows/running-the-app.md`](../docs/workflows/running-the-app.md) | Running locally, against staging, and against production |
+| [`../docs/workflows/invitations-and-onboarding.md`](../docs/workflows/invitations-and-onboarding.md) | Org and team invitations, accept-invite journey, onboarding and password rules |
+| [`../docs/workflows/app-flows.md`](../docs/workflows/app-flows.md) | Every major user-facing flow: auth, org, team, retro, estimates, notifications |
+| [`../docs/workflows/email.md`](../docs/workflows/email.md) | Email-triggered UI flows: verification, password reset, org invite, team join request, retro report |
+
+### Root
+
+| Doc | What it covers |
+|---|---|
+| [`../docs/future-roadmap.md`](../docs/future-roadmap.md) | Planned features: AI summaries, Jira/ADO export, SAML, Team Spaces |
+| [`../docs/README.md`](../docs/README.md) | Full documentation index |
+
+### Package READMEs
+
+| Package | README |
+|---|---|
+| NestJS API | [`../retro-tool-api/README.md`](../retro-tool-api/README.md) |
+| React UI | [`../retro-tool-ui/README.md`](../retro-tool-ui/README.md) |
+| Convex backend | [`../convex-backend/README.md`](../convex-backend/README.md) |
+
+### End-user guide
+
+The user-facing guide lives in `retro-tool-ui/docs/` and is built with VitePress. It is served
+same-origin at `/docs` from the Azure Static Web App. Do not edit it here — see
+[`../docs/guidelines/user-guide-docs.md`](../docs/guidelines/user-guide-docs.md) for the maintainer
+reference (architecture, how to run it, adding pages, deploy).
