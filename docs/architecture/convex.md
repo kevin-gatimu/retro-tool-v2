@@ -203,6 +203,8 @@ super-admin endpoint and a scheduled cron
 to purge stale projection rows, surfaced in the admin UI at `/admin/convex`
 (immediate "Clear Tables Now" + a recurring "Scheduled Cleanup").
 
+The same admin page exposes Metrics, Health, and Insights views for the self-hosted deployment. NestJS proxies Convex's authenticated `/api/app_metrics/*` timeseries endpoints and `/version`, keeping `CONVEX_SYNC_ADMIN_KEY` server-side. Supported windows include 15 minutes, 1 hour, 6 hours, day, week, month, quarter, and year; adaptive bucket counts keep long-range requests bounded and charts readable. The UI polls less frequently for longer windows, renders the returned buckets with Recharts, and displays structured observations with evidence, impact, and recommended actions. “Peak running” is observed concurrency, not a configured capacity ceiling—capacity pressure is inferred from persistent queueing together with lag or failures. These operational endpoints are internal to the self-hosted Convex dashboard, so their request and response contract is isolated in `ConvexAdminService`.
+
 `clearTables` enforces an allowlist — the `CLEARABLE_TABLES` constant in
 [admin.ts](../../convex-backend/convex/admin.ts) — and the UI's table list in
 [convex.tsx](../../retro-tool-ui/src/routes/admin/convex.tsx) mirrors it exactly.

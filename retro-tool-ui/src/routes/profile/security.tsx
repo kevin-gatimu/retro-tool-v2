@@ -413,8 +413,8 @@ function SecurityPage() {
       title: 'Two-Factor Authentication',
       description:
         'Add an extra layer of security to your account by requiring a code from your phone.',
-      status: 'disabled',
-      action: 'Enable',
+      status: 'coming-soon',
+      action: 'Coming soon',
     },
     {
       icon: Lock,
@@ -642,7 +642,11 @@ function SecurityPage() {
                           : 'bg-muted text-muted-foreground'
                       }`}
                     >
-                      {feature.status === 'enabled' ? 'Enabled' : 'Disabled'}
+                      {feature.status === 'enabled'
+                        ? 'Enabled'
+                        : feature.status === 'coming-soon'
+                          ? 'Coming soon'
+                          : 'Disabled'}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
@@ -650,23 +654,16 @@ function SecurityPage() {
                   </p>
                 </div>
               </div>
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={feature.status === 'coming-soon'}
+              >
                 {feature.action}
               </Button>
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Login Activity */}
-      <div className="bg-card rounded-xl border border-border p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4">
-          Recent Login Activity
-        </h2>
-        <p className="text-sm text-muted-foreground mb-4">
-          Review recent sign-in activity on your account.
-        </p>
-        <Button variant="outline">View Login History</Button>
       </div>
     </div>
   )

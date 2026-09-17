@@ -11,13 +11,72 @@ export type OutboxExecutor =
   | NodePgDatabase<typeof adminSchema>
   | PgTransaction<never, typeof adminSchema, never>;
 
+export type MetricPoint = {
+  timestamp: string;
+  value: number | null;
+};
+
+export type NamedMetricSeries = {
+  name: string;
+  points: MetricPoint[];
+};
+
+export type MetricFetchError = {
+  metric: string;
+  message: string;
+};
+
+export type ConvexHealthStatus = 'healthy' | 'degraded' | 'unavailable';
+
+export type ConvexHealthCheck = {
+  name: string;
+  status: ConvexHealthStatus;
+  message: string;
+  value?: number;
+  unit?: string;
+};
+
+export type ConvexInsight = {
+  severity: 'info' | 'warning' | 'critical';
+  category: 'capacity' | 'reliability' | 'performance' | 'activity';
+  title: string;
+  description: string;
+  evidence: string;
+  impact: string;
+  recommendation: string;
+};
+
 export type OperationalMetrics = {
-  topFunctions: Array<{ identifier: string; calls: number }>;
-  cacheHitPercentage: number | null;
-  latencyPercentiles: { p50: number; p95: number; p99: number } | null;
-  scheduledJobLag: number | null;
-  functionConcurrency: number | null;
-  tableRates: Array<{ tableName: string; reads: number; writes: number }>;
+  generatedAt: string;
+  rangeMinutes: number;
+  bucketCount: number;
+  bucketMinutes: number;
+  status: 'available' | 'partial' | 'unavailable';
+  errors: MetricFetchError[];
+  functionCalls: NamedMetricSeries[];
+  failurePercentages: NamedMetricSeries[];
+  cacheHitPercentages: NamedMetricSeries[];
+  subscriptionInvalidations: NamedMetricSeries[];
+  scheduledJobLag: MetricPoint[];
+  concurrency: {
+    running: NamedMetricSeries[];
+    queued: NamedMetricSeries[];
+  };
+  summaries: {
+    totalCalls: number | null;
+    maxFailurePercentage: number | null;
+    averageCacheHitPercentage: number | null;
+    maxScheduledJobLagSeconds: number | null;
+    peakRunning: number | null;
+    peakQueued: number | null;
+    averageCallsPerMinute: number | null;
+    queuedBucketPercentage: number | null;
+  };
+  health: {
+    status: ConvexHealthStatus;
+    checks: ConvexHealthCheck[];
+  };
+  insights: ConvexInsight[];
 };
 
 export type UsageMetrics = {
