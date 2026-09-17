@@ -87,10 +87,8 @@ function setEnv(file, key, value) {
 }
 
 function envValue(content, key) {
-  return content
-    .match(new RegExp(`^${key}=(.*)$`, 'm'))?.[1]
-    .trim()
-    .replace(/^['"]|['"]$/g, '');
+  const raw = content.match(new RegExp(`^${key}=(.*)$`, 'm'))?.[1];
+  return raw?.trim().replace(/^['"]|['"]$/g, '');
 }
 
 function ensureLocalSecrets() {
