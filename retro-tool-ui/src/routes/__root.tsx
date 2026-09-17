@@ -11,6 +11,7 @@ import { useEffect } from 'react'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { NotificationBell } from '@/components/notification-bell'
+import { SessionLifecycleManager } from '@/components/session-lifecycle-manager'
 import { ThemeProvider } from '@/components/theme-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
@@ -120,6 +121,7 @@ function AuthenticatedLayout() {
 
   return (
     <SidebarProvider>
+      <SessionLifecycleManager sessionId={session.session.id} />
       <AppSidebar />
       <SidebarInset className="bg-background">
         <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card px-4 relative z-40">

@@ -276,7 +276,8 @@ jobs:
               CONVEX_SYNC_URL='${{ vars.CONVEX_SYNC_URL || secrets.CONVEX_SYNC_URL }}' \
               ENABLE_CRON_JOBS='true' \
               WEEKLY_DIGEST_SEND_HOUR='6' \
-              BETTER_AUTH_SESSION_EXPIRES_IN='604800' \
+              BETTER_AUTH_SESSION_EXPIRES_IN='${{ vars.BETTER_AUTH_SESSION_EXPIRES_IN || '1800' }}' \
+              BETTER_AUTH_SESSION_UPDATE_AGE='${{ vars.BETTER_AUTH_SESSION_UPDATE_AGE || '300' }}' \
               MICROSOFT_TENANT_ID='${{ vars.MICROSOFT_TENANT_ID || secrets.MICROSOFT_TENANT_ID || secrets.AZURE_TENANT_ID || vars.AZURE_TENANT_ID }}' \
               EMAIL_FROM='${{ vars.EMAIL_FROM || secrets.EMAIL_FROM }}' \
             --output none

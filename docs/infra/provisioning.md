@@ -203,7 +203,7 @@ pnpm gh:env:sync staging -- --prune             # report GitHub keys missing fro
 
 ### Automated by the deploy pipeline (do NOT add as GitHub vars)
 
-The `deploy-api.yml` workflow computes and pushes these to App Service automatically on every deploy. Adding them as GitHub environment variables causes conflicts.
+The `deploy-api.yml` workflow computes and pushes these to App Service automatically on every deploy. Session-policy values come from GitHub environment variables with secure defaults; adding the other values as GitHub environment variables causes conflicts.
 
 | Setting | Value | How it's set |
 | --- | --- | --- |
@@ -211,7 +211,8 @@ The `deploy-api.yml` workflow computes and pushes these to App Service automatic
 | `NODE_ENV` | `production` | Hardcoded in workflow |
 | `ENABLE_CRON_JOBS` | `true` | Hardcoded in workflow |
 | `WEEKLY_DIGEST_SEND_HOUR` | `6` | Hardcoded in workflow |
-| `BETTER_AUTH_SESSION_EXPIRES_IN` | `604800` | Hardcoded in workflow |
+| `BETTER_AUTH_SESSION_EXPIRES_IN` | `1800` | GitHub environment variable; workflow defaults to 30 minutes |
+| `BETTER_AUTH_SESSION_UPDATE_AGE` | `300` | GitHub environment variable; workflow defaults to 5 minutes |
 | `ALLOWED_ORIGINS` | `{FRONTEND_URL},{API_URL}` | Computed from `FRONTEND_URL` + `API_WEBAPP_NAME` |
 | `BETTER_AUTH_URL` | `https://{API_WEBAPP_NAME}.azurewebsites.net` | Computed from `API_WEBAPP_NAME` |
 | `LOCAL_SERVER_URL` | `https://{API_WEBAPP_NAME}.azurewebsites.net` | Computed from `API_WEBAPP_NAME` |

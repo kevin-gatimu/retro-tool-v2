@@ -525,7 +525,7 @@ a Variable of the same name via `secrets.X || vars.X`).
 > removed from the API — so set every flag to `convex` in practice.
 >
 > Do **not** add `PORT`, `NODE_ENV`, `ENABLE_CRON_JOBS`, `WEEKLY_DIGEST_SEND_HOUR`,
-> `BETTER_AUTH_SESSION_EXPIRES_IN`, `ALLOWED_ORIGINS`, `BETTER_AUTH_URL`,
+> `ALLOWED_ORIGINS`, `BETTER_AUTH_URL`,
 > `LOCAL_SERVER_URL`, or `DEPLOYED_SERVER_URL` as GitHub vars — `deploy-api.yml`
 > computes and pushes those to the App Service on every deploy, and duplicates
 > cause conflicts.

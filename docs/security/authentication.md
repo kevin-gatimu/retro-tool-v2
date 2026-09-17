@@ -79,7 +79,7 @@ same credentials:
   in `sessionStorage`. Every subsequent API request attaches it as `Authorization: Bearer …`.
 - **Session cookie** — kept as a **fallback** during the cookie→bearer rollout (`credentials: 'include'`). In production the UI and API are on different subdomains, so the cookie is
   `SameSite=None; Secure`. Cookie is `better-auth.session_token` → row in `session` (unique `token`,
-  `expiresAt` check); 7-day expiry, 1-day update age, 5-min cookie cache.
+  `expiresAt` check); 30-minute rolling expiry, 5-minute update age, 5-minute cookie cache.
 - **RS256 JWT** — issued on demand by the `jwt` plugin (`GET /api/auth/token`, JWKS at
   `GET /api/auth/jwks`) to authenticate the Convex realtime client. See
   [convex-nestjs-auth.md](./convex-nestjs-auth.md).
@@ -381,7 +381,7 @@ Tables: `verification`, `user`, `session` (all revoked).
 - **API:** the global `AuthGuard` (registered by `@thallesp/nestjs-better-auth` in [auth.module.ts](../../retro-tool-api/src/auth/auth.module.ts), **not disabled**) is **fail-closed** — every route requires a valid session/bearer **unless** marked `@AllowAnonymous`. `/api/auth/*` is handled by Better Auth middleware before the guard.
 - **Public routes** (`@AllowAnonymous`): `GET /health*`, `GET /users/admin/exists`, `GET /invitations/preview/:token`, and all `/api/otp/*`.
 - **UI:** [lib/api.ts](../../retro-tool-ui/src/lib/api.ts) `apiFetch` sends `credentials:'include'` and adds `Authorization: Bearer` when `shouldUseBearerToken()` (private-window fallback). Token comes from the `set-auth-token` header captured by [lib/auth-client.ts](../../retro-tool-ui/src/lib/auth-client.ts).
-- **Validation:** session cookie `better-auth.session_token` → row in `session` (unique `token`, `expiresAt` check). 7-day expiry, 1-day update age, 5-min cookie cache.
+- **Validation:** session cookie `better-auth.session_token` → row in `session` (unique `token`, `expiresAt` check). 30-minute rolling expiry, 5-minute update age, 5-minute cookie cache.
 
 ### 9. Convex realtime auth (no WebSocket gateways)
 

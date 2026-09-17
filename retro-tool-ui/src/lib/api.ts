@@ -1,5 +1,6 @@
 import { env } from '#/env'
 import { getBearerToken } from './auth-client'
+import { notifySessionUnauthorized } from './session-lifecycle'
 
 const API_BASE_URL = env.VITE_API_URL
 
@@ -38,6 +39,10 @@ async function apiFetch<T = {}>(
   })
 
   if (!response.ok) {
+    if (response.status === 401) {
+      notifySessionUnauthorized()
+    }
+
     const err = await response.json().catch(() => ({}))
     throw new ApiError(
       response.status,

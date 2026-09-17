@@ -11,7 +11,9 @@ const pool = new Pool({
 });
 
 const BETTER_AUTH_SESSION_EXPIRES_IN =
-  parseInt(process.env.BETTER_AUTH_SESSION_EXPIRES_IN!, 10) || 60 * 60 * 24 * 7; // Default to 7 days if not set
+  parseInt(process.env.BETTER_AUTH_SESSION_EXPIRES_IN!, 10) || 30 * 60;
+const BETTER_AUTH_SESSION_UPDATE_AGE =
+  parseInt(process.env.BETTER_AUTH_SESSION_UPDATE_AGE!, 10) || 5 * 60;
 
 const db = drizzle(pool, { schema });
 
@@ -60,8 +62,8 @@ export const auth = betterAuth({
   plugins: [bearer(), admin({ defaultRole: 'member' }), multiSession()],
   // Configure session settings
   session: {
-    expiresIn: BETTER_AUTH_SESSION_EXPIRES_IN, // 7 day
-    updateAge: 60 * 60 * 24, // 1 day
+    expiresIn: BETTER_AUTH_SESSION_EXPIRES_IN,
+    updateAge: BETTER_AUTH_SESSION_UPDATE_AGE,
     // Store session token in cookie
     cookieCache: {
       enabled: true,

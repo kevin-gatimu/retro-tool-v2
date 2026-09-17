@@ -142,7 +142,7 @@ Better Auth middleware before NestJS routing. Plugins enabled: **`bearer`**, **`
 | Password reset           | OTP- or link-based (20-min token); resets invalidate**all** sessions.                                                                                                                                                                                         |
 
 **Session lifecycle:** cookie `better-auth.session_token` ↔ row in `session` (unique `token`,
-`expiresAt`); 7-day expiry, 1-day update age, 5-min cookie cache. Sign-out
+`expiresAt`); 30-minute rolling expiry, 5-minute update age, 5-minute cookie cache. Sign-out
 (`signOutWithCleanup()`) clears the sessionStorage bearer, revokes the session row, expires the
 cookie, and clears the query cache.
 

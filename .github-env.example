@@ -55,10 +55,20 @@ FRONTEND_URL=
 SWA_URL=
 EMAIL_FROM=
 
+# ── Session policy ───────────────────────────────────────────────
+# Server session lifetime in seconds: 1800 = 30 minutes
+BETTER_AUTH_SESSION_EXPIRES_IN=1800
+# Minimum server renewal interval in seconds: 300 = 5 minutes
+BETTER_AUTH_SESSION_UPDATE_AGE=300
+
 # ── UI build-time variables (baked into the bundle) ──────────────
 VITE_API_URL=
 VITE_APP_ENV=
 VITE_APP_TITLE=
+# Log out after 30 minutes without trusted browser activity
+VITE_AUTH_IDLE_TIMEOUT_MINUTES=30
+# Show the inactivity warning 2 minutes before logout
+VITE_AUTH_IDLE_WARNING_MINUTES=2
 VITE_CONVEX_URL=
 VITE_ESTIMATES_REALTIME_BACKEND=convex
 VITE_RETROS_REALTIME_BACKEND=convex
