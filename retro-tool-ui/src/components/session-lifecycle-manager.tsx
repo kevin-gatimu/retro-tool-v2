@@ -9,6 +9,7 @@ import {
   getSessionActivityState,
   getSessionActivityStorageKey,
   isSessionLifecycleMessage,
+  normalizeWarningDuration,
   publishSessionLifecycleMessage,
   readSessionActivity,
   SESSION_LIFECYCLE_CHANNEL,
@@ -35,9 +36,9 @@ const ACTIVITY_EVENTS = [
 export function SessionLifecycleManager({ sessionId }: { sessionId: string }) {
   const queryClient = useQueryClient()
   const idleTimeoutMs = env.VITE_AUTH_IDLE_TIMEOUT_MINUTES * 60_000
-  const warningDurationMs = Math.min(
-    env.VITE_AUTH_IDLE_WARNING_MINUTES * 60_000,
+  const warningDurationMs = normalizeWarningDuration(
     idleTimeoutMs,
+    env.VITE_AUTH_IDLE_WARNING_MINUTES * 60_000,
   )
   const initialActivity = readSessionActivity(sessionId) ?? Date.now()
   const lastActivityRef = useRef(initialActivity)

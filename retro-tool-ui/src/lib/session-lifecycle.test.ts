@@ -1,4 +1,12 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import {
   clearSessionActivity,
@@ -23,12 +31,25 @@ const localStorageMock: Storage = {
   setItem: (key, value) => storedValues.set(key, value),
 }
 
+const originalLocalStorage = Object.getOwnPropertyDescriptor(
+  window,
+  'localStorage',
+)
+
 describe('session lifecycle', () => {
   beforeAll(() => {
     Object.defineProperty(window, 'localStorage', {
       configurable: true,
       value: localStorageMock,
     })
+  })
+
+  afterAll(() => {
+    if (originalLocalStorage) {
+      Object.defineProperty(window, 'localStorage', originalLocalStorage)
+    } else {
+      Reflect.deleteProperty(window, 'localStorage')
+    }
   })
 
   beforeEach(() => {
