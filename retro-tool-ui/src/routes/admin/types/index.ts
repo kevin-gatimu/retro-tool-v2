@@ -162,13 +162,63 @@ export type PaginatedOrgsResponse = {
 // convex.tsx types
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface MetricPoint {
+  timestamp: string
+  value: number | null
+}
+
+export interface NamedMetricSeries {
+  name: string
+  points: MetricPoint[]
+}
+
+export type ConvexHealthStatus = 'healthy' | 'degraded' | 'unavailable'
+
 export interface OperationalMetrics {
-  topFunctions: Array<{ identifier: string; calls: number }>
-  cacheHitPercentage: number | null
-  latencyPercentiles: { p50: number; p95: number; p99: number } | null
-  scheduledJobLag: number | null
-  functionConcurrency: number | null
-  tableRates: Array<{ tableName: string; reads: number; writes: number }>
+  generatedAt: string
+  rangeMinutes: number
+  bucketCount: number
+  bucketMinutes: number
+  status: 'available' | 'partial' | 'unavailable'
+  errors: Array<{ metric: string; message: string }>
+  functionCalls: NamedMetricSeries[]
+  failurePercentages: NamedMetricSeries[]
+  cacheHitPercentages: NamedMetricSeries[]
+  subscriptionInvalidations: NamedMetricSeries[]
+  scheduledJobLag: MetricPoint[]
+  concurrency: {
+    running: NamedMetricSeries[]
+    queued: NamedMetricSeries[]
+  }
+  summaries: {
+    totalCalls: number | null
+    maxFailurePercentage: number | null
+    averageCacheHitPercentage: number | null
+    maxScheduledJobLagSeconds: number | null
+    peakRunning: number | null
+    peakQueued: number | null
+    averageCallsPerMinute: number | null
+    queuedBucketPercentage: number | null
+  }
+  health: {
+    status: ConvexHealthStatus
+    checks: Array<{
+      name: string
+      status: ConvexHealthStatus
+      message: string
+      value?: number
+      unit?: string
+    }>
+  }
+  insights: Array<{
+    severity: 'info' | 'warning' | 'critical'
+    category: 'capacity' | 'reliability' | 'performance' | 'activity'
+    title: string
+    description: string
+    evidence: string
+    impact: string
+    recommendation: string
+  }>
 }
 
 export interface UsageMetricEntry {

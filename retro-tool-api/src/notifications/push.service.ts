@@ -142,9 +142,17 @@ export class PushService {
                 ),
               );
           } else {
-            this.logger.warn(
-              `Failed to send push to ${endpoint}: ${(err as Error)?.message}`,
-            );
+            const statusCode = (err as { statusCode?: number })?.statusCode;
+            const message = (err as Error)?.message;
+            if (statusCode === 401 || statusCode === 403) {
+              this.logger.error(
+                `Push send to ${endpoint} failed with ${statusCode}: ${message} — likely invalid/mismatched VAPID keys, verify VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_SUBJECT`,
+              );
+            } else {
+              this.logger.error(
+                `Failed to send push to ${endpoint} (status ${statusCode}): ${message}`,
+              );
+            }
           }
         }
       }),

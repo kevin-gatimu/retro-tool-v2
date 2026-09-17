@@ -10,7 +10,7 @@ on every subsequent API, Convex-token, and realtime request. The Better Auth **s
 a fallback** during the cookie→bearer rollout (`credentials: 'include'` is still sent). The UI enforces **no
 security decisions of its own** — route guards and RBAC gating are UX conveniences; the NestJS API is the sole
 trust boundary and re-checks auth and permissions on every request (see [`./backend-api.md`](./backend-api.md)
-and [`./rbac.md`](./rbac.md)).
+and [`./authorization-rbac.md`](./authorization-rbac.md)).
 
 ## Credential storage & transport
 
@@ -91,7 +91,7 @@ Route protection is **client-side UX only** and lives in
 - **RBAC-driven UI gating** — [`src/lib/rbac.ts`](../../retro-tool-ui/src/lib/rbac.ts) mirrors the backend role
   matrix and is used to show/hide admin nav, action buttons, and management panels. This is **presentation
   only** — it does not protect data. Every gated action re-hits the API, which enforces the authoritative check.
-  See [`./rbac.md`](./rbac.md) for the full matrix.
+  See [`./authorization-rbac.md`](./authorization-rbac.md) for the full matrix.
 
 ## Realtime (Convex) auth from the browser
 

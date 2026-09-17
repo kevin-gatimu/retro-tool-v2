@@ -1,6 +1,6 @@
 # CLAUDE.md — Retro Tool
 
-This is a **pnpm monorepo** containing three applications and one shared package. Read this file before touching any code.
+This is a **pnpm monorepo** containing three applications and one shared package. Read this file before touching any code. Follow the vendor-neutral workflow in [docs/guidelines/ai-agent-guidelines.md](docs/guidelines/ai-agent-guidelines.md).
 
 ---
 
@@ -27,11 +27,11 @@ module-name/
 ├── module-name.module.ts
 ├── module-name.controller.ts
 ├── module-name.service.ts
-├── module-name.gateway.ts       # (if WebSocket events)
 ├── dto/                         # Request/response DTOs
 ├── types/
 │   └── index.ts                 # All module-specific TypeScript types
-├── schema.ts                    # Drizzle table definitions
+├── schema/
+│   └── index.ts                 # Drizzle table definitions
 └── guards/                      # (if module-specific guards)
 ```
 
@@ -84,7 +84,7 @@ pnpm --filter retro-tool-ui   type-check
 pnpm --filter retro-tool-ui   lint
 
 pnpm --filter convex-backend  dev             # Convex watcher
-pnpm --filter convex-backend  deploy          # Deploy to Convex Cloud
+pnpm --filter convex-backend  deploy          # Push functions to the self-hosted deployment the loaded .env file targets
 ```
 
 ### Running locally against remote environments
@@ -166,7 +166,7 @@ retro-tool/
 │       └── rateLimits.ts
 ├── packages/
 │   └── shared/contracts/  # Shared TypeScript contracts (UI ↔ Convex)
-├── retro-tool-api/        # NestJS REST + Socket.IO backend
+├── retro-tool-api/        # NestJS REST backend
 │   ├── src/
 │   │   ├── auth/
 │   │   ├── organizations/
@@ -184,7 +184,7 @@ retro-tool/
 │   │   ├── sessions/
 │   │   ├── team-roles/
 │   │   ├── convex-admin/
-│   │   ├── adapters/      # Socket.IO adapter
+│   │   ├── adapters/      # Projection sync adapters
 │   │   ├── common/        # Shared guards, interceptors, types
 │   │   ├── config/
 │   │   ├── database/
@@ -200,8 +200,9 @@ retro-tool/
 ├── infra/                 # Azure Bicep IaC (CLI-only deployment)
 │   ├── deploy.bicep       # Subscription-scoped entry point
 │   ├── main.bicep         # All resources
-│   ├── README.md          # Full deployment docs
-│   └── README-prod.md    # Production-specific runbook
+│   ├── convex-staging.bicep     # Self-hosted Convex (staging)
+│   └── convex-production.bicep  # Self-hosted Convex (production)
+│   # docs live in docs/infra/ (provisioning.md, oidc.md)
 ├── docker/
 │   └── docker-compose.local.yml
 ├── .github/workflows/
@@ -254,8 +255,8 @@ Each package has multiple env files for different contexts:
 ```env
 VITE_API_URL=http://localhost:8000
 VITE_CONVEX_URL=http://localhost:3210
-VITE_RETROS_REALTIME_BACKEND=convex       # or: socket-io
-VITE_ESTIMATES_REALTIME_BACKEND=convex    # or: socket-io
+VITE_RETROS_REALTIME_BACKEND=convex
+VITE_ESTIMATES_REALTIME_BACKEND=convex
 VITE_NOTIFICATIONS_REALTIME_BACKEND=convex
 ```
 
@@ -272,12 +273,12 @@ The API uses `ConfigModule.forRoot` with `envFilePath: ['.env.local', '.env']`. 
 | Frontend | React 19, TanStack Router (file-based), TanStack Query/Form/Table |
 | Styling | TailwindCSS 4, Radix UI primitives, shadcn/ui pattern |
 | Auth client | Better Auth |
-| Realtime (UI) | Socket.IO client + Convex React SDK |
+| Realtime (UI) | Convex React SDK |
 | API | NestJS 11, TypeScript |
 | Database | PostgreSQL 16 via Drizzle ORM |
 | Auth server | Better Auth + `@thallesp/nestjs-better-auth` |
-| WebSockets | Socket.IO |
-| Realtime projection | Self-hosted Convex (local) / Convex Cloud (staging & production) |
+| WebSockets | Self-hosted Convex subscriptions |
+| Realtime projection | Self-hosted Convex everywhere it's deployed — Docker locally, Azure App Service for staging & production (`develop` has no deployment; local-only). No environment uses Convex Cloud. |
 | Email | Resend |
 | Push notifications | web-push (VAPID) |
 | Scheduler | `@nestjs/schedule` |
@@ -307,7 +308,7 @@ Two role dimensions:
 - **Org roles**: `org-owner` → `org-admin` → `member`
 - **Team roles**: `team-lead` → `member`
 
-First sign-up is auto-bootstrapped as `super-admin`. Full matrices: [docs/security/rbac.md](docs/security/rbac.md).
+First sign-up is auto-bootstrapped as `super-admin`. Full matrices: [docs/security/authorization-rbac.md](docs/security/authorization-rbac.md).
 
 ---
 
@@ -319,9 +320,13 @@ Three environments mapped to branches:
 |---|---|---|
 | Production | `main` | `retrotool-prod-rg` |
 | Staging | `staging` | `retrotool-staging-rg` |
-| Develop | `develop` | `retrotool-develop-rg` |
 
-Infrastructure is provisioned via Azure CLI + Bicep (`infra/` folder). See [infra/README.md](infra/README.md) for full commands.
+`develop` is **not** a deployed Azure environment — nothing is provisioned for it (no resource
+group, ACR, Postgres server, App Service, Static Web App, or Convex deployment). All
+`develop`-branch work happens locally via the same Docker Compose / self-hosted Convex workflow
+used for any other branch.
+
+Infrastructure is provisioned via Azure CLI + Bicep (`infra/` folder). See [docs/infra/provisioning.md](docs/infra/provisioning.md) for full commands.
 
 GitHub Actions handle app deployment (not infra):
 - **CI** runs on all PRs (lint, type-check, test)
@@ -349,7 +354,7 @@ GitHub Actions handle app deployment (not infra):
 
 | Package | README | What it covers |
 | --- | --- | --- |
-| NestJS API | [retro-tool-api/README.md](retro-tool-api/README.md) | Module list, auth setup, seed credentials, Socket.IO events, all API endpoints |
+| NestJS API | [retro-tool-api/README.md](retro-tool-api/README.md) | Module list, auth setup, seed credentials, projection sync, all API endpoints |
 | React UI | [retro-tool-ui/README.md](retro-tool-ui/README.md) | Route map, RBAC helpers, TanStack Query cache strategy, UI component conventions |
 | Convex backend | [convex-backend/README.md](convex-backend/README.md) | Deployment setup, code generation steps, Convex module overview |
 
@@ -357,7 +362,7 @@ GitHub Actions handle app deployment (not infra):
 
 | Document | What it covers |
 |---|---|
-| [docs/security/rbac.md](docs/security/rbac.md) | Full permission matrices for system, org, team, and retro actions; helper function signatures; user status lifecycle |
+| [docs/security/authorization-rbac.md](docs/security/authorization-rbac.md) | Full permission matrices for system, org, team, and retro actions; helper function signatures; user status lifecycle |
 | [docs/security/backend-api.md](docs/security/backend-api.md) | API hardening: Helmet, rate limiting (throttler + Better Auth), CORS, and the CSRF posture / residual risk |
 | [docs/guidelines/file-naming-conventions.md](docs/guidelines/file-naming-conventions.md) | UI file naming (kebab-case files, idiomatic export names, route-file exception) |
 | [docs/workflows/app-flows.md](docs/workflows/app-flows.md) | Step-by-step flows: auth, user approval, org/team management, retro phases, estimates, notifications |
@@ -375,8 +380,9 @@ GitHub Actions handle app deployment (not infra):
 | [docs/workflows/running-the-app.md](docs/workflows/running-the-app.md) | Running the app locally, against staging, and against production |
 | [docs/future-roadmap.md](docs/future-roadmap.md) | Planned: AI summaries, Jira/ADO export, SAML, Team Spaces |
 | [docs/README.md](docs/README.md) | Documentation index — all docs by domain |
-| [infra/README.md](infra/README.md) | Azure Bicep deployment commands, outputs, post-provisioning checklist |
-| [infra/README-prod.md](infra/README-prod.md) | Production-specific runbook with App Registration details |
+| [docs/infra/provisioning.md](docs/infra/provisioning.md) | Azure Bicep deployment commands, outputs, post-provisioning checklist |
+| [docs/infra/oidc.md](docs/infra/oidc.md) | OIDC federated-credential setup for GitHub Actions |
+| [docs/deployment/convex-production-runbook.md](docs/deployment/convex-production-runbook.md) | Production-specific self-hosted Convex runbook |
 | [docs/deployment/release-and-branch-strategy.md](docs/deployment/release-and-branch-strategy.md) | Branch model, release-please lockstep versioning, conventional commits, and deployment triggers (including the staging-only gap for production) |
 
 ### Convex AI guidelines

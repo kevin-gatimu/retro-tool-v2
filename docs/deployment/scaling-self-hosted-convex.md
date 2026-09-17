@@ -86,7 +86,7 @@ Climb §1.1: **B1 → B2/B3 → P0v3/P1v3/P2v3 → P3v3 (or P3mv3 for memory pre
 
 ### Rank 3 (terminal) — Move the outgrown environment to Convex Cloud
 
-The vendor's own answer to "self-hosted ran out of scale." Low-risk here because our Convex is a **rebuildable projection**: re-point `CONVEX_SYNC_URL`/`CONVEX_SYNC_ADMIN_KEY` (API) and `VITE_CONVEX_URL` (UI), deploy the same `convex/` functions, let the outbox + nightly reconciliation repopulate — no durable-data migration. **Production already runs on Convex Cloud**, so this is a known, deployed configuration.
+The vendor's own answer to "self-hosted ran out of scale." Low-risk here because our Convex is a **rebuildable projection**: re-point `CONVEX_SYNC_URL`/`CONVEX_SYNC_ADMIN_KEY` (API) and `VITE_CONVEX_URL` (UI), deploy the same `convex/` functions, let the outbox + nightly reconciliation repopulate — no durable-data migration. **Neither staging nor production runs on Convex Cloud today** — both self-host (`infra/convex-staging.bicep` / `infra/convex-production.bicep`). The re-point mechanics described here aren't hypothetical, though: staging (and, per the runbooks, production) already migrated *from* Convex Cloud *to* self-hosted this exact way, so reversing the direction for a single outgrown environment is a known-good, previously-exercised procedure.
 
 Convex Cloud pricing ([convex.dev/pricing](https://www.convex.dev/pricing)):
 
@@ -170,7 +170,7 @@ Reserved-instance / savings-plan discounts on Premium v3 can cut App Service fig
 
 1. **Ship write-reduction first (S1 kill-the-fan-out + S2 delta writes + S3 coalescing).** Free, already scoped, ~8–16× cut exceeds the whole vertical ladder. Gate on a harness baseline.
 2. **If a single worker still saturates on CPU, climb the vertical ladder** (one-line Bicep SKU changes, re-baseline each rung). Cheap, mechanical, finite.
-3. **When P3v3/P3mv3 is exhausted for an environment, move that environment to Convex Cloud** — low-risk (rebuildable projection, prod already runs it). Keep self-hosting where load stays green.
+3. **When P3v3/P3mv3 is exhausted for an environment, move that environment to Convex Cloud** — low-risk (rebuildable projection; the re-point mechanics were already proven in the opposite direction when staging/production migrated *from* Convex Cloud to self-hosted). Keep self-hosting where load stays green.
 4. **Do not shard self-hosted Convex; do not move the container to ACA** for a higher ceiling. Use **read-path offload** as a targeted relief valve.
 5. **Stay on App Service** (`numberOfWorkers: 1` + `alwaysOn` + WebSockets), keeping the P1 REST backstop + degraded-mode banner as the single-instance SPOF mitigation at every rung below Convex Cloud.
 

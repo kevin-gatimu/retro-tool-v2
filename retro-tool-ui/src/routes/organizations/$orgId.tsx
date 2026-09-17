@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import {
   ArrowLeft,
   LogOut,
@@ -55,13 +56,24 @@ import { LeaveOrgDialog } from './components/dialogs/leave-org-dialog'
 import { DeleteTeamDialog } from './components/dialogs/delete-team-dialog'
 import { RemoveMemberDialog } from './components/dialogs/remove-member-dialog'
 
+function OrgAccessError({ error }: { error: Error }) {
+  const navigate = useNavigate()
+  useEffect(() => {
+    console.error('Organization access error:', error.message, error.stack)
+    toast.error(error.message)
+    void navigate({ to: '/organizations' })
+  }, [error, navigate])
+  return null
+}
+
 export const Route = createFileRoute('/organizations/$orgId')({
   loader: ({ context: { queryClient }, params: { orgId } }) =>
-    void queryClient.prefetchQuery({
+    queryClient.ensureQueryData({
       queryKey: ['organization', orgId] as const,
       queryFn: () =>
         api.get<OrganizationDetail>(ORGANIZATIONS_ENDPOINTS.BY_ID(orgId)),
     }),
+  errorComponent: OrgAccessError,
   pendingComponent: OrgDetailSkeleton,
   component: OrganizationDetailPage,
 })

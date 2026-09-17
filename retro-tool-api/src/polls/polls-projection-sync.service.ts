@@ -1,10 +1,8 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection';
-import type { Config } from '../config/configuration';
-import type { ConvexFunctionResponse } from '../common/types';
+import { ConvexMutationClientService } from '../convex-admin/convex-mutation-client.service';
 import { ProjectionOutboxService } from '../convex-admin/projection-outbox.service';
 import * as pollsSchema from './schema';
 
@@ -20,11 +18,9 @@ const PROJECTION = 'polls';
  */
 @Injectable()
 export class PollsProjectionSyncService implements OnModuleInit {
-  private readonly logger = new Logger(PollsProjectionSyncService.name);
-
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
-    private readonly configService: ConfigService<Config, true>,
+    private readonly convexClient: ConvexMutationClientService,
     private readonly outbox: ProjectionOutboxService,
   ) {}
 
@@ -60,8 +56,7 @@ export class PollsProjectionSyncService implements OnModuleInit {
   }
 
   async syncPollProjection(pollId: string): Promise<void> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
+    if (!this.convexClient.isConfigured()) {
       return;
     }
 
@@ -79,7 +74,7 @@ export class PollsProjectionSyncService implements OnModuleInit {
       return;
     }
 
-    await this.runMutation('livePolls:upsertPollProjection', {
+    await this.convexClient.runMutation('livePolls:upsertPollProjection', {
       pollId: record.id,
       teamId: record.teamId,
       isClosed: record.isClosed,
@@ -88,12 +83,13 @@ export class PollsProjectionSyncService implements OnModuleInit {
   }
 
   async deletePollProjection(pollId: string): Promise<void> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
+    if (!this.convexClient.isConfigured()) {
       return;
     }
 
-    await this.runMutation('livePolls:deletePollProjection', { pollId });
+    await this.convexClient.runMutation('livePolls:deletePollProjection', {
+      pollId,
+    });
   }
 
   /**
@@ -105,8 +101,7 @@ export class PollsProjectionSyncService implements OnModuleInit {
    * scanned. No-ops when Convex is unconfigured.
    */
   async syncAllPolls(): Promise<{ scanned: number }> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
+    if (!this.convexClient.isConfigured()) {
       return { scanned: 0 };
     }
 
@@ -115,59 +110,9 @@ export class PollsProjectionSyncService implements OnModuleInit {
       .from(pollsSchema.poll);
 
     for (const poll of polls) {
-      try {
-        await this.syncPollProjection(poll.id);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'unknown error';
-        this.logger.warn(
-          `Reconcile: poll ${poll.id} projection failed: ${message}`,
-        );
-      }
+      await this.syncPollProjection(poll.id);
     }
 
     return { scanned: polls.length };
-  }
-
-  /**
-   * POST a projection mutation to Convex. Throws on any transport or
-   * Convex-side error so the outbox dispatcher (which wraps delivery) can retry;
-   * no-ops silently only when Convex is unconfigured. Reconciliation catches
-   * per-entity so one failure does not abort a full rebuild.
-   */
-  private async runMutation(path: string, args: object): Promise<void> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
-      return;
-    }
-
-    const response = await fetch(
-      `${convexConfig.url.replace(/\/$/, '')}/api/mutation`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Convex ${convexConfig.adminKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          path,
-          args,
-          format: 'json',
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Convex poll projection mutation ${path} failed with status ${response.status}`,
-      );
-    }
-
-    const result = (await response.json()) as ConvexFunctionResponse;
-    if (result.status === 'error') {
-      throw new Error(
-        `Convex poll projection mutation ${path} returned an error: ${result.errorMessage ?? 'unknown error'}`,
-      );
-    }
   }
 }

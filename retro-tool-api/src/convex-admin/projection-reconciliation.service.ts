@@ -1,10 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection';
-import type { Config } from '../config/configuration';
-import type { ConvexFunctionResponse } from '../common/types';
 import { generateId } from '../lib/utils';
+import { ConvexMutationClientService } from './convex-mutation-client.service';
 import { TeamsMembersProjectionSyncService } from '../teams/teams-members-projection-sync.service';
 import { RetrosProjectionSyncService } from '../retros/retros-projection-sync.service';
 import { EstimatesProjectionSyncService } from '../estimates/estimates-projection-sync.service';
@@ -45,7 +43,7 @@ export class ProjectionReconciliationService {
   constructor(
     @Inject(DATABASE_CONNECTION)
     private readonly database: NodePgDatabase,
-    private readonly configService: ConfigService<Config, true>,
+    private readonly convexClient: ConvexMutationClientService,
     private readonly teamsMembers: TeamsMembersProjectionSyncService,
     private readonly retros: RetrosProjectionSyncService,
     private readonly estimates: EstimatesProjectionSyncService,
@@ -68,7 +66,7 @@ export class ProjectionReconciliationService {
     const startedAtMs = Date.now();
     const startedAt = new Date(startedAtMs).toISOString();
 
-    if (!this.convexConfigured()) {
+    if (!this.convexClient.isConfigured()) {
       this.logger.warn(
         `[reconcile ${runId}] Convex is not configured — nothing to reconcile`,
       );
@@ -239,75 +237,22 @@ export class ProjectionReconciliationService {
   ): Promise<number> {
     let deleted = 0;
     for (let batch = 0; batch < MAX_PRUNE_BATCHES; batch += 1) {
-      const result = await this.runPrune(tableName, olderThan);
+      const result = await this.convexClient.runMutationForResult<{
+        deleted: number;
+        done: boolean;
+      }>('admin:pruneStaleByUpdatedAt', { tableName, olderThan });
+
       if (!result) {
-        break;
+        throw new Error(`Prune ${tableName} returned no result`);
       }
+
       deleted += result.deleted;
       if (result.done) {
-        break;
+        return deleted;
       }
     }
-    return deleted;
-  }
 
-  private async runPrune(
-    tableName: string,
-    olderThan: number,
-  ): Promise<{ deleted: number; done: boolean } | null> {
-    const convex = this.configService.get('convex', { infer: true });
-    if (!convex?.url || !convex.adminKey) {
-      return null;
-    }
-
-    try {
-      const response = await fetch(
-        `${convex.url.replace(/\/$/, '')}/api/mutation`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Convex ${convex.adminKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            path: 'admin:pruneStaleByUpdatedAt',
-            args: { tableName, olderThan },
-            format: 'json',
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        this.logger.warn(
-          `Prune ${tableName} failed with status ${response.status}`,
-        );
-        return null;
-      }
-
-      const result = (await response.json()) as ConvexFunctionResponse & {
-        value?: { deleted: number; done: boolean };
-      };
-      if (result.status === 'error') {
-        this.logger.warn(
-          `Prune ${tableName} returned error: ${result.errorMessage ?? 'unknown'}`,
-        );
-        return null;
-      }
-
-      return {
-        deleted: result.value?.deleted ?? 0,
-        done: result.value?.done ?? true,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown error';
-      this.logger.warn(`Prune ${tableName} failed: ${message}`);
-      return null;
-    }
-  }
-
-  private convexConfigured(): boolean {
-    const convex = this.configService.get('convex', { infer: true });
-    return Boolean(convex?.url && convex.adminKey);
+    throw new Error(`Prune ${tableName} exceeded ${MAX_PRUNE_BATCHES} batches`);
   }
 }
 

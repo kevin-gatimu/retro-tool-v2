@@ -342,7 +342,7 @@ Same as email/password sign-up — first user becomes `super-admin` + `approved`
 
 ### 5.2 Phase Transitions
 
-Retros move through phases in order. Only the creator (or system admin) can advance phases. Each transition is a separate endpoint and emits a WebSocket event (`retro-status-changed`) to all connected participants.
+Retros move through phases in order. Only the creator (or system admin) can advance phases. Each transition is a separate endpoint that enqueues a Convex projection sync (`liveRetros:upsertRetroProjection` + per-member board snapshots) so every connected participant's board updates via their Convex subscription.
 
 | From | To | Endpoint | What changes |
 |---|---|---|---|
@@ -355,15 +355,17 @@ Retros move through phases in order. Only the creator (or system admin) can adva
 
 ### 5.3 Cards
 
-| Action | Endpoint | Restrictions | WebSocket event |
-|---|---|---|---|
-| Add card | `POST /retros/cards` | `active` phase only | `retro-changed` |
-| Edit card | `PATCH /retros/cards/{cardId}` | Author or creator, before `voting` | `retro-changed` |
-| Delete card | `DELETE /retros/cards/{cardId}` | Author or creator | `retro-changed` |
-| Vote | `POST /retros/cards/{cardId}/vote` | `voting` phase, one vote per card | `retro-changed` |
-| Unvote | `DELETE /retros/cards/{cardId}/vote` | `voting` phase | `retro-changed` |
-| Merge | `POST /{id}/merge-cards` | `grouping` phase, creator only | `retro-changed` |
-| Unmerge | `POST /{id}/cards/{cardId}/unmerge` | `grouping` phase, creator only | `retro-changed` |
+Every action below enqueues the same retro projection sync (Convex, not a WebSocket event) so all participants' boards update via their Convex subscription.
+
+| Action | Endpoint | Restrictions |
+|---|---|---|
+| Add card | `POST /retros/cards` | `active` phase only |
+| Edit card | `PATCH /retros/cards/{cardId}` | Author or creator, before `voting` |
+| Delete card | `DELETE /retros/cards/{cardId}` | Author or creator |
+| Vote | `POST /retros/cards/{cardId}/vote` | `voting` phase, one vote per card |
+| Unvote | `DELETE /retros/cards/{cardId}/vote` | `voting` phase |
+| Merge | `POST /{id}/merge-cards` | `grouping` phase, creator only |
+| Unmerge | `POST /{id}/cards/{cardId}/unmerge` | `grouping` phase, creator only |
 
 **Voting toggle:** Calling vote on a card the user already voted on removes the vote (same as unvote).
 
@@ -375,8 +377,8 @@ Retros move through phases in order. Only the creator (or system admin) can adva
 
 1. Creator clicks a card to discuss.
 2. `POST /{id}/cards/{cardId}/discuss`.
-3. Backend: sets `retro.currentDiscussionCardId = cardId`, emits `discussion-card-changed` WebSocket event.
-4. All participants see the card highlighted in real time.
+3. Backend: sets `retro.currentDiscussionCardId = cardId`, enqueues a retro projection sync to Convex.
+4. All participants see the card highlighted in real time via their Convex board subscription.
 
 **Mark discussed:**
 
@@ -416,7 +418,7 @@ Retros move through phases in order. Only the creator (or system admin) can adva
 
 1. User navigates to an active session, clicks "Join".
 2. `POST /api/estimates/{sessionId}/join`.
-3. Backend: adds user to `story_estimate_participant`. WebSocket broadcasts `session-changed` to all connected clients.
+3. Backend: adds user to `story_estimate_participant`, enqueues an estimate projection sync to Convex so all connected clients' boards update via their subscription.
 
 ### 6.3 Vote / Unvote
 
@@ -424,8 +426,8 @@ Retros move through phases in order. Only the creator (or system admin) can adva
 
 1. User clicks a point card (1, 2, 3, 5, 8, 13, 21, ☕, ?).
 2. `POST /api/estimates/{sessionId}/votes` with `{ points }`.
-3. Backend: creates or updates `story_estimate_vote` for user.
-4. WebSocket: broadcasts `session-changed` — others see a dot indicating this user has voted (not the value, until revealed).
+3. Backend: creates or updates `story_estimate_vote` for user, enqueues an estimate projection sync.
+4. Convex subscription: others see a dot indicating this user has voted (not the value, until revealed).
 
 **Unvote (toggle):**
 
@@ -541,8 +543,8 @@ Status values: `waiting` (created, not started), `curating` (facilitator browsin
 
 **Real-time delivery:**
 
-- WebSocket room `user:{userId}` — server pushes `notification` events.
-- `NotificationBell` component listens and refetches on event.
+- Convex subscription (`liveNotifications:listUserNotifications`) — the API upserts a projection row on every notification create/read; `notification-convex-sync.tsx` subscribes and writes the TanStack Query cache directly (`setQueryData`), no server push or socket room involved.
+- `NotificationBell` reads from that cache; when Convex is unconfigured it falls back to REST polling instead.
 - Certain notification types also trigger React Query cache invalidation (e.g. `team_join_approved` invalidates `['teams']` so membership reflects immediately).
 
 **Notification types generated by the backend:**
@@ -581,31 +583,24 @@ Status values: `waiting` (created, not started), `curating` (facilitator browsin
 
 ## Realtime Architecture
 
-The app uses a **hybrid realtime approach**:
+Socket.IO has been fully removed from the codebase (no gateway files, no `socket.io`/
+`socket.io-client` dependency, no `WsAuthService`, no client `lib/socket.ts`). **Convex is the sole
+realtime transport** — REST mutations write to PostgreSQL (system of record) and enqueue a
+projection sync that pushes a snapshot to Convex; the UI subscribes to that snapshot instead of a
+socket. See [architecture/overview.md §3.2](../architecture/overview.md#32-realtime-convex-only)
+and [architecture/convex.md](../architecture/convex.md) for the full topology.
 
 | Feature | Transport | Direction |
 |---|---|---|
-| Retro board updates | Socket.IO WebSocket | Server → all participants |
-| Estimates session updates | Socket.IO WebSocket | Server → all participants |
-| In-app notifications | Socket.IO WebSocket | Server → single user room |
+| Retro board updates | Convex subscription | Convex → all participants |
+| Estimates session updates | Convex subscription | Convex → all participants |
+| In-app notifications | Convex subscription | Convex → single user |
 | Icebreaker session/board updates | Convex subscription | Convex → all participants |
 | Icebreaker reactions (presenting phase) | Convex public mutation + subscription | Client → Convex → all participants |
 | Standup updates | Convex subscription | Convex → all participants |
 | Push notifications | Web Push (service worker) | Server → browser (even when closed) |
-| Data fetching / cache | React Query | Client polls / invalidates on mutation |
+| Data fetching / cache | React Query | Client polls / invalidates on mutation; Convex sync components write the cache directly via `setQueryData` |
 
-**Socket.IO rooms:**
-
-- `user:{userId}` — personal notifications
-- `session:{sessionId}` — estimate session updates
-
-**WebSocket events:**
-
-| Event | Payload | Used by |
-|---|---|---|
-| `retro-changed` | Full retro object | Retro board |
-| `retro-status-changed` | `{ status }` | Retro board phase transitions |
-| `retro-list-changed` | none | Retro list page refetch |
-| `discussion-card-changed` | `{ cardId }` | Discussion phase |
-| `session-changed` | Full session object | Estimates session |
+Every per-feature `VITE_*_REALTIME_BACKEND` flag is hardcoded to `convex` in every env file — the
+schema still accepts a vestigial `socket-io` value, but no code path implements it.
 | `notification` | Notification object | Notification bell |

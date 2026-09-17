@@ -1,3 +1,4 @@
+import { reportBestEffortFailure } from '../../common/best-effort';
 import {
   Injectable,
   ForbiddenException,
@@ -142,7 +143,7 @@ export class OrgInvitationsService {
           userId: invitee.id,
           type: EMAIL_LOG_TYPES.OrgInvite,
         })
-        .catch(() => undefined);
+        .catch(reportBestEffortFailure('Organization invitation side effect'));
     } else {
       void this.emailService
         .send({
@@ -158,7 +159,7 @@ export class OrgInvitationsService {
           userId,
           type: EMAIL_LOG_TYPES.OrgInviteExternal,
         })
-        .catch(() => undefined);
+        .catch(reportBestEffortFailure('Organization invitation side effect'));
     }
 
     return { pending: true };
@@ -373,7 +374,7 @@ export class OrgInvitationsService {
           userId: invitee.id,
           type: EMAIL_LOG_TYPES.OrgInvite,
         })
-        .catch(() => undefined);
+        .catch(reportBestEffortFailure('Organization invitation side effect'));
     } else {
       void this.emailService
         .send({
@@ -389,7 +390,7 @@ export class OrgInvitationsService {
           userId: actorId,
           type: EMAIL_LOG_TYPES.OrgInviteExternal,
         })
-        .catch(() => undefined);
+        .catch(reportBestEffortFailure('Organization invitation side effect'));
     }
 
     return { resent: true };
@@ -518,7 +519,7 @@ export class OrgInvitationsService {
 
     void this.notificationsService
       .notifyUserOfOrgInvite(userId, invitation.organizationId, '')
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Organization invitation side effect'));
 
     return { organizationId: invitation.organizationId, member };
   }

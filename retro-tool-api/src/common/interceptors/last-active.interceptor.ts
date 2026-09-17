@@ -1,3 +1,4 @@
+import { reportBestEffortFailure } from '../best-effort';
 import {
   Injectable,
   NestInterceptor,
@@ -30,7 +31,9 @@ export class LastActiveInterceptor implements NestInterceptor {
     const userId = request.session?.user?.id;
     if (userId) {
       // Fire-and-forget — do not block the response
-      this.updateLastActive(userId).catch(() => undefined);
+      this.updateLastActive(userId).catch(
+        reportBestEffortFailure('Last-active update'),
+      );
     }
 
     return next.handle();

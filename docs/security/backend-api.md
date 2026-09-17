@@ -41,16 +41,19 @@ the limit off `req.ips[0]` (falling back to `req.ip`). Without `trust proxy`, ev
 to come from the proxy and share one bucket.
 
 **Exemptions:** `HealthController` is annotated `@SkipThrottle()` so liveness/readiness probes are never
-limited. The throttler governs **HTTP only**; WebSocket traffic is served by the Socket.IO adapter and
-is not affected.
+limited. The throttler governs **HTTP only**; there is no WebSocket gateway left to worry about —
+Socket.IO has been removed entirely and Convex (the sole realtime transport) is a separate service
+with its own rate limiting (see [architecture/convex.md](../architecture/convex.md)).
 
 ## CORS
 
 [`src/main.ts`](../../retro-tool-api/src/main.ts) calls `app.enableCors` with an **allow-list** of origins
 (`credentials: true`) resolved from `ALLOWED_ORIGINS` (comma-separated), falling back to `FRONTEND_URL` +
 `LOCAL_SERVER_URL`. In **production the app refuses to boot** if no origins resolve, rather than starting
-with an empty/`undefined` list. Socket.IO mirrors the same allow-list in
-[`adapters/socket-io.adapter.ts`](../../retro-tool-api/src/adapters/socket-io.adapter.ts). Better Auth's
+with an empty/`undefined` list. There is no separate Socket.IO adapter to mirror this allow-list against
+anymore — Socket.IO was removed entirely, and the browser's only realtime connection (Convex) is a
+separate service authenticated by JWT rather than CORS (see
+[security/convex-nestjs-auth.md](./convex-nestjs-auth.md)). Better Auth's
 `trustedOrigins` is also set to the same list.
 
 ## CSRF

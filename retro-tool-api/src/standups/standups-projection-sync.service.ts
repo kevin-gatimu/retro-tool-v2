@@ -1,10 +1,9 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DATABASE_CONNECTION } from '../database/database-connection';
-import type { Config } from '../config/configuration';
-import type { ConvexFunctionResponse } from '../common/types';
+import { mapWithConcurrency } from '../lib/concurrency';
+import { ConvexMutationClientService } from '../convex-admin/convex-mutation-client.service';
 import { ProjectionOutboxService } from '../convex-admin/projection-outbox.service';
 import * as standupsSchema from './schema';
 import * as teamSchema from '../teams/schema';
@@ -16,11 +15,9 @@ const PROJECTION = 'standups';
 
 @Injectable()
 export class StandupsProjectionSyncService implements OnModuleInit {
-  private readonly logger = new Logger(StandupsProjectionSyncService.name);
-
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly database: Database,
-    private readonly configService: ConfigService<Config, true>,
+    private readonly convexClient: ConvexMutationClientService,
     private readonly outbox: ProjectionOutboxService,
     private readonly standupsEntriesService: StandupsEntriesService,
   ) {}
@@ -70,8 +67,7 @@ export class StandupsProjectionSyncService implements OnModuleInit {
   }
 
   async syncEntryProjection(standupId: string, date: string): Promise<void> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
+    if (!this.convexClient.isConfigured()) {
       return;
     }
 
@@ -90,7 +86,7 @@ export class StandupsProjectionSyncService implements OnModuleInit {
 
     const updatedAt = Date.now();
 
-    await this.runMutation('liveStandups:upsertEntryProjection', {
+    await this.convexClient.runMutation('liveStandups:upsertEntryProjection', {
       standupId: standup.id,
       entryDate: date,
       teamId: standup.teamId,
@@ -106,14 +102,16 @@ export class StandupsProjectionSyncService implements OnModuleInit {
   }
 
   async deleteStandupProjection(standupId: string): Promise<void> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
+    if (!this.convexClient.isConfigured()) {
       return;
     }
 
-    await this.runMutation('liveStandups:deleteStandupProjection', {
-      standupId,
-    });
+    await this.convexClient.runMutation(
+      'liveStandups:deleteStandupProjection',
+      {
+        standupId,
+      },
+    );
   }
 
   /**
@@ -127,8 +125,7 @@ export class StandupsProjectionSyncService implements OnModuleInit {
    * when Convex is unconfigured.
    */
   async syncAllStandups(): Promise<{ scanned: number }> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
+    if (!this.convexClient.isConfigured()) {
       return { scanned: 0 };
     }
 
@@ -140,15 +137,7 @@ export class StandupsProjectionSyncService implements OnModuleInit {
       .from(standupsSchema.standupEntry);
 
     for (const row of rows) {
-      try {
-        await this.syncEntryProjection(row.standupId, row.entryDate);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'unknown error';
-        this.logger.warn(
-          `Reconcile: standup entry ${row.standupId}:${row.entryDate} projection failed: ${message}`,
-        );
-      }
+      await this.syncEntryProjection(row.standupId, row.entryDate);
     }
 
     return { scanned: rows.length };
@@ -171,64 +160,20 @@ export class StandupsProjectionSyncService implements OnModuleInit {
 
     // Push every member's board snapshot. A failure propagates so the outbox
     // retries the whole (idempotent) delivery — re-pushing all members is safe.
-    await Promise.all(
-      members.map(async ({ userId }) => {
-        const entryDetail = await this.standupsEntriesService.getEntryDetail(
-          userId,
-          standupId,
-          date,
-        );
-
-        await this.runMutation('liveStandups:upsertStandupBoard', {
-          standupId,
-          entryDate: date,
-          userId,
-          snapshot: JSON.stringify({ entryDetail }),
-          updatedAt,
-        });
-      }),
-    );
-  }
-
-  /**
-   * POST a projection mutation to Convex. Throws on any transport or
-   * Convex-side error so the outbox dispatcher (which wraps delivery) can retry;
-   * no-ops silently only when Convex is unconfigured. Reconciliation catches
-   * per-entity so one failure does not abort a full rebuild.
-   */
-  private async runMutation(path: string, args: object): Promise<void> {
-    const convexConfig = this.configService.get('convex', { infer: true });
-    if (!convexConfig?.url || !convexConfig.adminKey) {
-      return;
-    }
-
-    const response = await fetch(
-      `${convexConfig.url.replace(/\/$/, '')}/api/mutation`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Convex ${convexConfig.adminKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          path,
-          args,
-          format: 'json',
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Convex standup projection mutation ${path} failed with status ${response.status}`,
+    await mapWithConcurrency(members, 2, async ({ userId }) => {
+      const entryDetail = await this.standupsEntriesService.getEntryDetail(
+        userId,
+        standupId,
+        date,
       );
-    }
 
-    const result = (await response.json()) as ConvexFunctionResponse;
-    if (result.status === 'error') {
-      throw new Error(
-        `Convex standup projection mutation ${path} returned an error: ${result.errorMessage ?? 'unknown error'}`,
-      );
-    }
+      await this.convexClient.runMutation('liveStandups:upsertStandupBoard', {
+        standupId,
+        entryDate: date,
+        userId,
+        snapshot: JSON.stringify({ entryDetail }),
+        updatedAt,
+      });
+    });
   }
 }

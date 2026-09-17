@@ -1,9 +1,8 @@
 import { config as loadDotenv } from 'dotenv';
 import { join } from 'path';
-// Local runs read .env.local (staging/prod preload their own file via dotenv-cli
+// Local runs read .env (staging/prod preload their own file via dotenv-cli
 // in db.mjs, and process.env already-set values win because override is off).
 loadDotenv({ path: join(__dirname, '../.env') });
-loadDotenv({ path: join(__dirname, '../.env.local') });
 import { Pool, PoolClient } from 'pg';
 import * as path from 'path';
 import * as fs from 'fs';

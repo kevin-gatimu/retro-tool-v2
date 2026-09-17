@@ -6,7 +6,7 @@
  * Run staging:   pnpm db:seed:icebreaker-templates:staging
  * Run prod:      pnpm db:seed:icebreaker-templates:prod
  *
- * The staging/prod scripts pre-load `.env.staging-local`/`.env.production-local`
+ * The staging/prod scripts pre-load `.env.staging.local`/`.env.production.local`
  * via `dotenv_config_path`. The fallback loads below use `override: false` so
  * they never clobber a DATABASE_URL that was already injected that way — they
  * only fill it in for a plain local run.
@@ -14,7 +14,6 @@
 import { config as loadDotenv } from 'dotenv';
 import { join } from 'path';
 loadDotenv({ path: join(__dirname, '../../.env'), override: false });
-loadDotenv({ path: join(__dirname, '../../.env.local'), override: false });
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { randomUUID } from 'crypto';

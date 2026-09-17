@@ -1,3 +1,4 @@
+import { reportBestEffortFailure } from '../common/best-effort';
 import {
   Injectable,
   Inject,
@@ -281,7 +282,7 @@ export class StandupsSubmissionsService {
           message: data.content.slice(0, 120),
           link: `/standups/${context.standupId}?date=${context.entryDate}`,
         })
-        .catch(() => undefined);
+        .catch(reportBestEffortFailure('Standup notification'));
     }
 
     return {

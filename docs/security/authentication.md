@@ -2,7 +2,7 @@
 
 > The complete authentication reference for Retro-Tool: every sign-in method (email/password, email-OTP, passkeys, Microsoft OAuth), the cookie + bearer + JWT credential model, and the file-level flow map of what gets hit on every auth path.
 
-This document merges the passwordless feature reference with the per-file request traces of every auth flow. For the Convex↔NestJS JWT path see [convex-nestjs-auth.md](./convex-nestjs-auth.md); for hardening (rate limits, CORS, CSRF posture) see [backend-api.md](./backend-api.md); for the same flows at a product/behaviour level see [app-flows.md](../workflows/app-flows.md) §1; for roles & permissions see [rbac.md](./rbac.md). When behaviour docs and the code references here disagree, trust the code references.
+This document merges the passwordless feature reference with the per-file request traces of every auth flow. For the Convex↔NestJS JWT path see [convex-nestjs-auth.md](./convex-nestjs-auth.md); for hardening (rate limits, CORS, CSRF posture) see [backend-api.md](./backend-api.md); for the same flows at a product/behaviour level see [app-flows.md](../workflows/app-flows.md) §1; for roles & permissions see [authorization-rbac.md](./authorization-rbac.md). When behaviour docs and the code references here disagree, trust the code references.
 
 ---
 
@@ -16,14 +16,14 @@ This document merges the passwordless feature reference with the per-file reques
   - [1. Email / password sign-up](#1-email--password-sign-up)
   - [2. Email / password sign-in](#2-email--password-sign-in)
   - [3. Email-OTP passwordless sign-in](#3-email-otp-passwordless-sign-in)
-  - [4. Passkey (WebAuthn) — sign-in & management](#4-passkey-webauthn--sign-in--management)
+  - [4. Passkey (WebAuthn) — sign-in &amp; management](#4-passkey-webauthn--sign-in--management)
   - [5. Microsoft OAuth](#5-microsoft-oauth)
   - [6. Email verification](#6-email-verification)
   - [7. Password reset (OTP + token-link)](#7-password-reset-otp--token-link)
   - [8. Session validation on every request](#8-session-validation-on-every-request)
-  - [9. WebSocket auth](#9-websocket-auth)
+  - [9. Convex realtime auth (no WebSocket gateways)](#9-convex-realtime-auth-no-websocket-gateways)
   - [10. Sign-out](#10-sign-out)
-  - [11. RBAC & approval lifecycle](#11-rbac--approval-lifecycle)
+  - [11. RBAC &amp; approval lifecycle](#11-rbac--approval-lifecycle)
 - [Shared post-sign-in status gate](#shared-post-sign-in-status-gate)
 - [Passkey relying-party binding (rpID / origin)](#passkey-relying-party-binding-rpid--origin)
 - [Configuration reference](#configuration-reference)
@@ -38,8 +38,8 @@ This document merges the passwordless feature reference with the per-file reques
   `bearer`, `admin`, `multiSession`, `emailOTP`, `passkey`, `jwt`. PostgreSQL via
   Drizzle. Microsoft OAuth.
 - **UI:** React 19 + TanStack Router; Better Auth React client.
-- **Realtime:** Socket.IO + Convex (Convex auth detailed in
-  [convex.md](../architecture/convex.md)).
+- **Realtime:** Convex only — Socket.IO was removed entirely (no gateways, no `WsAuthService`).
+  Convex auth is detailed in [convex.md](../architecture/convex.md).
 
 **PostgreSQL is the system of record.** Better Auth (mounted in the NestJS API via
 `@thallesp/nestjs-better-auth`) owns the auth tables (`user`, `session`, `account`, `verification`,
@@ -49,23 +49,22 @@ send/verify stays server-side for rate-limiting and logging).
 
 ## Key files that recur across flows
 
-| File | Role |
-| --- | --- |
-| [auth.config.ts](../../retro-tool-api/src/auth/auth.config.ts) | The Better Auth instance: all plugins, email/OTP/reset hooks, social providers, session & cookie config, rate limits. The heart of every flow. |
-| [auth.module.ts](../../retro-tool-api/src/auth/auth.module.ts) | Registers Better Auth (`forRootAsync`) → **global `AuthGuard` is active** (fail-closed); mounts `SignupCleanupMiddleware`. |
-| [auth.controller.ts](../../retro-tool-api/src/auth/auth.controller.ts) | Thin stubs; Better Auth middleware handles `/api/auth/*` before NestJS routing. |
-| [otp/otp.controller.ts](../../retro-tool-api/src/auth/otp/otp.controller.ts) + [otp.service.ts](../../retro-tool-api/src/auth/otp/otp.service.ts) | Our `/api/otp/*` endpoints that proxy to `auth.api.*` (all `@AllowAnonymous`). |
-| [auth/schema/index.ts](../../retro-tool-api/src/auth/schema/index.ts) | Drizzle tables: `user`, `session`, `account`, `verification`, `passkey`, `jwks`, `adminActionLog`. |
-| [configuration.ts](../../retro-tool-api/src/config/configuration.ts) | Env parsing: auth secret/url, JWT issuer/audience, rpId/rpName, Microsoft, Convex. |
-| [main.ts](../../retro-tool-api/src/main.ts) | Global `api` prefix (health excluded), CORS, Helmet/CSP, cookie parser, OAuth state-cookie-lost fallback, `x-forwarded-for` backfill. |
-| [lib/auth-client.ts](../../retro-tool-ui/src/lib/auth-client.ts) | Better Auth React client; bearer-token capture/storage (private-window fallback); `passkeyClient()`, `jwtClient()`, `multiSessionClient()`; `signOutWithCleanup`. |
-| [lib/api.ts](../../retro-tool-ui/src/lib/api.ts) | `apiFetch` — sends `credentials:'include'` + `Authorization: Bearer` (fallback). |
-| [lib/api-endpoints.ts](../../retro-tool-ui/src/lib/api-endpoints.ts) | Endpoint constants (`OTP_ENDPOINTS`, `USERS_ENDPOINTS`, …). |
-| [routes/auth/hooks/](../../retro-tool-ui/src/routes/auth/hooks/) | `use-sign-in`, `use-sign-up`, `use-forgot-password`, `use-reset-password`. |
+| File                                                                                                                                            | Role                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [auth.config.ts](../../retro-tool-api/src/auth/auth.config.ts)                                                                                   | The Better Auth instance: all plugins, email/OTP/reset hooks, social providers, session & cookie config, rate limits. The heart of every flow.                           |
+| [auth.module.ts](../../retro-tool-api/src/auth/auth.module.ts)                                                                                   | Registers Better Auth (`forRootAsync`) → **global `AuthGuard` is active** (fail-closed); mounts `SignupCleanupMiddleware`.                                  |
+| [auth.controller.ts](../../retro-tool-api/src/auth/auth.controller.ts)                                                                           | Thin stubs; Better Auth middleware handles`/api/auth/*` before NestJS routing.                                                                                         |
+| [otp/otp.controller.ts](../../retro-tool-api/src/auth/otp/otp.controller.ts) + [otp.service.ts](../../retro-tool-api/src/auth/otp/otp.service.ts) | Our`/api/otp/*` endpoints that proxy to `auth.api.*` (all `@AllowAnonymous`).                                                                                      |
+| [auth/schema/index.ts](../../retro-tool-api/src/auth/schema/index.ts)                                                                            | Drizzle tables:`user`, `session`, `account`, `verification`, `passkey`, `jwks`, `adminActionLog`.                                                          |
+| [configuration.ts](../../retro-tool-api/src/config/configuration.ts)                                                                             | Env parsing: auth secret/url, JWT issuer/audience, rpId/rpName, Microsoft, Convex.                                                                                       |
+| [main.ts](../../retro-tool-api/src/main.ts)                                                                                                      | Global`api` prefix (health excluded), CORS, Helmet/CSP, cookie parser, OAuth state-cookie-lost fallback, `x-forwarded-for` backfill.                                 |
+| [lib/auth-client.ts](../../retro-tool-ui/src/lib/auth-client.ts)                                                                                 | Better Auth React client; bearer-token capture/storage (private-window fallback);`passkeyClient()`, `jwtClient()`, `multiSessionClient()`; `signOutWithCleanup`. |
+| [lib/api.ts](../../retro-tool-ui/src/lib/api.ts)                                                                                                 | `apiFetch` — sends `credentials:'include'` + `Authorization: Bearer` (fallback).                                                                                  |
+| [lib/api-endpoints.ts](../../retro-tool-ui/src/lib/api-endpoints.ts)                                                                             | Endpoint constants (`OTP_ENDPOINTS`, `USERS_ENDPOINTS`, …).                                                                                                         |
+| [routes/auth/hooks/](../../retro-tool-ui/src/routes/auth/hooks/)                                                                                 | `use-sign-in`, `use-sign-up`, `use-forgot-password`, `use-reset-password`.                                                                                       |
 
 **Auth route data flow (shared):** every browser auth call goes
-`route component → hook → authClient.* or api.post(OTP_ENDPOINTS.*) → /api/auth/*
-or /api/otp/* → Better Auth → Postgres`. Successful auth returns a session cookie
+`route component → hook → authClient.* or api.post(OTP_ENDPOINTS.*) → /api/auth/* or /api/otp/* → Better Auth → Postgres`. Successful auth returns a session cookie
 (+ `set-auth-token` header captured for the private-window bearer fallback).
 
 ---
@@ -78,13 +77,21 @@ same credentials:
 - **Bearer token** — the **primary** API credential. Better Auth returns it in the `set-auth-token`
   response header; the `authClient` `onSuccess` hook (or a manual header read on the OTP path) stores it
   in `sessionStorage`. Every subsequent API request attaches it as `Authorization: Bearer …`.
-- **Session cookie** — kept as a **fallback** during the cookie→bearer rollout (`credentials:
-  'include'`). In production the UI and API are on different subdomains, so the cookie is
+- **Session cookie** — kept as a **fallback** during the cookie→bearer rollout (`credentials: 'include'`). In production the UI and API are on different subdomains, so the cookie is
   `SameSite=None; Secure`. Cookie is `better-auth.session_token` → row in `session` (unique `token`,
   `expiresAt` check); 7-day expiry, 1-day update age, 5-min cookie cache.
 - **RS256 JWT** — issued on demand by the `jwt` plugin (`GET /api/auth/token`, JWKS at
   `GET /api/auth/jwks`) to authenticate the Convex realtime client. See
   [convex-nestjs-auth.md](./convex-nestjs-auth.md).
+
+  **What's a JWKS?** A **JSON Web Key Set** (RFC 7517) is a standard JSON document —
+  `{ "keys": [...] }` — for publishing public keys so third parties can verify a
+  signed JWT without ever holding a shared secret. Here, the `jwt` plugin generates
+  an RS256 key pair on first use and stores it in the `jwks` table (private key
+  AES-encrypted at rest by the plugin); the public half is served, unauthenticated,
+  at `GET /api/auth/jwks`. Convex fetches and caches that endpoint to verify the
+  RS256 JWTs the UI attaches to every Convex call — no shared secret crosses to
+  Convex, and Convex never calls the API per request to check a session.
 
 Private-window handling: cookies are blocked in incognito, but the app runs fully on the bearer token, so
 sign-in still works — the UI just warns that the session won't persist after the window closes.
@@ -99,7 +106,6 @@ by contrast, *must* run their browser ceremony through the `authClient`, so thos
 `/api/auth/*`.
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 flowchart LR
   subgraph UI["retro-tool-ui (React)"]
     AC["authClient<br/>(better-auth/react)<br/>+ passkeyClient, jwtClient, multiSessionClient"]
@@ -128,11 +134,11 @@ flowchart LR
 
 The three passwordless methods at a glance:
 
-| Method | Sign-in trigger | Server route(s) | Where managed |
-|---|---|---|---|
-| **Passkey (WebAuthn)** | `authClient.signIn.passkey()` (button + Conditional-UI autofill) | `/api/auth/sign-in/passkey`, `/api/auth/passkey/*` (Better Auth plugin) | `/profile/security` — list / add / rename / delete |
-| **Email OTP** | `/api/otp/send` → `/api/otp/sign-in` (our NestJS controller) | `/api/otp/*` → `auth.api.*` (emailOTP plugin) | n/a — no stored credential; a fresh code each time |
-| **Microsoft OAuth** | `authClient.signIn.social({ provider: 'microsoft' })` | `/api/auth/sign-in/social` + `/auth/social-callback` | Microsoft account (external); auto-linked by verified email |
+| Method                       | Sign-in trigger                                                    | Server route(s)                                                             | Where managed                                               |
+| ---------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **Passkey (WebAuthn)** | `authClient.signIn.passkey()` (button + Conditional-UI autofill) | `/api/auth/sign-in/passkey`, `/api/auth/passkey/*` (Better Auth plugin) | `/profile/security` — list / add / rename / delete       |
+| **Email OTP**          | `/api/otp/send` → `/api/otp/sign-in` (our NestJS controller)  | `/api/otp/*` → `auth.api.*` (emailOTP plugin)                          | n/a — no stored credential; a fresh code each time         |
+| **Microsoft OAuth**    | `authClient.signIn.social({ provider: 'microsoft' })`            | `/api/auth/sign-in/social` + `/auth/social-callback`                    | Microsoft account (external); auto-linked by verified email |
 
 All methods converge on the **same session** (Better Auth `session`/`account` rows) and the **same
 post-sign-in status gate** (`/users/me` → pending / rejected / suspended handling).
@@ -162,8 +168,7 @@ Tables: `session`, `user`. The shared success handler is reused by OTP and passk
 
 ### 3. Email-OTP passwordless sign-in
 
-"Email me a sign-in code" — a 6-digit code emailed to the user, valid 5 minutes, 3 attempts (`emailOTP({
-otpLength: 6, expiresIn: 300, allowedAttempts: 3 })`). The sign-in page's passwordless mode collects the
+"Email me a sign-in code" — a 6-digit code emailed to the user, valid 5 minutes, 3 attempts (`emailOTP({ otpLength: 6, expiresIn: 300, allowedAttempts: 3 })`). The sign-in page's passwordless mode collects the
 email (`request` mode), sends a code, then verifies it (`code` mode).
 
 Unlike passkey/social, **the UI does not call the Better Auth plugin routes** — it calls our
@@ -177,7 +182,6 @@ File trace:
 3. `POST /api/otp/sign-in` `{ email, otp }` → `auth.api.signInEmailOTP()`. The controller propagates `set-cookie` + `set-auth-token` to the response; the UI captures the bearer token, then runs the same `resolveSignInOutcome()` status flow as §2.
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
   participant U as User
   participant UI as sign-in.tsx (request/code mode)
@@ -232,7 +236,6 @@ Triggered from the sign-in page's **"Sign in with a passkey"** button (`useSignI
 supporting browsers — from Conditional-UI autofill.
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
   participant U as User
   participant UI as sign-in.tsx / useSignInPasskey
@@ -268,7 +271,6 @@ hook (TanStack Query list + mutations). The badge reads **Enabled** when ≥1 pa
 **Disabled**.
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
   participant U as User
   participant Sec as security.tsx / usePasskeys
@@ -321,7 +323,6 @@ File trace:
 4. **State-cookie-lost fallback**: [main.ts](../../retro-tool-api/src/main.ts) redirects API-root OAuth errors back to `/auth/sign-in?error=…`.
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
   participant U as User
   participant UI as sign-in.tsx
@@ -382,18 +383,17 @@ Tables: `verification`, `user`, `session` (all revoked).
 - **UI:** [lib/api.ts](../../retro-tool-ui/src/lib/api.ts) `apiFetch` sends `credentials:'include'` and adds `Authorization: Bearer` when `shouldUseBearerToken()` (private-window fallback). Token comes from the `set-auth-token` header captured by [lib/auth-client.ts](../../retro-tool-ui/src/lib/auth-client.ts).
 - **Validation:** session cookie `better-auth.session_token` → row in `session` (unique `token`, `expiresAt` check). 7-day expiry, 1-day update age, 5-min cookie cache.
 
-### 9. WebSocket auth
+### 9. Convex realtime auth (no WebSocket gateways)
 
-The three gateways —
-[retros.gateway.ts](../../retro-tool-api/src/retros/retros.gateway.ts),
-[estimates.gateway.ts](../../retro-tool-api/src/estimates/estimates.gateway.ts),
-[notifications.gateway.ts](../../retro-tool-api/src/notifications/notifications.gateway.ts)
-— share an identical `handleConnection`: parse `better-auth.session_token` from
-the handshake cookie, look it up in the `session` table, reject on missing/expired,
-else stash `userId` on `client.data`. The notifications gateway also joins a
-`user:{userId}` room. Client: [lib/socket.ts](../../retro-tool-ui/src/lib/socket.ts)
-connects with `withCredentials:true` (cookie-based; **no** bearer fallback yet — a
-bearer migration for sockets is deferred).
+Socket.IO has been removed entirely — no gateway files (`retros.gateway.ts`,
+`estimates.gateway.ts`, `notifications.gateway.ts` no longer exist), no `WsAuthService`, no client
+`lib/socket.ts`. Convex is the sole realtime transport, and it authenticates independently of the
+session cookie/bearer model above: the API issues a short-lived RS256 JWT at
+`GET /api/auth/token` (Better Auth's `jwt` plugin), the UI attaches it via
+`ConvexProviderWithAuth`, and Convex verifies it against the API's JWKS endpoint. See
+[convex-nestjs-auth.md](./convex-nestjs-auth.md) for the full issue/verify design and
+[architecture/convex.md §7](../architecture/convex.md#7-authentication-current) for the
+UI/authorization details.
 
 ### 10. Sign-out
 
@@ -410,7 +410,7 @@ on every login via `GET /api/users/me`. Admins approve/reject/suspend through th
 users module (`PATCH /api/users/{id}/status`, suspend/reactivate endpoints),
 writing `approvedAt`/`approvedById`/`suspendedReason` on `user` and an audit row
 in `adminActionLog`. Roles (`super-admin → system-admin → member`, plus org/team
-roles) and the full permission matrices live in [rbac.md](./rbac.md).
+roles) and the full permission matrices live in [authorization-rbac.md](./authorization-rbac.md).
 
 ---
 
@@ -421,7 +421,6 @@ Password, passkey, and OTP sign-in all funnel through **one success path** (`res
 every method behaves identically:
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 flowchart TD
   START["session established<br/>(any method)"] --> WAIT["wait ~100ms for session to settle"]
   WAIT --> ME["GET /users/me"]
@@ -446,8 +445,7 @@ Passkeys are bound to the **UI domain, not the API domain** (they deploy separat
 
 - `origin = frontend.url` (e.g. `https://app.example.com`), `rpID = hostname of frontend.url`.
 - Derived in [configuration.ts](../../retro-tool-api/src/config/configuration.ts) (`auth.rpId` defaults from
-  `FRONTEND_URL`; `auth.rpName` defaults `'Retro-Tool'`) and passed into `passkey({ rpID, rpName, origin
-  })` in [auth.config.ts](../../retro-tool-api/src/auth/auth.config.ts).
+  `FRONTEND_URL`; `auth.rpName` defaults `'Retro-Tool'`) and passed into `passkey({ rpID, rpName, origin })` in [auth.config.ts](../../retro-tool-api/src/auth/auth.config.ts).
 - `rpID` is the registrable domain — **no scheme/port**. A passkey registered on `localhost` will **not**
   work on the deployed domain, and vice-versa.
 
@@ -455,16 +453,16 @@ Passkeys are bound to the **UI domain, not the API domain** (they deploy separat
 
 ## Configuration reference
 
-| Config (`configuration.ts`) | Env var | Purpose |
-|---|---|---|
-| `auth.rpId` | `WEBAUTHN_RP_ID` (defaults from `FRONTEND_URL` host) | WebAuthn relying-party ID (registrable UI hostname) |
-| `auth.rpName` | `WEBAUTHN_RP_NAME` (default `Retro-Tool`) | Human-readable RP name shown in the authenticator prompt |
-| `frontend.url` | `FRONTEND_URL` | Passkey `origin`; reset/verify email links |
-| `auth.secret` | `BETTER_AUTH_SECRET` | Session signing |
-| `auth.url` | `BETTER_AUTH_URL` | API base + JWT issuer default |
-| `auth.jwtIssuer` / `auth.jwtAudience` | `BETTER_AUTH_JWT_ISSUER` / `_AUDIENCE` | Convex customJwt verification |
-| `auth.microsoft.clientId` / `Secret` | `MICROSOFT_CLIENT_ID` / `_SECRET` | Microsoft OAuth (omitted → provider disabled) |
-| `email.resendApiKey` | `RESEND_API_KEY` | OTP / verify / reset email delivery |
+| Config (`configuration.ts`)             | Env var                                                  | Purpose                                                  |
+| ----------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
+| `auth.rpId`                             | `WEBAUTHN_RP_ID` (defaults from `FRONTEND_URL` host) | WebAuthn relying-party ID (registrable UI hostname)      |
+| `auth.rpName`                           | `WEBAUTHN_RP_NAME` (default `Retro-Tool`)            | Human-readable RP name shown in the authenticator prompt |
+| `frontend.url`                          | `FRONTEND_URL`                                         | Passkey`origin`; reset/verify email links              |
+| `auth.secret`                           | `BETTER_AUTH_SECRET`                                   | Session signing                                          |
+| `auth.url`                              | `BETTER_AUTH_URL`                                      | API base + JWT issuer default                            |
+| `auth.jwtIssuer` / `auth.jwtAudience` | `BETTER_AUTH_JWT_ISSUER` / `_AUDIENCE`               | Convex customJwt verification                            |
+| `auth.microsoft.clientId` / `Secret`  | `MICROSOFT_CLIENT_ID` / `_SECRET`                    | Microsoft OAuth (omitted → provider disabled)           |
+| `email.resendApiKey`                    | `RESEND_API_KEY`                                       | OTP / verify / reset email delivery                      |
 
 emailOTP: `otpLength: 6`, `expiresIn: 300`s, `allowedAttempts: 3`. jwt: RS256, 2048-bit, 15-min
 expiry.
@@ -476,16 +474,16 @@ expiry.
 Per-IP, in-memory (uses forwarded headers behind the Azure reverse proxy). Auth-relevant rules
 from `rateLimit.customRules` in [auth.config.ts](../../retro-tool-api/src/auth/auth.config.ts):
 
-| Route | Window | Max |
-|---|---|---|
-| `/email-otp/send-verification-otp` | 300s | 5 |
-| `/sign-in/email-otp` | 60s | 10 |
-| `/email-otp/verify-email` | 60s | 10 |
-| `/email-otp/request-password-reset` | 300s | 3 |
-| `/email-otp/reset-password` | 300s | 10 |
-| `/sign-in/email` | 60s | 10 |
-| `/sign-up/email` | 300s | 5 |
-| `/forgot-password` | 300s | 3 |
+| Route                                 | Window | Max |
+| ------------------------------------- | ------ | --- |
+| `/email-otp/send-verification-otp`  | 300s   | 5   |
+| `/sign-in/email-otp`                | 60s    | 10  |
+| `/email-otp/verify-email`           | 60s    | 10  |
+| `/email-otp/request-password-reset` | 300s   | 3   |
+| `/email-otp/reset-password`         | 300s   | 10  |
+| `/sign-in/email`                    | 60s    | 10  |
+| `/sign-up/email`                    | 300s   | 5   |
+| `/forgot-password`                  | 300s   | 3   |
 
 These are defense-in-depth on top of the emailOTP `allowedAttempts: 3`. Global default: 100 req / 60s.
 
@@ -494,6 +492,6 @@ These are defense-in-depth on top of the emailOTP `allowedAttempts: 3`. Global d
 ## Cross-references
 
 - **Behaviour-level walkthroughs:** [app-flows.md](../workflows/app-flows.md) §1–2.
-- **Roles & permissions:** [rbac.md](./rbac.md).
+- **Roles & permissions:** [authorization-rbac.md](./authorization-rbac.md).
 - **API hardening (Helmet, rate limits, CSRF posture):** [backend-api.md](./backend-api.md).
 - **Convex JWT auth:** [convex-nestjs-auth.md](./convex-nestjs-auth.md), [convex.md](../architecture/convex.md) §7.

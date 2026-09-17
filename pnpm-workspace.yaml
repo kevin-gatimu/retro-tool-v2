@@ -28,19 +28,19 @@ overrides:
   multer: '>=2.2.0'
   # Stay on undici 7.x — undici 8 dropped internals jsdom 28 requires
   # (undici/lib/handler/wrap-handler.js), which breaks the vitest/jsdom pool.
-  undici: '>=7.28.0 <8'
+  undici: '>=7.29.0 <8'
   kysely: '>=0.28.17'
-  # Stay on fast-uri 3.x — an open '>=3.1.2' silently resolves to 4.x, a major
-  # jump beyond the advisory's patched floor.
-  fast-uri: '>=3.1.2 <4'
+  # Stay on fast-uri 3.x to avoid an unnecessary major-version jump.
+  fast-uri: '>=3.1.5 <4'
   ws: '>=8.21.0'
-  # js-yaml <4.3.0 has a quadratic-CPU YAML merge-key parsing bug; pulled in
-  # transitively via @nestjs/swagger. Capped at <5 — an open '>=4.3.0' silently
-  # resolves to 5.x, a major jump beyond the advisory's patched floor.
-  js-yaml: '>=4.3.0 <5'
+  # Stay on js-yaml 4.x to avoid an unnecessary major-version jump.
+  js-yaml: '>=4.3.1 <5'
   # engine.io <6.6.7 allows polling-transport connection exhaustion; pulled in
   # transitively via @nestjs/platform-socket.io > socket.io.
   engine.io: '>=6.6.7'
+  nanoid: '>=3.3.18 <4'
+  seroval: '>=1.5.3 <2'
+  socket.io-parser: '>=4.2.7 <5'
   # NB: no vitest/vite override needed — better-auth >=1.6.13 no longer pulls
   # them into the production tree, so the prod audit is clean without forcing a
   # major bump of our own dev-time vitest.

@@ -16,8 +16,7 @@
  */
 import { config as loadDotenv } from 'dotenv';
 import { join } from 'path';
-loadDotenv({ path: join(__dirname, '../../.env'), override: true });
-loadDotenv({ path: join(__dirname, '../../.env.local'), override: true });
+loadDotenv({ path: join(__dirname, '../../.env'), override: false });
 import { randomUUID } from 'crypto';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';

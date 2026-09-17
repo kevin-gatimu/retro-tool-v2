@@ -18,7 +18,7 @@ the plain-string constant maps in `retro-tool-api/src/common/enums/`.
 here. The self-hosted Convex layer holds only read-only realtime *projections*
 that NestJS pushes after each mutation — those tables are **not** documented here
 (see [../architecture/convex.md](../architecture/convex.md)). Role definitions
-referenced below are detailed in [../security/rbac.md](../security/rbac.md).
+referenced below are detailed in [../security/authorization-rbac.md](../security/authorization-rbac.md).
 
 ### Conventions
 
@@ -1033,7 +1033,6 @@ teams; teams contain members. Retros and estimate sessions belong to a team and
 are created by a user.
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 erDiagram
     user ||--o{ organization_member : "member of"
     user ||--o{ team_member : "member of"

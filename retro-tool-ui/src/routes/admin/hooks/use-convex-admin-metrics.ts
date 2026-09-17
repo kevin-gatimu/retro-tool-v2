@@ -19,14 +19,28 @@ export const CONVEX_USAGE_METRICS_KEY = [
 ] as const
 export const CONVEX_CRON_CONFIG_KEY = ['convex-admin', 'cron-config'] as const
 
-export function useConvexOperationalMetrics() {
-  // Manual refresh only — no polling. Callers expose a Refresh button that
-  // calls `refetch()`.
+export function useConvexOperationalMetrics(
+  rangeMinutes = 60,
+  pollingEnabled = true,
+) {
+  const refreshInterval =
+    rangeMinutes <= 360
+      ? 30_000
+      : rangeMinutes <= 1440
+        ? 60_000
+        : rangeMinutes <= 43_200
+          ? 5 * 60_000
+          : 15 * 60_000
+
   return useQuery({
-    queryKey: CONVEX_OPERATIONAL_METRICS_KEY,
+    queryKey: [...CONVEX_OPERATIONAL_METRICS_KEY, rangeMinutes],
     queryFn: () =>
-      api.get<OperationalMetrics>(CONVEX_ADMIN_ENDPOINTS.METRICS_OPERATIONAL),
-    staleTime: 30_000,
+      api.get<OperationalMetrics>(
+        `${CONVEX_ADMIN_ENDPOINTS.METRICS_OPERATIONAL}?rangeMinutes=${rangeMinutes}`,
+      ),
+    staleTime: refreshInterval / 2,
+    refetchInterval: pollingEnabled ? refreshInterval : false,
+    refetchOnWindowFocus: false,
   })
 }
 

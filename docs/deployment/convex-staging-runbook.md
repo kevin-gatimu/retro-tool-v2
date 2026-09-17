@@ -210,7 +210,10 @@ in the same release) redeploy them against self-hosted Convex.
 **UI** (`deploy-ui.yml` — compiled into the bundle at build time):
 - `VITE_CONVEX_URL` = `https://retrotool-staging-convex.azurewebsites.net`
 - The five realtime flags (`VITE_{ESTIMATES,RETROS,ICEBREAKERS,STANDUPS,NOTIFICATIONS}_REALTIME_BACKEND`)
-  are already validated by the workflow. Leave any not ready on `socket-io`.
+  are already validated by the workflow and hardcoded to `convex` in every env file. The `socket-io`
+  enum value is still accepted by the schema but has no live code path behind it — Socket.IO
+  gateways were removed from the API — so there is no working per-feature fallback to leave a flag
+  on.
 
 > `VITE_CONVEX_URL` only takes effect on a UI **rebuild**. Changing the Azure
 > setting alone does nothing — the value is baked into the JavaScript bundle.
@@ -286,8 +289,12 @@ A backend **image** change cannot be zero-downtime on this single-instance
 topology. The workflow already stops the Web App before updating. For a
 data-bearing upgrade, the full maintenance sequence is:
 
-1. Switch affected UI features to their Socket.IO / REST fallback (flip the
-   `VITE_*_REALTIME_BACKEND` flags and redeploy the UI), keeping API writes live.
+1. There is no per-feature Socket.IO fallback to switch to anymore (gateways were removed). To fall
+   back to REST polling for the maintenance window, redeploy the UI with `VITE_CONVEX_URL` unset —
+   `isConvexConfigured()` then returns `false` and TanStack Query's `refetchInterval` polling resumes
+   for every feature. This requires a UI rebuild (the URL is baked into the bundle) and is a
+   coarser, all-or-nothing switch than the old per-feature flags. API writes stay live via REST
+   throughout.
 2. Pause Convex projection dispatch (the API buffers projection events durably —
    see the outbox in [convex-azure-self-hosting-plan.md](./convex-azure-self-hosting-plan.md)).
 3. Verify PostgreSQL PITR + Azure Files backup, then take a logical export:

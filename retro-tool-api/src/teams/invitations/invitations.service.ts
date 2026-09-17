@@ -1,3 +1,4 @@
+import { reportBestEffortFailure } from '../../common/best-effort';
 import {
   Injectable,
   ForbiddenException,
@@ -142,7 +143,7 @@ export class TeamInvitationsService {
           userId: invitee.id,
           type: EMAIL_LOG_TYPES.TeamInvite,
         })
-        .catch(() => undefined);
+        .catch(reportBestEffortFailure('Team invitation side effect'));
     } else {
       void this.emailService
         .send({
@@ -159,7 +160,7 @@ export class TeamInvitationsService {
           userId: actorId,
           type: EMAIL_LOG_TYPES.TeamInviteExternal,
         })
-        .catch(() => undefined);
+        .catch(reportBestEffortFailure('Team invitation side effect'));
     }
 
     return { pending: true };
@@ -349,7 +350,7 @@ export class TeamInvitationsService {
           userId: invitee.id,
           type: EMAIL_LOG_TYPES.TeamInvite,
         })
-        .catch(() => undefined);
+        .catch(reportBestEffortFailure('Team invitation side effect'));
     } else {
       void this.emailService
         .send({
@@ -366,7 +367,7 @@ export class TeamInvitationsService {
           userId: actorId,
           type: EMAIL_LOG_TYPES.TeamInviteExternal,
         })
-        .catch(() => undefined);
+        .catch(reportBestEffortFailure('Team invitation side effect'));
     }
 
     return { resent: true };
@@ -561,7 +562,7 @@ export class TeamInvitationsService {
 
     void this.notificationsService
       .notifyUserOfTeamInvite(userId, team.id, team.name)
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Team invitation side effect'));
 
     return { organizationId: team.organizationId, teamId: team.id };
   }

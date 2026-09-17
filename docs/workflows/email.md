@@ -482,10 +482,10 @@ mutation.isError // true if failed
 ### Environment Setup for Testing
 
 ```env
-# retro-tool-ui/.env.local
+# retro-tool-ui/.env
 VITE_API_URL=http://localhost:8000
 
-# retro-tool-api/.env.local
+# retro-tool-api/.env
 RESEND_API_KEY=re_test_...  # Or leave blank for console logging
 ```
 

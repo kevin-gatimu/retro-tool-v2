@@ -176,7 +176,6 @@ short-circuit the normal admin-approval gate.
 A record is `Created` with `acceptedAt = NULL` and `expiresAt = createdAt + 3 days`, then moves through:
 
 ```mermaid
-%%{init: {'theme':'neutral'}}%%
 stateDiagram-v2
     [*] --> Pending: invite sent (acceptedAt = NULL)
     Pending --> Accepted: user accepts (acceptedAt set)

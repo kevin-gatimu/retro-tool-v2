@@ -4,11 +4,11 @@ How to run the API + UI (+ Convex) against each of the three environments. In ev
 runs locally** (`http://localhost:8000` / `http://localhost:3000`) and hot-reloads; what changes is
 **which backing resources** (Postgres, Convex, secrets) it talks to.
 
-| Mode | Backing resources | Env file loaded | Isolation |
-|---|---|---|---|
-| **Local** | Docker: Postgres + self-hosted Convex | `.env.local` | Fully isolated — your own DB & Convex |
-| **Staging** | Deployed staging Azure resources (shared) | `.env.staging-local` | Shared with every dev + the deployed staging API |
-| **Production** | Deployed production Azure resources | `.env.production-local` | **Live user data — read the warnings** |
+| Mode | Backing resources | API/UI env file | Convex env file | Isolation |
+|---|---|---|---|---|
+| **Local** | Docker: Postgres + self-hosted Convex | `.env` | `.env.local` | Fully isolated — your own DB & Convex |
+| **Staging** | Deployed staging Azure resources (shared) | `.env.staging.local` | `.env.staging-local` | Shared with every dev + the deployed staging API |
+| **Production** | Deployed production Azure resources | `.env.production.local` | `.env.production-local` | **Live user data — read the warnings** |
 
 ---
 
@@ -36,11 +36,13 @@ All commands run from the repo root.
 | **Convex watcher** | `pnpm dev:convex` | `pnpm dev:convex:staging` | `pnpm dev:convex:prod` |
 | **API + UI together** | `pnpm local:dev` | `pnpm dev:staging` | — |
 | **API + UI + Convex + docs** | `pnpm local:dev:all` | — | — |
-| **Env file** | `.env.local` | `.env.staging-local` | `.env.production-local` |
+| **API/UI env file** | `.env` | `.env.staging.local` | `.env.production.local` |
+| **Convex env file** | `.env.local` | `.env.staging-local` | `.env.production-local` |
 
-Under the hood the `:staging` / `:prod` scripts use `dotenv-cli` to pre-load the environment-specific
-file (Vite uses `--mode staging-local` / `--mode production-local`). `ConfigModule` won't overwrite
-already-set `process.env`, so those values take precedence.
+Under the hood, API `:staging` / `:prod` scripts use `dotenv-cli` to preload their environment-specific
+file. Vite uses `--mode staging` / `--mode production`, which selects `.env.staging.local` /
+`.env.production.local`. `ConfigModule` does not overwrite already-set `process.env`, so preloaded API
+values take precedence.
 
 ---
 
@@ -51,8 +53,8 @@ gymnastics.
 
 ```bash
 pnpm local:infra   # Postgres + self-hosted Convex + dashboard in Docker
-pnpm dev:api       # NestJS on :8000, loads .env.local
-pnpm dev:ui        # Vite on :3000
+pnpm dev:api       # NestJS on :8000, loads retro-tool-api/.env
+pnpm dev:ui        # Vite on :3000, loads retro-tool-ui/.env
 pnpm dev:convex    # Convex function watcher (self-hosted)
 ```
 
@@ -60,7 +62,7 @@ Or start the full stack in Docker with `pnpm local:up`, and run all three app pr
 `pnpm local:dev` (add the VitePress user-guide dev server too with `pnpm local:dev:all`). Stop infra
 with `pnpm local:down`; tail logs with `pnpm local:logs`.
 
-`.env.local` points at the **self-hosted** Convex, whose JWKS URL is your own localhost — so the
+The local API/UI `.env` files point at the **self-hosted** Convex, whose JWKS URL is your own localhost — so the
 three-way JWT alignment described below is automatic. First run: `pnpm local:bootstrap` (seed) /
 `pnpm local:reset` (wipe + reseed).
 
@@ -73,8 +75,8 @@ including working **Convex realtime**. Useful for reproducing staging-only issue
 real shared data.
 
 ```bash
-pnpm dev:api:staging      # NestJS on :8000, loads retro-tool-api/.env.staging-local
-pnpm dev:ui:staging       # Vite on :3000, loads retro-tool-ui/.env.staging-local
+pnpm dev:api:staging      # NestJS on :8000, loads retro-tool-api/.env.staging.local
+pnpm dev:ui:staging       # Vite on :3000, loads retro-tool-ui/.env.staging.local
 ```
 
 with local env files configured to **share** these staging resources:
@@ -82,7 +84,7 @@ with local env files configured to **share** these staging resources:
 | Resource | Value (shared by everyone) |
 |---|---|
 | PostgreSQL | `retrotool-staging-db.postgres.database.azure.com` / `retro_tool_db` — the **same DB the deployed staging API uses** |
-| Convex | The staging Convex Cloud deployment (`CONVEX_SYNC_URL` / `VITE_CONVEX_URL`) |
+| Convex | The self-hosted staging Convex deployment on Azure App Service (`retrotool-staging-convex`), via `CONVEX_SYNC_URL` / `VITE_CONVEX_URL` |
 | `BETTER_AUTH_SECRET` | Identical to the deployed staging App Service setting |
 | `BETTER_AUTH_JWT_ISSUER` | `https://retrotool-staging-api.azurewebsites.net` (see [below](#why-convex-realtime-needs-three-things-to-line-up)) |
 
@@ -97,19 +99,19 @@ backing data is shared.
 > or a deliberate, coordinated operation — never for routine development. Prefer local or staging.
 
 ```bash
-pnpm dev:api:prod         # NestJS on :8000, loads retro-tool-api/.env.production-local
-pnpm dev:ui:prod          # Vite on :3000, loads retro-tool-ui/.env.production-local
-pnpm dev:convex:prod      # Convex watcher against production Cloud
+pnpm dev:api:prod         # NestJS on :8000, loads retro-tool-api/.env.production.local
+pnpm dev:ui:prod          # Vite on :3000, loads retro-tool-ui/.env.production.local
+pnpm dev:convex:prod      # Convex watcher against the self-hosted production deployment
 ```
 
-`.env.production-local` shares the production resources the same way staging does, but with production
+The API/UI `.env.production.local` files share production resources the same way staging does, but with production
 values:
 
 | Resource | Production value |
 |---|---|
 | PostgreSQL | `retro-tool-db-server…` / `retro_tool_db` |
 | API host (JWT issuer) | `https://retrotool-prod-api.azurewebsites.net` |
-| Convex | The production Convex Cloud deployment |
+| Convex | The self-hosted production Convex deployment on Azure App Service (`retrotool-prod-convex`) |
 | `BETTER_AUTH_SECRET` | Identical to the deployed **production** App Service setting |
 
 The same three-way JWT alignment applies — substitute the production API host for the staging one in
@@ -120,9 +122,10 @@ The same three-way JWT alignment applies — substitute the production API host 
 
 ## Why Convex realtime needs three things to line up
 
-*(Applies to staging and production modes — local uses self-hosted Convex where this is automatic.)*
+*(Applies when running locally against the shared staging/production Convex deployments — plain
+local `.env` development is automatic, since its JWKS URL points at your own local container.)*
 
-Convex Cloud verifies browser JWTs with a `customJwt` provider configured (staging example) as:
+Convex verifies browser JWTs with a `customJwt` provider configured (staging example) as:
 
 ```
 issuer  = https://retrotool-staging-api.azurewebsites.net
@@ -147,12 +150,12 @@ A locally-minted token is only accepted when **all three** hold:
    BETTER_AUTH_JWT_AUDIENCE=convex
    ```
 
-   (Use the production API host in `.env.production-local`.) This only changes the JWT `iss` claim used
+   (Use the production API host in `.env.production.local`.) This only changes the JWT `iss` claim used
    by Convex; cookies, redirects, and OAuth still use the localhost `BETTER_AUTH_URL`.
 
-3. **Publicly reachable JWKS** — Convex Cloud fetches keys from the *deployed* API's `/api/auth/jwks`,
-   which it can reach. Your local JWKS never needs to be exposed because it serves the same keys (shared
-   DB).
+3. **Publicly reachable JWKS** — the self-hosted Convex deployment fetches keys from the *deployed*
+   API's `/api/auth/jwks`, which it can reach. Your local JWKS never needs to be exposed because it
+   serves the same keys (shared DB).
 
 With those in place, `useConvexAuth()` authenticates locally, `*ConvexSync` components hydrate from
 projections, and updates you make appear live in every other developer's browser. For the full JWT
@@ -166,7 +169,7 @@ issue/verify design see [convex-nestjs-auth.md](../security/convex-nestjs-auth.m
 |---|---|---|
 | `No auth provider found matching the given token … issuer=…azurewebsites.net` | Local token has `iss=http://localhost:8000` | Set `BETTER_AUTH_JWT_ISSUER` (recipe above) |
 | `The JWT's 'kid' … does this key match any key in the provider's JWKS?` | Local API signs with a different key than the deployed JWKS serves — usually a **different DB** or different `BETTER_AUTH_SECRET` | Point `DATABASE_URL` at the shared DB and copy the matching secret; restart the local API |
-| No error, but no realtime updates | `VITE_*_REALTIME_BACKEND=convex` while Convex auth is broken — the Socket.IO fallback and REST polling are disabled when Convex is enabled | Fix Convex auth, or set the feature's flag to `socket-io` in the local env file |
+| No error, but no realtime updates | `VITE_*_REALTIME_BACKEND=convex` while Convex auth is broken — REST polling is disabled for most features whenever `isConvexConfigured()` is true, even if the Convex connection itself is failing | Fix Convex auth. There is no working `socket-io` flag value to fall back to anymore (Socket.IO gateways were removed) — to force REST polling instead, unset `VITE_CONVEX_URL` and rebuild the UI |
 
 > The deployed API caches JWKS keys in memory at startup. If the `jwks` table changes (e.g. someone
 > connected with a wrong secret and generated a new key), restart the App Service so the public JWKS
@@ -178,8 +181,8 @@ issue/verify design see [convex-nestjs-auth.md](../security/convex-nestjs-auth.m
 
 ## Rules for sharing staging/production safely
 
-- **Never cross environments in an env file.** Keep `.env.staging-local` pointed only at staging
-  resources and `.env.production-local` only at production. Prod DB is `retro-tool-db-server…/retro_tool_db`;
+- **Never cross environments in an env file.** Keep API/UI `.env.staging.local` files pointed only at staging
+  resources and `.env.production.local` files only at production. Prod DB is `retro-tool-db-server…/retro_tool_db`;
   staging is `retrotool-staging-db…/retro_tool_db`. Mixing them corrupts JWKS trust and scatters data.
   Verify with:
   `Select-String retro-tool-api/.env.*-local -Pattern '^DATABASE_URL='`
@@ -187,10 +190,10 @@ issue/verify design see [convex-nestjs-auth.md](../security/convex-nestjs-auth.m
   schema, so coordinate before applying breaking changes. Use the per-environment scripts (see
   [next section](#database--convex-operations-per-environment)).
 - **Convex function changes are shared.** A schema/function push affects everyone on that environment.
-- **Socket.IO events are per-API-instance.** Your local API only emits socket events to browsers
-  connected to *your* localhost. Convex is the cross-instance realtime channel: the projection lives in
-  Convex Cloud, so pushes from any API instance (yours, a teammate's, or the deployed one) reach all
-  browsers.
+- **Convex is the cross-instance realtime channel.** There's no Socket.IO layer anymore (it was
+  removed entirely — no gateways, no per-instance broadcast to worry about). The projection lives in
+  the shared Convex deployment (self-hosted on Azure App Service for staging/production), so pushes
+  from any API instance (yours, a teammate's, or the deployed one) reach all browsers.
 - **Sign-in state is shared through the DB**, but cookies are per-origin, so you sign in once per origin
   (localhost vs azurewebsites.net).
 

@@ -1,3 +1,4 @@
+import { reportBestEffortFailure } from '../common/best-effort';
 import {
   Injectable,
   Inject,
@@ -163,7 +164,7 @@ export class IcebreakersCreationService {
 
     void this.notificationsService
       .notifyTeamOfIcebreakerSession(id, data.name, data.teamId)
-      .catch(() => undefined);
+      .catch(reportBestEffortFailure('Icebreaker notification'));
 
     return { id };
   }

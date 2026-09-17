@@ -12,9 +12,9 @@
  *         seed:large-org | seed:prod-safe
  *   env   local (default) | staging | prod
  *
- * local        → runs the TypeScript sources via ts-node against .env.local
+ * local        → runs the TypeScript sources via ts-node against .env
  * staging/prod → builds once, then runs the compiled dist/ output with
- *                dotenv preloading .env.<staging|production>-local
+ *                dotenv preloading .env.<staging|production>.local
  */
 import { execSync } from 'node:child_process';
 import process from 'node:process';
@@ -49,8 +49,8 @@ const TASKS = {
 };
 
 const ENV_FILES = {
-  staging: '.env.staging-local',
-  prod: '.env.production-local',
+  staging: '.env.staging.local',
+  prod: '.env.production.local',
 };
 
 const [taskName, envName = 'local'] = process.argv.slice(2);

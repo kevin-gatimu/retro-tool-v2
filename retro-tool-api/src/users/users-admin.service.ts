@@ -1,3 +1,4 @@
+import { reportBestEffortFailure } from '../common/best-effort';
 import {
   Injectable,
   Inject,
@@ -86,7 +87,7 @@ export class UsersAdminService {
           userId: updated.id,
           type: EMAIL_LOG_TYPES.AccountApproved,
         })
-        .catch(() => undefined);
+        .catch(reportBestEffortFailure('Users admin side effect'));
     }
 
     return updated;
@@ -402,7 +403,7 @@ export class UsersAdminService {
               userId: user.id,
               type: EMAIL_LOG_TYPES.AccountApproved,
             })
-            .catch(() => undefined);
+            .catch(reportBestEffortFailure('Users admin side effect'));
         }
       }
     }

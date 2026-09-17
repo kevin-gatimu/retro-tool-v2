@@ -1,6 +1,15 @@
 # Retro Tool
 
-A collaborative agile retrospective and story-estimation platform. Built for engineering teams who want structured, real-time retrospectives with role-based access control, live story estimates, actionable reporting, and automated email workflows.
+**Retro Tool** brings every recurring team ceremony into one place: retrospectives, story estimates,
+async standups, icebreakers, polls, and surveys.
+
+Every board is live — add a card, cast a vote, or advance a phase and all participants see it
+immediately, with no refresh. Nothing is lost between sessions: unresolved action items carry
+forward into the next retro, and reports track completion rates and action-item health over time.
+Access is scoped end to end by system, organization, and team roles.
+
+It runs on infrastructure you control. PostgreSQL is the system of record, and the realtime layer is
+self-hosted Convex — Convex Cloud is not used in any environment.
 
 ---
 
@@ -23,18 +32,63 @@ A collaborative agile retrospective and story-estimation platform. Built for eng
 
 ## What It Does
 
-Retro Tool provides everything a team needs to run effective agile ceremonies:
+Retro Tool provides everything a team needs to run effective agile ceremonies. The structure below
+mirrors the app's sidebar navigation groups.
 
-| Feature                         | Description                                                                                                                                                |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Retrospectives**        | Phased retro boards (brainstorm → group → vote → discuss → action items) with built-in templates (Start/Stop/Continue, 4Ls, Mad/Sad/Glad, and more)    |
-| **Story Estimates**       | Real-time story-estimation sessions with reveal mechanics and consensus tracking                                                                           |
-| **Organizations & Teams** | Hierarchical org → team → member structure with fine-grained RBAC                                                                                        |
-| **Action Items**          | Per-retro action items with carry-forward tracking across sessions                                                                                         |
-| **Reports & Analytics**   | Dashboards for retro completion rates, card counts, vote counts, and action item health — answered from PostgreSQL via the`/api/reports/v2/*` endpoints |
-| **Notifications**         | In-app notification centre + browser push notifications (VAPID)                                                                                            |
-| **Email Workflows**       | Retro reminders, weekly digests, and transactional email via Resend                                                                                        |
-| **Multi-Session Auth**    | Email/password + OAuth (Microsoft) via Better Auth with multi-session support                                                                              |
+### Dashboard (`/dashboard`)
+
+| Feature | Description |
+| ------- | ----------- |
+| **Dashboard** | Home screen showing stat cards (total retros, teams, cards created, total votes), a recent retros list, active survey and poll counts, and quick-action links. |
+
+### Ceremonies
+
+| Feature | Description | Route |
+| ------- | ----------- | ----- |
+| **Retrospectives** | Phased retro boards moving through `draft → waiting → active → grouping → voting → discussing → completed`. Cards, threaded comments, voting, carry-forward across sessions, built-in templates (Start/Stop/Continue, 4Ls, Mad/Sad/Glad, and more), per-retro action items, and emailed reports. | `/retros` |
+| **Story Estimate** | Real-time story estimate sessions: rounds, participant votes, reveal mechanics, consensus tracking, per-story revote, built-in timer, and emailed reports. Fully templated (Fibonacci, T-shirt sizes, and custom scales). | `/estimate` |
+| **Standups** | Async daily standup cadence per team: entries and submissions by date, skip days, comments on submissions, emoji reactions, send-report, and team activity view. | `/standups` |
+
+### Engagement
+
+| Feature | Description | Route |
+| ------- | ----------- | ----- |
+| **Icebreakers** | Facilitated icebreaker sessions: prompt-based swipe/advance flow with a built-in timer. A session either picks an icebreaker template or uses host-authored one-off prompts. Icebreaker templates are managed in the Admin Panel (`/admin/templates`), not the `/templates` route. | `/icebreakers` |
+| **Polls** | Quick-vote polls with a voting lifecycle (open → voted → closed) and email distribution. | `/polls` |
+| **Surveys** | Team or org-scoped surveys with typed questions (multiple-choice, open text). Create, distribute, collect responses, close, and email results. | `/surveys` |
+
+### Library
+
+| Feature | Description | Route |
+| ------- | ----------- | ----- |
+| **Templates** | Browse and manage retro templates and estimate templates — both built-in and org-custom. Retro templates define card columns; estimate templates define point scales. Icebreaker templates live in the Admin Panel (`/admin/templates`) instead. | `/templates` |
+| **Reports** | Analytics dashboards: retro completion rates, card/vote counts, action-item health, and more — answered from PostgreSQL via `/api/reports/v2/*`. | `/reports` |
+
+### Account
+
+| Feature | Description | Route |
+| ------- | ----------- | ----- |
+| **Organizations** | Top-level multi-tenant boundary. Org-owners and org-admins manage members, settings, and team creation. | `/organizations` |
+| **Teams** | Teams within an org. Team-leads and members; fine-grained team roles. | `/teams` |
+| **Profile** | User profile, password and security settings, notification preferences, and active session management. | `/profile` |
+
+### Admin Panel (`/admin` — `super-admin` / `system-admin` only)
+
+Projection outbox management (pause / resume / replay), full reconciliation, cron config, and
+usage metrics. Accessible only to super-admin and system-admin roles.
+
+### Platform Capabilities
+
+Supporting capabilities that power the features above — not direct sidebar entries.
+
+| Capability | Description |
+| ---------- | ----------- |
+| **Action Items** | Per-retro action items with carry-forward so unresolved items surface automatically in the next session. Surfaces inside `/retros/:id`. |
+| **Notifications** | In-app notification centre (bell icon) + browser push notifications via `web-push` (VAPID). |
+| **Email** | Transactional email via Resend: org/team invites, OTP verification, password reset, weekly digest, retro and standup reports. |
+| **Auth & Sessions** | Email + password, email OTP, passkey, and Microsoft OAuth — all via Better Auth with multi-session support. |
+| **Invitations** | Org and team invitations by email; accept-invite journey with onboarding and password setup. |
+| **User Preferences** | Per-user notification preferences and appearance settings (accessible from `/profile`). |
 
 ---
 
@@ -100,7 +154,7 @@ The platform has two parallel role dimensions: a **system-level role** on every 
 └────────────────────────────────────────────────────────────────┘
 ```
 
-> Full permission matrices are in [docs/security/rbac.md](docs/security/rbac.md).
+> Full permission matrices are in [docs/security/authorization-rbac.md](docs/security/authorization-rbac.md).
 
 ---
 
@@ -296,7 +350,9 @@ Socket.IO remains the fallback transport when either flag is set to `socket-io`.
 ├── infra/                    # Azure Bicep IaC (CLI-only)
 │   ├── deploy.bicep          # Subscription-scoped entry point
 │   ├── main.bicep            # All resources
-│   └── README.md             # Deployment documentation
+│   ├── convex-staging.bicep       # Self-hosted Convex (staging)
+│   └── convex-production.bicep    # Self-hosted Convex (production)
+│   # docs live in docs/infra/ (provisioning.md, oidc.md)
 │
 ├── .github/workflows/        # CI/CD pipelines
 │   ├── ci.yml                # Lint + type-check + test
@@ -592,13 +648,18 @@ The project targets **Azure** with infrastructure provisioned via Bicep (CLI-onl
 | ----------- | ----------- | ------------------------ |
 | `main`    | Production  | `retrotool-prod-rg`    |
 | `staging` | Staging     | `retrotool-staging-rg` |
-| `develop` | Develop     | `retrotool-develop-rg` |
 
-Each environment has its own App Service, ACR, Static Web App, and Managed Identity. PostgreSQL Flexible Server is per-environment.
+Each of these environments has its own App Service, ACR, Static Web App, and Managed Identity. PostgreSQL Flexible Server is per-environment.
+
+> **`develop` is not a deployed environment.** `infra/main.bicep` accepts `environment=develop` as
+> a parameter value, but nobody has ever run it — there is no `retrotool-develop-rg`, ACR, Postgres
+> server, App Service, Static Web App, or Convex deployment for it. All `develop`-branch work
+> happens locally via the same Docker Compose / self-hosted Convex workflow used for any other
+> branch (`pnpm local:up`, `pnpm dev:api`, `pnpm dev:ui`, `pnpm dev:convex`).
 
 ### Infrastructure (Bicep — CLI only)
 
-Infrastructure is provisioned manually via Azure CLI + Bicep templates in the `infra/` folder. See [infra/README.md](infra/README.md) for full commands and outputs.
+Infrastructure is provisioned manually via Azure CLI + Bicep templates in the `infra/` folder. See [docs/infra/provisioning.md](docs/infra/provisioning.md) for full commands and outputs.
 
 ```powershell
 # Preview changes
@@ -628,7 +689,7 @@ az deployment sub create --location southafricanorth --template-file infra/deplo
 - [ ] Custom domains and SSL configured
 - [ ] OAuth redirect URIs updated in App Registration
 
-> Full step-by-step: [infra/README.md](infra/README.md) · OIDC setup: [infra/README-oidc.md](infra/README-oidc.md)
+> Full step-by-step: [docs/infra/provisioning.md](docs/infra/provisioning.md) · OIDC setup: [docs/infra/oidc.md](docs/infra/oidc.md)
 
 ---
 
@@ -638,20 +699,19 @@ az deployment sub create --location southafricanorth --template-file infra/deplo
 
 | Document                                                                                    | Description                                                                        |
 | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [docs/security/rbac.md](docs/security/rbac.md)                                               | Complete role and permission matrices                                              |
+| [docs/security/authorization-rbac.md](docs/security/authorization-rbac.md)                   | Complete role and permission matrices                                              |
 | [docs/workflows/app-flows.md](docs/workflows/app-flows.md)                                   | Every major user-facing flow (auth, org, team, retro, estimates)                   |
 | [docs/workflows/invitations-and-onboarding.md](docs/workflows/invitations-and-onboarding.md) | Invitation system (org + team), accept-invite journey, onboarding & password rules |
 | [docs/deployment/convex-self-hosting.md](docs/deployment/convex-self-hosting.md)             | Running Convex in Docker (local + production)                                      |
-| [docs/future-roadmap.md](docs/future-roadmap.md)                                             | Planned features: IceBreakers, AI summaries, Jira/ADO export, SAML                 |
+| [docs/future-roadmap.md](docs/future-roadmap.md)                                             | Planned features: AI summaries, Jira/ADO export, SAML, Team Spaces                 |
 
 ### Infrastructure & Deployment
 
 | Document                                                                                              | Description                                                                    |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [infra/README.md](infra/README.md)                                                                     | Bicep deployment commands, what-if, outputs, post-provisioning checklist       |
-| [infra/README-oidc.md](infra/README-oidc.md)                                                           | OIDC federated-credential setup for GitHub Actions                             |
-| [docs/deployment/azure-provisioning.md](docs/deployment/azure-provisioning.md)                         | Full provisioning walkthrough                                                  |
-| [docs/deployment/azure-resources.md](docs/deployment/azure-resources.md)                               | Azure resource inventory and architecture                                      |
+| [docs/infra/provisioning.md](docs/infra/provisioning.md)                                               | Bicep deployment commands, what-if, outputs, post-provisioning checklist       |
+| [docs/infra/oidc.md](docs/infra/oidc.md)                                                               | OIDC federated-credential setup for GitHub Actions                             |
+| [docs/deployment/azure-resources.md](docs/deployment/azure-resources.md)                               | Azure resource inventory (legacy-named production snapshot) and architecture   |
 | [docs/deployment/convex-azure-self-hosting-plan.md](docs/deployment/convex-azure-self-hosting-plan.md) | Plan for self-hosting Convex on Azure App Service                              |
 | [docs/deployment/convex-staging-runbook.md](docs/deployment/convex-staging-runbook.md)                 | Staging Convex deployment runbook                                              |
 | [docs/deployment/release-and-branch-strategy.md](docs/deployment/release-and-branch-strategy.md)       | Branch model, release-please versioning, conventional commits, deploy triggers |

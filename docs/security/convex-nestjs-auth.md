@@ -217,7 +217,7 @@ they legitimately differ in local Docker:
 
 In deployed environments both use the public API host, e.g.
 `https://retrotool-prod-api.azurewebsites.net` and
-`…/api/auth/jwks`. Set these in [infra/README.md](../../infra/README.md) step 7.
+`…/api/auth/jwks`. Set these in [infra/provisioning.md](../infra/provisioning.md) step 7.
 
 > **The #1 failure mode:** a byte-mismatch on `JWT_ISSUER` (extra trailing slash,
 > `http` vs `https`, missing port). Verification then fails on the `iss` check and

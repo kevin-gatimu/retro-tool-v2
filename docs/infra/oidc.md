@@ -1,5 +1,9 @@
 # GitHub Actions OIDC Setup
 
+> How to configure Azure federated identity credentials so GitHub Actions can authenticate to
+> Azure via OIDC (no client secrets needed). Companion to
+> [provisioning.md](./provisioning.md).
+
 This guide explains how to configure Azure federated identity credentials so GitHub Actions can authenticate to Azure using OpenID Connect (OIDC) — no client secrets needed.
 
 ---
@@ -116,17 +120,19 @@ az account show --query "{tenantId:tenantId, subscriptionId:id}" -o table
 
 ## How Workflows Use OIDC
 
-The deploy workflows use `azure/login@v2` with OIDC:
+The deploy workflows (`deploy-api.yml`, `deploy-convex.yml`, `deploy-convex-production.yml`) use `azure/login@v3` with OIDC:
 
 ```yaml
-- uses: azure/login@v2
+- uses: azure/login@v3
   with:
-    client-id: ${{ secrets.AZURE_CLIENT_ID }}
-    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    client-id: ${{ secrets.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID }}
+    tenant-id: ${{ secrets.AZURE_TENANT_ID || vars.AZURE_TENANT_ID }}
+    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID || vars.AZURE_SUBSCRIPTION_ID }}
 ```
 
-The workflow's `permissions: id-token: write` setting allows it to request the OIDC token from GitHub.
+The workflow's `permissions: id-token: write` setting allows it to request the OIDC token from GitHub. Each deploy workflow's `environment:` job key (`staging`, `production`, or the resolved
+`develop`/`prod` env for `deploy-api.yml`) must match the GitHub environment name the federated
+credential's `subject` claim was created for.
 
 ---
 
@@ -157,9 +163,9 @@ The issuer URL is wrong. The script uses the correct value (`https://token.actio
 az ad app federated-credential list --id <OBJECT_ID> --query "[].{name:name, issuer:issuer}" -o table
 ```
 
-### Known CLI bug: `MissingSubscription` on `az role assignment create/list`
+### Known CLI bug: `MissingSubscription` on `az role assignment`
 
-If your account is the subscription's classic **Account Admin** (common on
+Affects both `create` and `list` subcommands. If your account is the subscription's classic **Account Admin** (common on
 Visual Studio Enterprise or legacy CSP subscriptions), the `az role assignment`
 subcommand can fail with:
 
