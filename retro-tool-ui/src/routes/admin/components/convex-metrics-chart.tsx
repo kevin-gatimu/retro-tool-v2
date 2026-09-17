@@ -34,7 +34,7 @@ function formatTimestamp(timestamp: string, rangeMinutes: number) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
   if (rangeMinutes <= 10_080) {
-    return date.toLocaleDateString([], { weekday: 'short', hour: '2-digit' })
+    return date.toLocaleString([], { weekday: 'short', hour: '2-digit' })
   }
   if (rangeMinutes <= 129_600) {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
@@ -124,7 +124,9 @@ export function ConvexMetricsChart({
                   borderRadius: '0.5rem',
                   fontSize: '0.75rem',
                 }}
-                formatter={(value) => [`${String(value)}${valueSuffix}`]}
+                formatter={(value) => [
+                  value == null ? '—' : `${String(value)}${valueSuffix}`,
+                ]}
               />
               <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
               {series.map((item, index) => (
