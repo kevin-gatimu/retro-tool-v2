@@ -552,7 +552,7 @@ Self-hosted deploy vars (populated by `pnpm local:bootstrap` for local dev):
 
 ### 6. Running against remote environments
 
-Each package has `.env.staging-local` and `.env.production-local` files for running locally against Azure resources. Uses `dotenv-cli` to load env before the process starts:
+Each package has `.env.staging.local` and `.env.production.local` files for running locally against Azure resources. Uses `dotenv-cli` to load env before the process starts:
 
 ```powershell
 pnpm dev:api:staging    # API against staging DB + Convex

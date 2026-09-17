@@ -90,12 +90,12 @@ pnpm --filter convex-backend  deploy          # Push functions to the self-hoste
 ### Running locally against remote environments
 
 ```bash
-# Against staging (loads .env.staging-local)
+# Against staging (loads .env.staging.local)
 pnpm dev:api:staging
 pnpm dev:ui:staging
 pnpm dev:convex:staging
 
-# Against production (loads .env.production-local)
+# Against production (loads .env.production.local)
 pnpm dev:api:prod
 pnpm dev:ui:prod
 pnpm dev:convex:prod
@@ -232,8 +232,8 @@ Each package has multiple env files for different contexts:
 | File | Purpose |
 |---|---|
 | `.env.local` | Local dev with local infra (Docker) — **not committed** |
-| `.env.staging-local` | Local dev running against staging Azure resources |
-| `.env.production-local` | Local dev running against production Azure resources |
+| `.env.staging.local` | Local dev running against staging Azure resources |
+| `.env.production.local` | Local dev running against production Azure resources |
 | `.env.example` | Template for local development |
 
 **Key API env vars** (`retro-tool-api/.env.local`):

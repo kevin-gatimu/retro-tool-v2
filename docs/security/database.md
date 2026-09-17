@@ -155,7 +155,7 @@ Migrations are custom-run (not `drizzle-kit push`) by
 - Applies `drizzle/*.sql` files listed in `meta/_journal.json`, tracked in a `__drizzle_migrations`
   table, idempotently (already-applied tags and "already exists" DDL errors are skipped).
 - `pnpm --dir retro-tool-api db:migrate` runs locally; `db:migrate … staging`/`prod` build `dist/` and
-  run against the environment's `.env.*-local` file. Demo-user/role seeds are marked `localOnly` and
+  run against the environment's `.env.*.local` file. Demo-user/role seeds are marked `localOnly` and
   **refuse** to target staging or prod.
 - The `deploy-api` workflow runs the same migrate + prod-safe seeds automatically against the
   `staging` `DATABASE_URL` secret on deploy.

@@ -7,8 +7,8 @@ runs locally** (`http://localhost:8000` / `http://localhost:3000`) and hot-reloa
 | Mode | Backing resources | API/UI env file | Convex env file | Isolation |
 |---|---|---|---|---|
 | **Local** | Docker: Postgres + self-hosted Convex | `.env` | `.env.local` | Fully isolated — your own DB & Convex |
-| **Staging** | Deployed staging Azure resources (shared) | `.env.staging.local` | `.env.staging-local` | Shared with every dev + the deployed staging API |
-| **Production** | Deployed production Azure resources | `.env.production.local` | `.env.production-local` | **Live user data — read the warnings** |
+| **Staging** | Deployed staging Azure resources (shared) | `.env.staging.local` | `.env.staging.local` | Shared with every dev + the deployed staging API |
+| **Production** | Deployed production Azure resources | `.env.production.local` | `.env.production.local` | **Live user data — read the warnings** |
 
 ---
 
@@ -37,7 +37,7 @@ All commands run from the repo root.
 | **API + UI together** | `pnpm local:dev` | `pnpm dev:staging` | — |
 | **API + UI + Convex + docs** | `pnpm local:dev:all` | — | — |
 | **API/UI env file** | `.env` | `.env.staging.local` | `.env.production.local` |
-| **Convex env file** | `.env.local` | `.env.staging-local` | `.env.production-local` |
+| **Convex env file** | `.env.local` | `.env.staging.local` | `.env.production.local` |
 
 Under the hood, API `:staging` / `:prod` scripts use `dotenv-cli` to preload their environment-specific
 file. Vite uses `--mode staging` / `--mode production`, which selects `.env.staging.local` /
@@ -185,7 +185,7 @@ issue/verify design see [convex-nestjs-auth.md](../security/convex-nestjs-auth.m
   resources and `.env.production.local` files only at production. Prod DB is `retro-tool-db-server…/retro_tool_db`;
   staging is `retrotool-staging-db…/retro_tool_db`. Mixing them corrupts JWKS trust and scatters data.
   Verify with:
-  `Select-String retro-tool-api/.env.*-local -Pattern '^DATABASE_URL='`
+  `Select-String "retro-tool-api/.env.*.local" -Pattern '^DATABASE_URL='`
 - **Migrations are shared.** Every developer and the deployed API on that environment use the same
   schema, so coordinate before applying breaking changes. Use the per-environment scripts (see
   [next section](#database--convex-operations-per-environment)).
@@ -208,7 +208,7 @@ Run from the repo root. **Local** commands hit your Docker Postgres / self-hoste
 | Apply migrations | `pnpm --dir retro-tool-api db:migrate` | `db:migrate:staging` | `db:migrate:prod` |
 | Seed (prod-safe) | `pnpm --dir retro-tool-api db:seed` | `db:seed:staging` | `db:seed:prod` |
 | Seed templates | `db:seed:templates` | `db:seed:templates:staging` | `db:seed:templates:prod` |
-| Deploy Convex functions | *(watcher)* `pnpm dev:convex` | `pnpm --dir convex-backend exec dotenv -e .env.staging-local -- convex deploy` | `…-e .env.production-local -- convex deploy` |
+| Deploy Convex functions | *(watcher)* `pnpm dev:convex` | `pnpm --dir convex-backend exec dotenv -e .env.staging.local -- convex deploy` | `…-e .env.production.local -- convex deploy` |
 
 Migrations and Convex pushes are shared on staging/production — coordinate before applying breaking
 changes.

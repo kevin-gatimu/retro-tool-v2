@@ -308,8 +308,8 @@ Scripts in [convex-backend/package.json](../../convex-backend/package.json):
 | Command | Targets | Notes |
 | --- | --- | --- |
 | `pnpm --filter convex-backend dev` | local self-hosted (`.env.local`) | watch + push functions |
-| `pnpm --filter convex-backend dev:staging` | staging, per `.env.staging-local` | |
-| `pnpm --filter convex-backend dev:prod` | production, per `.env.production-local` | |
+| `pnpm --filter convex-backend dev:staging` | staging, per `.env.staging.local` | |
+| `pnpm --filter convex-backend dev:prod` | production, per `.env.production.local` | |
 | `pnpm --filter convex-backend codegen` | current deployment | regenerates `_generated/` types |
 | `pnpm --filter convex-backend deploy` | target per env file | pushes functions |
 
@@ -317,7 +317,7 @@ Scripts in [convex-backend/package.json](../../convex-backend/package.json):
 > (`CONVEX_SELF_HOSTED_URL`/`CONVEX_SELF_HOSTED_ADMIN_KEY` targeting
 > `infra/convex-production.bicep`, like staging) — its `CONVEX_DEPLOY_KEY` /
 > Convex Cloud block is present but explicitly marked inactive. Verify against
-> your real `.env.production-local` rather than trusting the example file for
+> your real `.env.production.local` rather than trusting the example file for
 > actual secret values.
 
 **Staging and production function deploys are automated.**
