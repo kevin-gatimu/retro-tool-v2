@@ -9,6 +9,7 @@ import { CHART_COLORS } from './components/charts/chart-defaults'
 import { ChartCard } from './components/chart-card'
 import { EmptyReportState } from './components/empty-report-state'
 import { LeagueTable } from './components/league-table'
+import { MetricInfo } from './components/metric-info'
 import { ReportLoadError } from './components/report-load-error'
 import { ReportPageHeader } from './components/report-page-header'
 import { ReportScopePicker } from './components/report-scope-picker'
@@ -22,6 +23,7 @@ import {
 } from './hooks/use-report-queries'
 import { downloadCsv } from './helpers/download-csv'
 import { exportReportPdf } from './helpers/export-report-pdf'
+import { TEAM_METRIC_EXPLANATIONS } from './helpers/metric-explanations'
 import { ReportsSkeleton } from './skeleton'
 import type { TeamMemberBreakdownRow, TeamReport } from './types'
 
@@ -153,28 +155,36 @@ function TeamHealthPage() {
           title="Retros completed"
           value={report.kpis.retrosCompleted}
           icon={CalendarCheck}
+          info={TEAM_METRIC_EXPLANATIONS.retrosCompleted}
         />
         <StatCard
           title="Attendance"
           value={`${report.kpis.attendanceRate}%`}
           hint="True attendance via participants"
+          info={TEAM_METRIC_EXPLANATIONS.attendance}
         />
         <StatCard
           title="Discussion coverage"
           value={`${report.kpis.discussionCoverage}%`}
           hint={`${report.kpis.cardsPerRetro} cards per retro`}
           icon={MessageSquare}
+          info={TEAM_METRIC_EXPLANATIONS.discussionCoverage}
         />
         <StatCard
           title="Estimate consensus"
           value={`${report.kpis.consensusRate}%`}
           hint={`Avg vote spread ${report.voteSpreadAvg}`}
           icon={Target}
+          info={TEAM_METRIC_EXPLANATIONS.estimateConsensus}
         />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <ChartCard title="Health score" description={report.health.description}>
+        <ChartCard
+          title="Health score"
+          description={report.health.description}
+          info={TEAM_METRIC_EXPLANATIONS.healthScore}
+        >
           <HealthGauge
             score={report.health.score}
             description={report.health.description}
@@ -183,7 +193,13 @@ function TeamHealthPage() {
 
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Health components</CardTitle>
+            <div className="flex items-start justify-between gap-2">
+              <CardTitle className="text-base">Health components</CardTitle>
+              <MetricInfo
+                explanation={TEAM_METRIC_EXPLANATIONS.healthComponents}
+                className="-mt-0.5"
+              />
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {healthComponents.map((component) => (
@@ -205,6 +221,7 @@ function TeamHealthPage() {
         <ChartCard
           title="Attendance trend"
           description="Attendance rate per period (completed retros)"
+          info={TEAM_METRIC_EXPLANATIONS.attendanceTrend}
         >
           <TrendAreaChart
             data={report.attendanceSeries}
@@ -221,6 +238,7 @@ function TeamHealthPage() {
         <ChartCard
           title="Sentiment mix"
           description="Cards per template column across the range"
+          info={TEAM_METRIC_EXPLANATIONS.sentimentMix}
         >
           {report.sentiment.length > 0 ? (
             <StackedBarChart
@@ -242,6 +260,7 @@ function TeamHealthPage() {
         <ChartCard
           title="Vote concentration"
           description="How votes distribute across cards"
+          info={TEAM_METRIC_EXPLANATIONS.voteConcentration}
         >
           <StackedBarChart
             data={report.voteHistogram.map((bin) => ({
@@ -256,6 +275,7 @@ function TeamHealthPage() {
         <ChartCard
           title="Story estimate velocity"
           description="Rounds revealed and rounds reaching agreed points"
+          info={TEAM_METRIC_EXPLANATIONS.estimateVelocity}
         >
           <TrendAreaChart
             data={report.estimateVelocity}
@@ -278,6 +298,7 @@ function TeamHealthPage() {
           <ChartCard
             title="Standup submissions"
             description="Submission rate across the team's standups"
+            info={TEAM_METRIC_EXPLANATIONS.standupSubmissions}
           >
             <TrendAreaChart
               data={report.standupSeries}
@@ -296,7 +317,13 @@ function TeamHealthPage() {
       {report.isLead ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Member breakdown</CardTitle>
+            <div className="flex items-start justify-between gap-2">
+              <CardTitle className="text-base">Member breakdown</CardTitle>
+              <MetricInfo
+                explanation={TEAM_METRIC_EXPLANATIONS.memberBreakdown}
+                className="-mt-0.5"
+              />
+            </div>
             <p className="text-xs text-muted-foreground">
               Visible to team leads and admins only
             </p>

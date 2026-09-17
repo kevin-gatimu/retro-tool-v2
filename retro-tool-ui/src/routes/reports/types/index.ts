@@ -217,3 +217,17 @@ export interface PlatformReport {
   statusFunnel: StatusFunnelSlice[]
   activity: ActivityPoint[]
 }
+
+// ── UI-only presentation types (no API counterpart) ─────────────────────────
+
+/** Plain-language explanation of how a report metric or chart is derived. */
+export interface MetricExplanation {
+  /** Metric name, used in the trigger's accessible label and popover heading. */
+  label: string
+  /** One or two sentences on what the number means. */
+  summary: string
+  /** The calculation, written so a non-engineer can follow it. */
+  formula?: string
+  /** Caveats and reading tips — what counts, what doesn't, which way is good. */
+  notes?: string[]
+}
