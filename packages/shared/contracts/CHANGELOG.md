@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/kevin-gatimu/retro-tool-v2/compare/contracts-v1.1.0...contracts-v1.2.0) (2026-09-18)
+
+
+### Miscellaneous Chores
+
+* **contracts:** Synchronize retro-tool versions
+
 ## [1.1.0](https://github.com/kevin-gatimu/retro-tool-v2/compare/contracts-v1.0.0...contracts-v1.1.0) (2026-07-22)
 
 
