@@ -177,6 +177,17 @@ Restricted to `super-admin` / `system-admin`. The `admin.tsx` layout gates acces
 
 - Dashboards for personal, team, org, and system scopes (`/reports`, `/reports/me`, `/reports/team/$teamId`, `/reports/org/$orgId`, `/reports/system`) — charts, league tables, CSV and PDF export. Access gated by `use-report-access`.
 
+**Metric explanation affordance.** `ChartCard` and `StatCard` accept an optional `info?: MetricExplanation` prop
+(interface at `src/routes/reports/types/index.ts`). When provided, a `MetricInfo` popover button
+(`src/routes/reports/components/metric-info.tsx`) renders next to the card title and shows a plain-language
+summary, optional formula, and caveats. A Popover is used (not a Tooltip) because the content must stay open
+while being read and must work on touch. The team-report explanations are collected in
+`src/routes/reports/helpers/metric-explanations.ts` (`TEAM_METRIC_EXPLANATIONS`) and **directly mirror the
+formulas in `retro-tool-api/src/reports/queries/team-report.queries.ts` (`buildTeamReport`)**. If a formula or
+weight changes in the backend, update the matching entry in `TEAM_METRIC_EXPLANATIONS` so the user-facing copy
+stays accurate. The `info` prop is intentionally available on both shared card components so the other report
+pages (`me.tsx`, `org.$orgId.tsx`, `system.tsx`) can adopt the same affordance.
+
 ### Templates (`/templates`)
 
 Browse and create retro and estimate templates available to the user.

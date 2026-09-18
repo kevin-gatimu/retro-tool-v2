@@ -25,10 +25,15 @@ overrides:
   # type augmentation (authClient.passkey.*) breaks against a newer core.
   '@better-auth/passkey': '>=1.6.13'
   '@better-auth/core': '>=1.6.13'
-  multer: '>=2.2.0'
+  # 2.2.0 itself is affected by GHSA-qfvm-cv95-jqjf (fd leak on aborted uploads)
+  # with no patch on the 2.2.x line, so floor at 2.3.0.
+  multer: '>=2.3.0'
   # Stay on undici 7.x — undici 8 dropped internals jsdom 28 requires
   # (undici/lib/handler/wrap-handler.js), which breaks the vitest/jsdom pool.
   undici: '>=7.29.0 <8'
+  # Build-time only (Vite/Babel toolchain), but pinned patched so the advisory
+  # stays fixed even if browserslist re-enters the production tree.
+  browserslist: '>=4.28.7'
   kysely: '>=0.28.17'
   # Stay on fast-uri 3.x to avoid an unnecessary major-version jump.
   fast-uri: '>=3.1.5 <4'

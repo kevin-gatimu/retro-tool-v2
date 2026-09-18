@@ -50,6 +50,20 @@ export function getSessionActivityState(
   return 'active'
 }
 
+/**
+ * The warning window must be strictly shorter than the idle timeout. At parity
+ * `getSessionActivityState` reports 'warning' the moment activity is recorded
+ * (idleTimeoutMs - warningDurationMs === 0), which re-raises the toast forever,
+ * so a window that cannot fit is treated as "no warning" instead.
+ */
+export function normalizeWarningDuration(
+  idleTimeoutMs: number,
+  requestedWarningMs: number,
+): number {
+  if (!Number.isFinite(requestedWarningMs) || requestedWarningMs <= 0) return 0
+  return requestedWarningMs < idleTimeoutMs ? requestedWarningMs : 0
+}
+
 export function readSessionActivity(sessionId: string): number | null {
   try {
     const value = window.localStorage.getItem(

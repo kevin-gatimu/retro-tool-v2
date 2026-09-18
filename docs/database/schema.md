@@ -43,7 +43,7 @@ pnpm --dir retro-tool-api db:migrate      # apply pending migrations
 pnpm --dir retro-tool-api db:studio       # open Drizzle Studio
 ```
 
-Environment-targeted variants load the matching `.env.*-local` file:
+Environment-targeted variants load the matching `.env.*.local` file:
 
 ```bash
 pnpm --dir retro-tool-api db:generate:staging   # / :prod

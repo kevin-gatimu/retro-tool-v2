@@ -91,8 +91,8 @@ pnpm dev:convex     # runs `convex dev` (this package's `dev` script)
 ### Running against remote environments
 
 ```bash
-pnpm dev:convex:staging    # loads .env.staging-local → watches against staging
-pnpm dev:convex:prod       # loads .env.production-local → watches against production
+pnpm dev:convex:staging    # loads .env.staging.local → watches against staging
+pnpm dev:convex:prod       # loads .env.production.local → watches against production
 ```
 
 ### Deploying
@@ -122,8 +122,8 @@ After verification, `ctx.auth.getUserIdentity().subject` is the Better Auth user
 | Script | Command | Description |
 | --- | --- | --- |
 | `dev` | `convex dev` | Watch mode against the local self-hosted backend |
-| `dev:staging` | `dotenv -e .env.staging-local -- convex dev` | Watch against staging |
-| `dev:prod` | `dotenv -e .env.production-local -- convex dev` | Watch against production |
+| `dev:staging` | `dotenv -e .env.staging.local -- convex dev` | Watch against staging |
+| `dev:prod` | `dotenv -e .env.production.local -- convex dev` | Watch against production |
 | `codegen` | `convex codegen` | Regenerate TypeScript types |
 | `deploy` | `convex deploy` | Deploy functions to the configured deployment |
 | `type-check` | `tsc --noEmit -p convex/tsconfig.json` | Type-check the functions |

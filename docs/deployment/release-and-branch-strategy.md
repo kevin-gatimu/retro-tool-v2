@@ -118,18 +118,24 @@ Full conventions, commit-type rules, and the no-`wip`-on-main rule are in [../gu
 
 When a transitive dependency contains a High/Critical advisory and the direct dep author hasn't released a fix yet, the standard remediation is to add a version floor to the `overrides:` block in [`pnpm-workspace.yaml`](../../pnpm-workspace.yaml). pnpm resolves **every** instance of that package to at least the floor version, regardless of what the direct dep declares. The overrides block carries a comment for each entry explaining why it exists and what constraint to revisit.
 
-**Current active overrides (as of 2026-07-19):**
+**Current active overrides (as of 2026-09-18):**
 
 | Package | Floor | Reason |
 |---|---|---|
 | `better-auth` | `>=1.6.13` | Security advisory in earlier versions |
 | `@better-auth/passkey` | `>=1.6.13` | Must stay in lockstep with `better-auth` or passkey client type augmentation breaks |
 | `@better-auth/core` | `>=1.6.13` | Same lockstep requirement |
-| `multer` | `>=2.2.0` | Security advisory in earlier versions |
-| `undici` | `>=7.28.0 <8` | Security advisory; capped at `<8` — undici 8 removed internals that jsdom 28 requires, which breaks the vitest/jsdom pool |
+| `multer` | `>=2.3.0` | GHSA-qfvm-cv95-jqjf (fd leak on aborted uploads) — 2.2.x has no patch, floor at 2.3.0 |
+| `undici` | `>=7.29.0 <8` | Security advisory; capped at `<8` — undici 8 removed internals that jsdom 28 requires, which breaks the vitest/jsdom pool |
+| `browserslist` | `>=4.28.7` | Build-time only but pinned so the advisory stays fixed even if browserslist re-enters the production tree |
 | `kysely` | `>=0.28.17` | Security advisory in earlier versions |
-| `fast-uri` | `>=3.1.2` | Security advisory in earlier versions |
+| `fast-uri` | `>=3.1.5 <4` | Security advisory; capped at `<4` to avoid an unnecessary major-version jump |
 | `ws` | `>=8.21.0` | Security advisory in earlier versions |
+| `js-yaml` | `>=4.3.1 <5` | Security advisory; capped at `<5` to avoid an unnecessary major-version jump |
+| `engine.io` | `>=6.6.7` | Polling-transport connection exhaustion (CVE); pulled in transitively via `@nestjs/platform-socket.io > socket.io` |
+| `nanoid` | `>=3.3.18 <4` | Security advisory; capped at `<4` to avoid an unnecessary major-version jump |
+| `seroval` | `>=1.5.3 <2` | Security advisory; capped at `<2` to avoid an unnecessary major-version jump |
+| `socket.io-parser` | `>=4.2.7 <5` | Security advisory; capped at `<5` to avoid an unnecessary major-version jump |
 
 When direct dependencies advance past these floors, the corresponding override entries should be dropped.
 

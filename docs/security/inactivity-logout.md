@@ -131,7 +131,11 @@ Recommended defaults:
 | `BETTER_AUTH_SESSION_EXPIRES_IN` | `1800` | Rolling server-session lifetime in seconds |
 | `BETTER_AUTH_SESSION_UPDATE_AGE` | `300` | Minimum interval between server expiry renewals in seconds |
 
-The server update age must be shorter than the server expiration; startup configuration validation rejects an invalid relationship. Keep the client and server timeout at 30 minutes unless a deliberate policy change is being deployed to both layers.
+Both `BETTER_AUTH_SESSION_EXPIRES_IN` and `BETTER_AUTH_SESSION_UPDATE_AGE` are parsed and validated in [`retro-tool-api/src/config/session-timing.ts`](../../retro-tool-api/src/config/session-timing.ts), which is shared by the NestJS config factory (`configuration.ts`) and the standalone Better Auth instance (`auth.ts`). Values are parsed with `Number()` rather than `parseInt()`, so a string like `"30m"` fails Zod validation instead of silently yielding `30`. The server update age must be strictly shorter than the server expiration; a malformed or non-renewable pairing throws at startup rather than silently falling back to defaults.
+
+If `VITE_AUTH_IDLE_WARNING_MINUTES` is not strictly less than `VITE_AUTH_IDLE_TIMEOUT_MINUTES`, `normalizeWarningDuration` in [`retro-tool-ui/src/lib/session-lifecycle.ts`](../../retro-tool-ui/src/lib/session-lifecycle.ts) returns `0` and the warning toast is disabled, preventing a continuously re-raised warning when the window cannot fit inside the timeout.
+
+Keep the client and server timeout at 30 minutes unless a deliberate policy change is being deployed to both layers.
 
 The local manager checks every 5 seconds and on focus, visibility, and page-show recovery. It does not make an API request or write to the database. Better Auth performs any required session read or throttled renewal as part of normal authenticated server traffic. The redirect target is `/auth/sign-in?status=session-expired`.
 

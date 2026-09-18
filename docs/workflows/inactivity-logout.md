@@ -117,7 +117,7 @@ This feature should be configured in one place so the values are visible and exp
 - re-check cadence: 5-second local interval plus focus, visibility, and page-show re-evaluation
 - redirect target: `/auth/sign-in?status=session-expired`
 
-Configuration should be in the same runtime config used by the auth and API layers; the timer should not be hidden in individual components or route modules.
+Configuration should be in the same runtime config used by the auth and API layers; the timer should not be hidden in individual components or route modules. `BETTER_AUTH_SESSION_EXPIRES_IN` and `BETTER_AUTH_SESSION_UPDATE_AGE` are Zod-validated at startup in `retro-tool-api/src/config/session-timing.ts`; a non-numeric value or an update age ≥ expiry throws on boot. If `VITE_AUTH_IDLE_WARNING_MINUTES` is not strictly less than `VITE_AUTH_IDLE_TIMEOUT_MINUTES`, the warning is silently disabled rather than firing continuously. See [inactivity-logout.md](../security/inactivity-logout.md) for the full validation details.
 
 ---
 

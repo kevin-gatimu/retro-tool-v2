@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "convex dev",
-    "dev:staging": "dotenv -e .env.staging-local -- convex dev",
-    "dev:prod": "dotenv -e .env.production-local -- convex dev",
+    "dev:staging": "dotenv -e .env.staging.local -- convex dev",
+    "dev:prod": "dotenv -e .env.production.local -- convex dev",
     "codegen": "convex codegen",
     "deploy": "convex deploy",
     "build": "pnpm type-check",

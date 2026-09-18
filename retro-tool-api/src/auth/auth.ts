@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { createEmailService } from '../lib/email';
+import { readSessionTiming } from '../config/session-timing';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, bearer, multiSession } from 'better-auth/plugins';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -10,10 +11,9 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-const BETTER_AUTH_SESSION_EXPIRES_IN =
-  parseInt(process.env.BETTER_AUTH_SESSION_EXPIRES_IN!, 10) || 30 * 60;
-const BETTER_AUTH_SESSION_UPDATE_AGE =
-  parseInt(process.env.BETTER_AUTH_SESSION_UPDATE_AGE!, 10) || 5 * 60;
+// Throws on a malformed or non-renewable pairing rather than silently falling
+// back to defaults, matching the NestJS config factory.
+const { sessionExpiresIn, sessionUpdateAge } = readSessionTiming();
 
 const db = drizzle(pool, { schema });
 
@@ -62,8 +62,8 @@ export const auth = betterAuth({
   plugins: [bearer(), admin({ defaultRole: 'member' }), multiSession()],
   // Configure session settings
   session: {
-    expiresIn: BETTER_AUTH_SESSION_EXPIRES_IN,
-    updateAge: BETTER_AUTH_SESSION_UPDATE_AGE,
+    expiresIn: sessionExpiresIn,
+    updateAge: sessionUpdateAge,
     // Store session token in cookie
     cookieCache: {
       enabled: true,
