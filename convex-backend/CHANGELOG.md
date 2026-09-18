@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/kevin-gatimu/retro-tool-v2/compare/convex-backend-v1.1.0...convex-backend-v1.2.0) (2026-09-18)
+
+
+### Features
+
+* add Role-Based Access Control (RBAC) documentation ([d5258c3](https://github.com/kevin-gatimu/retro-tool-v2/commit/d5258c38b17a2e23aeb09e590aa202315bc32fbe))
+
+
+### Bug Fixes
+
+* harden projection reliability and environment handling ([d409c90](https://github.com/kevin-gatimu/retro-tool-v2/commit/d409c907693f6133ad3ec9f546153085a448dcbf))
+* unblock the production audit gate and address session-lifecycle review findings ([5ac5851](https://github.com/kevin-gatimu/retro-tool-v2/commit/5ac5851e9df4c3ed6372e28ad8a26481b1d87ad8))
+
 ## [1.1.0](https://github.com/kevin-gatimu/retro-tool-v2/compare/convex-backend-v1.0.0...convex-backend-v1.1.0) (2026-07-22)
 
 

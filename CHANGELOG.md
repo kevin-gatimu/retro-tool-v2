@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.2.0](https://github.com/kevin-gatimu/retro-tool-v2/compare/v1.1.0...v1.2.0) (2026-09-18)
+
+
+### Features
+
+* add Role-Based Access Control (RBAC) documentation ([d5258c3](https://github.com/kevin-gatimu/retro-tool-v2/commit/d5258c38b17a2e23aeb09e590aa202315bc32fbe))
+* **auth:** enforce inactivity and rolling session expiry ([4bab0be](https://github.com/kevin-gatimu/retro-tool-v2/commit/4bab0be95970f7a5f83c74b059f71ffb46a2bf8d))
+* **auth:** enforce inactivity and rolling session expiry ([5c60c7b](https://github.com/kevin-gatimu/retro-tool-v2/commit/5c60c7b576991a67fda7352ad69b969ae6f905a4))
+* **convex-admin:** improve monitoring and local runtime ([17d6188](https://github.com/kevin-gatimu/retro-tool-v2/commit/17d6188b6a5357d1d5ab88438800f311998b1626))
+* **reports:** explain how team report metrics are calculated ([58cd813](https://github.com/kevin-gatimu/retro-tool-v2/commit/58cd813e97f39ca2c52a75b8df6aedc7cd5ebc1e))
+
+
+### Bug Fixes
+
+* **admin:** correct week-view labels and empty tooltip values ([52c951a](https://github.com/kevin-gatimu/retro-tool-v2/commit/52c951a268cf46d89f7b4c622b8c544d5802a9d9))
+* **auth:** fail fast on invalid rolling-session timings ([0b0e041](https://github.com/kevin-gatimu/retro-tool-v2/commit/0b0e0418950c30995b2722e8bb3af06ca09e1f43))
+* **ci:** use packageManager pnpm version ([a9e4c75](https://github.com/kevin-gatimu/retro-tool-v2/commit/a9e4c75c2b759c62a7e44fd52f780dd61bf1eb51))
+* **deps:** clear high-severity advisories from the production audit ([8b342fb](https://github.com/kevin-gatimu/retro-tool-v2/commit/8b342fb62b8dbf3f0dc968676644dd30a1463296))
+* harden projection reliability and environment handling ([d409c90](https://github.com/kevin-gatimu/retro-tool-v2/commit/d409c907693f6133ad3ec9f546153085a448dcbf))
+* **scripts:** tolerate absent keys when reading local env values ([7cd0bcd](https://github.com/kevin-gatimu/retro-tool-v2/commit/7cd0bcd66b02065ba54d6fd69fad66da93393508))
+* **ui:** disable the idle warning when its window cannot fit ([df1dccd](https://github.com/kevin-gatimu/retro-tool-v2/commit/df1dccdafe4b4aae50c66c3655e30f8a3e5e5ae4))
+* unblock the production audit gate and address session-lifecycle review findings ([5ac5851](https://github.com/kevin-gatimu/retro-tool-v2/commit/5ac5851e9df4c3ed6372e28ad8a26481b1d87ad8))
+
 ## [1.1.0](https://github.com/kevin-gatimu/retro-tool-v2/compare/v1.0.0...v1.1.0) (2026-07-22)
 
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.2.0](https://github.com/kevin-gatimu/retro-tool-v2/compare/retro-tool-api-v1.1.0...retro-tool-api-v1.2.0) (2026-09-18)
+
+
+### Features
+
+* add Role-Based Access Control (RBAC) documentation ([d5258c3](https://github.com/kevin-gatimu/retro-tool-v2/commit/d5258c38b17a2e23aeb09e590aa202315bc32fbe))
+* **auth:** enforce inactivity and rolling session expiry ([4bab0be](https://github.com/kevin-gatimu/retro-tool-v2/commit/4bab0be95970f7a5f83c74b059f71ffb46a2bf8d))
+* **auth:** enforce inactivity and rolling session expiry ([5c60c7b](https://github.com/kevin-gatimu/retro-tool-v2/commit/5c60c7b576991a67fda7352ad69b969ae6f905a4))
+* **convex-admin:** improve monitoring and local runtime ([17d6188](https://github.com/kevin-gatimu/retro-tool-v2/commit/17d6188b6a5357d1d5ab88438800f311998b1626))
+
+
+### Bug Fixes
+
+* **auth:** fail fast on invalid rolling-session timings ([0b0e041](https://github.com/kevin-gatimu/retro-tool-v2/commit/0b0e0418950c30995b2722e8bb3af06ca09e1f43))
+* harden projection reliability and environment handling ([d409c90](https://github.com/kevin-gatimu/retro-tool-v2/commit/d409c907693f6133ad3ec9f546153085a448dcbf))
+* unblock the production audit gate and address session-lifecycle review findings ([5ac5851](https://github.com/kevin-gatimu/retro-tool-v2/commit/5ac5851e9df4c3ed6372e28ad8a26481b1d87ad8))
+
 ## [1.1.0](https://github.com/kevin-gatimu/retro-tool-v2/compare/retro-tool-api-v1.0.0...retro-tool-api-v1.1.0) (2026-07-22)
 
 
