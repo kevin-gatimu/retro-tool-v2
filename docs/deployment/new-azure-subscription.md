@@ -96,9 +96,9 @@ Decide up front and keep a scratch file:
 > targets `retrotool-staging-rg` / `retrotoolstagingacr` / `retrotool-staging-convex`
 > and runs automatically on push to `staging`. A separate
 > `deploy-convex-production.yml` targets `retro_tool` / `retrotool` /
-> `retrotool-prod-convex` and is **manual `workflow_dispatch` only** — there is
-> no automated production release pipeline; trigger it deliberately after
-> `deploy-api`/`deploy-ui` have already gone out to `main`. For a new
+> `retrotool-prod-convex` and is called automatically by `release-production.yml`
+> on every qualifying push to `main`; `workflow_dispatch` is also available for
+> out-of-band Convex-only deploys. For a new
 > subscription reusing either of these environment names, the workflows work
 > as-is once secrets/vars are set. For a differently-named environment, use the
 > **manual `az` commands** in this guide (steps 5–9), or copy one of the two

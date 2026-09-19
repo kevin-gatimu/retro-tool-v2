@@ -2,11 +2,14 @@ name: Deploy Convex Production (App Service)
 
 # Provisions and updates the single self-hosted Convex production backend on
 # Azure App Service, then deploys Convex functions. Mirrors deploy-convex.yml
-# (staging) with production naming. Manual dispatch only — there is no
-# automated production release pipeline; trigger this deliberately after
-# deploy-api and deploy-ui have been run against `main`.
+# (staging) with production naming; it exists as a separate workflow because
+# deploy-convex.yml hardcodes `environment: staging` and has no production path.
+#
+# Called first by release-production.yml on every qualifying push to `main`, and
+# still dispatchable on its own for an out-of-band, Convex-only deploy.
 
 on:
+  workflow_call:
   workflow_dispatch:
 
 concurrency:

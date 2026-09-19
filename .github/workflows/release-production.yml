@@ -1,0 +1,76 @@
+# Production deploy orchestrator — the counterpart to release-staging.yml.
+#
+# Chains the same reusable deploy workflows, in the same order, against `main`.
+# `deploy-api.yml` and `deploy-ui.yml` resolve `environment: production` from
+# `github.ref_name == 'main'`, so they need no inputs. Convex is the exception:
+# `deploy-convex.yml` hardcodes `environment: staging` and has no production
+# path, so production chains the dedicated `deploy-convex-production.yml`.
+#
+# Why push-to-main and not the release tag: release-please creates tags with the
+# default GITHUB_TOKEN, and GitHub deliberately does not start workflow runs from
+# GITHUB_TOKEN-authored events. An `on: push: tags:` trigger here would silently
+# never fire — exactly the gap this workflow exists to close.
+#
+# Merging a release PR bumps every package.json, which also matches the paths
+# below, so a release lands two runs: one for the staging→main merge and one for
+# the version bump. They queue on the concurrency group rather than overlap, and
+# the second stamps images/builds with the released version.
+#
+# To require sign-off before anything reaches production, add a required reviewer
+# to the `production` GitHub environment — every deploy job here runs in it.
+name: Release Production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "convex-backend/**"
+      - "infra/**"
+      - "packages/shared/contracts/**"
+      - "retro-tool-api/**"
+      - "retro-tool-ui/**"
+      - ".github/workflows/deploy-api.yml"
+      - ".github/workflows/deploy-convex-production.yml"
+      - ".github/workflows/deploy-ui.yml"
+      - ".github/workflows/release-production.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # deploy-convex-production.yml always targets production, while deploy-api.yml
+  # and deploy-ui.yml resolve their environment from `github.ref_name`. A dispatch
+  # from any other branch would therefore split the release — Convex to production,
+  # API and UI to staging — so refuse before anything deploys.
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse to release production from a non-main ref
+        if: github.ref_name != 'main'
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          echo "Release Production must run on main; got '${REF_NAME}'."
+          echo 'Convex would deploy to production while API and UI deployed to staging.'
+          exit 1
+
+  convex:
+    needs: guard
+    uses: ./.github/workflows/deploy-convex-production.yml
+    secrets: inherit
+
+  api:
+    needs: convex
+    uses: ./.github/workflows/deploy-api.yml
+    secrets: inherit
+
+  ui:
+    needs: api
+    uses: ./.github/workflows/deploy-ui.yml
+    secrets: inherit

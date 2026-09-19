@@ -415,9 +415,9 @@ container, same as any other branch.
 **workflow_dispatch**.
 
 **Production** — the **Deploy Convex Production (App Service)** workflow
-(`.github/workflows/deploy-convex-production.yml`) is **`workflow_dispatch`
-only** — there is no automated production release pipeline. Trigger it
-deliberately after `deploy-api`/`deploy-ui` have already gone out to `main`.
+(`.github/workflows/deploy-convex-production.yml`) is called automatically by
+`release-production.yml` on every qualifying push to `main`, and can also be run
+via **workflow_dispatch** for an out-of-band Convex-only deploy.
 
 Both perform the same stop-first upgrade sequence (export → pause outbox →
 stop → deploy → start → verify `/version` → set Convex `JWT_*` env → `convex
