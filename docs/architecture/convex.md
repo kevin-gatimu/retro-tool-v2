@@ -53,9 +53,9 @@ external NestJS API issues. See [security/authentication.md](../security/authent
 > [convex-production-runbook.md](../deployment/convex-production-runbook.md)).
 > **No environment uses Convex Cloud today** — `develop` was never a deployed
 > environment to begin with, so there was never a Convex Cloud project backing it
-> either. Production's self-hosted stack is deployed manually (`workflow_dispatch`
-> on `deploy-convex-production.yml`) rather than automatically on every push,
-> unlike staging.
+> either. Production's self-hosted Convex stack is deployed automatically by
+> `release-production.yml` (which calls `deploy-convex-production.yml`) on every
+> qualifying push to `main`, mirroring how `release-staging.yml` handles staging.
 
 The browser connects to whatever `VITE_CONVEX_URL` is built into the UI; the API
 syncs to whatever `CONVEX_SYNC_URL` it's configured with.
@@ -324,7 +324,7 @@ Scripts in [convex-backend/package.json](../../convex-backend/package.json):
 [`deploy-convex.yml`](../../.github/workflows/deploy-convex.yml) (staging, on
 every push to `staging`) and
 [`deploy-convex-production.yml`](../../.github/workflows/deploy-convex-production.yml)
-(production, `workflow_dispatch` only) both provision/update the self-hosted
+(production, called automatically by `release-production.yml` on push to `main`) both provision/update the self-hosted
 Web App via Bicep and then run `pnpm exec convex deploy` against it. The
 `dev`/`dev:staging`/`dev:prod` scripts above are for local iteration against
 whichever deployment the loaded `.env*` file targets — they are not what ships

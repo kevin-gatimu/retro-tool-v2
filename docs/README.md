@@ -57,7 +57,7 @@ one-line summary. When a doc and the code disagree, trust the code — and pleas
 | [convex-production-runbook.md](deployment/convex-production-runbook.md) | Phase-by-phase production Convex self-hosting deploy + rollback runbook |
 | [convex-azure-self-hosting-plan.md](deployment/convex-azure-self-hosting-plan.md) | Architecture & decision plan for self-hosting Convex on Azure App Service |
 | [new-azure-subscription.md](deployment/new-azure-subscription.md) | End-to-end deploy of Retro Tool to a brand-new Azure subscription |
-| [release-and-branch-strategy.md](deployment/release-and-branch-strategy.md) | Branch model, release-please lockstep versioning, conventional commits, and deployment triggers (including the staging-only gap for production) |
+| [release-and-branch-strategy.md](deployment/release-and-branch-strategy.md) | Branch model, release-please lockstep versioning, conventional commits, and deployment triggers for both staging and production automated pipelines |
 
 ## workflows/ — operational & product flows
 

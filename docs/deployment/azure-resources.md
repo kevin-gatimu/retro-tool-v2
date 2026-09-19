@@ -61,7 +61,7 @@ Retro Tool is a **pnpm monorepo**: a React UI (Static Web App), a NestJS REST AP
            GitHub Actions --upload build------> Static Web App
            GitHub Actions --deploy container--> Convex App Service
                                                  (staging: auto on push;
-                                                  production: manual only)
+                                                  production: auto on push to main)
 ```
 
 > This ASCII sketch is a simplified mental model. The full topology (all
@@ -121,10 +121,11 @@ into the **same** resource group as table A. Full field-by-field detail:
 | Convex runtime identity (#2) | `AcrPull` | Container Registry (table A, #5) |
 | Convex runtime identity (#2) | Key Vault Secrets User | Key Vault (#4) |
 
-> Deploy is `workflow_dispatch`-only for production
-> ([`deploy-convex-production.yml`](../../.github/workflows/deploy-convex-production.yml)) — there is
-> no automated production Convex release pipeline; staging's equivalent
-> ([`deploy-convex.yml`](../../.github/workflows/deploy-convex.yml)) runs automatically on push.
+> [`deploy-convex-production.yml`](../../.github/workflows/deploy-convex-production.yml) runs
+> automatically as part of [`release-production.yml`](../../.github/workflows/release-production.yml)
+> on every qualifying push to `main`; it can also be triggered via `workflow_dispatch` for an
+> out-of-band Convex-only deploy. Staging's equivalent
+> ([`deploy-convex.yml`](../../.github/workflows/deploy-convex.yml)) runs automatically via `release-staging.yml` on push to `staging`.
 
 ---
 

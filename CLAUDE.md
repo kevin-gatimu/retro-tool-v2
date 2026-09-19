@@ -383,7 +383,7 @@ GitHub Actions handle app deployment (not infra):
 | [docs/infra/provisioning.md](docs/infra/provisioning.md) | Azure Bicep deployment commands, outputs, post-provisioning checklist |
 | [docs/infra/oidc.md](docs/infra/oidc.md) | OIDC federated-credential setup for GitHub Actions |
 | [docs/deployment/convex-production-runbook.md](docs/deployment/convex-production-runbook.md) | Production-specific self-hosted Convex runbook |
-| [docs/deployment/release-and-branch-strategy.md](docs/deployment/release-and-branch-strategy.md) | Branch model, release-please lockstep versioning, conventional commits, and deployment triggers (including the staging-only gap for production) |
+| [docs/deployment/release-and-branch-strategy.md](docs/deployment/release-and-branch-strategy.md) | Branch model, release-please lockstep versioning, conventional commits, and deployment triggers for both staging and production automated pipelines |
 
 ### Convex AI guidelines
 

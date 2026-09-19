@@ -177,9 +177,11 @@ are set.
 
 ## Phase B — first automated deploy (provision + functions)
 
-Trigger `Deploy Convex Production (App Service)` via **workflow_dispatch**
-(Actions tab → select the workflow → Run workflow, branch `main`). The `deploy`
-job ([deploy-convex-production.yml](../../.github/workflows/deploy-convex-production.yml)):
+The **Deploy Convex Production (App Service)** workflow
+([deploy-convex-production.yml](../../.github/workflows/deploy-convex-production.yml))
+runs automatically as part of `release-production.yml` on every qualifying push to `main`.
+For an out-of-band first-time provision, trigger it via **workflow_dispatch** (Actions tab →
+select the workflow → Run workflow, branch `main`). The `deploy` job:
 
 1. **validate** — type-check + lint `convex-backend`, assert the manifest's
    `productionImage` is digest-pinned and the SDK version matches, `az bicep

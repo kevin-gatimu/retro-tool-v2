@@ -7,8 +7,11 @@
 #   - updates CHANGELOG.md
 #   - tags vX.Y.Z and creates the GitHub Release
 #
-# The tag push then feeds the deploy workflows, which stamp images/builds with
-# the release version.
+# The tag does NOT trigger a deploy: release-please tags with the default
+# GITHUB_TOKEN, and GitHub does not start workflow runs from GITHUB_TOKEN-authored
+# events. Production is deployed by release-production.yml, which watches pushes
+# to `main` (including the release-PR merge, so builds still get stamped with the
+# released version).
 name: Release Please
 
 on:

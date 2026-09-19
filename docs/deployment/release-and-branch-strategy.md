@@ -1,6 +1,6 @@
 # Release & branch strategy
 
-> How branches map to environments, how conventional commits drive automated versioning, and how GitHub Actions wire those together to deploy staging automatically while requiring a manual trigger for production.
+> How branches map to environments, how conventional commits drive automated versioning, and how GitHub Actions wire those together to deploy staging and production automatically on every qualifying push.
 
 ---
 
@@ -10,7 +10,7 @@ Three long-lived branches each map 1:1 to an Azure environment.
 
 | Branch | Environment | Resource group | Deploy trigger |
 |---|---|---|---|
-| `main` | Production | `retrotool-prod-rg` | **Manual** — `workflow_dispatch` only (no automated prod deploy exists) |
+| `main` | Production | `retrotool-prod-rg` | **Automatic** on push (path-filtered) or `workflow_dispatch` via `release-production.yml` |
 | `staging` | Staging | `retrotool-staging-rg` | Automatic on push (path-filtered) or `workflow_dispatch` via `release-staging.yml` |
 | `develop` | *(not a deployed environment)* | *(none — never provisioned)* | No deploy workflow exists, and there is no Azure environment to deploy to |
 | *(local)* | — | Docker Compose | `pnpm local:up` / `pnpm local:dev` |
@@ -38,7 +38,11 @@ feature-branch → PR → develop → PR → staging → PR → main
    step happens entirely on each developer's local stack (`pnpm local:up`, or `pnpm dev:api` /
    `pnpm dev:ui` / `pnpm dev:convex` against local infra).
 4. Promote to `staging` — the `release-staging.yml` workflow fires automatically on merge.
-5. When staging is validated, promote to `main`. On `main`, release-please maintains the release PR; merging that PR bumps versions and creates the tag. Deploying to production requires a separate manual `workflow_dispatch`.
+5. When staging is validated, promote to `main`. `release-production.yml` fires automatically on
+   push and chains `convex` → `api` → `ui` against the `production` GitHub environment. In parallel,
+   release-please maintains the rolling release PR; merging that PR bumps versions, creates the tag,
+   and triggers a second production run that stamps images/builds with the released version. Both
+   runs queue on the `production-release` concurrency group.
 
 ---
 
@@ -108,11 +112,12 @@ Full conventions, commit-type rules, and the no-`wip`-on-main rule are in [../gu
 |---|---|---|
 | `ci.yml` | PR targeting `develop`, `staging`, or `main`; also `workflow_dispatch` | `pnpm audit --prod --audit-level high`, lint, type-check, test, build for all packages. Concurrency: cancel-in-progress per branch. |
 | `release-please.yml` | Push to `main` | Maintains the rolling release PR; on merge bumps all `package.json` versions, updates `CHANGELOG.md`, creates `vX.Y.Z` tag, creates GitHub Release. **Does not deploy anything.** |
-| `release-staging.yml` | Push to `staging` (path-filtered) or `workflow_dispatch` | Chains the three deploy workflows in order: `deploy-convex` → `deploy-api` → `deploy-ui`. |
+| `release-staging.yml` | Push to `staging` (path-filtered) or `workflow_dispatch` | Chains the three deploy workflows in order: `deploy-convex` → `deploy-api` → `deploy-ui` against staging. |
+| `release-production.yml` | Push to `main` (path-filtered) or `workflow_dispatch` | Guards the ref, then chains `deploy-convex-production` → `deploy-api` → `deploy-ui` against production. Concurrency group `production-release`, `cancel-in-progress: false`. |
 | `deploy-convex.yml` | `workflow_call` (from `release-staging`) or `workflow_dispatch` | Validates Bicep + Convex functions, deploys self-hosted Convex App Service to **staging**, deploys Convex functions. Stop-first upgrade if image is changing (exports a backup first). Hardcodes `environment: staging` — has no production path. |
-| `deploy-api.yml` | `workflow_call` or `workflow_dispatch` | Validates + type-checks API, builds + pushes Docker image to ACR (tagged `<env>-<sha>`, `<env>-latest`, `<env>-v<version>`), runs DB migrations, runs idempotent seeds, deploys container to App Service, health-checks. A `set-env` job picks `environment: production` when `github.ref_name == 'main'`, otherwise `environment: staging` — the same reusable workflow serves both, but nothing triggers it automatically on `main`. |
-| `deploy-ui.yml` | `workflow_call` or `workflow_dispatch` | Validates + type-checks UI, builds Vite with baked-in `VITE_*` env vars, deploys to Azure Static Web App. Same branch-based `set-env` logic as `deploy-api.yml` (`production` on `main`, else `staging`), triggered manually. |
-| `deploy-convex-production.yml` | `workflow_dispatch` only | Dedicated production-only counterpart to `deploy-convex.yml` (which is staging-hardcoded). Validates Bicep + Convex functions, deploys the self-hosted Convex App Service (`retrotool-prod-convex`) from `infra/convex-production.bicep`, stop-first upgrade if the image is changing. Targets the `production` GitHub environment. |
+| `deploy-api.yml` | `workflow_call` (from `release-staging` or `release-production`) or `workflow_dispatch` | Validates + type-checks API, builds + pushes Docker image to ACR (tagged `<env>-<sha>`, `<env>-latest`, `<env>-v<version>`), runs DB migrations, runs idempotent seeds, deploys container to App Service, health-checks. A `set-env` job picks `environment: production` when `github.ref_name == 'main'`, otherwise `environment: staging` — the same reusable workflow serves both. |
+| `deploy-ui.yml` | `workflow_call` (from `release-staging` or `release-production`) or `workflow_dispatch` | Validates + type-checks UI, builds Vite with baked-in `VITE_*` env vars, deploys to Azure Static Web App. Same branch-based `set-env` logic as `deploy-api.yml` (`production` on `main`, else `staging`). |
+| `deploy-convex-production.yml` | `workflow_call` (from `release-production`) or `workflow_dispatch` | Dedicated production-only counterpart to `deploy-convex.yml` (which is staging-hardcoded). Validates Bicep + Convex functions, deploys the self-hosted Convex App Service (`retrotool-prod-convex`) from `infra/convex-production.bicep`, stop-first upgrade if the image is changing. Targets the `production` GitHub environment. `workflow_dispatch` is available for out-of-band Convex-only deploys. |
 
 ### Keeping the audit gate green — pnpm workspace overrides
 
@@ -172,16 +177,51 @@ retro-tool-ui/**
 
 Documentation-only commits to `staging` do not trigger a deploy.
 
-### Production deploy — manual only, mechanics differ by component
+### Path filter (production auto-deploy)
 
-There is no automated (push-triggered) production release pipeline — no `release-production.yml` exists to chain deploys the way `release-staging.yml` does for staging. How each component's production path works differs:
+`release-production.yml` only fires if the push touches:
 
-- **API and UI** (`deploy-api.yml`, `deploy-ui.yml`): the `set-env` job picks `environment: production` when `github.ref_name == 'main'`, else `environment: staging` — the same reusable workflow serves both environments and correctly targets the `production` GitHub environment when dispatched from `main`. Nothing triggers this automatically; it requires a manual `workflow_dispatch` from the `main` branch.
-- **Convex** (`deploy-convex.yml`): hardcodes `environment: staging` unconditionally — it has no production path at all. Production Convex is deployed by a separate, dedicated workflow, [`deploy-convex-production.yml`](../../.github/workflows/deploy-convex-production.yml), which is `workflow_dispatch`-only and deploys against `infra/convex-production.bicep`.
+```
+convex-backend/**
+infra/**
+packages/shared/contracts/**
+retro-tool-api/**
+retro-tool-ui/**
+.github/workflows/deploy-api.yml
+.github/workflows/deploy-convex-production.yml
+.github/workflows/deploy-ui.yml
+.github/workflows/release-production.yml
+```
 
-**To deploy production today:** trigger `deploy-api.yml` and `deploy-ui.yml` via `workflow_dispatch` from the `main` branch (each auto-selects the `production` environment), and trigger `deploy-convex-production.yml` via `workflow_dispatch` separately for Convex. All three require the `production` GitHub environment's secrets/variables to be configured.
+Documentation-only commits to `main` do not trigger a production deploy.
 
-This remains a known gap: production deploys are manual and opt-in for every component, and there is still no `release-production.yml` equivalent to `release-staging.yml` to chain them.
+### Production deploy chain (`release-production.yml`)
+
+```mermaid
+flowchart LR
+    push["push to main\n(path-filtered)\nor workflow_dispatch"]
+    guard["guard\n(fails unless ref is main)"]
+    convex["deploy-convex-production\n(validate Bicep + functions,\nstop-first if image changes,\ndeploy functions)"]
+    api["deploy-api\n(validate, build image,\nmigrate DB, seed,\ndeploy container,\nhealth-check)"]
+    ui["deploy-ui\n(validate, Vite build,\nStatic Web App deploy)"]
+    push --> guard --> convex --> api --> ui
+```
+
+- `guard` refuses to run on any ref other than `main`. `deploy-convex-production.yml` always targets production, while `deploy-api.yml` / `deploy-ui.yml` derive their environment from `github.ref_name` — a dispatch from another branch would otherwise send Convex to production and API/UI to staging.
+- Concurrency group `production-release`, `cancel-in-progress: false` — queued runs execute in order, never cancelled mid-flight.
+- Authentication uses OIDC (`id-token: write`) — no stored Azure credentials; federated identity credentials are configured per GitHub environment.
+- Secrets are inherited from the `production` GitHub environment.
+
+**Why `deploy-convex-production.yml` instead of `deploy-convex.yml`:** `deploy-convex.yml` hardcodes `environment: staging` and has no production path. `deploy-convex-production.yml` is the dedicated production counterpart, deploying against `infra/convex-production.bicep` and the `retro_tool` resource group.
+
+**Double run on a release PR merge:** a release-please merge touches `package.json` files (matched by the `retro-tool-api/**` / `retro-tool-ui/**` / `convex-backend/**` path filters), so a release lands two production runs — one for the staging→main merge, one for the version-bump commit. Both queue on `production-release`; the second stamps images/builds with the released version.
+
+**Approval gating:** add a required reviewer on the `production` GitHub environment to gate every deploy job in the chain before it executes.
+
+**Out-of-band manual deploys:** individual reusable workflows can also be triggered via `workflow_dispatch` from `main` for targeted hotfixes:
+
+- `deploy-api.yml` and `deploy-ui.yml` — `set-env` resolves `environment: production` when the branch is `main`.
+- `deploy-convex-production.yml` — always targets production; available for a Convex-only out-of-band deploy.
 
 ### API image tagging
 
@@ -208,4 +248,5 @@ The `<version>` is read from `retro-tool-api/package.json` at build time, so aft
 | [../guidelines/coding-guidelines.md](../guidelines/coding-guidelines.md) | §9 Versioning & releases — conventional commit rules, commitlint config, no-wip-on-main |
 | [`../../.github/workflows/release-please.yml`](../../.github/workflows/release-please.yml) | Release-please workflow source |
 | [`../../.github/workflows/release-staging.yml`](../../.github/workflows/release-staging.yml) | Staging deploy chain source |
+| [`../../.github/workflows/release-production.yml`](../../.github/workflows/release-production.yml) | Production deploy chain source |
 | [`../../release-please-config.json`](../../release-please-config.json) | Packages, components, linked-versions config |
